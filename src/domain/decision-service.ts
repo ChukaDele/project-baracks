@@ -9,6 +9,8 @@ export interface NewDecisionInput {
   projectId?: string;
   taskId?: string;
   contextJson?: string;
+  /** ISO 8601 UTC instant at/after which the approval is invalid. */
+  expiresAt?: string;
 }
 
 export function createDecisionRequest(db: DbConn, input: NewDecisionInput) {
@@ -19,6 +21,7 @@ export function createDecisionRequest(db: DbConn, input: NewDecisionInput) {
     category: input.category,
     question: input.question,
     contextJson: input.contextJson ?? null,
+    expiresAt: input.expiresAt ?? null,
     status: 'open' as const,
   };
   db.insert(decisionRequests).values(row).run();
@@ -62,11 +65,24 @@ export interface DecisionScope {
  * scope naming a different provider/model, or unparseable context — is NOT
  * authorisation. Expectations with `taskId`/`projectId` require the decision
  * to be explicitly bound to that task/project: a NULL binding never matches.
+ *
+ * When `scope` is expected it must be EXPLICITLY declared and match both
+ * provider and modelRef — a missing scope is treated as authorising nothing,
+ * never as unrestricted. `requireExpiry`/`requireUnconsumed` add the paid
+ * approval invariants; an approval past its `expiresAt` never authorises.
  */
 export function isApprovedDecision(
   db: DbConn,
   decisionId: string,
-  expect: { category: string; taskId?: string; projectId?: string; scope?: DecisionScope },
+  expect: {
+    category: string;
+    taskId?: string;
+    projectId?: string;
+    scope?: DecisionScope;
+    requireExpiry?: boolean;
+    requireUnconsumed?: boolean;
+    now?: Date;
+  },
 ): boolean {
   const row = db.select().from(decisionRequests).where(eq(decisionRequests.id, decisionId)).get();
   if (!row) return false;
@@ -74,6 +90,9 @@ export function isApprovedDecision(
   if (row.category !== expect.category) return false;
   if (expect.taskId !== undefined && row.taskId !== expect.taskId) return false;
   if (expect.projectId !== undefined && row.projectId !== expect.projectId) return false;
+  if (expect.requireUnconsumed && row.consumedByRunId !== null) return false;
+  if (expect.requireExpiry && !row.expiresAt) return false;
+  if (row.expiresAt && row.expiresAt <= (expect.now ?? new Date()).toISOString()) return false;
   if (expect.scope !== undefined) {
     let declared: DecisionScope | undefined;
     if (row.contextJson) {
@@ -83,10 +102,14 @@ export function isApprovedDecision(
         return false; // unparseable context cannot prove a matching scope
       }
     }
-    if (declared?.provider !== undefined && declared.provider !== expect.scope.provider) {
-      return false;
-    }
-    if (declared?.modelRef !== undefined && declared.modelRef !== expect.scope.modelRef) {
+    // A scope must be explicitly declared and match exactly; missing scope
+    // authorises nothing.
+    if (
+      declared?.provider === undefined ||
+      declared.provider !== expect.scope.provider ||
+      declared.modelRef === undefined ||
+      declared.modelRef !== expect.scope.modelRef
+    ) {
       return false;
     }
   }

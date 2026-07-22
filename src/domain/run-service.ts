@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { Db, DbConn } from '../db/client.js';
 import {
+  agentModels,
   agentProviders,
   agentRunEvents,
   agentRuns,
+  decisionRequests,
   taskClaims,
   tasks,
   usageObservations,
@@ -65,6 +67,35 @@ export function createRun(db: Db, input: NewRunInput) {
         );
       }
 
+      // Billing derives from authoritative persisted model state, never from
+      // caller input: when the model is persisted, the run's billing must
+      // equal the model's observed billing, and an unobserved ('unknown')
+      // model is unroutable. Configuration/installation/heuristics prove
+      // nothing about cost.
+      const model = tx
+        .select()
+        .from(agentModels)
+        .where(
+          and(eq(agentModels.providerId, input.providerId), eq(agentModels.modelRef, input.modelRef)),
+        )
+        .get();
+      if (model) {
+        if (model.billingMode === 'unknown') {
+          throw new RunAuthorisationError(
+            `model ${input.modelRef} has no authoritative billing observation: unroutable`,
+          );
+        }
+        if (model.billingMode !== input.billingMode) {
+          throw new RunAuthorisationError(
+            `run billing '${input.billingMode}' does not match the authoritative persisted ` +
+              `billing '${model.billingMode}' of model ${input.modelRef}`,
+          );
+        }
+        if (input.modelId !== undefined && input.modelId !== model.id) {
+          throw new RunAuthorisationError(`modelId ${input.modelId} does not match ${input.modelRef}`);
+        }
+      }
+
       if (input.claimId !== undefined) {
         const claim = tx.select().from(taskClaims).where(eq(taskClaims.id, input.claimId)).get();
         const nowIsoStr = (input.now?.() ?? new Date()).toISOString();
@@ -96,11 +127,14 @@ export function createRun(db: Db, input: NewRunInput) {
           taskId: input.taskId,
           projectId: task.projectId,
           scope: { provider: provider?.name ?? '', modelRef: input.modelRef },
+          requireExpiry: true,
+          requireUnconsumed: true,
+          now: input.now?.(),
         });
         if (!authorised) {
           throw new RunAuthorisationError(
             `DecisionRequest ${input.paidUsageDecisionId} does not authorise paid usage for ` +
-              `this task, project and provider/model scope`,
+              `this task, project and provider/model scope (approved, unexpired, unconsumed, scoped)`,
           );
         }
       }
@@ -122,6 +156,29 @@ export function createRun(db: Db, input: NewRunInput) {
         status: 'pending' as const,
       };
       tx.insert(agentRuns).values(row).run();
+
+      // Consume the paid approval EXACTLY ONCE, atomically in this same
+      // transaction. The compare-and-swap on a NULL consumed_by_run_id means a
+      // second run under the same approval finds it consumed and fails; the
+      // insert above already checked unconsumed, so the stamp closes the
+      // window between check and use.
+      if (PAID_BILLING_MODES.includes(input.billingMode) && input.paidUsageDecisionId) {
+        const consumed = tx
+          .update(decisionRequests)
+          .set({ consumedByRunId: row.id })
+          .where(
+            and(
+              eq(decisionRequests.id, input.paidUsageDecisionId),
+              isNull(decisionRequests.consumedByRunId),
+            ),
+          )
+          .run();
+        if (consumed.changes !== 1) {
+          throw new RunAuthorisationError(
+            `paid approval ${input.paidUsageDecisionId} was already consumed by another run`,
+          );
+        }
+      }
       return row;
     },
     { behavior: 'immediate' },

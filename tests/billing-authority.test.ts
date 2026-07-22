@@ -143,6 +143,7 @@ describe('paid-usage decision validation inside the run transaction', () => {
       category: 'paid_usage',
       question: 'spend on claude-code/opus for this task?',
       contextJson: JSON.stringify({ scope: { provider: 'claude-code', modelRef: 'opus' } }),
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     });
     resolveDecision(db, decision.id, 'approved', 'authorised');
     const run = createRun(db, paidRunInput(task.id, providerId, decision.id));

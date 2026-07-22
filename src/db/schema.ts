@@ -499,15 +499,25 @@ export const decisionRequests = sqliteTable(
     status: text('status', { enum: DECISION_STATUSES }).notNull().default('open'),
     resolution: text('resolution'),
     resolvedAt: text('resolved_at'),
+    /** When set, the approval is invalid at/after this instant (ISO 8601 UTC).
+     * Mandatory for paid_usage approvals (enforced at the DB boundary). */
+    expiresAt: text('expires_at'),
+    /** The single run that consumed this approval. A paid approval authorises
+     * exactly one run: once stamped, it can never authorise another. */
+    consumedByRunId: text('consumed_by_run_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  () => [
+  (t) => [
     enumCheck('decision_requests_status_valid', 'status', DECISION_STATUSES),
     check(
       'decision_requests_resolved_has_time',
       sql`status NOT IN ('approved', 'rejected') OR resolved_at IS NOT NULL`,
     ),
+    // At most one run may consume any approval (single-use, DB-backed).
+    uniqueIndex('decision_requests_consumed_by_run')
+      .on(t.consumedByRunId)
+      .where(sql`consumed_by_run_id IS NOT NULL`),
   ],
 );
 
