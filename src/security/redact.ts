@@ -52,12 +52,81 @@ export function redactText(text: string, extraPatterns: RegExp[] = []): string {
   return out;
 }
 
-/** Key names whose ENTIRE value is a secret, whatever its shape or format. */
-const SENSITIVE_KEY_PATTERN =
-  /(^|[_\-.\s])(password|passwd|secret|secrets|token|tokens|api[_-]?key|apikey|private[_-]?key|client[_-]?secret|credential|credentials|auth|authorization|bearer|cookie|session[_-]?token|access[_-]?key|refresh[_-]?token|signing[_-]?key)([_\-.\s]|$)/i;
+/**
+ * Split a structured key into normalised lowercase word tokens, so a key is
+ * recognised regardless of casing convention: camelCase, PascalCase,
+ * snake_case, kebab-case, dotted, spaced or punctuated. `authToken`,
+ * `AuthToken`, `auth_token`, `auth-token` and `Auth Token` all normalise to
+ * the same `['auth', 'token']`. This is what lets the compound key match a
+ * bare secret word like `token` that a single regex over the raw key misses.
+ */
+export function normalizeKeyTokens(key: string): string[] {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2') // camelCase / PascalCase boundary
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2') // ACRONYMBoundary -> ACRONYM Boundary
+    .replace(/[_\-.\s]+/g, ' ') // separators -> space
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean);
+}
 
+/** A single word token that, on its own, marks the whole value secret. */
+const SECRET_WORDS = new Set([
+  'password',
+  'passwd',
+  'passphrase',
+  'secret',
+  'secrets',
+  'token',
+  'tokens',
+  'credential',
+  'credentials',
+  'cookie',
+  'cookies',
+  'bearer',
+  'auth',
+  'authorization',
+  'authorisation',
+  'apikey',
+  'otp',
+]);
+
+/**
+ * Qualifiers that make a following `key`/`keys` token secret (so `apiKey`,
+ * `privateKey`, `accessKey`, `signingKey` are caught, but a bare `key` used as
+ * a generic map key is not over-redacted).
+ */
+const KEY_QUALIFIERS = new Set([
+  'api',
+  'private',
+  'secret',
+  'access',
+  'signing',
+  'encryption',
+  'ssh',
+  'client',
+  'session',
+  'refresh',
+  'auth',
+  'consumer',
+  'license',
+  'licence',
+]);
+
+/**
+ * True when the key's normalised tokens name a secret-bearing value. Matches
+ * bare secret words in any casing convention and qualifier+key compounds.
+ */
 export function isSensitiveKey(key: string): boolean {
-  return SENSITIVE_KEY_PATTERN.test(key);
+  const tokens = normalizeKeyTokens(key);
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]!;
+    if (SECRET_WORDS.has(token)) return true;
+    if ((token === 'key' || token === 'keys') && i > 0 && KEY_QUALIFIERS.has(tokens[i - 1]!)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function redactStructured(value: unknown, seen: WeakSet<object>, extraPatterns: RegExp[]): unknown {
@@ -65,6 +134,16 @@ function redactStructured(value: unknown, seen: WeakSet<object>, extraPatterns: 
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) return REDACTED; // circular reference: fail closed
   seen.add(value);
+  // Errors carry their message/stack on NON-enumerable fields that JSON drops
+  // silently; surface and redact them explicitly rather than persisting a bare
+  // `{}` that hides a secret-bearing message.
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: redactText(value.message, extraPatterns),
+      stack: value.stack ? redactText(value.stack, extraPatterns) : undefined,
+    };
+  }
   if (Array.isArray(value)) {
     return value.map((item) => redactStructured(item, seen, extraPatterns));
   }
