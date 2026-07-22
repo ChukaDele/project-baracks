@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { roadmapItems, roadmapUpdates } from '../src/db/schema.js';
-import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
 import { recordVerificationRun } from '../src/domain/run-service.js';
 import { addEvidence, addTask } from '../src/domain/task-service.js';
@@ -12,16 +11,16 @@ import {
   reconcileRoadmapApplies,
 } from '../src/roadmap/proposal-service.js';
 import type { RoadmapAdapter } from '../src/roadmap/types.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { seedProject, testDb } from './helpers.js';
 
 /**
- * P1-6 reproducer: reconciliation must not treat a still-leased apply attempt
- * as abandoned. A concurrent reconciler that runs while the legitimate
- * external write is in-flight must query the adapter's idempotency record
- * first and, finding the write not yet recorded but the lease still live,
- * leave the attempt alone — never requeue it and permit a second external
- * write. Lease expiry alone never authorises another write: reconciliation
- * still reconciles via the idempotency key first.
+ * External roadmap application is an unavailable capability in this build:
+ * apply and reconcile refuse unconditionally before touching the adapter, so
+ * no external write (or write-settling bookkeeping) can occur through any
+ * code path. The crash-consistent apply protocol is deferred to milestone M5
+ * (independent review found its reconciliation not exact-attempt-safe).
+ * Proposals with recorded dry runs remain available and read-only.
  */
 
 const CHANGES = [{ stableId: 'RM-1', columns: { Status: 'Done' } }];
@@ -49,118 +48,82 @@ function setup() {
   const adapter = new MockSheetsAdapter([
     { stableId: 'RM-1', values: { Title: 'Auth', Status: 'In Progress' } },
   ]);
-  const decision = createDecisionRequest(db, {
-    projectId: project.id,
-    category: 'roadmap_done',
-    question: 'mark RM-1 Done?',
-  });
-  resolveDecision(db, decision.id, 'approved', 'confirmed');
-  return { db, project, itemId, proof, adapter, decision };
+  return { db, project, itemId, proof, adapter };
 }
 
-async function propose(
-  db: ReturnType<typeof testDb>,
-  adapter: MockSheetsAdapter,
-  itemId: string,
-  proofId: string,
-) {
-  return proposeRoadmapUpdate(db, adapter, {
-    roadmapItemId: itemId,
-    baseKey: 'rm1-done',
-    changes: CHANGES,
-    rationale: 'verified',
-    evidenceIds: [proofId],
-  });
+/** Wrap an adapter so every write-side call is recorded. */
+function spying(adapter: MockSheetsAdapter) {
+  const calls: string[] = [];
+  const wrapped: RoadmapAdapter = {
+    readRow: (id) => adapter.readRow(id),
+    readAll: () => adapter.readAll(),
+    revision: () => {
+      calls.push('revision');
+      return adapter.revision();
+    },
+    dryRun: (p) => adapter.dryRun(p),
+    wasApplied: (k) => {
+      calls.push('wasApplied');
+      return adapter.wasApplied(k);
+    },
+    apply: (p, o) => {
+      calls.push('apply');
+      return adapter.apply(p, o);
+    },
+  };
+  return { wrapped, calls };
 }
 
-describe('P1-6 apply-lease reconciliation', () => {
-  it('does not requeue an in-flight apply whose lease is still live', async () => {
-    const { db, itemId, proof, adapter, decision } = setup();
-    const update = await propose(db, adapter, itemId, proof.id);
-
-    let reconcileDuringWrite: unknown;
-    const inFlight: RoadmapAdapter = {
-      readRow: (id) => adapter.readRow(id),
-      readAll: () => adapter.readAll(),
-      revision: () => adapter.revision(),
-      dryRun: (p) => adapter.dryRun(p),
-      wasApplied: (k) => adapter.wasApplied(k),
-      apply: async (p, o) => {
-        // The external write is in progress and NOT yet recorded. A concurrent
-        // reconciler runs now; it must leave the live-leased attempt alone.
-        reconcileDuringWrite = await reconcileRoadmapApplies(db, adapter);
-        return adapter.apply(p, o);
-      },
-    };
-
-    const result = await applyRoadmapUpdate(db, inFlight, update.id, {
-      roadmapDoneDecisionId: decision.id,
+describe('roadmap apply is disabled (external-roadmap-application unavailable)', () => {
+  it('refuses a fully proposed, evidence-backed update without touching the adapter', async () => {
+    const { db, itemId, proof, adapter } = setup();
+    const update = await proposeRoadmapUpdate(db, adapter, {
+      roadmapItemId: itemId,
+      baseKey: 'rm1-done',
+      changes: CHANGES,
+      rationale: 'verified',
+      evidenceIds: [proof.id],
     });
-    expect(result.status).toBe('applied');
-    expect(reconcileDuringWrite).toEqual([]); // the live attempt was not requeued
-    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('Done');
-  });
+    expect(update.status).toBe('proposed');
 
-  it('reconciles an already-applied write to applied even after the lease expired', async () => {
-    const { db, itemId, proof, adapter, decision } = setup();
-    const update = await propose(db, adapter, itemId, proof.id);
-
-    // Claim + external write happened, then the process crashed after the write.
-    const crashing: RoadmapAdapter = {
-      readRow: (id) => adapter.readRow(id),
-      readAll: () => adapter.readAll(),
-      revision: () => adapter.revision(),
-      dryRun: (p) => adapter.dryRun(p),
-      wasApplied: (k) => adapter.wasApplied(k),
-      apply: async (p, o) => {
-        await adapter.apply(p, o);
-        throw new Error('crash after external write');
-      },
-    };
-    await expect(
-      applyRoadmapUpdate(db, crashing, update.id, { roadmapDoneDecisionId: decision.id }),
-    ).rejects.toThrow(/crash after external write/);
-
-    // Even with the lease long expired, recovery reconciles via idempotency
-    // (write happened -> applied), never a second write.
-    const future = () => new Date(Date.now() + 60 * 60 * 1000);
-    const resolved = await reconcileRoadmapApplies(db, adapter, { now: future });
-    expect(resolved).toEqual([{ updateId: update.id, outcome: 'applied' }]);
+    const { wrapped, calls } = spying(adapter);
+    await expect(applyRoadmapUpdate(db, wrapped, update.id)).rejects.toThrow(
+      CapabilityUnavailableError,
+    );
+    expect(calls).toEqual([]); // the adapter was never consulted
+    // the update record is untouched and the external source unchanged
     const row = db.select().from(roadmapUpdates).where(eq(roadmapUpdates.id, update.id)).get()!;
-    expect(row.status).toBe('applied');
+    expect(row.status).toBe('proposed');
+    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('In Progress');
   });
 
-  it('requeues only once the apply lease has lapsed (never while live)', async () => {
-    const { db, itemId, proof, adapter, decision } = setup();
-    const update = await propose(db, adapter, itemId, proof.id);
+  it('refuses reconciliation the same way, even with a seeded stuck apply', async () => {
+    const { db, itemId, proof, adapter } = setup();
+    const update = await proposeRoadmapUpdate(db, adapter, {
+      roadmapItemId: itemId,
+      baseKey: 'rm1-done',
+      changes: CHANGES,
+      rationale: 'verified',
+      evidenceIds: [proof.id],
+    });
+    // simulate durable crash state left by a hypothetical older build
+    db.update(roadmapUpdates)
+      .set({
+        status: 'applying',
+        applyAttemptId: newId('rapl'),
+        applyStartedAt: new Date().toISOString(),
+        applyWorkerId: 'w-crashed',
+        applyLeaseExpiresAt: new Date(Date.now() - 1000).toISOString(),
+      })
+      .where(eq(roadmapUpdates.id, update.id))
+      .run();
 
-    const crashingEarly: RoadmapAdapter = {
-      readRow: (id) => adapter.readRow(id),
-      readAll: () => adapter.readAll(),
-      revision: () => adapter.revision(),
-      dryRun: (p) => adapter.dryRun(p),
-      wasApplied: (k) => adapter.wasApplied(k),
-      apply: async () => {
-        throw new Error('crash before external write');
-      },
-    };
-    await expect(
-      applyRoadmapUpdate(db, crashingEarly, update.id, { roadmapDoneDecisionId: decision.id }),
-    ).rejects.toThrow(/before external write/);
-
-    // Immediately (lease still live): reconciliation leaves it alone.
-    expect(await reconcileRoadmapApplies(db, adapter)).toEqual([]);
-    expect(
-      db.select().from(roadmapUpdates).where(eq(roadmapUpdates.id, update.id)).get()!.status,
-    ).toBe('applying');
-
-    // Only after the lease lapses does recovery requeue it for a fresh attempt.
-    const future = () => new Date(Date.now() + 60 * 60 * 1000);
-    expect(await reconcileRoadmapApplies(db, adapter, { now: future })).toEqual([
-      { updateId: update.id, outcome: 'requeued' },
-    ]);
-    expect(
-      db.select().from(roadmapUpdates).where(eq(roadmapUpdates.id, update.id)).get()!.status,
-    ).toBe('proposed');
+    const { wrapped, calls } = spying(adapter);
+    await expect(reconcileRoadmapApplies(db, wrapped)).rejects.toThrow(
+      CapabilityUnavailableError,
+    );
+    expect(calls).toEqual([]);
+    const row = db.select().from(roadmapUpdates).where(eq(roadmapUpdates.id, update.id)).get()!;
+    expect(row.status).toBe('applying'); // nothing was settled or requeued
   });
 });

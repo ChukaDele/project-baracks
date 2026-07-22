@@ -10,12 +10,8 @@ import {
   proposalPayloadHash,
 } from '../src/roadmap/canonical.js';
 import { MockSheetsAdapter } from '../src/roadmap/mock-sheets.js';
-import {
-  applyRoadmapUpdate,
-  proposeRoadmapUpdate,
-  reconcileRoadmapApplies,
-} from '../src/roadmap/proposal-service.js';
-import type { RoadmapAdapter } from '../src/roadmap/types.js';
+import { applyRoadmapUpdate, proposeRoadmapUpdate } from '../src/roadmap/proposal-service.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { seedProject, testDb } from './helpers.js';
 
 function setup() {
@@ -64,7 +60,7 @@ describe('canonical payload identity', () => {
   });
 });
 
-describe('proposal lifecycle', () => {
+describe('proposal lifecycle (propose + dry-run only in this build)', () => {
   it('records the dry run, payload hash and source revision at propose time', async () => {
     const { db, itemId, proof, adapter } = setup();
     const update = await proposeRoadmapUpdate(db, adapter, {
@@ -116,58 +112,19 @@ describe('proposal lifecycle', () => {
     ).rejects.toThrow(/requires at least one evidence/);
   });
 
-  it('applies only with an approved roadmap_done decision, exactly once', async () => {
-    const { db, project, itemId, proof, adapter } = setup();
-    const update = await proposeRoadmapUpdate(db, adapter, {
-      roadmapItemId: itemId,
-      baseKey: 'rm1-done',
-      changes: CHANGES,
-      rationale: 'task verified',
-      evidenceIds: [proof.id],
-    });
-
-    await expect(applyRoadmapUpdate(db, adapter, update.id)).rejects.toThrow(/roadmap_done/);
-
-    const decision = createDecisionRequest(db, {
-      projectId: project.id,
-      category: 'roadmap_done',
-      question: 'mark RM-1 Done?',
-    });
-    await expect(
-      applyRoadmapUpdate(db, adapter, update.id, { roadmapDoneDecisionId: decision.id }),
-    ).rejects.toThrow(/roadmap_done/); // open, not approved
-
-    resolveDecision(db, decision.id, 'approved', 'confirmed');
-    const applied = await applyRoadmapUpdate(db, adapter, update.id, {
-      roadmapDoneDecisionId: decision.id,
-    });
-    expect(applied.status).toBe('applied');
-    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('Done');
-
-    const again = await applyRoadmapUpdate(db, adapter, update.id, {
-      roadmapDoneDecisionId: decision.id,
-    });
-    expect(again.status).toBe('already_applied');
-  });
-
-  it('invalidates the proposal when the source changed since the dry run', async () => {
+  it('proposing never writes to the source (dry-run only)', async () => {
     const { db, itemId, proof, adapter } = setup();
-    const update = await proposeRoadmapUpdate(db, adapter, {
+    await proposeRoadmapUpdate(db, adapter, {
       roadmapItemId: itemId,
       baseKey: 'rm1-done',
       changes: CHANGES,
       rationale: 'task verified',
       evidenceIds: [proof.id],
     });
-    adapter.setCell('RM-1', 'Status', 'Blocked'); // human edited the sheet
-    const result = await applyRoadmapUpdate(db, adapter, update.id, {
-      roadmapDoneDecisionId: 'irrelevant',
-    });
-    expect(result.status).toBe('superseded');
-    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('Blocked');
+    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('In Progress');
   });
 
-  it('reconciles an already-applied external write instead of superseding it', async () => {
+  it('apply refuses even with an approved roadmap_done decision (capability gate)', async () => {
     const { db, project, itemId, proof, adapter } = setup();
     const update = await proposeRoadmapUpdate(db, adapter, {
       roadmapItemId: itemId,
@@ -182,170 +139,10 @@ describe('proposal lifecycle', () => {
       question: 'mark RM-1 Done?',
     });
     resolveDecision(db, decision.id, 'approved', 'confirmed');
-
-    // The external write already happened under this idempotency key (a
-    // previous process applied it and crashed before internal bookkeeping);
-    // the source revision has therefore CHANGED since the dry run.
-    await adapter.apply(
-      {
-        idempotencyKey: update.idempotencyKey,
-        changes: CHANGES,
-        rationale: update.rationale,
-        evidenceRefs: [proof.id],
-      },
-      {},
-    );
-    expect(await adapter.revision()).not.toBe(update.sourceRevision);
-
-    // Retry must reconcile via the idempotency key, not misclassify as superseded.
-    const result = await applyRoadmapUpdate(db, adapter, update.id, {
-      roadmapDoneDecisionId: decision.id,
-    });
-    expect(result.status).toBe('applied');
-    expect(result.update.status).toBe('applied');
-    expect(result.update.appliedAt).toBeTruthy();
-  });
-
-  it('recovers a crash between the external write and internal bookkeeping', async () => {
-    const { db, project, itemId, proof, adapter } = setup();
-    const update = await proposeRoadmapUpdate(db, adapter, {
-      roadmapItemId: itemId,
-      baseKey: 'rm1-done',
-      changes: CHANGES,
-      rationale: 'task verified',
-      evidenceIds: [proof.id],
-    });
-    const decision = createDecisionRequest(db, {
-      projectId: project.id,
-      category: 'roadmap_done',
-      question: 'mark RM-1 Done?',
-    });
-    resolveDecision(db, decision.id, 'approved', 'confirmed');
-
-    // Adapter whose process "crashes" right after the external write lands.
-    const crashing: RoadmapAdapter = {
-      readRow: (id) => adapter.readRow(id),
-      readAll: () => adapter.readAll(),
-      revision: () => adapter.revision(),
-      dryRun: (p) => adapter.dryRun(p),
-      wasApplied: (k) => adapter.wasApplied(k),
-      apply: async (p, o) => {
-        await adapter.apply(p, o);
-        throw new Error('simulated crash after external write');
-      },
-    };
-    await expect(
-      applyRoadmapUpdate(db, crashing, update.id, { roadmapDoneDecisionId: decision.id }),
-    ).rejects.toThrow(/simulated crash/);
-
-    // Durable crash evidence: the update is stuck in 'applying' with an attempt id.
-    const stuck = (await import('../src/db/schema.js')).roadmapUpdates;
-    const { eq } = await import('drizzle-orm');
-    const row = db.select().from(stuck).where(eq(stuck.id, update.id)).get()!;
-    expect(row.status).toBe('applying');
-    expect(row.applyAttemptId).toBeTruthy();
-
-    // A concurrent apply attempt is refused while the claim is held.
     await expect(
       applyRoadmapUpdate(db, adapter, update.id, { roadmapDoneDecisionId: decision.id }),
-    ).rejects.toThrow(/apply in progress/);
-
-    // Recovery reconciles against the adapter's idempotency record.
-    const resolved = await reconcileRoadmapApplies(db, adapter);
-    expect(resolved).toEqual([{ updateId: update.id, outcome: 'applied' }]);
-    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('Done');
-
-    // and a re-run finds nothing left to do
-    expect(await reconcileRoadmapApplies(db, adapter)).toEqual([]);
-  });
-
-  it('requeues a claimed apply whose external write never happened', async () => {
-    const { db, project, itemId, proof, adapter } = setup();
-    const update = await proposeRoadmapUpdate(db, adapter, {
-      roadmapItemId: itemId,
-      baseKey: 'rm1-done',
-      changes: CHANGES,
-      rationale: 'task verified',
-      evidenceIds: [proof.id],
-    });
-    const decision = createDecisionRequest(db, {
-      projectId: project.id,
-      category: 'roadmap_done',
-      question: 'mark RM-1 Done?',
-    });
-    resolveDecision(db, decision.id, 'approved', 'confirmed');
-
-    // Crash BEFORE the external write reached the source.
-    const crashingEarly: RoadmapAdapter = {
-      readRow: (id) => adapter.readRow(id),
-      readAll: () => adapter.readAll(),
-      revision: () => adapter.revision(),
-      dryRun: (p) => adapter.dryRun(p),
-      wasApplied: (k) => adapter.wasApplied(k),
-      apply: async () => {
-        throw new Error('simulated crash before external write');
-      },
-    };
-    await expect(
-      applyRoadmapUpdate(db, crashingEarly, update.id, { roadmapDoneDecisionId: decision.id }),
-    ).rejects.toThrow(/before external write/);
-
-    // The write never landed, but the attempt's lease is still live: recovery
-    // leaves it alone until the lease lapses (never requeues a possibly-live
-    // attempt). Advance past the lease to reclaim it.
-    expect(await reconcileRoadmapApplies(db, adapter)).toEqual([]);
-    const afterLease = () => new Date(Date.now() + 60 * 60 * 1000);
-    const resolved = await reconcileRoadmapApplies(db, adapter, { now: afterLease });
-    expect(resolved).toEqual([{ updateId: update.id, outcome: 'requeued' }]);
+    ).rejects.toThrow(CapabilityUnavailableError);
     expect((await adapter.readRow('RM-1'))?.values.Status).toBe('In Progress');
-
-    // the requeued proposal applies cleanly on retry
-    const retried = await applyRoadmapUpdate(db, adapter, update.id, {
-      roadmapDoneDecisionId: decision.id,
-    });
-    expect(retried.status).toBe('applied');
-    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('Done');
-  });
-
-  it('only one worker can claim an apply (duplicate apply is refused)', async () => {
-    const { db, project, itemId, proof, adapter } = setup();
-    const update = await proposeRoadmapUpdate(db, adapter, {
-      roadmapItemId: itemId,
-      baseKey: 'rm1-done',
-      changes: CHANGES,
-      rationale: 'task verified',
-      evidenceIds: [proof.id],
-    });
-    const decision = createDecisionRequest(db, {
-      projectId: project.id,
-      category: 'roadmap_done',
-      question: 'mark RM-1 Done?',
-    });
-    resolveDecision(db, decision.id, 'approved', 'confirmed');
-
-    // Worker B attempts to apply while worker A is mid-apply (inside the
-    // adapter call, after A claimed 'applying').
-    let concurrentError: unknown;
-    const contended: RoadmapAdapter = {
-      readRow: (id) => adapter.readRow(id),
-      readAll: () => adapter.readAll(),
-      revision: () => adapter.revision(),
-      dryRun: (p) => adapter.dryRun(p),
-      wasApplied: (k) => adapter.wasApplied(k),
-      apply: async (p, o) => {
-        try {
-          await applyRoadmapUpdate(db, adapter, update.id, { roadmapDoneDecisionId: decision.id });
-        } catch (error) {
-          concurrentError = error;
-        }
-        return adapter.apply(p, o);
-      },
-    };
-    const result = await applyRoadmapUpdate(db, contended, update.id, {
-      roadmapDoneDecisionId: decision.id,
-    });
-    expect(result.status).toBe('applied');
-    expect(String(concurrentError)).toMatch(/apply in progress/);
   });
 
   it('the stored proposal payload is immutable at the DB level', async () => {
