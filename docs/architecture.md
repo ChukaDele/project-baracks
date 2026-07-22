@@ -69,8 +69,10 @@ TypeScript:
 - **No hard-coded model names** — routing classes come from the user-editable capability
   registry; a new model release is a config edit, not a code change.
 - **Billing safety** — unknown billing is unroutable; paid routes require an approved
-  `paid_usage` DecisionRequest (a DB CHECK refuses paid runs without one); otherwise
-  the router checkpoints, and the checkpoint is persisted.
+  `paid_usage` DecisionRequest, re-validated inside the run-creation transaction
+  (category, approval status, task, project and provider/model scope) and again by DB
+  triggers (unknown billing and unapproved paid references are refused at insert);
+  otherwise the router checkpoints, and the checkpoint is persisted.
 - **One execution boundary** — every external process passes through the execution
   gateway (`docs/security-model.md`).
 
@@ -88,3 +90,19 @@ versioned envelope: `{ "schemaVersion": 1, "kind": …, "data": … }`.
 - Live Google Sheets adapter (contract + mock exist; live impl slots behind the same
   interface).
 - Worktree lifecycle automation, verification orchestration, review adjudication loop.
+
+## Recorded follow-ups (from the independent PR #1 review, P2)
+
+1. **Suggestion provenance referential integrity** — non-human suggestion provenance
+   requires a non-null `source_ref`, but neither the service nor the database yet
+   confirms the referenced entity exists and matches the declared `source_type` and
+   project. Follow-up: validate each source type against its owning table (and
+   project) inside the suggestion transaction, with cross-project and dangling-ref
+   tests. (Provenance immutability, deduplication, transactional approval and
+   rejected-scope suppression are already enforced.)
+2. **Production-boundary and migration coverage** — roadmap coverage exercises the
+   in-memory adapter (crash-window, duplicate-apply and reconciliation paths included);
+   the live Sheets adapter still needs a contract test suite run against the same
+   scenarios, and migrations need representative legacy-database fixtures beyond the
+   current fresh/reopen and 0000+0001-prefix upgrade tests, before live execution is
+   enabled.

@@ -44,8 +44,10 @@ stateDiagram-v2
   target is not `completed`).
 - **→ completed** requires the **completion proof set** (`src/domain/completion.ts`),
   evaluated inside the same transaction as the transition:
-  - at least one **passed** `verification_runs` record (free-text evidence is never
-    sufficient);
+  - at least one QUALIFYING **passed** `verification_runs` record: status `passed`
+    with exit code 0, completed start/end timestamps, produced under a **succeeded
+    agent run of this same task** (the composite FK guarantees the task linkage), and
+    cited by an append-only evidence row — a bare `passed` label proves nothing;
   - no open critical/major review findings — each must be fixed or carry an explicit
     disposition;
   - at least one evidence record whose relationships verify (a `verification_run`
@@ -58,7 +60,12 @@ stateDiagram-v2
   leases, `src/domain/claim-service.ts`).
 
 Both guards refuse when the guard data wasn't supplied, so the service layer
-(`transitionTask`) is the only practical entry point.
+(`transitionTask`) is the only practical entry point. Completion is additionally
+enforced at the database boundary (drizzle/0004): triggers refuse any write that sets
+`completed` from a status other than `ready_to_merge` or without a qualifying
+verification run and clean findings — a direct SQL update cannot bypass the proof.
+Verification records themselves are consistency-checked (`passed` requires exit code 0
+and timestamps) and immutable once terminal.
 
 ## Transactions, claims and crash recovery
 
@@ -72,6 +79,12 @@ attempt history (triggers). `heartbeatClaim` extends the lease; `releaseClaim` h
 task back (requeue) or cancels it; `recoverExpiredClaims` idempotently expires lapsed
 leases and requeues their tasks after a crash — on the same connection or a fresh one
 after restart.
+
+The claim row (id + monotonic per-task attempt) is a **fencing token**: every owner
+mutation — heartbeat, completion, release — requires the claim to be active AND its
+lease still in the future, so a stalled worker is fenced out the instant its lease
+expires, before any recovery sweep runs. Downstream writes bind to the token too:
+`createRun` refuses a claim that is not the task's current active, unexpired claim.
 
 ## Suggested vs. real tasks
 

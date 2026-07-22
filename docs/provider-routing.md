@@ -24,9 +24,14 @@ detectors.
 
 `src/providers/registry.ts` classifies models via user-editable rules
 (`~/.major/model-registry.json`, `$MAJOR_MODEL_REGISTRY` to relocate). Rules map regex
-patterns to routing classes, billing modes, and prohibitions — new model names never
-require code changes. Class-level aliases (`opus`, `sonnet`) are preferred over versioned
-marketing names so the defaults survive releases.
+patterns to routing classes, EXPECTED billing modes, and prohibitions — new model names
+never require code changes. Class-level aliases (`opus`, `sonnet`) are preferred over
+versioned marketing names so the defaults survive releases.
+
+Registry billing is a configuration expectation, never evidence: `registryModels`
+always reports `billingMode: 'unknown'` (unroutable) with the rule's value exposed only
+as `expectedBillingMode` for display. Neither the registry file nor the
+`$MAJOR_MODEL_REGISTRY` environment variable can make a model spendable.
 
 ## The router
 
@@ -42,16 +47,22 @@ marketing names so the defaults survive releases.
 5. A model whose billing mode is `unknown` is **unroutable** — with or without paid
    approval. Routing requires proof the run is free, or an approval to pay.
 6. Subscription-included capacity always beats paid capacity. Paid capacity is used only
-   when the request carries `approvedPaidUsage: { decisionId }` — the id of an APPROVED
-   `paid_usage` DecisionRequest that the caller verified against the database
-   (`isApprovedDecision`). A bare boolean is not accepted. Otherwise the router returns
-   a `checkpoint` decision listing the paid options for a human to approve.
+   when the request carries `approvedPaidUsage: { decisionId }` — a REFERENCE to a
+   `paid_usage` DecisionRequest. The reference itself grants nothing: `createRun`
+   re-validates it inside the run-creation transaction — the decision must exist, be
+   APPROVED, have category `paid_usage`, be bound to the run's exact task and project,
+   and any scope its context declares (provider/model) must match the route. Otherwise
+   the router returns a `checkpoint` decision listing the paid options for a human to
+   approve.
 
 Every `route` decision carries a human-readable `reason` that is persisted on the
 `agent_runs` record along with billing mode, allowance state and (for paid routes) the
-authorising decision id — the `agent_runs_paid_requires_decision` CHECK refuses paid
-runs without one. Checkpoint decisions are persisted to the append-only
-`routing_checkpoints` table (`recordRoutingCheckpoint`).
+authorising decision id. The database enforces the same authority independently:
+`agent_runs_billing_known` refuses runs with an unknown billing mode, and
+`agent_runs_paid_requires_approved_decision` refuses paid inserts whose decision is not
+approved, `paid_usage`-categorised and bound to the same task (drizzle/0004). Checkpoint
+decisions are persisted to the append-only `routing_checkpoints` table
+(`recordRoutingCheckpoint`).
 
 ## Persisted discovery and probe backoff
 
@@ -62,10 +73,19 @@ append-only `discovery_observations` row carrying the observed state, its **sour
 (`configured`/`inferred`/`observed`) and timestamp. `major doctor` and `major run
 --dry-run` persist what they discover.
 
+Billing authority is stricter than availability: discovery NEVER writes
+`billing_mode`. New models persist as `unknown` (unroutable) and re-discovery preserves
+whatever was authoritatively observed. The only path that sets a billing mode is
+`recordBillingObservation`, restricted by type to the two authoritative sources — a
+human attestation (`human`, confidence `configured`) or an observed run outcome
+(`run_outcome`, confidence `observed`). Registry defaults, executable presence and
+auth-file heuristics can never classify execution as subscription-included.
+
 Exhaustion and rate limits observed from real runs are recorded with a `nextProbeAt`
 backoff (defaults: 15 min rate-limited, 60 min exhausted). `shouldProbe` gates
 re-probing, and an optimistic re-discover does not erase an observed exhaustion until
 the window passes. `loadPersistedProviderInfos` builds routing inputs from this
 persisted state. No environment variable can silently activate API billing: billing
-modes come from persisted observations/configuration, and the execution gateway strips
-billing-related variables from every child environment (see `docs/security-model.md`).
+modes come only from authoritative persisted observations, and the execution gateway
+strips billing-related variables from every child environment (see
+`docs/security-model.md`).
