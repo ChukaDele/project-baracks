@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { openDb, type Db } from '../src/db/client.js';
 import { addProject } from '../src/config/project-service.js';
 import { projectConfigSchema } from '../src/config/project-config.js';
@@ -61,8 +61,12 @@ export function recordQualifyingVerification(db: Db, taskId: string) {
 }
 
 /**
- * Drive a task to 'completed' the legitimate way: through the lifecycle with
- * a qualifying passed verification run and linked evidence.
+ * TEST FIXTURE ONLY: drive a task to 'completed'. The service-layer
+ * completion transition is disabled in this build (automated-task-completion
+ * is an unavailable capability), so after satisfying the DB backstop's proof
+ * requirements (lifecycle to ready_to_merge, qualifying verification with
+ * linked evidence) the final status write happens at the SQLite level. This
+ * is not a production path — production code cannot complete a task at all.
  */
 export function completeTaskProperly(db: Db, taskId: string) {
   if (getTask(db, taskId).status === 'draft') transitionTask(db, taskId, 'ready');
@@ -70,7 +74,10 @@ export function completeTaskProperly(db: Db, taskId: string) {
     transitionTask(db, taskId, status);
   }
   recordQualifyingVerification(db, taskId);
-  return transitionTask(db, taskId, 'completed');
+  db.run(
+    sql`UPDATE tasks SET status = 'completed', version = version + 1 WHERE id = ${taskId}`,
+  );
+  return getTask(db, taskId);
 }
 
 export function seedProject(db: Db, name = 'demo') {

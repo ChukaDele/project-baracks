@@ -1,23 +1,24 @@
 import { and, asc, eq, gt, lt, max } from 'drizzle-orm';
 import type { Db, DbConn } from '../db/client.js';
 import { taskClaims, tasks } from '../db/schema.js';
+import { assertCapabilityAvailable } from '../security/capabilities.js';
 import { newId } from './ids.js';
 import { applyTransition, ConcurrencyError } from './task-service.js';
 
 /**
- * Durable queue claims. All mutations run inside BEGIN IMMEDIATE transactions
- * so two workers on the same SQLite file cannot claim the same task: the
- * first writer holds the write lock, the second sees the claim (or the moved
- * task status) and skips. The task_claims_one_active partial unique index is
- * the DB-level backstop.
+ * Durable queue claims — the worker dispatch/lease model.
  *
- * Fencing: the claim row (id + monotonic per-task attempt) is the durable
- * fencing token. Every owner mutation — heartbeat, completion, release —
- * requires (claim id, worker id, status 'active', lease still in the future)
- * in its WHERE clause, so a worker whose lease has lapsed is fenced out the
- * instant it expires, even before any recovery sweep runs. Downstream writes
- * bind to the token too: run creation verifies the claim is the task's
- * current active, unexpired claim (see domain/run-service.ts).
+ * IN THIS BUILD, WORKER OPERATIONS ARE DISABLED. Worker-owned downstream
+ * mutations are an unavailable capability (src/security/capabilities.ts):
+ * claimNextTask, heartbeatClaim, completeClaim and releaseClaim refuse
+ * unconditionally, so nothing can acquire or exercise a work claim until
+ * milestone M4 delivers complete fencing (independent review found the
+ * current fencing does not cover every owner mutation and downstream write).
+ * Only reads (getClaim) and the supervisor-side crash-recovery sweep
+ * (recoverExpiredClaims) remain runnable. The lease/fencing machinery below
+ * the gates — BEGIN IMMEDIATE claim transactions, the task_claims_one_active
+ * unique index, the ownerFence predicate — is retained, compiled and
+ * DB-backed as the M4 starting point.
  */
 
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
@@ -53,6 +54,7 @@ export function getClaim(db: DbConn, claimId: string) {
  * transaction.
  */
 export function claimNextTask(db: Db, options: ClaimOptions) {
+  assertCapabilityAvailable('worker-owned-downstream-mutations');
   const leaseMs = options.leaseMs ?? DEFAULT_LEASE_MS;
   return db.transaction(
     (tx) => {
@@ -118,6 +120,7 @@ export function heartbeatClaim(
   leaseMs: number = DEFAULT_LEASE_MS,
   now: () => Date = () => new Date(),
 ) {
+  assertCapabilityAvailable('worker-owned-downstream-mutations');
   const nowMs = now().getTime();
   const result = db
     .update(taskClaims)
@@ -161,6 +164,7 @@ export function completeClaim(
   reason = 'completed',
   now: () => Date = () => new Date(),
 ) {
+  assertCapabilityAvailable('worker-owned-downstream-mutations');
   return db.transaction(
     (tx) => closeClaim(tx, claimId, workerId, 'completed', reason, now().getTime()),
     { behavior: 'immediate' },
@@ -181,6 +185,7 @@ export function releaseClaim(
     now?: () => Date;
   },
 ) {
+  assertCapabilityAvailable('worker-owned-downstream-mutations');
   return db.transaction(
     (tx) => {
       const nowMs = (options.now?.() ?? new Date()).getTime();

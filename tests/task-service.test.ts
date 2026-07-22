@@ -8,6 +8,10 @@ import {
   roadmapItems,
   tasks,
 } from '../src/db/schema.js';
+import {
+  evaluateCompletionProof,
+  parseCompletionCriteria,
+} from '../src/domain/completion.js';
 import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
 import {
@@ -24,6 +28,7 @@ import {
   addSuggestion,
   addTask,
   approveSuggestion,
+  getTask,
   queueableTasks,
   rejectSuggestion,
   scopeFingerprint,
@@ -162,7 +167,7 @@ describe('dependency blocking', () => {
   });
 });
 
-describe('completion proof', () => {
+describe('completion proof (model preserved; the completed transition is disabled)', () => {
   function taskAtReadyToMerge(db: ReturnType<typeof testDb>) {
     const project = seedProject(db);
     const task = readyTask(db, project.id, 'ship it');
@@ -178,11 +183,15 @@ describe('completion proof', () => {
     return task;
   }
 
-  it('refuses completion on a bare free-text evidence assertion', () => {
+  const defaultCriteria = () => parseCompletionCriteria(null);
+
+  it('the proof set refuses a bare free-text evidence assertion', () => {
     const db = testDb();
     const task = taskAtReadyToMerge(db);
     addEvidence(db, { taskId: task.id, kind: 'other', summary: 'trust me, it works' });
-    expect(() => transitionTask(db, task.id, 'completed')).toThrow(/passed verification run/);
+    const proof = evaluateCompletionProof(db, task.id, defaultCriteria());
+    expect(proof.ok).toBe(false);
+    expect(proof.failures.join('; ')).toMatch(/passed verification run/);
   });
 
   it('refuses fabricated verification evidence pointing at nothing', () => {
@@ -219,7 +228,7 @@ describe('completion proof', () => {
     ).toThrow(/same task/);
   });
 
-  it('completes only with a QUALIFYING passed verification run and linked evidence', () => {
+  it('is satisfied only by a QUALIFYING passed verification run with linked evidence', () => {
     const db = testDb();
     const task = taskAtReadyToMerge(db);
     const failed = recordVerificationRun(db, {
@@ -234,7 +243,7 @@ describe('completion proof', () => {
       ref: failed.id,
       summary: 'first attempt failed',
     });
-    expect(() => transitionTask(db, task.id, 'completed')).toThrow(/passed verification run/);
+    expect(evaluateCompletionProof(db, task.id, defaultCriteria()).ok).toBe(false);
 
     // A 'passed' record WITHOUT provenance (no agent run behind it) does not
     // qualify: the proof requires a trustworthy run/task relationship.
@@ -250,13 +259,13 @@ describe('completion proof', () => {
       ref: unprovenanced.id,
       summary: 'passed but from nowhere',
     });
-    expect(() => transitionTask(db, task.id, 'completed')).toThrow(/passed verification run/);
+    expect(evaluateCompletionProof(db, task.id, defaultCriteria()).ok).toBe(false);
 
     recordQualifyingVerification(db, task.id);
-    expect(transitionTask(db, task.id, 'completed').status).toBe('completed');
+    expect(evaluateCompletionProof(db, task.id, defaultCriteria()).ok).toBe(true);
   });
 
-  it('blocks completion on open critical/major review findings', () => {
+  it('blocks on open critical/major review findings', () => {
     const db = testDb();
     const task = taskAtReadyToMerge(db);
     recordQualifyingVerification(db, task.id);
@@ -280,10 +289,12 @@ describe('completion proof', () => {
         summary: 'auth bypass',
       })
       .run();
-    expect(() => transitionTask(db, task.id, 'completed')).toThrow(/open critical\/major/);
+    const blocked = evaluateCompletionProof(db, task.id, defaultCriteria());
+    expect(blocked.ok).toBe(false);
+    expect(blocked.failures.join('; ')).toMatch(/open critical\/major/);
 
     db.update(reviewFindings).set({ status: 'fixed' }).run();
-    expect(transitionTask(db, task.id, 'completed').status).toBe('completed');
+    expect(evaluateCompletionProof(db, task.id, defaultCriteria()).ok).toBe(true);
   });
 
   it('enforces task-specific criteria (artifact and required decisions)', () => {
@@ -308,7 +319,10 @@ describe('completion proof', () => {
       transitionTask(db, task.id, status);
     }
     recordQualifyingVerification(db, task.id);
-    expect(() => transitionTask(db, task.id, 'completed')).toThrow(/artifact/);
+    const criteria = () => parseCompletionCriteria(getTask(db, task.id).completionCriteriaJson);
+    expect(evaluateCompletionProof(db, task.id, criteria()).failures.join('; ')).toMatch(
+      /artifact/,
+    );
 
     addEvidence(db, {
       taskId: task.id,
@@ -316,7 +330,9 @@ describe('completion proof', () => {
       ref: 'https://github.com/x/y/pull/1',
       summary: 'PR opened',
     });
-    expect(() => transitionTask(db, task.id, 'completed')).toThrow(/'merge' DecisionRequest/);
+    expect(evaluateCompletionProof(db, task.id, criteria()).failures.join('; ')).toMatch(
+      /'merge' DecisionRequest/,
+    );
 
     const decision = createDecisionRequest(db, {
       taskId: task.id,
@@ -325,7 +341,16 @@ describe('completion proof', () => {
       question: 'merge PR #1?',
     });
     resolveDecision(db, decision.id, 'approved', 'lgtm');
-    expect(transitionTask(db, task.id, 'completed').status).toBe('completed');
+    expect(evaluateCompletionProof(db, task.id, criteria()).ok).toBe(true);
+  });
+
+  it('the completed transition itself is disabled: a fully proven task still refuses', () => {
+    const db = testDb();
+    const task = taskAtReadyToMerge(db);
+    recordQualifyingVerification(db, task.id);
+    expect(evaluateCompletionProof(db, task.id, defaultCriteria()).ok).toBe(true);
+    expect(() => transitionTask(db, task.id, 'completed')).toThrow(CapabilityUnavailableError);
+    expect(getTask(db, task.id).status).toBe('ready_to_merge');
   });
 });
 

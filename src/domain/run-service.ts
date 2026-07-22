@@ -68,6 +68,9 @@ export function createRun(db: Db, input: NewRunInput) {
   if (PAID_BILLING_MODES.includes(input.billingMode)) {
     assertCapabilityAvailable('paid-provider-execution');
   }
+  if (input.claimId !== undefined) {
+    assertCapabilityAvailable('worker-owned-downstream-mutations');
+  }
   return db.transaction(
     (tx) => {
       const task = tx.select().from(tasks).where(eq(tasks.id, input.taskId)).get();

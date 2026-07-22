@@ -10,6 +10,7 @@ import {
   type TaskComplexity,
 } from '../db/schema.js';
 import { taskClaims } from '../db/schema.js';
+import { assertCapabilityAvailable } from '../security/capabilities.js';
 import { StaleClaimError } from './claim-service.js';
 import { evaluateCompletionProof, parseCompletionCriteria } from './completion.js';
 import { newId, nowIso } from './ids.js';
@@ -120,9 +121,16 @@ export function applyTransition(
   to: TaskStatus,
   opts: { fence?: ClaimFence } = {},
 ) {
-  // A worker-driven transition must hold a live fencing token: an expired or
-  // superseded claimant is refused here, in the same transaction as the
-  // compare-and-swap, before it can advance the task it no longer owns.
+  // Worker-owned downstream mutations are unavailable in this build: a
+  // fence-carrying (worker-attributed) transition is refused outright,
+  // regardless of the fence's validity (milestone M4 — fencing coverage is
+  // incomplete). The live-claim check below is retained for M4.
+  if (opts.fence) assertCapabilityAvailable('worker-owned-downstream-mutations');
+  // Automated task completion is unavailable in this build: NO service-layer
+  // path reaches 'completed' (milestone M3 — completion criteria are mutable,
+  // so the proof set cannot yet be trusted as task-specific and immutable).
+  // The proof evaluation below is retained for M3.
+  if (to === 'completed') assertCapabilityAvailable('automated-task-completion');
   if (opts.fence) assertLiveClaim(db, opts.fence, taskId);
   const task = getTask(db, taskId);
   const guards: Parameters<typeof assertTransition>[2] = {

@@ -1,125 +1,123 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { openDb, type Db } from '../src/db/client.js';
-import { agentProviders, taskClaims } from '../src/db/schema.js';
-import {
-  claimNextTask,
-  recoverExpiredClaims,
-  StaleClaimError,
-} from '../src/domain/claim-service.js';
+import { agentProviders, agentRuns, taskClaims } from '../src/db/schema.js';
 import { newId } from '../src/domain/ids.js';
-import {
-  appendRunEvent,
-  createRun,
-  recordUsage,
-  recordVerificationRun,
-  setRunStatus,
-} from '../src/domain/run-service.js';
+import { appendRunEvent, createRun, setRunStatus } from '../src/domain/run-service.js';
 import { addTask, transitionTask } from '../src/domain/task-service.js';
-import { seedProject } from './helpers.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
+import { seedProject, testDb } from './helpers.js';
 
 /**
- * P1-4 reproducers: an expired claimant must be fenced out of EVERY downstream
- * owner mutation — run status changes, run events, usage, verification runs and
- * worker-driven task transitions — the instant its lease lapses, before any
- * recovery sweep. Fencing is DB-enforced (run-linked writes) and validated in
- * the transition transaction (task state).
+ * Worker-owned downstream mutations are an unavailable capability in this
+ * build: every fence-carrying or claim-bound write refuses unconditionally,
+ * BEFORE any fencing logic runs — comprehensive fencing is deferred to
+ * milestone M4 (independent review found the current fencing incomplete).
+ * The DB-level fencing triggers on run-linked writes are retained as a
+ * backstop and verified here with directly seeded rows.
  */
 
-function expireLease(db: Db, claimId: string) {
-  db.update(taskClaims)
-    .set({ leaseExpiresAt: new Date(Date.now() - 1000).toISOString() })
-    .where(eq(taskClaims.id, claimId))
-    .run();
-}
-
-function claimedRun(db: Db) {
+function runningTask(db: ReturnType<typeof testDb>) {
   const project = seedProject(db);
   const task = addTask(db, { projectId: project.id, title: 'work' });
   transitionTask(db, task.id, 'ready');
   transitionTask(db, task.id, 'queued');
+  transitionTask(db, task.id, 'running');
   const providerId = newId('aprov');
   db.insert(agentProviders).values({ id: providerId, name: 'mock' }).run();
-  const claimed = claimNextTask(db, { workerId: 'w1' })!;
-  const run = createRun(db, {
-    taskId: claimed.task.id,
-    providerId,
-    claimId: claimed.claim.id,
-    modelRef: 'sonnet',
-    purpose: 'implementation',
-    billingMode: 'subscription_included',
-    routingReason: 'live',
-  });
-  setRunStatus(db, run.id, 'running'); // succeeds while the lease is live
-  return { db, providerId, task: claimed.task, claim: claimed.claim, run };
+  return { project, task, providerId };
 }
 
-describe('P1-4 expired claimants are fenced from downstream writes', () => {
-  it('cannot mark its run succeeded once the lease expired', () => {
-    const { db, claim, run } = claimedRun(openDb(':memory:').db);
-    expireLease(db, claim.id);
-    expect(() => setRunStatus(db, run.id, 'succeeded')).toThrow();
-  });
+function seedClaim(db: ReturnType<typeof testDb>, taskId: string, expired = false) {
+  const row = {
+    id: newId('tclm'),
+    taskId,
+    workerId: 'w1',
+    attempt: 1,
+    status: 'active' as const,
+    leaseExpiresAt: new Date(Date.now() + (expired ? -60_000 : 60_000)).toISOString(),
+    heartbeatAt: new Date().toISOString(),
+  };
+  db.insert(taskClaims).values(row).run();
+  return row;
+}
 
-  it('cannot append a run event once the lease expired', () => {
-    const { db, claim, run } = claimedRun(openDb(':memory:').db);
-    expireLease(db, claim.id);
-    expect(() => appendRunEvent(db, run.id, 'result', { ok: true })).toThrow(/live claim/);
-  });
-
-  it('cannot record usage or a verification run once the lease expired', () => {
-    const { db, providerId, claim, run } = claimedRun(openDb(':memory:').db);
-    expireLease(db, claim.id);
+describe('claim-bound writes are disabled (worker-owned-downstream-mutations)', () => {
+  it('createRun refuses any claim-bound run, even under a live claim', () => {
+    const db = testDb();
+    const { task, providerId } = runningTask(db);
+    const claim = seedClaim(db, task.id);
     expect(() =>
-      recordUsage(db, { providerId, agentRunId: run.id, kind: 'tokens', data: { n: 1 } }),
-    ).toThrow(/live claim/);
-    expect(() =>
-      recordVerificationRun(db, {
-        taskId: run.taskId,
-        command: 'pnpm test',
-        status: 'passed',
-        exitCode: 0,
-        agentRunId: run.id,
+      createRun(db, {
+        taskId: task.id,
+        providerId,
+        claimId: claim.id,
+        modelRef: 'sonnet',
+        purpose: 'implementation',
+        billingMode: 'subscription_included',
+        routingReason: 'live claim, still refused',
       }),
-    ).toThrow(/live claim/);
+    ).toThrow(CapabilityUnavailableError);
+    expect(db.select().from(agentRuns).all()).toHaveLength(0);
   });
 
-  it('cannot advance the task it holds once the lease expired', () => {
-    const { db, task, claim } = claimedRun(openDb(':memory:').db);
-    expireLease(db, claim.id);
+  it('a fence-carrying task transition refuses before any fencing logic runs', () => {
+    const db = testDb();
+    const { task } = runningTask(db);
+    const claim = seedClaim(db, task.id);
     expect(() =>
       transitionTask(db, task.id, 'verifying', {
         fence: { claimId: claim.id, workerId: 'w1' },
       }),
-    ).toThrow(StaleClaimError);
+    ).toThrow(CapabilityUnavailableError);
+    // an invalid fence gets the same refusal — the gate fires first
+    expect(() =>
+      transitionTask(db, task.id, 'verifying', {
+        fence: { claimId: 'tclm_forged', workerId: 'intruder' },
+      }),
+    ).toThrow(CapabilityUnavailableError);
   });
 
-  it('a live claimant still performs all of these', () => {
-    const { db, providerId, task, claim, run } = claimedRun(openDb(':memory:').db);
-    expect(setRunStatus(db, run.id, 'succeeded').status).toBe('succeeded');
-    // re-open a run for the remaining writes (a succeeded run is terminal in intent)
-    appendRunEvent(db, run.id, 'note', { ok: true });
-    recordUsage(db, { providerId, agentRunId: run.id, kind: 'tokens', data: { n: 1 } });
-    const moved = transitionTask(db, task.id, 'verifying', {
-      fence: { claimId: claim.id, workerId: 'w1' },
-    });
-    expect(moved.status).toBe('verifying');
+  it('unfenced supervisor transitions remain possible (no worker attribution)', () => {
+    const db = testDb();
+    const { task } = runningTask(db);
+    expect(transitionTask(db, task.id, 'verifying').status).toBe('verifying');
   });
 });
 
-describe('P1-4 recovery issues a strictly newer token; old workers cannot write', () => {
-  it('after recovery the zombie run write is fenced and a new attempt owns the task', () => {
-    const { db, claim, run } = claimedRun(openDb(':memory:').db);
-    expireLease(db, claim.id);
+describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
+  function seededClaimedRun(db: ReturnType<typeof testDb>) {
+    const { task, providerId } = runningTask(db);
+    const claim = seedClaim(db, task.id);
+    const run = {
+      id: newId('arun'),
+      taskId: task.id,
+      providerId,
+      claimId: claim.id,
+      modelRef: 'sonnet',
+      purpose: 'implementation' as const,
+      billingMode: 'subscription_included' as const,
+      routingReason: 'seeded directly (service path is gated)',
+      status: 'pending' as const,
+    };
+    db.insert(agentRuns).values(run).run();
+    return { task, claim, run };
+  }
 
-    const recovered = recoverExpiredClaims(db);
-    expect(recovered).toHaveLength(1);
+  it('refuses run status changes and run events once the claim lease expired', () => {
+    const db = testDb();
+    const { claim, run } = seededClaimedRun(db);
+    db.update(taskClaims)
+      .set({ leaseExpiresAt: new Date(Date.now() - 1000).toISOString() })
+      .where(eq(taskClaims.id, claim.id))
+      .run();
+    expect(() => setRunStatus(db, run.id, 'running')).toThrow();
+    expect(() => appendRunEvent(db, run.id, 'result', { ok: true })).toThrow(/live claim/);
+  });
 
-    // the new attempt is strictly newer
-    const next = claimNextTask(db, { workerId: 'w2' })!;
-    expect(next.claim.attempt).toBe(claim.attempt + 1);
-
-    // the zombie worker's run can no longer be advanced
-    expect(() => setRunStatus(db, run.id, 'succeeded')).toThrow();
+  it('permits run-linked writes while the seeded claim is live', () => {
+    const db = testDb();
+    const { run } = seededClaimedRun(db);
+    expect(setRunStatus(db, run.id, 'running').status).toBe('running');
+    expect(appendRunEvent(db, run.id, 'note', { ok: true }).duplicate).toBe(false);
   });
 });
