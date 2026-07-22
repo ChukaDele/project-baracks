@@ -105,7 +105,7 @@ describe('execute() is disabled in this build (live-agent-execution unavailable)
       gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: process.cwd() }),
     ).toThrow(CapabilityUnavailableError);
     expect(decisions[0]!.allowed).toBe(false);
-    expect(gateway.probeSync('which', ['node'])).toBeDefined();
+    expect(gateway.resolveExecutable('node')).toBeDefined();
   });
 
   it('no gateway option can re-enable execution (there is no such option)', () => {
@@ -254,7 +254,7 @@ describe('policy decision audit trail', () => {
     expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
       CapabilityUnavailableError,
     );
-    gateway.probeSync('which', ['node']);
+    gateway.resolveExecutable('node');
     const rows = db.select().from(executionPolicyDecisions).all();
     expect(rows).toHaveLength(2);
     expect(rows.map((r) => r.allowed)).toEqual([false, true]);
@@ -262,17 +262,21 @@ describe('policy decision audit trail', () => {
   });
 });
 
-describe('probes (read-only discovery, still available)', () => {
-  it('allows which/version probes and records them', () => {
+describe('discovery resolution (process-free, no subprocess)', () => {
+  it('resolves an allowlisted name on PATH for reporting and records it', () => {
     const { gateway, decisions } = makeGateway();
-    const resolved = gateway.probeSync('which', ['node']);
+    const resolved = gateway.resolveExecutable('node');
     expect(resolved).toContain('node');
     expect(decisions[0]).toMatchObject({ kind: 'probe', allowed: true });
+    // Resolution is reporting-only: it carries no argv (nothing is executed).
+    expect(decisions[0]!.argv).toEqual([]);
   });
 
-  it('refuses probes with arbitrary arguments', () => {
+  it('refuses a path-qualified target and any name off the discovery allowlist', () => {
     const { gateway } = makeGateway();
-    expect(() => gateway.probeSync('git', ['clone', 'http://evil'])).toThrow(GatewayViolationError);
-    expect(() => gateway.probeSync('which', ['a; rm -rf /'])).toThrow(GatewayViolationError);
+    // A path-qualified (environment/PATH-selected) override cannot be resolved.
+    expect(() => gateway.resolveExecutable('/tmp/evil/node')).toThrow(GatewayViolationError);
+    // Names outside the allowlist are refused outright.
+    expect(() => gateway.resolveExecutable('rm')).toThrow(GatewayViolationError);
   });
 });

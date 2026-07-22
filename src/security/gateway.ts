@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { isAbsolute, resolve } from 'node:path';
 import { executeStreaming, type StreamingSpawnSpec } from '../providers/exec.js';
 import type { ExecuteHandle } from '../providers/types.js';
@@ -28,8 +27,16 @@ import {
  * unavailable capability (src/security/capabilities.ts): every call records a
  * refusal and throws CapabilityUnavailableError before any validation or
  * spawn, unconditionally — no configuration, environment variable or
- * constructor option can pass the gate. Only read-only discovery probes
- * (probeSync) and trusted-installation pinning remain runnable.
+ * constructor option can pass the gate.
+ *
+ * Discovery in this foundation is RESOLUTION-ONLY and PROCESS-FREE. The
+ * gateway exposes exactly one discovery operation — resolveExecutable(), a
+ * PATH lookup for reporting — and NO method spawns a process: there is no
+ * --version probe, no `which` subprocess, no execFile/spawn anywhere in this
+ * file. A resolvable path is reported but confers no execution trust and is
+ * never evidence a binary is genuine or runnable; verifying that requires the
+ * trusted, OS-isolated execution boundary of milestone M1
+ * (docs/deferred-security-milestones.md).
  *
  * The validation pipeline below the gate (path canonicalisation, trusted
  * executable binding, argv policy, path-argument confinement, environment
@@ -109,16 +116,6 @@ export interface GatewayOptions {
   probeOnlyInternal?: boolean;
 }
 
-/** Argument forms a probe may use; probes are read-only version/auth checks. */
-const PROBE_ARG_FORMS: readonly (readonly string[])[] = [
-  ['--version'],
-  ['-V'],
-  ['-v'],
-  ['auth', 'status'],
-];
-
-const PROBE_TIMEOUT_MS = 20_000;
-
 export class ExecutionGateway {
   private readonly options: GatewayOptions;
   private readonly probeOnly: boolean;
@@ -139,8 +136,8 @@ export class ExecutionGateway {
   }
 
   /**
-   * A gateway that can only run read-only probes (which/--version/auth
-   * status). Used before any project is registered; execute() always refuses.
+   * A gateway restricted to process-free discovery (resolveExecutable). Used
+   * before any project is registered; execute() always refuses.
    */
   static probeOnly(options: Omit<GatewayOptions, 'allowedRoots'>): ExecutionGateway {
     return new ExecutionGateway({ ...options, allowedRoots: [], probeOnlyInternal: true });
@@ -375,128 +372,48 @@ export class ExecutionGateway {
   }
 
   /**
-   * Pin an explicitly configured installation path as the trusted canonical
-   * installation for its basename. Returns the spawnable path, or undefined
-   * when the path is not a valid executable (recorded either way).
-   */
-  pinExecutable(path: string): string | undefined {
-    try {
-      const trusted = this.options.trustedExecutables.pin(path);
-      this.record({
-        kind: 'probe',
-        allowed: true,
-        executable: path,
-        argv: [],
-        reason: `pinned trusted executable ${trusted.name} -> ${trusted.canonicalPath}`,
-        strippedEnv: [],
-        authorizedEnv: [],
-      });
-      return trusted.spawnPath;
-    } catch (error) {
-      this.record({
-        kind: 'probe',
-        allowed: false,
-        executable: path,
-        argv: [],
-        reason: error instanceof Error ? error.message : 'pin failed',
-        strippedEnv: [],
-        authorizedEnv: [],
-      });
-      return undefined;
-    }
-  }
-
-  /**
-   * Read-only discovery probe (`which x`, `x --version`, `gh auth status`).
-   * Only fixed argument forms are allowed; env is sanitised with no
-   * authorised secrets; output is captured, trimmed and returned.
+   * Resolve an executable NAME to a path on PATH, for REPORTING ONLY. This is
+   * the ENTIRE discovery surface of this disabled foundation, and it is
+   * PROCESS-FREE: it performs a supervisor-side PATH lookup (filesystem
+   * metadata only) and never runs anything — no --version, no `which`
+   * subprocess, no execFile/spawn. A path-qualified argument is rejected: only
+   * bare names on the discovery allowlist are resolved, so an
+   * environment/PATH-selected executable override can never be turned into a
+   * spawn here.
    *
-   * `which` never spawns: it is resolved supervisor-side over the sanitised
-   * PATH and the result is registered as the trusted canonical installation.
-   * Every other probe form only ever runs a trusted installation.
+   * A resolved path is reported (e.g. by doctor) but confers NO execution
+   * trust and is NOT evidence the binary is genuine, installed or runnable —
+   * that requires the trusted, OS-isolated execution boundary of milestone M1.
+   * Returns the resolved path, or undefined when the name is not on PATH.
    */
-  probeSync(executable: string, args: readonly string[]): string | undefined {
-    const base = executable.split('/').at(-1) ?? executable;
-    const isWhich =
-      base === 'which' && args.length === 1 && /^[A-Za-z0-9._-]+$/.test(args[0] ?? '');
-    const isKnownForm =
-      (this.options.commandPolicy.allowedExecutables ?? []).includes(base) &&
-      PROBE_ARG_FORMS.some(
-        (form) => form.length === args.length && form.every((a, i) => a === args[i]),
+  resolveExecutable(name: string): string | undefined {
+    if (name.includes('/')) {
+      this.refuse(
+        'probe',
+        { executable: name, args: [] },
+        `discovery is name-only (resolution-only): a path-qualified target is refused: ${name}`,
       );
-    if (!isWhich && !isKnownForm) {
-      this.refuse('probe', { executable, args }, `probe not allowed: ${base} ${args.join(' ')}`);
     }
-
+    if (!(this.options.commandPolicy.allowedExecutables ?? []).includes(name)) {
+      this.refuse('probe', { executable: name, args: [] }, `discovery not allowed: ${name}`);
+    }
     const env = sanitizeEnv(this.options.baseEnv ?? process.env, {
       allowlist: this.options.envAllowlist ?? [],
     });
-
-    if (isWhich) {
-      // `which` is read-only reporting: resolve on PATH (trusted binding first)
-      // WITHOUT conferring execution trust. The result must never be spawned by
-      // execute() — only verify()'d bindings are spawnable there.
-      const target = args[0]!;
-      const resolved =
-        this.options.trustedExecutables.get(target)?.spawnPath ??
-        this.options.trustedExecutables.resolveForReport(target, env.env.PATH);
-      this.record({
-        kind: 'probe',
-        allowed: true,
-        executable,
-        argv: args,
-        reason: resolved ? `resolved ${target} -> ${resolved}` : `not found on PATH: ${target}`,
-        strippedEnv: env.stripped,
-        authorizedEnv: [],
-      });
-      return resolved;
-    }
-
-    // A read-only version/auth probe. Probes are NOT the adversarial execute
-    // boundary (execution trust, identity revalidation and containment are
-    // enforced only in execute()); they run a fixed, read-only argument form.
-    // A path-qualified probe target (e.g. a `which`-resolved path) is run as
-    // given; a bare name is resolved on PATH for reporting.
-    let spawnPath: string | undefined;
-    if (executable.includes('/')) {
-      spawnPath = executable;
-    } else {
-      spawnPath =
-        this.options.trustedExecutables.get(base)?.spawnPath ??
-        this.options.trustedExecutables.resolveForReport(base, env.env.PATH);
-      if (!spawnPath) {
-        this.record({
-          kind: 'probe',
-          allowed: true,
-          executable,
-          argv: args,
-          reason: `not found on PATH: ${base}`,
-          strippedEnv: env.stripped,
-          authorizedEnv: [],
-        });
-        return undefined;
-      }
-    }
-
+    // Resolution only: a previously trusted binding's path, else a PATH scan
+    // for reporting. Neither spawns; both are pure filesystem inspection.
+    const resolved =
+      this.options.trustedExecutables.get(name)?.spawnPath ??
+      this.options.trustedExecutables.resolveForReport(name, env.env.PATH);
     this.record({
       kind: 'probe',
       allowed: true,
-      executable: spawnPath,
-      argv: args,
-      reason: 'allowed',
+      executable: name,
+      argv: [],
+      reason: resolved ? `resolved ${name} -> ${resolved}` : `not found on PATH: ${name}`,
       strippedEnv: env.stripped,
       authorizedEnv: [],
     });
-    try {
-      const out = execFileSync(spawnPath, [...args], {
-        encoding: 'utf8',
-        timeout: PROBE_TIMEOUT_MS,
-        env: env.env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }).trim();
-      return out || undefined;
-    } catch {
-      return undefined;
-    }
+    return resolved;
   }
 }

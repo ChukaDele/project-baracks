@@ -1,12 +1,13 @@
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import type { ExecutionGateway } from '../security/gateway.js';
 import { loadModelRegistry, registryModels, type ModelRegistry } from './registry.js';
 import type { ExecuteHandle, ExecuteRequest, ProviderAdapter, ProviderInfo } from './types.js';
 
 const RATE_LIMIT_PATTERN = /rate.?limit|429|too many requests|slow down/i;
 const EXHAUSTION_PATTERN = /usage limit|quota exceeded|out of credits|plan limit/i;
+
+/** Canonical executable name resolved for reporting. Environment overrides are
+ * deliberately NOT consulted for discovery in this build. */
+const CODEX_EXECUTABLE = 'codex';
 
 export interface CodexOptions {
   /** Every spawn — probe or execution — goes through this gateway. */
@@ -23,34 +24,36 @@ export class CodexProvider implements ProviderAdapter {
 
   constructor(options: CodexOptions) {
     this.gateway = options.gateway;
-    this.executable = options.executable ?? process.env.MAJOR_CODEX_BIN ?? 'codex';
+    // An explicit executable path is retained ONLY for the quarantined execute()
+    // path (milestone M1); discovery never consults it. Environment overrides
+    // (MAJOR_CODEX_BIN) are ignored entirely.
+    this.executable = options.executable ?? CODEX_EXECUTABLE;
     this.registry = options.registry ?? loadModelRegistry();
   }
 
   async discover(): Promise<ProviderInfo> {
-    // Establish the executable for discovery/reporting: an explicitly
-    // configured path is PINNED as the trusted canonical installation (with a
-    // stable identity); a bare name is only RESOLVED on PATH for reporting and
-    // read-only probes — PATH resolution never confers execution trust.
-    const resolved = this.executable.includes('/')
-      ? this.gateway.pinExecutable(this.executable)
-      : this.gateway.probeSync('which', [this.executable]);
-    const version = resolved ? this.gateway.probeSync(resolved, ['--version']) : undefined;
-    const installed = Boolean(resolved && version);
-    // Codex stores credentials in ~/.codex/auth.json after `codex login`.
-    const authenticated = installed && existsSync(join(homedir(), '.codex', 'auth.json'));
+    // DISABLED FOUNDATION: discovery is RESOLUTION-ONLY and PROCESS-FREE. The
+    // CLI is never executed — no --version, no `which` subprocess, no spawn —
+    // so we cannot verify that a resolvable binary is genuine, installed or
+    // runnable; that needs OS-isolated execution (milestone M1). Only the
+    // canonical name is resolved on PATH for reporting; environment overrides
+    // are ignored for discovery and never touched.
+    const resolved = this.gateway.resolveExecutable(CODEX_EXECUTABLE);
     const info: ProviderInfo = {
       name: this.name,
-      installed,
-      authenticated,
-      models: registryModels(this.registry, this.name, { visible: installed, authenticated }),
+      // Cannot be confirmed without executing the binary → reported truthfully
+      // as unverified, never as installed/authenticated/available.
+      installed: false,
+      authenticated: false,
+      executableUnverified: true,
+      models: registryModels(this.registry, this.name, { visible: false, authenticated: false }),
     };
     if (resolved !== undefined) info.executable = resolved;
-    if (version !== undefined) info.version = version;
     return info;
   }
 
   async probe(): Promise<ProviderInfo> {
+    // Deliberately identical to discover(): resolution-only, process-free.
     return this.discover();
   }
 

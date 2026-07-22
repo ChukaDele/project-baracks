@@ -27,11 +27,19 @@ export interface ModelState {
 
 export interface ProviderInfo {
   name: string;
+  /** Path resolved on PATH for REPORTING ONLY. Not evidence of installation:
+   * in the disabled foundation the binary is never executed, so a resolvable
+   * path is unverified. */
   executable?: string;
   version?: string;
   installed: boolean;
   /** Best-effort. Undefined when authentication state is not detectable. */
   authenticated?: boolean;
+  /** True in the disabled foundation: executable availability could not be
+   * verified because verifying it requires executing the binary (deferred to
+   * milestone M1 — trusted OS-isolated execution). Presence on PATH is
+   * reported via `executable`, but is never treated as installed/available. */
+  executableUnverified?: boolean;
   models: ModelState[];
 }
 
