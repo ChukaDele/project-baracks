@@ -62,9 +62,11 @@ TypeScript:
   set) refuse when guard data is absent, so callers cannot bypass checks by omission.
 - **One approved task per suggestion** — partial unique indexes on
   `tasks.suggestion_id` and `task_suggestions.approved_task_id`; approval is the only
-  transactional materialisation path (and is itself DISABLED in this build — see the
-  security model), and triggers make decided suggestions and task/suggestion/roadmap
-  relationships immutable (no silent reassignment).
+  transactional materialisation path. Suggestion materialisation is DISABLED in this
+  build at the canonical task-creation boundary: `addTask` refuses any task carrying a
+  `suggestionId` before any write, and `approveSuggestion` refuses before its
+  transaction (see the security model). Triggers make decided suggestions and
+  task/suggestion/roadmap relationships immutable (no silent reassignment).
 - **Same-project consistency** — composite foreign keys force a task's (and
   suggestion's) roadmap item into the same project, and verification/review rows to
   cite a run of the same task. Evidence triggers refuse references to records that

@@ -26,9 +26,13 @@ variable or CLI flag can open:
 - **no worker-owned mutations** — nothing can acquire or exercise a work claim;
 - **no external roadmap writes** — apply/reconcile refuse before touching any adapter.
 
-Beyond the five, **suggestion approval is also disabled** in this dry-run / inspection
-foundation: `major task approve` and the underlying `approveSuggestion` refuse before
-any mutation (exit 4), so a suggestion can never be materialised into a task.
+Beyond the five, **suggestion materialisation is also disabled** in this dry-run /
+inspection foundation. Refusal happens at the canonical task-creation boundary, not
+only in the CLI: `addTask` refuses any task carrying suggestion provenance
+(`suggestionId`) before any write, and `approveSuggestion` / `major task approve` refuse
+before any mutation (exit 4). A pending suggestion therefore cannot be turned into a
+task through any exported path. Ordinary human-created tasks (no suggestion provenance)
+remain usable.
 
 Each capability returns in its own follow-up milestone with its own independent
 security review: see `docs/deferred-security-milestones.md`.

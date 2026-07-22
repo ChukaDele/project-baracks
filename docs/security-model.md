@@ -21,12 +21,23 @@ What remains fully implemented and verified in this build: redaction (below), th
 process-free discovery path (name resolution only), the argv command policy,
 environment sanitisation, and the database invariants/backstops.
 
-Beyond the five capabilities, **suggestion approval is also disabled** in this
-dry-run / inspection-only foundation. `approveSuggestion` — the canonical boundary
-that materialises a suggestion into a task — refuses with
-`SuggestionApprovalUnavailableError` before opening any transaction, and the
-`major task approve` command routes through it and exits with the policy-refusal
-code (4). Read-only suggestion inspection and the relational model are retained.
+Beyond the five capabilities, **suggestion materialisation is also disabled** in this
+dry-run / inspection-only foundation, enforced at the canonical task-creation mutation
+boundary rather than only in the CLI:
+
+- `addTask` — the exported production task-creation API — refuses any task carrying
+  suggestion provenance (`suggestionId`) with `SuggestionApprovalUnavailableError`
+  BEFORE any write (no transaction, no task insert, no suggestion change, no
+  relationship/approval record). The raw insert that can persist suggestion provenance
+  is module-private (`insertTask`), reachable only through `approveSuggestion`, so the
+  exported surface offers no alternate materialisation route.
+- `approveSuggestion` refuses before opening its transaction, and `major task approve`
+  routes through it and exits with the policy-refusal code (4).
+
+No environment variable, config file, database value or caller option can enable it.
+Read-only suggestion inspection and the relational model are retained; ordinary
+human-created tasks (no suggestion provenance) remain usable, as do roadmap-linked
+tasks (a roadmap item is not suggestion provenance).
 
 ## Redaction (`src/security/redact.ts`)
 
@@ -143,8 +154,10 @@ enforcement input.
   never runs a binary (no `--version`, no `which` subprocess, no `execFile`/`spawn`).
 - No paid usage of any kind in this build: paid routes checkpoint and paid run
   records are refused, approval or not (see `docs/provider-routing.md`).
-- No suggestion approval in this build: `approveSuggestion` and `major task approve`
-  refuse before any mutation; suggestions cannot be materialised into tasks.
+- No suggestion materialisation in this build: `addTask` refuses any task carrying
+  suggestion provenance, and `approveSuggestion` / `major task approve` refuse before
+  any mutation; a pending suggestion cannot be turned into a task through any exported
+  path.
 - No task ever reaches `completed`, no work claim can be taken, and no external
   roadmap write can occur in this build (capability gate).
 - No automatic merge, no automatic deployment: both are human-approval categories.
