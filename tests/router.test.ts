@@ -143,15 +143,20 @@ describe('billing safety', () => {
     }
   });
 
-  it('uses paid capacity only with explicit human approval', () => {
+  it('uses paid capacity only with an approving DecisionRequest reference', () => {
     const decision = route(
-      { purpose: 'implementation', complexity: 'architectural', approvedPaidUsage: true },
+      {
+        purpose: 'implementation',
+        complexity: 'architectural',
+        approvedPaidUsage: { decisionId: 'dreq_paid1' },
+      },
       paidOnly,
     );
     expect(decision.kind).toBe('route');
     if (decision.kind === 'route') {
       expect(decision.billingMode).toBe('usage_credits');
-      expect(decision.reason).toMatch(/human-approved/);
+      expect(decision.paidUsageDecisionId).toBe('dreq_paid1');
+      expect(decision.reason).toMatch(/approved by dreq_paid1/);
     }
   });
 
@@ -163,10 +168,33 @@ describe('billing safety', () => {
       ]),
     ];
     const decision = route(
-      { purpose: 'implementation', complexity: 'architectural', approvedPaidUsage: true },
+      {
+        purpose: 'implementation',
+        complexity: 'architectural',
+        approvedPaidUsage: { decisionId: 'dreq_paid1' },
+      },
       providers,
     );
     expect(decision.kind).toBe('route');
-    if (decision.kind === 'route') expect(decision.billingMode).toBe('subscription_included');
+    if (decision.kind === 'route') {
+      expect(decision.billingMode).toBe('subscription_included');
+      expect(decision.paidUsageDecisionId).toBeUndefined();
+    }
+  });
+
+  it('treats unknown billing as unroutable, even with paid approval', () => {
+    const providers = [
+      claude([{ modelRef: 'mystery', routingClass: 'fable', billingMode: 'unknown' }]),
+    ];
+    for (const approvedPaidUsage of [undefined, { decisionId: 'dreq_paid1' }]) {
+      const request: Parameters<typeof route>[0] = {
+        purpose: 'implementation',
+        complexity: 'architectural',
+      };
+      if (approvedPaidUsage) request.approvedPaidUsage = approvedPaidUsage;
+      const decision = route(request, providers);
+      expect(decision.kind).toBe('checkpoint');
+      if (decision.kind === 'checkpoint') expect(decision.paidOptionsAvailable).toHaveLength(0);
+    }
   });
 });

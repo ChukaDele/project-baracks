@@ -14,8 +14,9 @@ export interface ModelState {
   billingMode: BillingMode;
   prohibited: boolean;
   prohibitedReason?: string;
-  /** Where this knowledge came from: 'registry' config, 'cli' discovery, or 'probe'. */
-  source: 'registry' | 'cli' | 'probe';
+  /** Where this knowledge came from: 'registry' config, 'cli' discovery,
+   * 'probe', or the persisted observation store ('persisted'). */
+  source: 'registry' | 'cli' | 'probe' | 'persisted';
 }
 
 export interface ProviderInfo {

@@ -11,8 +11,13 @@ export interface RoutingRequest {
   implementedByProvider?: string;
   /** Prior failed repair attempts on this task; drives escalation. */
   repairAttempts?: number;
-  /** Explicit human approval to spend usage credits or API billing. */
-  approvedPaidUsage?: boolean;
+  /**
+   * Explicit human approval to spend usage credits or API billing: the id of
+   * an APPROVED 'paid_usage' DecisionRequest, verified by the caller against
+   * the database (see domain/decision-service.ts#isApprovedDecision). A bare
+   * boolean is deliberately not accepted.
+   */
+  approvedPaidUsage?: { decisionId: string };
 }
 
 export interface RoutingOptions {
@@ -33,6 +38,8 @@ export type RoutingDecision =
       routingClass: RoutingClass;
       billingMode: BillingMode;
       reason: string;
+      /** The approving DecisionRequest, present iff the route is paid. */
+      paidUsageDecisionId?: string;
       /** Set when review independence was lost (same-provider review). */
       independenceLoss?: string;
     }
@@ -81,7 +88,14 @@ export function targetClass(request: RoutingRequest): Exclude<RoutingClass, 'unk
 
 function usable(candidate: Candidate): boolean {
   const m = candidate.model;
-  return m.visible && m.authenticated && !m.prohibited && m.availability === 'available';
+  return (
+    m.visible &&
+    m.authenticated &&
+    !m.prohibited &&
+    m.availability === 'available' &&
+    // Unknown billing is unroutable: we cannot prove the run would be free.
+    m.billingMode !== 'unknown'
+  );
 }
 
 function collectCandidates(providers: ProviderInfo[]): Candidate[] {
@@ -160,7 +174,7 @@ export function route(
     return decision;
   }
 
-  // Only paid options remain. Spend them ONLY with explicit human approval.
+  // Only paid options remain. Spend them ONLY with an approved DecisionRequest.
   if (paid.length > 0 && request.approvedPaidUsage) {
     const chosen = paid[0]!;
     const decision: RoutingDecision = {
@@ -169,10 +183,11 @@ export function route(
       modelRef: chosen.model.modelRef,
       routingClass: chosen.model.routingClass,
       billingMode: chosen.model.billingMode,
+      paidUsageDecisionId: request.approvedPaidUsage.decisionId,
       reason:
         `no subscription-included model usable for target=${target}; ` +
-        `human-approved paid usage of ${chosen.provider}/${chosen.model.modelRef} ` +
-        `(${chosen.model.billingMode})`,
+        `paid usage of ${chosen.provider}/${chosen.model.modelRef} ` +
+        `(${chosen.model.billingMode}) approved by ${request.approvedPaidUsage.decisionId}`,
     };
     if (independenceLoss) decision.independenceLoss = independenceLoss;
     return decision;
