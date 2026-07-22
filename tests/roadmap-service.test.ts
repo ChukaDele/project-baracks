@@ -290,7 +290,12 @@ describe('proposal lifecycle', () => {
       applyRoadmapUpdate(db, crashingEarly, update.id, { roadmapDoneDecisionId: decision.id }),
     ).rejects.toThrow(/before external write/);
 
-    const resolved = await reconcileRoadmapApplies(db, adapter);
+    // The write never landed, but the attempt's lease is still live: recovery
+    // leaves it alone until the lease lapses (never requeues a possibly-live
+    // attempt). Advance past the lease to reclaim it.
+    expect(await reconcileRoadmapApplies(db, adapter)).toEqual([]);
+    const afterLease = () => new Date(Date.now() + 60 * 60 * 1000);
+    const resolved = await reconcileRoadmapApplies(db, adapter, { now: afterLease });
     expect(resolved).toEqual([{ updateId: update.id, outcome: 'requeued' }]);
     expect((await adapter.readRow('RM-1'))?.values.Status).toBe('In Progress');
 

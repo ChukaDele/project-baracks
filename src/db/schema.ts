@@ -590,6 +590,12 @@ export const roadmapUpdates = sqliteTable(
      * attempt may settle the update. */
     applyAttemptId: text('apply_attempt_id'),
     applyStartedAt: text('apply_started_at'),
+    /** Worker that owns the in-flight apply attempt. */
+    applyWorkerId: text('apply_worker_id'),
+    /** The apply attempt's lease. Reconciliation may only reclaim an
+     * 'applying' row after this lapses — and only after confirming, via the
+     * adapter idempotency record, that the external write did not land. */
+    applyLeaseExpiresAt: text('apply_lease_expires_at'),
     appliedAt: text('applied_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

@@ -63,7 +63,15 @@ export interface RoadmapAdapter {
   revision(): Promise<string>;
   /** Compute the diff and violations without writing anything. */
   dryRun(proposal: UpdateProposal): Promise<DryRunResult>;
-  /** Atomic, idempotent write. Must refuse when dryRun reports violations. */
+  /**
+   * Atomic, idempotent write. Must refuse when dryRun reports violations.
+   *
+   * CONTRACT: idempotency is mandatory, not best-effort. Applying the same
+   * idempotencyKey more than once MUST be a no-op at the source (returning
+   * `already_applied`), and `wasApplied(key)` MUST report true afterwards.
+   * The crash-consistent apply/reconcile protocol relies on this: it is what
+   * makes a reclaimed-but-actually-in-flight attempt safe to retry.
+   */
   apply(proposal: UpdateProposal, options?: ApplyOptions): Promise<ApplyResult>;
   /**
    * Read-only reconciliation query: has this idempotency key already been

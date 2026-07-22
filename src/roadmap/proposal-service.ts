@@ -106,9 +106,16 @@ function assertDoneEvidence(db: Db, roadmapItemId: string, evidenceIds: string[]
   }
 }
 
+const DEFAULT_APPLY_LEASE_MS = 5 * 60 * 1000;
+
 export interface ApplyRoadmapOptions {
   /** Required when the proposal marks a row Done. */
   roadmapDoneDecisionId?: string;
+  /** Durable identity of the worker performing the apply. */
+  workerId?: string;
+  /** How long the apply attempt holds its lease (default 5 minutes). */
+  applyLeaseMs?: number;
+  now?: () => Date;
 }
 
 /** Rebuild the canonical proposal from a stored update and verify that the
@@ -130,15 +137,26 @@ function proposalFromUpdate(update: ReturnType<typeof getUpdate>): UpdateProposa
   return proposal;
 }
 
-/** Compare-and-swap the update into 'applying' under a fresh attempt id.
- * Exactly one worker can win this claim; everyone else throws. */
-function claimApply(db: Db, updateId: string): string {
+/** Compare-and-swap the update into 'applying' under a fresh attempt id, owner
+ * and lease. Exactly one worker can win this claim; everyone else throws. */
+function claimApply(
+  db: Db,
+  updateId: string,
+  owner: { workerId: string; leaseMs: number; now: () => Date },
+): string {
   const attemptId = newId('rapl');
+  const nowMs = owner.now().getTime();
   return db.transaction(
     (tx) => {
       const result = tx
         .update(roadmapUpdates)
-        .set({ status: 'applying', applyAttemptId: attemptId, applyStartedAt: nowIso() })
+        .set({
+          status: 'applying',
+          applyAttemptId: attemptId,
+          applyStartedAt: nowIso(),
+          applyWorkerId: owner.workerId,
+          applyLeaseExpiresAt: new Date(nowMs + owner.leaseMs).toISOString(),
+        })
         .where(and(eq(roadmapUpdates.id, updateId), eq(roadmapUpdates.status, 'proposed')))
         .run();
       if (result.changes !== 1) {
@@ -214,13 +232,18 @@ export async function applyRoadmapUpdate(
 
   const proposal = proposalFromUpdate(update);
   const changes = proposal.changes;
+  const owner = {
+    workerId: options.workerId ?? newId('rapw'),
+    leaseMs: options.applyLeaseMs ?? DEFAULT_APPLY_LEASE_MS,
+    now: options.now ?? (() => new Date()),
+  };
 
   // Reconcile before any revision-based invalidation: an already-applied
   // idempotency key means a prior attempt reached the source.
   const revision = await adapter.revision();
   if (update.sourceRevision !== revision) {
     if (await adapter.wasApplied(update.idempotencyKey)) {
-      const attemptId = claimApply(db, updateId);
+      const attemptId = claimApply(db, updateId, owner);
       return { status: 'applied' as const, update: settle(db, updateId, attemptId, 'applied') };
     }
     db.update(roadmapUpdates)
@@ -240,7 +263,7 @@ export async function applyRoadmapUpdate(
     }
   }
 
-  const attemptId = claimApply(db, updateId);
+  const attemptId = claimApply(db, updateId, owner);
   const expectedDiff = JSON.parse(update.dryRunDiff) as DiffEntry[];
   const result = await adapter.apply(proposal, { expectedDiff });
   // A crash on the line above leaves this update in durable 'applying' state;
@@ -257,12 +280,28 @@ export async function applyRoadmapUpdate(
 }
 
 /**
- * Crash recovery for the apply protocol: every update stuck in 'applying'
- * is resolved against the adapter's idempotency record. If the external
- * write happened, the update is applied (reconciled); if it never happened,
- * the update returns to 'proposed' for a fresh, fully re-validated attempt.
+ * Crash recovery for the apply protocol. For every update stuck in 'applying':
+ *
+ *   1. query the adapter's idempotency record FIRST — an already-applied key
+ *      reconciles to Applied (never a second write), regardless of the lease;
+ *   2. otherwise the attempt may still be running: reclaim it ONLY once its
+ *      lease has lapsed, and return it to 'proposed' for a fresh, fully
+ *      re-validated attempt. A still-leased attempt is left untouched, so a
+ *      concurrent reconciler cannot displace an in-flight external write, and
+ *      lease expiry alone never triggers another write — the idempotency
+ *      query always runs first.
+ *
+ * Adapter idempotency (RoadmapAdapter.wasApplied + idempotent apply) is the
+ * contract that makes this safe even in the residual window where a reclaimed
+ * attempt's write was in fact still in flight: re-applying the same key is a
+ * no-op at the source.
  */
-export async function reconcileRoadmapApplies(db: Db, adapter: RoadmapAdapter) {
+export async function reconcileRoadmapApplies(
+  db: Db,
+  adapter: RoadmapAdapter,
+  options: { now?: () => Date } = {},
+) {
+  const nowIsoStr = (options.now?.() ?? new Date()).toISOString();
   const stuck = db.select().from(roadmapUpdates).where(eq(roadmapUpdates.status, 'applying')).all();
   const resolved: { updateId: string; outcome: 'applied' | 'requeued' }[] = [];
   for (const update of stuck) {
@@ -272,13 +311,22 @@ export async function reconcileRoadmapApplies(db: Db, adapter: RoadmapAdapter) {
         .where(and(eq(roadmapUpdates.id, update.id), eq(roadmapUpdates.status, 'applying')))
         .run();
       resolved.push({ updateId: update.id, outcome: 'applied' });
-    } else {
-      db.update(roadmapUpdates)
-        .set({ status: 'proposed' })
-        .where(and(eq(roadmapUpdates.id, update.id), eq(roadmapUpdates.status, 'applying')))
-        .run();
-      resolved.push({ updateId: update.id, outcome: 'requeued' });
+      continue;
     }
+    // Not applied at the source. Leave a still-leased attempt alone.
+    if (update.applyLeaseExpiresAt !== null && update.applyLeaseExpiresAt > nowIsoStr) {
+      continue;
+    }
+    db.update(roadmapUpdates)
+      .set({
+        status: 'proposed',
+        applyAttemptId: null,
+        applyWorkerId: null,
+        applyLeaseExpiresAt: null,
+      })
+      .where(and(eq(roadmapUpdates.id, update.id), eq(roadmapUpdates.status, 'applying')))
+      .run();
+    resolved.push({ updateId: update.id, outcome: 'requeued' });
   }
   return resolved;
 }
