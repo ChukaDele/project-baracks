@@ -12,7 +12,10 @@
 - Dependencies gate execution: a task cannot be queued while any dependency is not
   completed. Model this with `TaskDependency` rows rather than prose.
 - A task is completed only through the canonical lifecycle
-  (`src/domain/lifecycle.ts`) with at least one Evidence record. There is no other path
-  to `completed`.
+  (`src/domain/lifecycle.ts`) by satisfying the completion proof set
+  (`src/domain/completion.ts`): passed verification runs, resolved P0/P1 review
+  findings, verified evidence relationships, and any task-specific criteria. A
+  free-text evidence assertion is never sufficient, and agents cannot fabricate
+  evidence references (DB-enforced). There is no other path to `completed`.
 - If a task's scope turns out to be wrong (too big, ambiguous, conflicts with guidance),
   the agent stops and raises a DecisionRequest rather than improvising.

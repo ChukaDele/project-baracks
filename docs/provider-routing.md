@@ -39,9 +39,33 @@ marketing names so the defaults survive releases.
 3. Reviews prefer Codex, then any provider that didn't produce the work; a same-provider
    review is allowed only as a last resort and records `independenceLoss`.
 4. Outside reviews, Codex is skipped entirely (review reserve).
-5. Subscription-included capacity always beats paid capacity. Paid capacity is used only
-   when the request carries explicit human approval; otherwise the router returns a
-   `checkpoint` decision listing the paid options for a human to approve.
+5. A model whose billing mode is `unknown` is **unroutable** — with or without paid
+   approval. Routing requires proof the run is free, or an approval to pay.
+6. Subscription-included capacity always beats paid capacity. Paid capacity is used only
+   when the request carries `approvedPaidUsage: { decisionId }` — the id of an APPROVED
+   `paid_usage` DecisionRequest that the caller verified against the database
+   (`isApprovedDecision`). A bare boolean is not accepted. Otherwise the router returns
+   a `checkpoint` decision listing the paid options for a human to approve.
 
 Every `route` decision carries a human-readable `reason` that is persisted on the
-`agent_runs` record along with billing mode and allowance state.
+`agent_runs` record along with billing mode, allowance state and (for paid routes) the
+authorising decision id — the `agent_runs_paid_requires_decision` CHECK refuses paid
+runs without one. Checkpoint decisions are persisted to the append-only
+`routing_checkpoints` table (`recordRoutingCheckpoint`).
+
+## Persisted discovery and probe backoff
+
+Availability and billing state are never merely asserted in code. Every discovery is
+persisted (`src/providers/discovery-store.ts`): current state on `agent_models`, plus an
+append-only `discovery_observations` row carrying the observed state, its **source**
+(`registry`/`cli`/`probe`/`run_outcome`/`human`), **confidence**
+(`configured`/`inferred`/`observed`) and timestamp. `major doctor` and `major run
+--dry-run` persist what they discover.
+
+Exhaustion and rate limits observed from real runs are recorded with a `nextProbeAt`
+backoff (defaults: 15 min rate-limited, 60 min exhausted). `shouldProbe` gates
+re-probing, and an optimistic re-discover does not erase an observed exhaustion until
+the window passes. `loadPersistedProviderInfos` builds routing inputs from this
+persisted state. No environment variable can silently activate API billing: billing
+modes come from persisted observations/configuration, and the execution gateway strips
+billing-related variables from every child environment (see `docs/security-model.md`).

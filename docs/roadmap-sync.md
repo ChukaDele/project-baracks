@@ -24,7 +24,28 @@ the future live adapter call it, so the rules cannot drift between them:
 - missing rows reject the whole proposal (atomicity);
 - formula-backed cells are never overwritten;
 - a status change to Done/Complete/Completed with zero evidence refs is refused;
-- rationale and idempotency key are mandatory.
+- rationale and idempotency key are mandatory;
+- when apply carries the prior dry run's diff, any cell whose current value differs
+  from the `from` observed then rejects the proposal (`source changed since dry run`).
+
+## Proposal integrity (`src/roadmap/proposal-service.ts`)
+
+A persisted `roadmap_updates` row binds the proposal to:
+
+- its **canonical payload hash** (`proposalPayloadHash`, sorted-key JSON over the
+  change set) — the idempotency key embeds this hash, so the same key can never carry
+  a different payload; the stored payload is immutable at the DB level (trigger);
+- the **source revision** observed at dry-run time (`adapter.revision()`), recorded
+  with the dry-run diff and timestamp. Apply requires that exact prior dry run; a
+  changed source revision marks the proposal `superseded` and refuses the write;
+- **verified evidence relationships** for Done changes: every evidence id must exist
+  and belong to a task of this roadmap item — a non-empty evidence string proves
+  nothing;
+- an approved **`roadmap_done` DecisionRequest**, verified against the database, for
+  any Done change.
+
+Roadmap permission grants nothing else: no merge, deploy, paid-usage or destructive
+authority is ever inferred from the ability to propose roadmap updates.
 
 ## Mock vs. live
 

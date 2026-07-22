@@ -38,6 +38,10 @@ During development run them as `pnpm major <command>`; `pnpm build` produces
 `dist/cli/index.js` (the `major` bin). State lives in `~/.major/major.db`
 (`MAJOR_DB_PATH` overrides).
 
+Exit codes are stable: `0` success, `1` unexpected error, `2` usage error, `3` not
+found, `4` policy refusal, `5` unsafe environment (doctor). `--json` flags emit a
+versioned envelope (`{ "schemaVersion": 1, ... }`).
+
 ## Development
 
 ```sh
