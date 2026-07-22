@@ -49,6 +49,12 @@ export interface StreamingSpawnSpec {
   timeoutMs?: number;
   /** When set, cwd must resolve inside one of these roots. */
   allowedRoots?: readonly string[];
+  /**
+   * Spawn as a process-group leader so the WHOLE descendant tree can be
+   * signalled and terminated together (not only the direct child). Set by the
+   * execution gateway's process-tree containment.
+   */
+  detached?: boolean;
   /** Map one stdout line (usually NDJSON) to an event; null skips the line. */
   parseLine?: (line: string) => ProviderEvent | null;
   /** Provider-specific detection over stderr + parsed events. */
@@ -88,16 +94,30 @@ export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
   let cancelled = false;
   let timedOut = false;
 
+  const detached = spec.detached ?? false;
   const child = spawn(spec.executable, spec.args, {
     cwd: spec.cwd,
     env: spec.env,
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
+    // A detached child is its own process-group leader; killing the negative
+    // pid then signals the entire group — the whole descendant tree.
+    detached,
   });
 
+  // Signal the whole process group when detached, so descendants launched by
+  // the agent CLI are terminated too — never just the direct child.
+  const signalTree = (signal: NodeJS.Signals) => {
+    try {
+      if (detached && typeof child.pid === 'number') process.kill(-child.pid, signal);
+      else child.kill(signal);
+    } catch {
+      /* group already gone */
+    }
+  };
   const killChild = () => {
-    child.kill('SIGTERM');
-    setTimeout(() => child.kill('SIGKILL'), 5000).unref();
+    signalTree('SIGTERM');
+    setTimeout(() => signalTree('SIGKILL'), 5000).unref();
   };
 
   const timeout = setTimeout(() => {

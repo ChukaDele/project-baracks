@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { checkArgv } from '../src/security/commands.js';
+import { processTreeContainment } from '../src/security/containment.js';
 import { BILLING_ENV_NAMES, sanitizeEnv } from '../src/security/env.js';
 import {
   ExecutionGateway,
@@ -40,6 +41,7 @@ function makeGateway(overrides: Partial<ConstructorParameters<typeof ExecutionGa
     trustedExecutables: trustingNode(),
     baseEnv: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' },
     recordDecision: (d) => decisions.push(d),
+    containment: processTreeContainment(),
     ...overrides,
   });
   return { gateway, decisions, root };
@@ -130,8 +132,8 @@ describe('trusted canonical executable binding', () => {
   });
 
   it('discovery trusts only the PATH-resolved binary; re-binding to another is refused', () => {
-    const registry = new TrustedExecutableRegistry();
     const fakeDir = tempRoot();
+    const registry = new TrustedExecutableRegistry({ allowedDirs: [fakeDir] });
     const fake = join(fakeDir, 'mytool');
     writeFileSync(fake, '#!/bin/sh\necho fake\n');
     chmodSync(fake, 0o755);
@@ -398,6 +400,7 @@ describe('persisted audit trail', () => {
       trustedExecutables: trustingNode(),
       baseEnv: { PATH: process.env.PATH ?? '' },
       recordDecision: dbDecisionRecorder(db),
+      containment: processTreeContainment(),
     });
     await gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root }).outcome;
     expect(() => gateway.execute({ executable: 'curl', args: ['x'], cwd: root })).toThrow();

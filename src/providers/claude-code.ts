@@ -29,9 +29,12 @@ export class ClaudeCodeProvider implements ProviderAdapter {
   }
 
   async discover(): Promise<ProviderInfo> {
-    // Establish the trusted canonical installation: an explicitly configured
-    // path is pinned; a bare name resolves via the gateway's supervisor-side
-    // PATH discovery. Execution later refuses anything but this identity.
+    // Establish the executable for discovery/reporting: an explicitly
+    // configured path is PINNED as the trusted canonical installation (with a
+    // stable identity); a bare name is only RESOLVED on PATH for reporting and
+    // read-only probes — PATH resolution never confers execution trust. Live
+    // execution therefore requires an explicitly pinned installation and is
+    // refused for a merely PATH-resolved binary.
     const resolved = this.executable.includes('/')
       ? this.gateway.pinExecutable(this.executable)
       : this.gateway.probeSync('which', [this.executable]);

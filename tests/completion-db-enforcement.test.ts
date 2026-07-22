@@ -30,7 +30,14 @@ function harness() {
       requiredDecisionCategories: ['merge'],
     }),
   });
-  for (const s of ['ready', 'queued', 'running', 'verifying', 'reviewing', 'ready_to_merge'] as const) {
+  for (const s of [
+    'ready',
+    'queued',
+    'running',
+    'verifying',
+    'reviewing',
+    'ready_to_merge',
+  ] as const) {
     transitionTask(db, task.id, s);
   }
 
@@ -88,7 +95,12 @@ describe('P1-3 database-enforced completion criteria', () => {
       exitCode: 0,
       agentRunId: run2.id,
     });
-    addEvidence(db, { taskId: task.id, kind: 'verification_run', ref: vrun2.id, summary: 'green2' });
+    addEvidence(db, {
+      taskId: task.id,
+      kind: 'verification_run',
+      ref: vrun2.id,
+      summary: 'green2',
+    });
 
     // still missing artifact + merge decision
     expect(() => forceComplete()).toThrow();

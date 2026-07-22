@@ -1,9 +1,16 @@
 import { execFileSync } from 'node:child_process';
+import { isAbsolute, resolve } from 'node:path';
 import { executeStreaming, type StreamingSpawnSpec } from '../providers/exec.js';
 import type { ExecuteHandle } from '../providers/types.js';
 import { checkArgv, type CommandPolicy } from './commands.js';
+import type { Containment } from './containment.js';
 import { sanitizeEnv, type SanitizedEnv } from './env.js';
-import { assertWithinRootsCanonical, PathViolationError } from './paths.js';
+import {
+  assertWithinRootsCanonical,
+  canonicalize,
+  isWithinRoots,
+  PathViolationError,
+} from './paths.js';
 import { redactText } from './redact.js';
 import {
   ExecutableTrustError,
@@ -15,17 +22,24 @@ import {
  * The single boundary through which every external process must pass.
  * Provider adapters never spawn independently: they hold a gateway and ask it
  * to execute or probe. The gateway canonicalises paths, binds every spawn to
- * a trusted canonical executable installation, enforces the command
- * allowlist, sanitises the environment, redacts what it records, and records
- * every policy decision — allowed or refused.
+ * a trusted canonical executable installation (revalidated at the spawn
+ * boundary), enforces the command allowlist, confines path-bearing arguments
+ * to the allowed roots, sanitises the environment, applies process-tree
+ * containment, redacts what it records, and records every policy decision.
  *
- * Containment guarantee (stated precisely): the gateway guarantees WHICH
- * binary runs (trusted canonical identity), WHERE it starts (realpath-checked
- * working directory inside the allowed roots), WITH WHAT environment
- * (allowlisted, credential-stripped), and WITH WHAT arguments (policy-checked
- * argv, no shell). It is not an OS-level filesystem sandbox: a spawned agent
- * process is not kernel-jailed to the allowed roots, which is why only
- * trusted executables may be spawned at all.
+ * Containment guarantee (stated precisely, no overclaiming): the gateway
+ * guarantees WHICH binary runs (trusted canonical identity, content-revalidated
+ * at spawn), WHERE it starts (realpath-checked working directory inside the
+ * allowed roots), WITH WHAT arguments (policy-checked argv; path-bearing
+ * arguments confined to the allowed roots; no shell), WITH WHAT environment
+ * (allowlisted, credential-stripped), and that the COMPLETE spawned process
+ * tree is terminated together (process-group containment; see providers/exec).
+ *
+ * It is NOT an OS-level filesystem or network sandbox: a spawned agent process
+ * and its descendants are not kernel-jailed to the allowed roots. Because that
+ * isolation is not enforced, execute() FAILS CLOSED unless a containment
+ * mechanism is configured, and live agent execution stays disabled until the
+ * doctor proves real containment support (doctor.liveExecutionReady).
  */
 
 export interface ExecutionPolicyDecision {
@@ -75,6 +89,12 @@ export interface GatewayOptions {
    * pinning or supervisor-side PATH discovery can ever run.
    */
   trustedExecutables: TrustedExecutableRegistry;
+  /**
+   * Containment mechanism applied to every spawned process tree. execute()
+   * fails closed when this is absent or not enforced — the fail-closed gate
+   * that keeps live agent execution disabled until real containment exists.
+   */
+  containment?: Containment;
   /** Base environment (defaults to process.env). */
   baseEnv?: NodeJS.ProcessEnv;
   /** Extra non-sensitive env names to pass through. */
@@ -155,6 +175,79 @@ export class ExecutionGateway {
     throw new GatewayViolationError(reason);
   }
 
+  /** Flags whose following argument is a filesystem path (value consumed). */
+  private static readonly PATH_VALUE_FLAGS = new Set([
+    '-C',
+    '--cwd',
+    '--directory',
+    '--work-tree',
+    '--git-dir',
+    '-o',
+    '--output',
+    '--out',
+    '-f',
+    '--file',
+    '--config',
+    '--data-dir',
+  ]);
+
+  /**
+   * Return a violation reason when any argument names a filesystem path that
+   * escapes the allowed roots: an absolute path, or the value of a known
+   * directory/file flag. Relative candidates resolve against the (already
+   * contained) working directory. Non-path arguments (refspecs, model refs,
+   * URLs) are left untouched.
+   */
+  private argPathViolation(args: readonly string[], canonicalCwd: string): string | null {
+    const roots = this.options.allowedRoots.flatMap((r) => {
+      try {
+        return [canonicalize(r)];
+      } catch {
+        return [r];
+      }
+    });
+    const check = (candidate: string): string | null => {
+      const abs = isAbsolute(candidate) ? candidate : resolve(canonicalCwd, candidate);
+      // Resolve to a real location when possible so symlinks cannot escape.
+      let probe = abs;
+      try {
+        probe = canonicalize(abs);
+      } catch {
+        /* non-existent target: fall back to the lexical absolute path */
+      }
+      return isWithinRoots(probe, roots)
+        ? null
+        : `path-bearing argument escapes the allowed roots: ${candidate}`;
+    };
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i]!;
+      if (ExecutionGateway.PATH_VALUE_FLAGS.has(arg)) {
+        const value = args[i + 1];
+        i++;
+        if (value !== undefined) {
+          const violation = check(value);
+          if (violation) return violation;
+        }
+        continue;
+      }
+      const eq = arg.indexOf('=');
+      if (
+        arg.startsWith('--') &&
+        eq > 0 &&
+        ExecutionGateway.PATH_VALUE_FLAGS.has(arg.slice(0, eq))
+      ) {
+        const violation = check(arg.slice(eq + 1));
+        if (violation) return violation;
+        continue;
+      }
+      if (isAbsolute(arg)) {
+        const violation = check(arg);
+        if (violation) return violation;
+      }
+    }
+    return null;
+  }
+
   private buildEnv(
     kind: 'execute' | 'probe',
     request: { executable: string; args: readonly string[]; cwd?: string },
@@ -184,6 +277,18 @@ export class ExecutionGateway {
       this.refuse('execute', request, 'this gateway is probe-only: no allowed roots configured');
     }
 
+    // Fail closed unless a containment mechanism is configured and enforced.
+    // This is what keeps live agent execution disabled on any platform where
+    // the required process containment is unavailable.
+    if (!this.options.containment?.enforced) {
+      this.refuse(
+        'execute',
+        request,
+        'execution containment is not configured or unavailable on this platform: ' +
+          'live execution is disabled',
+      );
+    }
+
     let canonicalCwd: string;
     try {
       canonicalCwd = assertWithinRootsCanonical(request.cwd, this.options.allowedRoots);
@@ -195,6 +300,12 @@ export class ExecutionGateway {
 
     const check = checkArgv(request.executable, request.args, this.options.commandPolicy);
     if (!check.allowed) this.refuse('execute', request, check.reason);
+
+    // Confine path-bearing arguments (absolute paths and tool directory flags
+    // such as -C/--work-tree/--output) to the allowed roots, so a trusted
+    // binary cannot be aimed at the filesystem outside the roots.
+    const argViolation = this.argPathViolation(request.args, canonicalCwd);
+    if (argViolation) this.refuse('execute', request, argViolation);
 
     // Bind the spawn to a trusted canonical installation: the allowlist name
     // must have a registered binding, and a path-qualified request must
@@ -231,6 +342,9 @@ export class ExecutionGateway {
       cwd: canonicalCwd,
       env: env.env,
       allowedRoots: this.options.allowedRoots,
+      // Process-tree containment: spawn as a group leader so the whole
+      // descendant tree is terminated together (never only the direct child).
+      detached: true,
     };
     if (request.timeoutMs !== undefined) spec.timeoutMs = request.timeoutMs;
     if (request.parseLine) spec.parseLine = request.parseLine;
@@ -300,41 +414,38 @@ export class ExecutionGateway {
     });
 
     if (isWhich) {
+      // `which` is read-only reporting: resolve on PATH (trusted binding first)
+      // WITHOUT conferring execution trust. The result must never be spawned by
+      // execute() — only verify()'d bindings are spawnable there.
       const target = args[0]!;
-      const entry =
-        this.options.trustedExecutables.get(target) ??
-        this.options.trustedExecutables.discover(target, env.env.PATH);
+      const resolved =
+        this.options.trustedExecutables.get(target)?.spawnPath ??
+        this.options.trustedExecutables.resolveForReport(target, env.env.PATH);
       this.record({
         kind: 'probe',
         allowed: true,
         executable,
         argv: args,
-        reason: entry
-          ? `resolved and trusted ${target} -> ${entry.canonicalPath}`
-          : `not found on PATH: ${target}`,
+        reason: resolved ? `resolved ${target} -> ${resolved}` : `not found on PATH: ${target}`,
         strippedEnv: env.stripped,
         authorizedEnv: [],
       });
-      return entry?.spawnPath;
+      return resolved;
     }
 
-    let trusted: TrustedExecutable | undefined;
+    // A read-only version/auth probe. Probes are NOT the adversarial execute
+    // boundary (execution trust, identity revalidation and containment are
+    // enforced only in execute()); they run a fixed, read-only argument form.
+    // A path-qualified probe target (e.g. a `which`-resolved path) is run as
+    // given; a bare name is resolved on PATH for reporting.
+    let spawnPath: string | undefined;
     if (executable.includes('/')) {
-      // A path-qualified probe must match the trusted canonical installation.
-      try {
-        trusted = this.options.trustedExecutables.verify(executable);
-      } catch (error) {
-        this.refuse(
-          'probe',
-          { executable, args },
-          error instanceof ExecutableTrustError ? error.message : 'executable trust check failed',
-        );
-      }
+      spawnPath = executable;
     } else {
-      trusted =
-        this.options.trustedExecutables.get(base) ??
-        this.options.trustedExecutables.discover(base, env.env.PATH);
-      if (!trusted) {
+      spawnPath =
+        this.options.trustedExecutables.get(base)?.spawnPath ??
+        this.options.trustedExecutables.resolveForReport(base, env.env.PATH);
+      if (!spawnPath) {
         this.record({
           kind: 'probe',
           allowed: true,
@@ -351,14 +462,14 @@ export class ExecutionGateway {
     this.record({
       kind: 'probe',
       allowed: true,
-      executable: trusted.spawnPath,
+      executable: spawnPath,
       argv: args,
       reason: 'allowed',
       strippedEnv: env.stripped,
       authorizedEnv: [],
     });
     try {
-      const out = execFileSync(trusted.spawnPath, [...args], {
+      const out = execFileSync(spawnPath, [...args], {
         encoding: 'utf8',
         timeout: PROBE_TIMEOUT_MS,
         env: env.env,

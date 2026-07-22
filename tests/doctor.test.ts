@@ -39,6 +39,19 @@ describe('major doctor', () => {
     expect(report.providers[0]?.models[0]?.modelRef).toBe('sonnet');
   });
 
+  it('reports live agent execution as not ready (no OS filesystem containment)', async () => {
+    const report = await runDoctor({
+      providers: [healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      run: fullToolchain,
+      env: { GOOGLE_APPLICATION_CREDENTIALS: '/tmp/creds.json' },
+      fileExists: () => true,
+    });
+    expect(report.liveExecutionReady).toBe(false);
+    expect(report.liveExecutionBlockers.join()).toMatch(/containment/i);
+    expect(report.checks.find((c) => c.name === 'descendant-containment')?.status).toBe('warn');
+  });
+
   it('flags missing prerequisites and unsafe overnight execution', async () => {
     const report = await runDoctor({
       providers: [new MockProvider({ name: 'codex', installed: false, authenticated: false })],

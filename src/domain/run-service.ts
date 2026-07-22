@@ -76,7 +76,10 @@ export function createRun(db: Db, input: NewRunInput) {
         .select()
         .from(agentModels)
         .where(
-          and(eq(agentModels.providerId, input.providerId), eq(agentModels.modelRef, input.modelRef)),
+          and(
+            eq(agentModels.providerId, input.providerId),
+            eq(agentModels.modelRef, input.modelRef),
+          ),
         )
         .get();
       if (model) {
@@ -92,7 +95,9 @@ export function createRun(db: Db, input: NewRunInput) {
           );
         }
         if (input.modelId !== undefined && input.modelId !== model.id) {
-          throw new RunAuthorisationError(`modelId ${input.modelId} does not match ${input.modelRef}`);
+          throw new RunAuthorisationError(
+            `modelId ${input.modelId} does not match ${input.modelRef}`,
+          );
         }
       }
 
@@ -122,6 +127,7 @@ export function createRun(db: Db, input: NewRunInput) {
           .from(agentProviders)
           .where(eq(agentProviders.id, input.providerId))
           .get();
+        const now = input.now?.();
         const authorised = isApprovedDecision(tx, input.paidUsageDecisionId, {
           category: 'paid_usage',
           taskId: input.taskId,
@@ -129,7 +135,7 @@ export function createRun(db: Db, input: NewRunInput) {
           scope: { provider: provider?.name ?? '', modelRef: input.modelRef },
           requireExpiry: true,
           requireUnconsumed: true,
-          now: input.now?.(),
+          ...(now ? { now } : {}),
         });
         if (!authorised) {
           throw new RunAuthorisationError(

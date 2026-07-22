@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { platform, release } from 'node:os';
 import type { ProviderAdapter, ProviderInfo } from '../providers/types.js';
+import { detectContainment } from '../security/containment.js';
 import { redactText } from '../security/redact.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'missing';
@@ -20,6 +21,11 @@ export interface DoctorReport {
   missingPrerequisites: string[];
   overnightSafe: boolean;
   overnightSafeReasons: string[];
+  /** True only when the OS containment required for live agent execution is
+   * actually enforced. False in this foundation (no filesystem sandbox), which
+   * is why live agent execution stays disabled. */
+  liveExecutionReady: boolean;
+  liveExecutionBlockers: string[];
 }
 
 export type CommandRunner = (executable: string, args: string[]) => string | undefined;
@@ -112,6 +118,21 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
       : `${credsVar} not set (roadmap sync unavailable)`,
   });
 
+  // Descendant/process containment for live agent execution. Reported honestly:
+  // process-tree termination is available on POSIX, but no OS filesystem
+  // sandbox is wired, so live execution readiness is false.
+  const containment = detectContainment();
+  checks.push({
+    name: 'descendant-containment',
+    required: false,
+    status: containment.liveExecutionReady ? 'ok' : 'warn',
+    detail: containment.detail,
+  });
+  const liveExecutionBlockers: string[] = [];
+  if (!containment.liveExecutionReady) {
+    liveExecutionBlockers.push(`descendant containment insufficient: ${containment.detail}`);
+  }
+
   const missingPrerequisites = checks
     .filter((c) => c.required && c.status === 'missing')
     .map((c) => c.name);
@@ -142,5 +163,7 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     missingPrerequisites,
     overnightSafe: overnightSafeReasons.length === 0,
     overnightSafeReasons,
+    liveExecutionReady: containment.liveExecutionReady,
+    liveExecutionBlockers,
   };
 }
