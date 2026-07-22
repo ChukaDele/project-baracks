@@ -15,6 +15,20 @@
       "when": 1784685958818,
       "tag": "0001_append_only_run_events",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784689952839,
+      "tag": "0002_harden_invariants",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784690118885,
+      "tag": "0003_integrity_triggers",
+      "breakpoints": true
     }
   ]
 }

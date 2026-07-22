@@ -16,7 +16,11 @@ export type IdPrefix =
   | 'dreq'
   | 'evid'
   | 'rupd'
-  | 'usage';
+  | 'usage'
+  | 'tclm'
+  | 'dobs'
+  | 'rchk'
+  | 'xpd';
 
 /** Stable, globally unique, prefix-typed ID (e.g. `task_5f0c...`). */
 export function newId(prefix: IdPrefix): string {
