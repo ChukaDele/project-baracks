@@ -13,6 +13,7 @@ import {
   verificationRuns,
   type BillingMode,
 } from '../db/schema.js';
+import { assertCapabilityAvailable } from '../security/capabilities.js';
 import { redactText, redactValue } from '../security/redact.js';
 import { StaleClaimError } from './claim-service.js';
 import { isApprovedDecision } from './decision-service.js';
@@ -47,15 +48,26 @@ export interface NewRunInput {
 }
 
 /**
- * Create a run inside one immediate transaction that validates everything a
- * run's authority rests on: the task exists; the billing mode is known (an
- * 'unknown' cost basis is unroutable); a supplied claim is the task's current
- * active, unexpired claim (fencing token); and a paid billing mode carries an
- * approved, correctly scoped 'paid_usage' DecisionRequest for this task and
- * project. Caller- or environment-supplied identifiers grant nothing by
- * themselves — the decision row in THIS database is the authority.
+ * Create a run record inside one immediate transaction. In this build a run
+ * row is ledger/planning state only — nothing executes it (live agent
+ * execution is an unavailable capability, see src/security/capabilities.ts).
+ *
+ * Validations that remain live: the task exists, and the billing mode is
+ * known (an 'unknown' cost basis is unroutable) and must match the model's
+ * authoritatively observed billing.
+ *
+ * QUARANTINED paths: a PAID billing mode is refused unconditionally (paid
+ * provider execution is unavailable — M2), and a claim-bound run is refused
+ * unconditionally (worker-owned downstream mutations are unavailable — M4).
+ * The validation code for those paths below the gates is retained as the
+ * milestone starting point but is unreachable until then; independent review
+ * found it incomplete (approval scoping/consumption, fencing coverage), so it
+ * must not be presented as an enforced boundary.
  */
 export function createRun(db: Db, input: NewRunInput) {
+  if (PAID_BILLING_MODES.includes(input.billingMode)) {
+    assertCapabilityAvailable('paid-provider-execution');
+  }
   return db.transaction(
     (tx) => {
       const task = tx.select().from(tasks).where(eq(tasks.id, input.taskId)).get();

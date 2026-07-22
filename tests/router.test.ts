@@ -143,7 +143,9 @@ describe('billing safety', () => {
     }
   });
 
-  it('uses paid capacity only with an approving DecisionRequest reference', () => {
+  it('never routes to paid capacity, even with an approving DecisionRequest reference', () => {
+    // Paid provider execution is an unavailable capability in this build: an
+    // approved paid_usage reference still checkpoints instead of routing.
     const decision = route(
       {
         purpose: 'implementation',
@@ -152,11 +154,10 @@ describe('billing safety', () => {
       },
       paidOnly,
     );
-    expect(decision.kind).toBe('route');
-    if (decision.kind === 'route') {
-      expect(decision.billingMode).toBe('usage_credits');
-      expect(decision.paidUsageDecisionId).toBe('dreq_paid1');
-      expect(decision.reason).toMatch(/approved by dreq_paid1/);
+    expect(decision.kind).toBe('checkpoint');
+    if (decision.kind === 'checkpoint') {
+      expect(decision.reason).toMatch(/paid provider execution is unavailable/);
+      expect(decision.paidOptionsAvailable.length).toBeGreaterThan(0);
     }
   });
 

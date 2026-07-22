@@ -2,17 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { agentProviders, agentRuns } from '../src/db/schema.js';
 import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
-import { createRun, RunAuthorisationError } from '../src/domain/run-service.js';
+import { createRun } from '../src/domain/run-service.js';
 import { addTask } from '../src/domain/task-service.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { seedProject, testDb } from './helpers.js';
 
 /**
- * Paid execution authority: a run with a paid billing mode is created only
- * when an APPROVED 'paid_usage' DecisionRequest — bound to the same task and
- * project and covering the requested provider/model scope — exists in the
- * database, validated inside the run-creation transaction. Caller-supplied
- * identifiers, forged references, stale/cross-task/mis-scoped approvals all
- * fail, at the service layer and again at the DB boundary.
+ * Paid provider execution is an unavailable capability in this build: run
+ * creation refuses EVERY paid billing mode unconditionally — before the
+ * transaction, before any approval lookup — no matter how well-formed the
+ * approval is. The decision-scoping/consumption semantics are deferred to
+ * milestone M2. The DB boundary keeps its own backstop against forged direct
+ * paid inserts.
  */
 
 function setup() {
@@ -37,105 +38,15 @@ function paidRunInput(taskId: string, providerId: string, decisionId?: string) {
   return input;
 }
 
-describe('paid-usage decision validation inside the run transaction', () => {
-  it('refuses a forged decision reference that does not exist', () => {
+describe('paid run creation is disabled (paid-provider-execution unavailable)', () => {
+  it('refuses a paid run with no decision reference', () => {
     const { db, task, providerId } = setup();
-    expect(() => createRun(db, paidRunInput(task.id, providerId, 'dreq_forged'))).toThrow(
-      RunAuthorisationError,
+    expect(() => createRun(db, paidRunInput(task.id, providerId))).toThrow(
+      CapabilityUnavailableError,
     );
   });
 
-  it('refuses a decision that is open, rejected or expired (stale approvals)', () => {
-    const { db, project, task, providerId } = setup();
-    const open = createDecisionRequest(db, {
-      projectId: project.id,
-      taskId: task.id,
-      category: 'paid_usage',
-      question: 'spend?',
-    });
-    expect(() => createRun(db, paidRunInput(task.id, providerId, open.id))).toThrow(
-      RunAuthorisationError,
-    );
-
-    const rejected = createDecisionRequest(db, {
-      projectId: project.id,
-      taskId: task.id,
-      category: 'paid_usage',
-      question: 'spend?',
-    });
-    resolveDecision(db, rejected.id, 'rejected', 'no');
-    expect(() => createRun(db, paidRunInput(task.id, providerId, rejected.id))).toThrow(
-      RunAuthorisationError,
-    );
-  });
-
-  it('refuses an approval of the wrong category', () => {
-    const { db, project, task, providerId } = setup();
-    const merge = createDecisionRequest(db, {
-      projectId: project.id,
-      taskId: task.id,
-      category: 'merge',
-      question: 'merge?',
-    });
-    resolveDecision(db, merge.id, 'approved', 'lgtm');
-    expect(() => createRun(db, paidRunInput(task.id, providerId, merge.id))).toThrow(
-      RunAuthorisationError,
-    );
-  });
-
-  it('refuses a cross-task approval and an approval bound to no task', () => {
-    const { db, project, task, providerId } = setup();
-    const otherTask = addTask(db, { projectId: project.id, title: 'other work' });
-    const crossTask = createDecisionRequest(db, {
-      projectId: project.id,
-      taskId: otherTask.id,
-      category: 'paid_usage',
-      question: 'spend on the OTHER task?',
-    });
-    resolveDecision(db, crossTask.id, 'approved', 'yes, for the other task');
-    expect(() => createRun(db, paidRunInput(task.id, providerId, crossTask.id))).toThrow(
-      RunAuthorisationError,
-    );
-
-    const taskless = createDecisionRequest(db, {
-      projectId: project.id,
-      category: 'paid_usage',
-      question: 'blanket spend?',
-    });
-    resolveDecision(db, taskless.id, 'approved', 'blanket');
-    expect(() => createRun(db, paidRunInput(task.id, providerId, taskless.id))).toThrow(
-      RunAuthorisationError,
-    );
-  });
-
-  it('refuses an approval scoped to a different provider or model', () => {
-    const { db, project, task, providerId } = setup();
-    const wrongProvider = createDecisionRequest(db, {
-      projectId: project.id,
-      taskId: task.id,
-      category: 'paid_usage',
-      question: 'spend on codex?',
-      contextJson: JSON.stringify({ scope: { provider: 'codex' } }),
-    });
-    resolveDecision(db, wrongProvider.id, 'approved', 'codex only');
-    expect(() => createRun(db, paidRunInput(task.id, providerId, wrongProvider.id))).toThrow(
-      RunAuthorisationError,
-    );
-
-    const wrongModel = createDecisionRequest(db, {
-      projectId: project.id,
-      taskId: task.id,
-      category: 'paid_usage',
-      question: 'spend on sonnet only?',
-      contextJson: JSON.stringify({ scope: { provider: 'claude-code', modelRef: 'sonnet' } }),
-    });
-    resolveDecision(db, wrongModel.id, 'approved', 'sonnet only');
-    expect(() => createRun(db, paidRunInput(task.id, providerId, wrongModel.id))).toThrow(
-      RunAuthorisationError,
-    );
-  });
-
-  it('creates the run only for a correctly bound, correctly scoped approval', () => {
+  it('refuses a paid run even with a fully approved, correctly scoped decision', () => {
     const { db, project, task, providerId } = setup();
     const decision = createDecisionRequest(db, {
       projectId: project.id,
@@ -146,9 +57,25 @@ describe('paid-usage decision validation inside the run transaction', () => {
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     });
     resolveDecision(db, decision.id, 'approved', 'authorised');
-    const run = createRun(db, paidRunInput(task.id, providerId, decision.id));
-    expect(run.paidUsageDecisionId).toBe(decision.id);
-    expect(run.billingMode).toBe('api_billing');
+    expect(() => createRun(db, paidRunInput(task.id, providerId, decision.id))).toThrow(
+      CapabilityUnavailableError,
+    );
+    // nothing was written and nothing was consumed
+    expect(db.select().from(agentRuns).all()).toHaveLength(0);
+  });
+
+  it('refuses usage_credits the same as api_billing', () => {
+    const { db, task, providerId } = setup();
+    expect(() =>
+      createRun(db, {
+        taskId: task.id,
+        providerId,
+        modelRef: 'opus',
+        purpose: 'implementation',
+        billingMode: 'usage_credits',
+        routingReason: 'paid route under test',
+      }),
+    ).toThrow(CapabilityUnavailableError);
   });
 
   it('the DB boundary independently refuses forged paid inserts', () => {

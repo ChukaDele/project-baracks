@@ -1,5 +1,6 @@
 import type { BillingMode, RoutingClass, RunPurpose, TaskComplexity } from '../db/schema.js';
 import type { ModelState, ProviderInfo } from '../providers/types.js';
+import { isCapabilityAvailable } from '../security/capabilities.js';
 
 export type RiskLevel = 'normal' | 'high' | 'security_sensitive';
 
@@ -15,7 +16,9 @@ export interface RoutingRequest {
    * Explicit human approval to spend usage credits or API billing: the id of
    * an APPROVED 'paid_usage' DecisionRequest, verified by the caller against
    * the database (see domain/decision-service.ts#isApprovedDecision). A bare
-   * boolean is deliberately not accepted.
+   * boolean is deliberately not accepted. In this build the reference can
+   * never produce a paid route: paid provider execution is an unavailable
+   * capability, so the router checkpoints instead (milestone M2).
    */
   approvedPaidUsage?: { decisionId: string };
 }
@@ -174,8 +177,12 @@ export function route(
     return decision;
   }
 
-  // Only paid options remain. Spend them ONLY with an approved DecisionRequest.
-  if (paid.length > 0 && request.approvedPaidUsage) {
+  // Only paid options remain. Paid provider execution is unavailable in this
+  // build: even an approved DecisionRequest reference cannot route to paid
+  // capacity (capability gate, milestone M2) — the router checkpoints instead
+  // of ever creating a charge. The branch below is retained for M2 but is
+  // unreachable until then.
+  if (paid.length > 0 && request.approvedPaidUsage && isCapabilityAvailable('paid-provider-execution')) {
     const chosen = paid[0]!;
     const decision: RoutingDecision = {
       kind: 'route',
@@ -198,7 +205,8 @@ export function route(
     reason:
       paid.length > 0
         ? `only paid options remain for target=${target} (purpose=${request.purpose}); ` +
-          'checkpointing instead of creating an unapproved charge'
+          'paid provider execution is unavailable in this build — checkpointing instead ' +
+          'of creating an unapproved charge'
         : `no usable model for target=${target} (purpose=${request.purpose}); ` +
           'checkpointing until availability recovers',
     paidOptionsAvailable: paid,

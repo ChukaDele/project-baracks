@@ -29,6 +29,7 @@ import {
   scopeFingerprint,
   transitionTask,
 } from '../src/domain/task-service.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import {
   completeTaskProperly,
   recordQualifyingVerification,
@@ -389,7 +390,7 @@ describe('agent runs', () => {
     expect(() => db.delete(agentRunEvents).run()).toThrow(/append-only/);
   });
 
-  it('refuses a paid run without an authorising decision (service layer)', () => {
+  it('refuses every paid run: paid provider execution is unavailable in this build', () => {
     const { db, task, providerId } = seedRun(testDb());
     expect(() =>
       createRun(db, {
@@ -400,7 +401,7 @@ describe('agent runs', () => {
         billingMode: 'api_billing',
         routingReason: 'unauthorised paid route',
       }),
-    ).toThrow(/paid_usage/);
+    ).toThrow(CapabilityUnavailableError);
   });
 
   it('refuses an unknown-billing run at both the service and DB boundary', () => {
