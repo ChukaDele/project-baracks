@@ -91,4 +91,79 @@ describe('immutable run events', () => {
     expect(persisted).not.toContain('supersecret');
     expect(persisted).toContain('[REDACTED]');
   });
+
+  function persistedBytes(path: string): string {
+    const raw = openDb(path).sqlite.prepare('SELECT payload_json FROM agent_run_events').all() as {
+      payload_json: string;
+    }[];
+    return raw.map((r) => r.payload_json).join('\n');
+  }
+
+  it('multi-part and structured secret values leave no recoverable fragment', () => {
+    const path = tempDbPath();
+    const db = openDb(path).db;
+    const run = seedRun(db);
+    appendRunEvent(db, run.id, 'provider_stdout', {
+      // whole-value redaction by sensitive key: every fragment must vanish,
+      // even parts that match no known token format
+      password: 'correct horse battery staple',
+      // a sensitive key holding a structured value: the WHOLE subtree goes,
+      // fail closed, even the parts that look innocent
+      credentials: {
+        user: 'svc-secret-user',
+        private_key: 'part-one part-two part-three',
+      },
+      context: { user: 'svc-roadmap' },
+      // sensitive key holding a structured value: the whole subtree goes
+      auth: { header: 'Basic QWxhZGRpbjpvcGVuc2VzYW1l', renewal: { token: 'zzz' } },
+      // free text with a quoted multi-word secret (secondary pattern layer)
+      stderr: 'login failed: api_key: "alpha beta gamma delta" rejected by upstream',
+      harmless: 'exit code 0',
+    });
+    const persisted = persistedBytes(path);
+    for (const fragment of [
+      'correct horse',
+      'battery staple',
+      'svc-secret-user',
+      'part-one',
+      'part-two',
+      'part-three',
+      'QWxhZGRpbjpvcGVuc2VzYW1l',
+      'zzz',
+      'alpha beta',
+      'gamma delta',
+    ]) {
+      expect(persisted).not.toContain(fragment);
+    }
+    // non-secret context survives
+    expect(persisted).toContain('svc-roadmap');
+    expect(persisted).toContain('exit code 0');
+    // and what persisted is still valid JSON
+    for (const line of persisted.split('\n')) expect(() => JSON.parse(line)).not.toThrow();
+  });
+
+  it('provider stderr/errors are redacted before durable storage', () => {
+    const path = tempDbPath();
+    const db = openDb(path).db;
+    const run = seedRun(db);
+    appendRunEvent(db, run.id, 'provider_failed', {
+      error:
+        'request rejected: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.abcdefghijklmnop',
+      stderrTail: 'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY was set',
+    });
+    const persisted = persistedBytes(path);
+    expect(persisted).not.toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9');
+    expect(persisted).not.toContain('wJalrXUtnFEMIK7MDENG');
+  });
+
+  it('fails closed: an unredactable payload is withheld, not persisted raw', () => {
+    const path = tempDbPath();
+    const db = openDb(path).db;
+    const run = seedRun(db);
+    const circular: Record<string, unknown> = { note: 'ghp_abcdefghijklmnopqrstuvwxyz123456' };
+    circular.self = circular;
+    appendRunEvent(db, run.id, 'weird', circular);
+    const persisted = persistedBytes(path);
+    expect(persisted).not.toContain('ghp_abcdef');
+  });
 });
