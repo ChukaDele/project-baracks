@@ -13,11 +13,20 @@ of that boundary; no configuration can do it.
 ## M1 — Trusted OS-isolated execution
 
 Re-enables: `live-agent-execution` (`ExecutionGateway.execute`, `executeStreaming`,
-provider `execute`).
+provider `execute`) **and** executable probing.
+
+In this disabled foundation, discovery is resolution-only and PROCESS-FREE: the
+gateway exposes only `resolveExecutable` (a PATH lookup for reporting) and NO
+process-creating path — the former `--version` / `which` / `execFileSync` probe was
+removed because it could run an environment/PATH-selected binary outside any isolation.
+Executable availability is therefore represented as UNVERIFIED. Executing a binary to
+verify its identity, version or auth state — even for discovery — is part of THIS
+milestone and must be restored only behind the same trusted, isolated boundary.
 
 Known gaps: executable identity verification skips content hashing when file metadata
 appears unchanged (preserved-metadata mutation gap); execution is gated on
-process-group containment without OS filesystem/network isolation.
+process-group containment without OS filesystem/network isolation; a resolvable binary
+cannot yet be verified because no isolated execution path exists.
 
 Definition of done:
 
@@ -27,6 +36,9 @@ Definition of done:
 - Execution is gated on proven OS-level filesystem (and network, where required)
   isolation — an enforced sandbox mechanism, not process-group containment alone and
   not a doctor report or configuration claim.
+- Any executable probing that runs a binary (version/auth discovery) is reintroduced
+  only through this trusted, isolated boundary — never as a supposedly read-only path
+  that spawns an environment/PATH-selected executable.
 - The gateway's fail-closed documentation matches its behaviour exactly.
 - Adversarial tests cover binary replacement with preserved metadata, sandbox-absent
   platforms, and escape of the allowed roots by a spawned descendant.

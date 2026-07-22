@@ -62,8 +62,9 @@ TypeScript:
   set) refuse when guard data is absent, so callers cannot bypass checks by omission.
 - **One approved task per suggestion** — partial unique indexes on
   `tasks.suggestion_id` and `task_suggestions.approved_task_id`; approval is the only
-  transactional materialisation path, and triggers make decided suggestions and
-  task/suggestion/roadmap relationships immutable (no silent reassignment).
+  transactional materialisation path (and is itself DISABLED in this build — see the
+  security model), and triggers make decided suggestions and task/suggestion/roadmap
+  relationships immutable (no silent reassignment).
 - **Same-project consistency** — composite foreign keys force a task's (and
   suggestion's) roadmap item into the same project, and verification/review rows to
   cite a run of the same task. Evidence triggers refuse references to records that
@@ -96,7 +97,9 @@ TypeScript:
   comprehensive fencing of every downstream write is milestone M4.
 - **One (disabled) execution boundary** — every spawn path funnels through the
   execution gateway, and in this build the gateway's `execute()` refuses
-  unconditionally before any validation or spawn. Read-only discovery probes remain.
+  unconditionally before any validation or spawn. Discovery is process-free: the
+  gateway's only runnable discovery operation resolves names on PATH for reporting and
+  never runs a binary (no `--version`, no `which` subprocess, no `execFile`/`spawn`).
   The trust/containment pipeline behind the gate (supervisor-controlled canonical
   registry, path-argument confinement, process-group containment) is retained as M1
   groundwork with known gaps — it is not a complete execution boundary
@@ -106,8 +109,9 @@ TypeScript:
 
 `major` exits with stable, documented codes: `0` success, `1` unexpected error,
 `2` usage/validation error, `3` entity not found, `4` policy refusal, `5` unsafe
-environment (`major doctor` when overnight execution is not safe). `--json` output is a
-versioned envelope: `{ "schemaVersion": 1, "kind": …, "data": … }`.
+environment (`major doctor` when the inspection/dry-run environment is unhealthy;
+overnight/live execution is separately reported as UNAVAILABLE and never as safe).
+`--json` output is a versioned envelope: `{ "schemaVersion": 1, "kind": …, "data": … }`.
 
 ## Deliberate deferrals (later tracks)
 

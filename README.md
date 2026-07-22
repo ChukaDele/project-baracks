@@ -16,12 +16,19 @@ What this build can NOT do — five capabilities are unavailable, enforced by a
 hard-coded gate (`src/security/capabilities.ts`) that no configuration, environment
 variable or CLI flag can open:
 
-- **no live agent execution** — every spawn path refuses before any subprocess;
+- **no live agent execution** — every spawn path refuses before any subprocess, and
+  discovery is process-free: it resolves names on PATH but never runs a binary (no
+  `--version`, no `which` subprocess, no `execFile`/`spawn`), so executable
+  availability is reported as UNVERIFIED;
 - **no paid provider execution** — paid billing modes and paid routes refuse, even
   with an approved decision reference;
 - **no autonomous task completion** — no code path reaches `completed`;
 - **no worker-owned mutations** — nothing can acquire or exercise a work claim;
 - **no external roadmap writes** — apply/reconcile refuse before touching any adapter.
+
+Beyond the five, **suggestion approval is also disabled** in this dry-run / inspection
+foundation: `major task approve` and the underlying `approveSuggestion` refuse before
+any mutation (exit 4), so a suggestion can never be materialised into a task.
 
 Each capability returns in its own follow-up milestone with its own independent
 security review: see `docs/deferred-security-milestones.md`.
@@ -37,12 +44,14 @@ pnpm major doctor      # check prerequisites and providers
 ## Commands
 
 ```sh
-major doctor                       # environment, providers, models, overnight safety
+major doctor                       # environment, providers, models; overnight execution
+                                   #   is reported UNAVAILABLE (disabled), never "safe"
 major project add <config.json>   # register a project (see examples/)
 major project list
 major task add --project <name> --title <t> [--complexity routine|bounded|complex|architectural]
 major task suggest --project <name> --title <t> [--rationale <r>]
-major task approve <suggestionId> # suggestion -> draft task
+major task approve <suggestionId> # DISABLED in this foundation: refuses with exit 4
+                                   #   (approving a suggestion is not permitted)
 major task reject <suggestionId>
 major task list [--project <name>]
 major task show <taskId>

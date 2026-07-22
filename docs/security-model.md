@@ -18,8 +18,15 @@ capabilities; the report is diagnostic and never part of enforcement. Definition
 done for re-enabling each capability: `docs/deferred-security-milestones.md`.
 
 What remains fully implemented and verified in this build: redaction (below), the
-read-only probe path, the argv command policy, environment sanitisation, and the
-database invariants/backstops.
+process-free discovery path (name resolution only), the argv command policy,
+environment sanitisation, and the database invariants/backstops.
+
+Beyond the five capabilities, **suggestion approval is also disabled** in this
+dry-run / inspection-only foundation. `approveSuggestion` — the canonical boundary
+that materialises a suggestion into a task — refuses with
+`SuggestionApprovalUnavailableError` before opening any transaction, and the
+`major task approve` command routes through it and exits with the policy-refusal
+code (4). Read-only suggestion inspection and the relational model are retained.
 
 ## Redaction (`src/security/redact.ts`)
 
@@ -47,14 +54,23 @@ Applied:
 
 ## The execution gateway (`src/security/gateway.ts`)
 
-Every external process passes through one boundary: `ExecutionGateway`. Provider
+Every external process would pass through one boundary: `ExecutionGateway`. Provider
 adapters cannot spawn independently — they hold a gateway and ask it to `execute`
-(streamed agent runs) or `probeSync` (fixed-form discovery probes such as `which x`,
-`x --version`, `gh auth status`).
+(streamed agent runs, disabled) or, for discovery, `resolveExecutable` (a PROCESS-FREE
+PATH lookup for reporting).
 
 **In this build `execute()` is disabled**: it records a refusal and throws before any
-validation or spawn, on every gateway including a fully configured one. Only the
-read-only probe path is runnable. The pipeline described below is retained as
+validation or spawn, on every gateway including a fully configured one. And discovery
+is now **resolution-only and process-free**: the gateway's only runnable discovery
+operation, `resolveExecutable`, performs a filesystem PATH lookup and never runs a
+binary — there is no `--version` probe, no `which` subprocess and no `execFile`/`spawn`
+anywhere in the gateway. A path-qualified (environment/PATH-selected) executable
+override is refused by `resolveExecutable`, so it cannot be turned into a spawn; a
+resolved path is reported but is never treated as evidence a binary is genuine or
+runnable. Executable availability is represented as UNVERIFIED until the trusted,
+OS-isolated execution boundary of milestone M1.
+
+The pipeline described below is retained as
 **milestone M1 groundwork** — it is NOT a complete execution boundary. Independent
 review found two gaps that M1 must close before live execution can be considered:
 identity revalidation skips content hashing when file metadata appears unchanged, and
@@ -71,8 +87,9 @@ With those caveats, the M1 groundwork the gateway will build on:
    discovery **constrained to supervisor-controlled directories** (`allowedDirs`).
    Inherited PATH ordering never confers trust: a shadow binary in an unapproved
    directory is skipped however early it appears, and with no configured directories
-   discovery trusts nothing. `which` is a read-only reporting resolution and confers no
-   execution trust. Each binding captures a stable identity (device, inode, size, mtime
+   discovery trusts nothing. Reporting-only PATH resolution (used by discovery in this
+   build) is process-free and confers no execution trust. Each binding captures a stable
+   identity (device, inode, size, mtime
    and content hash); `verify()` re-checks it and refuses detected replacement or
    in-place mutation — with the KNOWN M1 GAP that content hashing is skipped when file
    metadata appears unchanged, so a preserved-metadata mutation is not yet caught. A
@@ -105,12 +122,13 @@ With those caveats, the M1 groundwork the gateway will build on:
    — is written with redacted argv, the stripped/authorised env names and the reason to
    the append-only `execution_policy_decisions` table (`dbDecisionRecorder`).
 
-`ExecutionGateway.probeOnly()` exists for pre-project contexts (doctor): probes work,
-`execute` always refuses and records the refusal — in this build EVERY gateway behaves
-that way for `execute`, via the capability gate.
+`ExecutionGateway.probeOnly()` exists for pre-project contexts (doctor): process-free
+name resolution works, `execute` always refuses and records the refusal — in this build
+EVERY gateway behaves that way for `execute`, via the capability gate.
 
-**What is and is not guaranteed:** in this build the only execution guarantee is that
-no agent process spawns at all. The retained pipeline is not an OS-level filesystem or
+**What is and is not guaranteed:** in this build the execution guarantee is that no
+process is created at all — neither an agent run nor a discovery probe spawns anything.
+The retained pipeline is not an OS-level filesystem or
 network sandbox — a spawned agent process and its descendants would not be
 kernel-jailed to the allowed roots — and its identity revalidation has the
 preserved-metadata gap above. Both must be closed, and independently reviewed, before
@@ -120,10 +138,13 @@ enforcement input.
 
 ## What Major will not do
 
-- No agent execution of any kind in this build: every spawn path refuses
-  (capability gate), and only read-only discovery probes run.
+- No process creation of any kind in this build: every agent spawn path refuses
+  (capability gate), and discovery is process-free — it resolves names on PATH but
+  never runs a binary (no `--version`, no `which` subprocess, no `execFile`/`spawn`).
 - No paid usage of any kind in this build: paid routes checkpoint and paid run
   records are refused, approval or not (see `docs/provider-routing.md`).
+- No suggestion approval in this build: `approveSuggestion` and `major task approve`
+  refuse before any mutation; suggestions cannot be materialised into tasks.
 - No task ever reaches `completed`, no work claim can be taken, and no external
   roadmap write can occur in this build (capability gate).
 - No automatic merge, no automatic deployment: both are human-approval categories.

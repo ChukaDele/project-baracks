@@ -13,6 +13,7 @@ import {
   listTasks,
   queueableTasks,
   rejectSuggestion,
+  SuggestionApprovalUnavailableError,
 } from '../domain/task-service.js';
 import { loadProjectConfig, resolveRepoPath } from '../config/project-config.js';
 import { addProject, getProjectByName, listProjects } from '../config/project-service.js';
@@ -107,7 +108,7 @@ program
         name: p.name,
         repoPath: p.repoPath,
       })),
-      run: (executable, args) => gateway.probeSync(executable, args),
+      resolve: (name) => gateway.resolveExecutable(name),
     });
     for (const info of report.providers) {
       persistProviderDiscovery(database, info, { source: 'cli' });
@@ -137,13 +138,20 @@ program
       for (const cap of report.capabilities) {
         console.log(`✗ capability ${cap.capability}: unavailable (${cap.milestone})`);
       }
+      // Overnight/autonomous LIVE execution is categorically unavailable in
+      // this foundation; it is never reported as SAFE.
       console.log(
-        report.overnightSafe
-          ? 'overnight execution: SAFE'
-          : `overnight execution: NOT SAFE — ${report.overnightSafeReasons.join('; ')}`,
+        `overnight execution: UNAVAILABLE — ${report.overnightExecutionReasons.join('; ')}`,
+      );
+      console.log(
+        report.inspectionEnvironmentOk
+          ? 'inspection environment (dry-run only): OK'
+          : `inspection environment (dry-run only): NEEDS ATTENTION — ${report.inspectionEnvironmentIssues.join('; ')}`,
       );
     }
-    if (!report.overnightSafe) process.exit(EXIT.unsafe);
+    // Exit code reflects the SUPPORTED (dry-run/inspection) health, not the
+    // categorically-unavailable overnight execution.
+    if (!report.inspectionEnvironmentOk) process.exit(EXIT.unsafe);
   });
 
 const project = program.command('project').description('Manage supervised projects');
@@ -280,11 +288,18 @@ task
 
 task
   .command('approve <suggestionId>')
-  .description('Approve a suggestion, materialising a draft task')
+  .description('Approve a suggestion (UNAVAILABLE in this disabled foundation)')
   .option('--note <text>', 'decision note')
   .action((suggestionId: string, opts: { note?: string }) => {
-    const { task: created } = approveSuggestion(db(), suggestionId, opts.note);
-    console.log(`approved ${suggestionId} -> task ${created.id} [${created.status}]`);
+    // Route through the canonical mutation boundary, which refuses before any
+    // database mutation. Map its refusal to the canonical unavailable exit code.
+    try {
+      const { task: created } = approveSuggestion(db(), suggestionId, opts.note);
+      console.log(`approved ${suggestionId} -> task ${created.id} [${created.status}]`);
+    } catch (error) {
+      if (error instanceof SuggestionApprovalUnavailableError) fail(error.message, EXIT.refused);
+      throw error;
+    }
   });
 
 task
