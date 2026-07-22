@@ -24,6 +24,7 @@ export function evaluateProposal(
   proposal: UpdateProposal,
   rows: Map<string, RoadmapRow>,
   policy: ProposalPolicy = {},
+  expectedDiff?: readonly DiffEntry[],
 ): { diff: DiffEntry[]; violations: string[] } {
   const { statusColumn, doneValues } = { ...DEFAULT_POLICY, ...policy };
   const diff: DiffEntry[] = [];
@@ -40,6 +41,15 @@ export function evaluateProposal(
     }
     for (const [column, newValue] of Object.entries(change.columns)) {
       const isFormulaCell = Boolean(row.formulas && column in row.formulas);
+      const expected = expectedDiff?.find(
+        (e) => e.stableId === change.stableId && e.column === column,
+      );
+      if (expected && expected.from !== row.values[column]) {
+        violations.push(
+          `source changed since dry run: ${change.stableId}.${column} was ` +
+            `${JSON.stringify(expected.from)}, now ${JSON.stringify(row.values[column])}`,
+        );
+      }
       diff.push({
         stableId: change.stableId,
         column,

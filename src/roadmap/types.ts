@@ -47,11 +47,22 @@ export interface ApplyResult {
   violations: string[];
 }
 
+export interface ApplyOptions {
+  /**
+   * The diff produced by the prior dry run. When present, apply re-checks
+   * that every affected cell still holds the `from` value observed then —
+   * changed source state rejects the write.
+   */
+  expectedDiff?: DiffEntry[];
+}
+
 export interface RoadmapAdapter {
   readRow(stableId: string): Promise<RoadmapRow | undefined>;
   readAll(): Promise<RoadmapRow[]>;
+  /** Opaque revision of the source; changes whenever the source changes. */
+  revision(): Promise<string>;
   /** Compute the diff and violations without writing anything. */
   dryRun(proposal: UpdateProposal): Promise<DryRunResult>;
   /** Atomic, idempotent write. Must refuse when dryRun reports violations. */
-  apply(proposal: UpdateProposal): Promise<ApplyResult>;
+  apply(proposal: UpdateProposal, options?: ApplyOptions): Promise<ApplyResult>;
 }
