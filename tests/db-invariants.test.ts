@@ -11,9 +11,14 @@ import {
 } from '../src/db/schema.js';
 import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
-import { createRun } from '../src/domain/run-service.js';
-import { addSuggestion, addTask, approveSuggestion } from '../src/domain/task-service.js';
-import { seedProject, testDb } from './helpers.js';
+import { createRun, recordVerificationRun } from '../src/domain/run-service.js';
+import {
+  addSuggestion,
+  addTask,
+  approveSuggestion,
+  transitionTask,
+} from '../src/domain/task-service.js';
+import { recordQualifyingVerification, seedProject, testDb } from './helpers.js';
 
 describe('database-enforced invariants', () => {
   it("refuses persisting a task with status 'suggested'", () => {
@@ -94,6 +99,7 @@ describe('database-enforced invariants', () => {
       billingMode: 'subscription_included',
       routingReason: 'test',
     });
+    const now = new Date().toISOString();
     expect(() =>
       db
         .insert(verificationRuns)
@@ -103,6 +109,9 @@ describe('database-enforced invariants', () => {
           agentRunId: runOnA.id,
           command: 'pnpm test',
           status: 'passed',
+          exitCode: 0,
+          startedAt: now,
+          endedAt: now,
         })
         .run(),
     ).toThrow(/FOREIGN KEY/i);
@@ -211,6 +220,93 @@ describe('database-enforced invariants', () => {
     });
     resolveDecision(db, decision.id, 'rejected', 'not yet');
     expect(() => resolveDecision(db, decision.id, 'approved')).toThrow(/not open/);
+  });
+
+  it('a direct write cannot mark a task completed without qualifying proof', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const task = addTask(db, { projectId: project.id, title: 'no shortcuts' });
+
+    // from a non-ready_to_merge status, however the write arrives
+    expect(() =>
+      db.update(tasks).set({ status: 'completed' }).where(eq(tasks.id, task.id)).run(),
+    ).toThrow(/only ready_to_merge may complete/);
+
+    // even FROM ready_to_merge, completion needs the full proof set
+    transitionTask(db, task.id, 'ready');
+    for (const status of ['queued', 'running', 'verifying', 'reviewing', 'ready_to_merge'] as const)
+      transitionTask(db, task.id, status);
+    expect(() =>
+      db.update(tasks).set({ status: 'completed' }).where(eq(tasks.id, task.id)).run(),
+    ).toThrow(/qualifying passed verification run/);
+
+    // a bare 'passed' verification row (no run provenance, no evidence) is not proof
+    recordVerificationRun(db, {
+      taskId: task.id,
+      command: 'pnpm test',
+      status: 'passed',
+      exitCode: 0,
+    });
+    expect(() =>
+      db.update(tasks).set({ status: 'completed' }).where(eq(tasks.id, task.id)).run(),
+    ).toThrow(/qualifying passed verification run/);
+
+    // with a fully qualifying record, the same direct write is accepted
+    recordQualifyingVerification(db, task.id);
+    db.update(tasks).set({ status: 'completed' }).where(eq(tasks.id, task.id)).run();
+  });
+
+  it('a task cannot be inserted directly in completed status', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    expect(() =>
+      db
+        .insert(tasks)
+        .values({
+          id: newId('task'),
+          projectId: project.id,
+          title: 'born finished',
+          status: 'completed',
+        })
+        .run(),
+    ).toThrow(/cannot be created directly in completed/);
+  });
+
+  it('verification runs refuse inconsistent passed labels and are immutable once terminal', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const task = addTask(db, { projectId: project.id, title: 'verified work' });
+
+    // direct insert of a 'passed' row without exit code 0 / timestamps
+    expect(() =>
+      db
+        .insert(verificationRuns)
+        .values({
+          id: newId('vrun'),
+          taskId: task.id,
+          command: 'pnpm test',
+          status: 'passed',
+          exitCode: 1,
+          startedAt: new Date().toISOString(),
+          endedAt: new Date().toISOString(),
+        })
+        .run(),
+    ).toThrow(/exit code 0/);
+
+    const vrun = recordVerificationRun(db, {
+      taskId: task.id,
+      command: 'pnpm test',
+      status: 'failed',
+      exitCode: 1,
+    });
+    // a terminal record cannot be laundered into 'passed' after the fact
+    expect(() =>
+      db
+        .update(verificationRuns)
+        .set({ status: 'passed', exitCode: 0 })
+        .where(eq(verificationRuns.id, vrun.id))
+        .run(),
+    ).toThrow(/immutable/);
   });
 
   it('agent runs enforce valid enums at the DB level', () => {

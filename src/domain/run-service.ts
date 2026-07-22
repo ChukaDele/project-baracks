@@ -2,14 +2,28 @@ import { createHash } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Db, DbConn } from '../db/client.js';
 import {
+  agentProviders,
   agentRunEvents,
   agentRuns,
+  taskClaims,
+  tasks,
   usageObservations,
   verificationRuns,
   type BillingMode,
 } from '../db/schema.js';
-import { redactValue } from '../security/redact.js';
+import { redactText, redactValue } from '../security/redact.js';
+import { StaleClaimError } from './claim-service.js';
+import { isApprovedDecision } from './decision-service.js';
 import { newId, nowIso } from './ids.js';
+
+export class RunAuthorisationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RunAuthorisationError';
+  }
+}
+
+const PAID_BILLING_MODES: readonly BillingMode[] = ['usage_credits', 'api_billing'];
 
 export interface NewRunInput {
   taskId: string;
@@ -20,32 +34,98 @@ export interface NewRunInput {
   purpose: (typeof agentRuns.$inferInsert)['purpose'];
   billingMode: BillingMode;
   routingReason: string;
-  /** Mandatory (DB CHECK) when billingMode is a paid mode. */
+  /** Mandatory when billingMode is paid: id of an APPROVED 'paid_usage'
+   * DecisionRequest bound to this exact task/project and covering this
+   * provider/model. Validated inside the run-creation transaction. */
   paidUsageDecisionId?: string;
   independenceLoss?: string;
   allowanceState?: string;
   worktreeId?: string;
+  now?: () => Date;
 }
 
-export function createRun(db: DbConn, input: NewRunInput) {
-  const row = {
-    id: newId('arun'),
-    taskId: input.taskId,
-    providerId: input.providerId,
-    claimId: input.claimId ?? null,
-    modelId: input.modelId ?? null,
-    modelRef: input.modelRef,
-    purpose: input.purpose,
-    billingMode: input.billingMode,
-    routingReason: input.routingReason,
-    paidUsageDecisionId: input.paidUsageDecisionId ?? null,
-    independenceLoss: input.independenceLoss ?? null,
-    allowanceState: input.allowanceState ?? null,
-    worktreeId: input.worktreeId ?? null,
-    status: 'pending' as const,
-  };
-  db.insert(agentRuns).values(row).run();
-  return row;
+/**
+ * Create a run inside one immediate transaction that validates everything a
+ * run's authority rests on: the task exists; the billing mode is known (an
+ * 'unknown' cost basis is unroutable); a supplied claim is the task's current
+ * active, unexpired claim (fencing token); and a paid billing mode carries an
+ * approved, correctly scoped 'paid_usage' DecisionRequest for this task and
+ * project. Caller- or environment-supplied identifiers grant nothing by
+ * themselves — the decision row in THIS database is the authority.
+ */
+export function createRun(db: Db, input: NewRunInput) {
+  return db.transaction(
+    (tx) => {
+      const task = tx.select().from(tasks).where(eq(tasks.id, input.taskId)).get();
+      if (!task) throw new Error(`task not found: ${input.taskId}`);
+
+      if (input.billingMode === 'unknown') {
+        throw new RunAuthorisationError(
+          'billing mode is unknown: refusing to create a run whose cost basis is unproven',
+        );
+      }
+
+      if (input.claimId !== undefined) {
+        const claim = tx.select().from(taskClaims).where(eq(taskClaims.id, input.claimId)).get();
+        const nowIsoStr = (input.now?.() ?? new Date()).toISOString();
+        if (
+          !claim ||
+          claim.taskId !== input.taskId ||
+          claim.status !== 'active' ||
+          claim.leaseExpiresAt <= nowIsoStr
+        ) {
+          throw new StaleClaimError(
+            `claim ${input.claimId} is not the current active, unexpired claim of task ${input.taskId}`,
+          );
+        }
+      }
+
+      if (PAID_BILLING_MODES.includes(input.billingMode)) {
+        if (!input.paidUsageDecisionId) {
+          throw new RunAuthorisationError(
+            'paid billing requires an approved paid_usage DecisionRequest',
+          );
+        }
+        const provider = tx
+          .select()
+          .from(agentProviders)
+          .where(eq(agentProviders.id, input.providerId))
+          .get();
+        const authorised = isApprovedDecision(tx, input.paidUsageDecisionId, {
+          category: 'paid_usage',
+          taskId: input.taskId,
+          projectId: task.projectId,
+          scope: { provider: provider?.name ?? '', modelRef: input.modelRef },
+        });
+        if (!authorised) {
+          throw new RunAuthorisationError(
+            `DecisionRequest ${input.paidUsageDecisionId} does not authorise paid usage for ` +
+              `this task, project and provider/model scope`,
+          );
+        }
+      }
+
+      const row = {
+        id: newId('arun'),
+        taskId: input.taskId,
+        providerId: input.providerId,
+        claimId: input.claimId ?? null,
+        modelId: input.modelId ?? null,
+        modelRef: input.modelRef,
+        purpose: input.purpose,
+        billingMode: input.billingMode,
+        routingReason: input.routingReason,
+        paidUsageDecisionId: input.paidUsageDecisionId ?? null,
+        independenceLoss: input.independenceLoss ?? null,
+        allowanceState: input.allowanceState ?? null,
+        worktreeId: input.worktreeId ?? null,
+        status: 'pending' as const,
+      };
+      tx.insert(agentRuns).values(row).run();
+      return row;
+    },
+    { behavior: 'immediate' },
+  );
 }
 
 export function getRun(db: DbConn, runId: string) {
@@ -158,7 +238,12 @@ export function listRunEvents(db: DbConn, runId: string) {
     .all();
 }
 
-/** Record a deterministic verification run (the completion proof's backbone). */
+/**
+ * Record a deterministic verification run (the completion proof's backbone).
+ * A 'passed' record must be internally consistent: exit code 0 and completed
+ * timestamps (defaulted to now when the caller ran the command synchronously)
+ * — a bare 'passed' label proves nothing and is refused here and by the DB.
+ */
 export function recordVerificationRun(
   db: DbConn,
   input: {
@@ -172,6 +257,10 @@ export function recordVerificationRun(
     endedAt?: string;
   },
 ) {
+  const terminal = input.status === 'passed' || input.status === 'failed';
+  if (input.status === 'passed' && input.exitCode !== 0) {
+    throw new Error(`a passed verification run requires exit code 0, got ${input.exitCode}`);
+  }
   const row = {
     id: newId('vrun'),
     taskId: input.taskId,
@@ -179,9 +268,9 @@ export function recordVerificationRun(
     command: input.command,
     status: input.status,
     exitCode: input.exitCode ?? null,
-    outputSummary: input.outputSummary ?? null,
-    startedAt: input.startedAt ?? null,
-    endedAt: input.endedAt ?? null,
+    outputSummary: input.outputSummary !== undefined ? redactText(input.outputSummary) : null,
+    startedAt: input.startedAt ?? (terminal ? nowIso() : null),
+    endedAt: input.endedAt ?? (terminal ? nowIso() : null),
   };
   db.insert(verificationRuns).values(row).run();
   return row;

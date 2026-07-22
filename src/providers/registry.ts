@@ -137,7 +137,17 @@ export function classifyModel(
   return { routingClass: 'unknown', billingMode: 'unknown', prohibited: false };
 }
 
-/** Models the registry expects for a provider, before any live probing. */
+/**
+ * Models the registry expects for a provider, before any live probing.
+ *
+ * Billing is DELIBERATELY 'unknown' here: a registry rule's billingMode is a
+ * configuration expectation, never discovery evidence. Routing treats
+ * 'unknown' as unroutable, so nothing can spend money on the strength of a
+ * config file (or an environment-supplied registry path). Billing becomes
+ * routable only through an authoritative observation — a human attestation
+ * or an observed run outcome (see providers/discovery-store.ts
+ * recordBillingObservation).
+ */
 export function registryModels(
   registry: ModelRegistry,
   provider: string,
@@ -152,7 +162,8 @@ export function registryModels(
       visible: base.visible,
       authenticated: base.authenticated,
       availability: base.visible && base.authenticated ? 'available' : 'unknown',
-      billingMode: cls.billingMode,
+      billingMode: 'unknown',
+      expectedBillingMode: cls.billingMode,
       prohibited: cls.prohibited,
       source: 'registry',
     };

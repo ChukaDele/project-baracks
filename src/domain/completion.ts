@@ -1,15 +1,25 @@
-import { and, count, eq, inArray } from 'drizzle-orm';
+import { and, count, countDistinct, eq, inArray, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbConn } from '../db/client.js';
-import { decisionRequests, evidence, reviewFindings, verificationRuns } from '../db/schema.js';
+import {
+  agentRuns,
+  decisionRequests,
+  evidence,
+  reviewFindings,
+  verificationRuns,
+} from '../db/schema.js';
 import type { CompletionProof } from './lifecycle.js';
 
 /**
  * The completion proof set: what must be true, in the database, before a task
  * may reach 'completed'. Free-text evidence alone is never sufficient — the
- * proof requires deterministic VerificationRun records, resolved P0/P1 review
+ * proof requires QUALIFYING VerificationRun records (passed with exit code 0,
+ * completed timestamps, produced under a succeeded agent run of this same
+ * task, and cited by an immutable evidence row), resolved P0/P1 review
  * findings, verified evidence relationships, and any task-specific criteria.
- * It is evaluated inside the same transaction as the final state transition.
+ * It is evaluated inside the same transaction as the final state transition,
+ * and the same invariants are enforced again by database triggers so a direct
+ * write cannot bypass them (drizzle/0004).
  */
 
 export const completionCriteriaSchema = z
@@ -44,15 +54,45 @@ export function evaluateCompletionProof(
 ): CompletionProofResult {
   const failures: string[] = [];
 
+  // A verification run qualifies only when its 'passed' label is backed by
+  // exit code 0, completed timestamps, provenance (a succeeded agent run of
+  // this same task — the composite FK guarantees the task linkage), and an
+  // immutable evidence row citing it.
   const passedVerifications =
     db
-      .select({ n: count() })
+      .select({ n: countDistinct(verificationRuns.id) })
       .from(verificationRuns)
-      .where(and(eq(verificationRuns.taskId, taskId), eq(verificationRuns.status, 'passed')))
+      .innerJoin(
+        agentRuns,
+        and(
+          eq(verificationRuns.agentRunId, agentRuns.id),
+          eq(agentRuns.taskId, verificationRuns.taskId),
+        ),
+      )
+      .innerJoin(
+        evidence,
+        and(
+          eq(evidence.ref, verificationRuns.id),
+          eq(evidence.kind, 'verification_run'),
+          eq(evidence.taskId, verificationRuns.taskId),
+        ),
+      )
+      .where(
+        and(
+          eq(verificationRuns.taskId, taskId),
+          eq(verificationRuns.status, 'passed'),
+          eq(verificationRuns.exitCode, 0),
+          isNotNull(verificationRuns.startedAt),
+          isNotNull(verificationRuns.endedAt),
+          eq(agentRuns.status, 'succeeded'),
+        ),
+      )
       .get()?.n ?? 0;
   if (passedVerifications < criteria.minPassedVerificationRuns) {
     failures.push(
-      `requires ${criteria.minPassedVerificationRuns} passed verification run(s), found ${passedVerifications}`,
+      `requires ${criteria.minPassedVerificationRuns} qualifying passed verification run(s) ` +
+        `(exit 0, completed, from a succeeded run of this task, with linked evidence), ` +
+        `found ${passedVerifications}`,
     );
   }
 

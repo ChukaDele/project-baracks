@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import {
   agentProviders,
   agentRunEvents,
+  agentRuns,
   reviewFindings,
   roadmapItems,
   tasks,
@@ -28,7 +29,12 @@ import {
   scopeFingerprint,
   transitionTask,
 } from '../src/domain/task-service.js';
-import { completeTaskProperly, seedProject, testDb } from './helpers.js';
+import {
+  completeTaskProperly,
+  recordQualifyingVerification,
+  seedProject,
+  testDb,
+} from './helpers.js';
 
 function readyTask(db: ReturnType<typeof testDb>, projectId: string, title: string) {
   const task = addTask(db, { projectId, title });
@@ -212,7 +218,7 @@ describe('completion proof', () => {
     ).toThrow(/same task/);
   });
 
-  it('completes only with a passed verification run and linked evidence', () => {
+  it('completes only with a QUALIFYING passed verification run and linked evidence', () => {
     const db = testDb();
     const task = taskAtReadyToMerge(db);
     const failed = recordVerificationRun(db, {
@@ -229,7 +235,9 @@ describe('completion proof', () => {
     });
     expect(() => transitionTask(db, task.id, 'completed')).toThrow(/passed verification run/);
 
-    const passed = recordVerificationRun(db, {
+    // A 'passed' record WITHOUT provenance (no agent run behind it) does not
+    // qualify: the proof requires a trustworthy run/task relationship.
+    const unprovenanced = recordVerificationRun(db, {
       taskId: task.id,
       command: 'pnpm test',
       status: 'passed',
@@ -238,22 +246,19 @@ describe('completion proof', () => {
     addEvidence(db, {
       taskId: task.id,
       kind: 'verification_run',
-      ref: passed.id,
-      summary: 'pnpm test passed',
+      ref: unprovenanced.id,
+      summary: 'passed but from nowhere',
     });
+    expect(() => transitionTask(db, task.id, 'completed')).toThrow(/passed verification run/);
+
+    recordQualifyingVerification(db, task.id);
     expect(transitionTask(db, task.id, 'completed').status).toBe('completed');
   });
 
   it('blocks completion on open critical/major review findings', () => {
     const db = testDb();
     const task = taskAtReadyToMerge(db);
-    const vrun = recordVerificationRun(db, {
-      taskId: task.id,
-      command: 'pnpm test',
-      status: 'passed',
-      exitCode: 0,
-    });
-    addEvidence(db, { taskId: task.id, kind: 'verification_run', ref: vrun.id, summary: 'green' });
+    recordQualifyingVerification(db, task.id);
 
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'mock-reviewer' }).run();
@@ -301,13 +306,7 @@ describe('completion proof', () => {
     ] as const) {
       transitionTask(db, task.id, status);
     }
-    const vrun = recordVerificationRun(db, {
-      taskId: task.id,
-      command: 'pnpm test',
-      status: 'passed',
-      exitCode: 0,
-    });
-    addEvidence(db, { taskId: task.id, kind: 'verification_run', ref: vrun.id, summary: 'green' });
+    recordQualifyingVerification(db, task.id);
     expect(() => transitionTask(db, task.id, 'completed')).toThrow(/artifact/);
 
     addEvidence(db, {
@@ -390,7 +389,7 @@ describe('agent runs', () => {
     expect(() => db.delete(agentRunEvents).run()).toThrow(/append-only/);
   });
 
-  it('refuses a paid run without an authorising decision (DB CHECK)', () => {
+  it('refuses a paid run without an authorising decision (service layer)', () => {
     const { db, task, providerId } = seedRun(testDb());
     expect(() =>
       createRun(db, {
@@ -401,7 +400,35 @@ describe('agent runs', () => {
         billingMode: 'api_billing',
         routingReason: 'unauthorised paid route',
       }),
-    ).toThrow(/CHECK|constraint/i);
+    ).toThrow(/paid_usage/);
+  });
+
+  it('refuses an unknown-billing run at both the service and DB boundary', () => {
+    const { db, task, providerId } = seedRun(testDb());
+    expect(() =>
+      createRun(db, {
+        taskId: task.id,
+        providerId,
+        modelRef: 'mystery',
+        purpose: 'implementation',
+        billingMode: 'unknown',
+        routingReason: 'unproven cost basis',
+      }),
+    ).toThrow(/billing mode is unknown/);
+    expect(() =>
+      db
+        .insert(agentRuns)
+        .values({
+          id: newId('arun'),
+          taskId: task.id,
+          providerId,
+          modelRef: 'mystery',
+          purpose: 'implementation',
+          billingMode: 'unknown',
+          routingReason: 'forged direct insert',
+        })
+        .run(),
+    ).toThrow(/authoritatively known billing mode/);
   });
 
   it('records usage observations', () => {

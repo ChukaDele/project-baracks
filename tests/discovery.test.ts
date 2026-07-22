@@ -3,6 +3,7 @@ import { discoveryObservations, routingCheckpoints } from '../src/db/schema.js';
 import {
   loadPersistedProviderInfos,
   persistProviderDiscovery,
+  recordBillingObservation,
   recordModelOutcome,
   shouldProbe,
 } from '../src/providers/discovery-store.js';
@@ -39,14 +40,49 @@ describe('discovery persistence', () => {
     }
   });
 
-  it('routing consumes persisted state, not fresh assertions', () => {
+  it('routing consumes persisted state, and billing stays unroutable until observed', () => {
     const db = testDb();
+    // The discovery input CLAIMS subscription billing, but discovery is not
+    // authority: the persisted state must be 'unknown' and unroutable.
     persistProviderDiscovery(db, providerInfo(), { source: 'cli' });
     const infos = loadPersistedProviderInfos(db);
     expect(infos).toHaveLength(1);
     expect(infos[0]!.models.every((m) => m.source === 'persisted')).toBe(true);
-    const decision = route({ purpose: 'implementation', complexity: 'bounded' }, infos);
+    expect(infos[0]!.models.every((m) => m.billingMode === 'unknown')).toBe(true);
+    expect(route({ purpose: 'implementation', complexity: 'bounded' }, infos).kind).toBe(
+      'checkpoint',
+    );
+
+    // An authoritative observation (human attestation) makes it routable.
+    recordBillingObservation(db, {
+      providerName: 'claude-code',
+      modelRef: 'sonnet',
+      billingMode: 'subscription_included',
+      source: 'human',
+      note: 'operator confirmed Max subscription covers this model',
+    });
+    const decision = route(
+      { purpose: 'implementation', complexity: 'bounded' },
+      loadPersistedProviderInfos(db),
+    );
     expect(decision.kind).toBe('route');
+  });
+
+  it('re-discovery never overwrites an authoritatively observed billing mode', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo(), { source: 'cli' });
+    recordBillingObservation(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      billingMode: 'subscription_included',
+      source: 'run_outcome',
+    });
+    // a later optimistic re-discover claiming different billing changes nothing
+    persistProviderDiscovery(db, providerInfo(), { source: 'cli' });
+    const opus = loadPersistedProviderInfos(db)[0]!.models.find((m) => m.modelRef === 'opus')!;
+    expect(opus.billingMode).toBe('subscription_included');
+    const sonnet = loadPersistedProviderInfos(db)[0]!.models.find((m) => m.modelRef === 'sonnet')!;
+    expect(sonnet.billingMode).toBe('unknown');
   });
 
   it('persists exhaustion with a next-probe time and blocks early re-probing', () => {

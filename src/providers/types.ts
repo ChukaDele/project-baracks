@@ -11,7 +11,13 @@ export interface ModelState {
   visible: boolean;
   authenticated: boolean;
   availability: ModelAvailability;
+  /** Authoritative billing state. 'unknown' (unroutable) until a human
+   * attestation or observed run outcome proves it — configuration defaults
+   * never populate this field. */
   billingMode: BillingMode;
+  /** What configuration EXPECTS billing to be; display/diagnostic only,
+   * never consulted by routing. */
+  expectedBillingMode?: BillingMode;
   prohibited: boolean;
   prohibitedReason?: string;
   /** Where this knowledge came from: 'registry' config, 'cli' discovery,

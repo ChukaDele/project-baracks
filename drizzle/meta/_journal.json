@@ -29,6 +29,13 @@
       "when": 1784690118885,
       "tag": "0003_integrity_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784701361485,
+      "tag": "0004_boundary_enforcement",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import {
   agentModels,
   agentProviders,
   discoveryObservations,
+  type BillingMode,
   type ModelAvailability,
 } from '../db/schema.js';
 import { newId } from '../domain/ids.js';
@@ -15,6 +16,13 @@ import type { ModelState, ProviderInfo } from './types.js';
  * and confidence, appended to discovery_observations, and the current state
  * on agent_models is what routing consumes. Exhaustion carries a next-probe
  * time; nothing re-probes or retries a model before it.
+ *
+ * Billing authority: discovery NEVER writes billing_mode. New models persist
+ * as 'unknown' (unroutable) and existing rows keep their current value; the
+ * only way billing becomes known is recordBillingObservation() with an
+ * authoritative source — a human attestation or an observed run outcome.
+ * Registry defaults, executable presence and auth-file heuristics are
+ * evidence of nothing where money is concerned.
  */
 
 export type ObservationSource = 'registry' | 'cli' | 'probe' | 'run_outcome' | 'human';
@@ -88,12 +96,15 @@ export function persistProviderDiscovery(
           now < existing.nextProbeAt;
         const availability = backingOff ? existing.availability : model.availability;
         const nextProbeAt = backingOff ? existing.nextProbeAt : null;
+        // Discovery cannot assert billing: keep the authoritatively observed
+        // value if one exists, otherwise stay 'unknown' (unroutable).
+        const billingMode = existing ? existing.billingMode : 'unknown';
         const state = {
           routingClass: model.routingClass,
           visible: model.visible,
           authenticated: model.authenticated,
           availability,
-          billingMode: model.billingMode,
+          billingMode,
           prohibited: model.prohibited,
           prohibitedReason: model.prohibitedReason ?? null,
           lastProbedAt: now,
@@ -123,6 +134,66 @@ export function persistProviderDiscovery(
         persisted.push({ modelId, modelRef: model.modelRef, availability, nextProbeAt });
       }
       return { providerId, models: persisted };
+    },
+    { behavior: 'immediate' },
+  );
+}
+
+/**
+ * Record an AUTHORITATIVE billing observation: a human attestation ('human')
+ * or a provider-observed run outcome ('run_outcome'). This is the ONLY code
+ * path that sets a model's billing_mode; anything configuration-shaped
+ * (registry, cli, probe) is refused by the type and would be evidence of
+ * nothing anyway.
+ */
+export function recordBillingObservation(
+  db: Db,
+  input: {
+    providerName: string;
+    modelRef: string;
+    billingMode: Exclude<BillingMode, 'unknown'>;
+    source: 'human' | 'run_outcome';
+    note?: string;
+    now?: () => Date;
+  },
+) {
+  return db.transaction(
+    (tx) => {
+      const provider = tx
+        .select()
+        .from(agentProviders)
+        .where(eq(agentProviders.name, input.providerName))
+        .get();
+      if (!provider) throw new Error(`provider not persisted: ${input.providerName}`);
+      const model = tx
+        .select()
+        .from(agentModels)
+        .where(
+          and(eq(agentModels.providerId, provider.id), eq(agentModels.modelRef, input.modelRef)),
+        )
+        .get();
+      if (!model) throw new Error(`model not persisted: ${input.providerName}/${input.modelRef}`);
+      const now = (input.now?.() ?? new Date()).toISOString();
+      tx.update(agentModels)
+        .set({ billingMode: input.billingMode })
+        .where(eq(agentModels.id, model.id))
+        .run();
+      tx.insert(discoveryObservations)
+        .values({
+          id: newId('dobs'),
+          providerId: provider.id,
+          modelId: model.id,
+          observedJson: JSON.stringify({
+            modelRef: input.modelRef,
+            billingMode: input.billingMode,
+            note: input.note ?? null,
+          }),
+          source: input.source,
+          confidence: CONFIDENCE_BY_SOURCE[input.source],
+          observedAt: now,
+        })
+        .run();
+      return { modelId: model.id, billingMode: input.billingMode };
     },
     { behavior: 'immediate' },
   );

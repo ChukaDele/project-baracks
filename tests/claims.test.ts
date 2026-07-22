@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { openDb } from '../src/db/client.js';
-import { taskClaims } from '../src/db/schema.js';
+import { agentProviders, taskClaims } from '../src/db/schema.js';
 import {
   claimNextTask,
+  getClaim,
   heartbeatClaim,
   completeClaim,
   recoverExpiredClaims,
   releaseClaim,
   StaleClaimError,
 } from '../src/domain/claim-service.js';
+import { newId } from '../src/domain/ids.js';
+import { createRun } from '../src/domain/run-service.js';
 import { addTask, transitionTask, getTask } from '../src/domain/task-service.js';
 import { seedProject, tempDbPath, testDb } from './helpers.js';
 
@@ -123,6 +126,112 @@ describe('leases, heartbeat, cancellation', () => {
     const closed = completeClaim(db, claim.id, 'w1');
     expect(closed.status).toBe('completed');
     expect(getTask(db, task.id).status).toBe('verifying');
+  });
+});
+
+describe('lease fencing', () => {
+  const claimAt = (offsetMs: number) => () => new Date(Date.now() + offsetMs);
+
+  it('fences a stale worker out of heartbeat the moment its lease expires', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    queuedTask(db, project.id);
+    // lease of 30s taken 60s in the past: expired, but NOT yet recovered
+    const { claim } = claimNextTask(db, {
+      workerId: 'stalled',
+      now: claimAt(-60_000),
+      leaseMs: 30_000,
+    })!;
+    expect(getClaim(db, claim.id).status).toBe('active');
+    expect(() => heartbeatClaim(db, claim.id, 'stalled')).toThrow(StaleClaimError);
+  });
+
+  it('fences a stale worker out of completion and release before any recovery sweep', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    queuedTask(db, project.id);
+    const { claim } = claimNextTask(db, {
+      workerId: 'stalled',
+      now: claimAt(-60_000),
+      leaseMs: 30_000,
+    })!;
+    expect(() => completeClaim(db, claim.id, 'stalled')).toThrow(StaleClaimError);
+    expect(() =>
+      releaseClaim(db, { claimId: claim.id, workerId: 'stalled', requeue: true, reason: 'late' }),
+    ).toThrow(StaleClaimError);
+    // the claim row itself is untouched: recovery still owns the transition
+    expect(getClaim(db, claim.id).status).toBe('active');
+  });
+
+  it('run creation is fenced by the claim token: expired or foreign claims are refused', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const taskA = queuedTask(db, project.id, 'A');
+    const taskB = queuedTask(db, project.id, 'B');
+    const providerId = newId('aprov');
+    db.insert(agentProviders).values({ id: providerId, name: 'mock' }).run();
+
+    const expired = claimNextTask(db, {
+      workerId: 'w-old',
+      now: claimAt(-60_000),
+      leaseMs: 30_000,
+    })!;
+    expect(() =>
+      createRun(db, {
+        taskId: expired.task.id,
+        providerId,
+        claimId: expired.claim.id,
+        modelRef: 'sonnet',
+        purpose: 'implementation',
+        billingMode: 'subscription_included',
+        routingReason: 'stale claim',
+      }),
+    ).toThrow(StaleClaimError);
+
+    const live = claimNextTask(db, { workerId: 'w-live' })!;
+    const otherTask = live.task.id === taskA.id ? taskB : taskA;
+    // a live claim cannot authorise a run on a DIFFERENT task
+    expect(() =>
+      createRun(db, {
+        taskId: otherTask.id,
+        providerId,
+        claimId: live.claim.id,
+        modelRef: 'sonnet',
+        purpose: 'implementation',
+        billingMode: 'subscription_included',
+        routingReason: 'cross-task claim',
+      }),
+    ).toThrow(StaleClaimError);
+
+    const run = createRun(db, {
+      taskId: live.task.id,
+      providerId,
+      claimId: live.claim.id,
+      modelRef: 'sonnet',
+      purpose: 'implementation',
+      billingMode: 'subscription_included',
+      routingReason: 'valid claim',
+    });
+    expect(run.claimId).toBe(live.claim.id);
+  });
+
+  it('a duplicate worker holding a recovered claim id cannot write over the new attempt', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const task = queuedTask(db, project.id);
+    const first = claimNextTask(db, { workerId: 'w-dup', now: claimAt(-60_000), leaseMs: 30_000 })!;
+    recoverExpiredClaims(db);
+    const second = claimNextTask(db, { workerId: 'w-new' })!;
+    expect(second.task.id).toBe(task.id);
+    expect(second.claim.attempt).toBe(first.claim.attempt + 1);
+
+    // the zombie worker's token (old claim id / attempt) no longer writes
+    expect(() => heartbeatClaim(db, first.claim.id, 'w-dup')).toThrow(StaleClaimError);
+    expect(() => completeClaim(db, first.claim.id, 'w-dup')).toThrow(StaleClaimError);
+    // and it cannot masquerade as the new attempt either
+    expect(() => heartbeatClaim(db, second.claim.id, 'w-dup')).toThrow(StaleClaimError);
+    // the legitimate holder still works
+    expect(heartbeatClaim(db, second.claim.id, 'w-new').status).toBe('active');
   });
 });
 

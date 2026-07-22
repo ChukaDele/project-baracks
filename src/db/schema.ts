@@ -545,7 +545,13 @@ export const evidence = sqliteTable(
   ],
 );
 
-export const ROADMAP_UPDATE_STATUSES = ['proposed', 'applied', 'rejected', 'superseded'] as const;
+export const ROADMAP_UPDATE_STATUSES = [
+  'proposed',
+  'applying',
+  'applied',
+  'rejected',
+  'superseded',
+] as const;
 
 export const roadmapUpdates = sqliteTable(
   'roadmap_updates',
@@ -569,6 +575,11 @@ export const roadmapUpdates = sqliteTable(
     dryRunDiff: text('dry_run_diff'),
     dryRunAt: text('dry_run_at'),
     status: text('status', { enum: ROADMAP_UPDATE_STATUSES }).notNull().default('proposed'),
+    /** Fencing token for the crash-consistent apply protocol: exactly one
+     * worker claims 'applying' under a fresh attempt id and only that
+     * attempt may settle the update. */
+    applyAttemptId: text('apply_attempt_id'),
+    applyStartedAt: text('apply_started_at'),
     appliedAt: text('applied_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -579,6 +590,11 @@ export const roadmapUpdates = sqliteTable(
     check(
       'roadmap_updates_applied_needs_dry_run',
       sql`status <> 'applied' OR (applied_at IS NOT NULL AND dry_run_diff IS NOT NULL AND dry_run_at IS NOT NULL)`,
+    ),
+    // An in-flight apply is always attributable to a claimed attempt.
+    check(
+      'roadmap_updates_applying_has_attempt',
+      sql`status <> 'applying' OR (apply_attempt_id IS NOT NULL AND apply_started_at IS NOT NULL)`,
     ),
   ],
 );
