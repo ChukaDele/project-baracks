@@ -37,6 +37,14 @@ export const projectConfigSchema = z.object({
   skillsRegistryPath: z.string().default('guidance/skills.registry.json'),
   /** Commands run to verify a change (tests, lint, typecheck...). */
   verificationCommands: z.array(z.string()).default([]),
+  /**
+   * Executables the execution gateway may spawn for this project. Mandatory
+   * allowlist semantics: anything not listed is refused at spawn time.
+   */
+  allowedExecutables: z
+    .array(z.string().min(1))
+    .nonempty()
+    .default(['claude', 'codex', 'git', 'pnpm', 'node', 'which']),
   /** Paths agents must never modify, relative to the repo. */
   protectedPaths: z.array(z.string()).default([]),
   /** Additional prohibited command patterns (regex sources). */

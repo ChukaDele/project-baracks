@@ -40,6 +40,12 @@ export interface StreamingSpawnSpec {
   executable: string;
   args: string[];
   cwd: string;
+  /**
+   * Exact child environment. Mandatory: children never inherit the parent
+   * environment implicitly — callers must pass a sanitised env (the
+   * execution gateway builds one via src/security/env.ts).
+   */
+  env: Record<string, string>;
   timeoutMs?: number;
   /** When set, cwd must resolve inside one of these roots. */
   allowedRoots?: readonly string[];
@@ -84,6 +90,7 @@ export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
 
   const child = spawn(spec.executable, spec.args, {
     cwd: spec.cwd,
+    env: spec.env,
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
   });

@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { platform, release } from 'node:os';
 import type { ProviderAdapter, ProviderInfo } from '../providers/types.js';
@@ -25,24 +24,19 @@ export interface DoctorReport {
 
 export type CommandRunner = (executable: string, args: string[]) => string | undefined;
 
-export const defaultRunner: CommandRunner = (executable, args) => {
-  try {
-    return execFileSync(executable, args, { encoding: 'utf8', timeout: 20000 }).trim();
-  } catch {
-    return undefined;
-  }
-};
-
 export interface DoctorInputs {
   providers: ProviderAdapter[];
   configuredProjects: { name: string; repoPath: string }[];
-  run?: CommandRunner;
+  /** Mandatory: doctor never spawns directly — the CLI supplies a
+   * gateway-backed probe runner so every probe is policy-checked and
+   * recorded. */
+  run: CommandRunner;
   env?: NodeJS.ProcessEnv;
   fileExists?: (path: string) => boolean;
 }
 
 export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
-  const run = inputs.run ?? defaultRunner;
+  const run = inputs.run;
   const env = inputs.env ?? process.env;
   const fileExists = inputs.fileExists ?? existsSync;
   const checks: DoctorCheck[] = [];

@@ -1,8 +1,7 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { cliVersion, which } from './claude-code.js';
-import { executeStreaming } from './exec.js';
+import type { ExecutionGateway } from '../security/gateway.js';
 import { loadModelRegistry, registryModels, type ModelRegistry } from './registry.js';
 import type { ExecuteHandle, ExecuteRequest, ProviderAdapter, ProviderInfo } from './types.js';
 
@@ -10,26 +9,27 @@ const RATE_LIMIT_PATTERN = /rate.?limit|429|too many requests|slow down/i;
 const EXHAUSTION_PATTERN = /usage limit|quota exceeded|out of credits|plan limit/i;
 
 export interface CodexOptions {
+  /** Every spawn — probe or execution — goes through this gateway. */
+  gateway: ExecutionGateway;
   executable?: string;
   registry?: ModelRegistry;
-  allowedRoots?: readonly string[];
 }
 
 export class CodexProvider implements ProviderAdapter {
   readonly name = 'codex';
+  private readonly gateway: ExecutionGateway;
   private readonly executable: string;
   private readonly registry: ModelRegistry;
-  private readonly allowedRoots: readonly string[] | undefined;
 
-  constructor(options: CodexOptions = {}) {
+  constructor(options: CodexOptions) {
+    this.gateway = options.gateway;
     this.executable = options.executable ?? process.env.MAJOR_CODEX_BIN ?? 'codex';
     this.registry = options.registry ?? loadModelRegistry();
-    this.allowedRoots = options.allowedRoots;
   }
 
   async discover(): Promise<ProviderInfo> {
-    const resolved = which(this.executable);
-    const version = resolved ? cliVersion(resolved) : undefined;
+    const resolved = this.gateway.probeSync('which', [this.executable]);
+    const version = resolved ? this.gateway.probeSync(resolved, ['--version']) : undefined;
     const installed = Boolean(resolved && version);
     // Codex stores credentials in ~/.codex/auth.json after `codex login`.
     const authenticated = installed && existsSync(join(homedir(), '.codex', 'auth.json'));
@@ -53,8 +53,8 @@ export class CodexProvider implements ProviderAdapter {
       ? ['exec', 'resume', request.resumeSessionRef, '--json', request.prompt]
       : ['exec', '--json', request.prompt];
     if (request.modelRef) args.splice(1, 0, '--model', request.modelRef);
-    const spec: Parameters<typeof executeStreaming>[0] = {
-      executable: which(this.executable) ?? this.executable,
+    const spec: Parameters<ExecutionGateway['execute']>[0] = {
+      executable: this.gateway.probeSync('which', [this.executable]) ?? this.executable,
       args,
       cwd: request.cwd,
       detectRateLimit: (text) => RATE_LIMIT_PATTERN.test(text),
@@ -70,7 +70,6 @@ export class CodexProvider implements ProviderAdapter {
       },
     };
     if (request.timeoutMs !== undefined) spec.timeoutMs = request.timeoutMs;
-    if (this.allowedRoots !== undefined) spec.allowedRoots = this.allowedRoots;
-    return executeStreaming(spec);
+    return this.gateway.execute(spec);
   }
 }

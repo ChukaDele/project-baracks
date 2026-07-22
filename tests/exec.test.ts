@@ -5,7 +5,12 @@ import { PathViolationError } from '../src/security/paths.js';
 const NODE = process.execPath;
 
 function nodeScript(source: string) {
-  return { executable: NODE, args: ['-e', source], cwd: process.cwd() };
+  return {
+    executable: NODE,
+    args: ['-e', source],
+    cwd: process.cwd(),
+    env: { PATH: process.env.PATH ?? '' },
+  };
 }
 
 describe('streamed execution', () => {
