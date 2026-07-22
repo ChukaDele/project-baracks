@@ -5,12 +5,14 @@ import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * Integration tests against the real CLI process: exit codes, versioned JSON
- * output, existence checks, and refusal semantics.
+ * Integration tests against the COMPILED CLI (`dist/cli/index.js`, built in
+ * beforeAll): exit codes, versioned JSON output, existence checks, and refusal
+ * semantics. Running the compiled artifact — not `src` via tsx — is what makes
+ * "compiled-CLI coverage" an accurate claim.
  */
 
 const ROOT = join(import.meta.dirname, '..');
-const CLI = join(ROOT, 'src', 'cli', 'index.ts');
+const CLI = join(ROOT, 'dist', 'cli', 'index.js');
 
 interface CliResult {
   status: number;
@@ -24,7 +26,7 @@ let configPath: string;
 
 function majorEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
   try {
-    const stdout = execFileSync(process.execPath, ['--import', 'tsx', CLI, ...args], {
+    const stdout = execFileSync(process.execPath, [CLI, ...args], {
       cwd: ROOT,
       encoding: 'utf8',
       env,
@@ -42,14 +44,50 @@ function major(...args: string[]): CliResult {
   return majorEnv({ ...process.env, MAJOR_DB_PATH: dbPath }, ...args);
 }
 
+/**
+ * Create a self-contained database with a registered project and one task,
+ * through the compiled CLI. Returns its db path and the task id. Every step is
+ * checked so a fixture failure surfaces meaningfully instead of yielding empty
+ * output that a later JSON.parse would choke on. Used by the isolated
+ * hostile-environment regression so it never depends on test order.
+ */
+function freshProjectDb(): { dbPath: string; taskId: string } {
+  const scratch = mkdtempSync(join(tmpdir(), 'major-iso-'));
+  const isoDb = join(scratch, 'major.db');
+  const isoRepo = join(scratch, 'repo');
+  mkdirSync(join(isoRepo, '.git'), { recursive: true });
+  const isoConfig = join(scratch, 'iso.project.json');
+  writeFileSync(isoConfig, JSON.stringify({ name: 'iso', repoPath: isoRepo }));
+  const env = { ...process.env, MAJOR_DB_PATH: isoDb };
+
+  const added = majorEnv(env, 'project', 'add', isoConfig);
+  if (added.status !== 0) {
+    throw new Error(`fixture: project add failed (exit ${added.status}): ${added.stderr}`);
+  }
+  const taskAdded = majorEnv(env, 'task', 'add', '--project', 'iso', '--title', 'iso work');
+  if (taskAdded.status !== 0) {
+    throw new Error(`fixture: task add failed (exit ${taskAdded.status}): ${taskAdded.stderr}`);
+  }
+  const list = majorEnv(env, 'task', 'list', '--project', 'iso', '--json');
+  if (list.status !== 0 || !list.stdout.trim()) {
+    throw new Error(`fixture: task list failed (exit ${list.status}): ${list.stderr}`);
+  }
+  const taskId = (JSON.parse(list.stdout) as { data: { id: string }[] }).data[0]!.id;
+  return { dbPath: isoDb, taskId };
+}
+
 beforeAll(() => {
+  // Build the production artifact so these tests exercise the compiled CLI.
+  execFileSync('pnpm', ['build'], { cwd: ROOT, stdio: 'ignore', timeout: 300_000 });
+  if (!existsSync(CLI)) throw new Error(`compiled CLI not found after build: ${CLI}`);
+
   const scratch = mkdtempSync(join(tmpdir(), 'major-cli-'));
   dbPath = join(scratch, 'major.db');
   repoDir = join(scratch, 'demo-repo');
   mkdirSync(join(repoDir, '.git'), { recursive: true });
   configPath = join(scratch, 'demo.project.json');
   writeFileSync(configPath, JSON.stringify({ name: 'demo', repoPath: repoDir }));
-});
+}, 300_000);
 
 describe('major CLI', () => {
   it('project add validates config existence and git-repository shape', () => {
@@ -186,24 +224,36 @@ describe('major CLI', () => {
   });
 
   it('hard-gates suggestion approval: refuses with exit 4 and mutates nothing', () => {
-    const suggest = major('task', 'suggest', '--project', 'demo', '--title', 'Approval gate check');
+    // Self-contained: its own database and project, independent of test order.
+    const { dbPath: isoDb } = freshProjectDb();
+    const isoEnv = { ...process.env, MAJOR_DB_PATH: isoDb };
+
+    const suggest = majorEnv(
+      isoEnv,
+      'task',
+      'suggest',
+      '--project',
+      'iso',
+      '--title',
+      'Approval gate check',
+    );
     expect(suggest.status).toBe(0);
     const suggestionId = suggest.stdout.match(/tsug_\w+/)?.[0];
     expect(suggestionId).toBeTruthy();
 
-    const beforeCount = (
-      JSON.parse(major('task', 'list', '--project', 'demo', '--json').stdout) as { data: unknown[] }
-    ).data.length;
+    const countTasks = (env: NodeJS.ProcessEnv) => {
+      const list = majorEnv(env, 'task', 'list', '--project', 'iso', '--json');
+      if (list.status !== 0 || !list.stdout.trim()) {
+        throw new Error(`task list failed (exit ${list.status}): ${list.stderr}`);
+      }
+      return (JSON.parse(list.stdout) as { data: unknown[] }).data.length;
+    };
+    const beforeCount = countTasks(isoEnv);
 
     // Even with hostile env/config, approval refuses with the canonical
     // unavailable exit code (4), before any database mutation.
     const approve = majorEnv(
-      {
-        ...process.env,
-        MAJOR_DB_PATH: dbPath,
-        MAJOR_ENABLE_APPROVAL: '1',
-        MAJOR_UNSAFE: '1',
-      },
+      { ...isoEnv, MAJOR_ENABLE_APPROVAL: '1', MAJOR_UNSAFE: '1' },
       'task',
       'approve',
       suggestionId!,
@@ -214,14 +264,19 @@ describe('major CLI', () => {
     expect(approve.stderr).toMatch(/unavailable in this disabled foundation/);
 
     // No task was materialised…
-    const afterCount = (
-      JSON.parse(major('task', 'list', '--project', 'demo', '--json').stdout) as { data: unknown[] }
-    ).data.length;
-    expect(afterCount).toBe(beforeCount);
+    expect(countTasks(isoEnv)).toBe(beforeCount);
 
     // …and the suggestion is unchanged: still PENDING, so a same-scope re-suggest
     // folds into it as a duplicate (an approved/rejected one would not).
-    const dup = major('task', 'suggest', '--project', 'demo', '--title', 'approval GATE check');
+    const dup = majorEnv(
+      isoEnv,
+      'task',
+      'suggest',
+      '--project',
+      'iso',
+      '--title',
+      'approval GATE check',
+    );
     expect(dup.stdout).toMatch(/duplicate of pending suggestion/);
   });
 
@@ -240,6 +295,10 @@ describe('major CLI', () => {
   });
 
   it('discovery and dry-run create no process, even with a hostile executable override', () => {
+    // Self-contained: its own database, project and task, so it runs in
+    // isolation regardless of test order.
+    const { dbPath: isoDb, taskId } = freshProjectDb();
+
     const hostileDir = mkdtempSync(join(tmpdir(), 'major-hostile-'));
     const sentinel = join(hostileDir, 'INVOKED');
     // A fake `claude` that, IF EVER EXECUTED, creates a sentinel file. It is
@@ -251,7 +310,7 @@ describe('major CLI', () => {
 
     const hostileEnv: NodeJS.ProcessEnv = {
       ...process.env,
-      MAJOR_DB_PATH: dbPath,
+      MAJOR_DB_PATH: isoDb,
       MAJOR_CLAUDE_BIN: fakeClaude,
       MAJOR_CODEX_BIN: fakeClaude,
       PATH: `${hostileDir}:${process.env.PATH ?? ''}`,
@@ -260,14 +319,10 @@ describe('major CLI', () => {
     // doctor --json performs provider + tool discovery
     const doctor = majorEnv(hostileEnv, 'doctor', '--json');
     expect([0, 5]).toContain(doctor.status);
+    if (!doctor.stdout.trim()) throw new Error(`doctor produced no output: ${doctor.stderr}`);
     expect(existsSync(sentinel)).toBe(false);
 
     // run --dry-run performs provider/model discovery + routing
-    const taskId = (
-      JSON.parse(major('task', 'list', '--project', 'demo', '--json').stdout) as {
-        data: { id: string }[];
-      }
-    ).data[0]!.id;
     const dry = majorEnv(hostileEnv, 'run', '--task', taskId, '--dry-run', '--json');
     expect(dry.status).toBe(0);
     expect(existsSync(sentinel)).toBe(false);
