@@ -63,9 +63,11 @@ TypeScript:
 - **One approved task per suggestion** — partial unique indexes on
   `tasks.suggestion_id` and `task_suggestions.approved_task_id`; approval is the only
   transactional materialisation path. Suggestion materialisation is DISABLED in this
-  build at the canonical task-creation boundary: `addTask` refuses any task carrying a
-  `suggestionId` before any write, and `approveSuggestion` refuses before its
-  transaction (see the security model). Triggers make decided suggestions and
+  build at the canonical task-creation boundary: `addTask` snapshots its input once
+  into an immutable object (each field read exactly once, so a stateful getter or
+  Proxy cannot change value between validation and persistence) and refuses any task
+  carrying a `suggestionId` before any write, and `approveSuggestion` refuses before
+  its transaction (see the security model). Triggers make decided suggestions and
   task/suggestion/roadmap relationships immutable (no silent reassignment).
 - **Same-project consistency** — composite foreign keys force a task's (and
   suggestion's) roadmap item into the same project, and verification/review rows to

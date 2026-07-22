@@ -28,11 +28,14 @@ variable or CLI flag can open:
 
 Beyond the five, **suggestion materialisation is also disabled** in this dry-run /
 inspection foundation. Refusal happens at the canonical task-creation boundary, not
-only in the CLI: `addTask` refuses any task carrying suggestion provenance
-(`suggestionId`) before any write, and `approveSuggestion` / `major task approve` refuse
-before any mutation (exit 4). A pending suggestion therefore cannot be turned into a
-task through any exported path. Ordinary human-created tasks (no suggestion provenance)
-remain usable.
+only in the CLI: `addTask` snapshots the caller's input into an immutable object up
+front — every field, including `suggestionId`, is read exactly once — then refuses any
+task carrying suggestion provenance before any write, and `approveSuggestion` /
+`major task approve` refuse before any mutation (exit 4). Because validation and
+persistence both consult only that frozen snapshot, a stateful getter or Proxy cannot
+show the guard one value and persistence another. A pending suggestion therefore
+cannot be turned into a task through any exported path. Ordinary human-created tasks
+(no suggestion provenance) remain usable.
 
 Each capability returns in its own follow-up milestone with its own independent
 security review: see `docs/deferred-security-milestones.md`.
@@ -79,6 +82,10 @@ pnpm typecheck    # strict TypeScript
 pnpm lint         # eslint (type-checked rules)
 pnpm format       # prettier
 ```
+
+CI (`.github/workflows/ci.yml`) runs these same canonical commands — format check,
+lint, strict type-check, full test suite, production build — on every pull request and
+push to `main`, with a read-only token, no secrets, and no live provider execution.
 
 ## Documentation
 

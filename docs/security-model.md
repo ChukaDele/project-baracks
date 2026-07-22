@@ -25,12 +25,24 @@ Beyond the five capabilities, **suggestion materialisation is also disabled** in
 dry-run / inspection-only foundation, enforced at the canonical task-creation mutation
 boundary rather than only in the CLI:
 
-- `addTask` — the exported production task-creation API — refuses any task carrying
-  suggestion provenance (`suggestionId`) with `SuggestionApprovalUnavailableError`
-  BEFORE any write (no transaction, no task insert, no suggestion change, no
-  relationship/approval record). The raw insert that can persist suggestion provenance
-  is module-private (`insertTask`), reachable only through `approveSuggestion`, so the
-  exported surface offers no alternate materialisation route.
+- `addTask` — the exported production task-creation API — treats the caller's input
+  as mutable and potentially accessor-backed: it snapshots the complete input into a
+  frozen, module-owned object FIRST, reading every property (in particular
+  `suggestionId`, the only suggestion-provenance field) exactly once. Validation runs
+  against that immutable snapshot, and the identical snapshot is what persists — the
+  insert never rereads the caller's object, re-invokes a getter or consults a Proxy
+  trap again, so a stateful accessor cannot show the guard `undefined` and hand
+  persistence a pending suggestion id. A snapshot carrying suggestion provenance is
+  refused with `SuggestionApprovalUnavailableError` BEFORE any write (no transaction,
+  no task insert, no suggestion change, no relationship/approval record). The raw
+  insert that can persist suggestion provenance is module-private (`insertTask`),
+  accepts only module-created snapshots, and is reachable only through
+  `approveSuggestion`, so the exported surface offers no alternate materialisation
+  route. The same single-read discipline covers the other conditionally gated
+  boundaries (`createRun`'s paid/claim gates, `applyTransition`'s fence,
+  `addSuggestion`'s dedup fingerprint); `tests/task-input-snapshot.test.ts` holds the
+  adversarial stateful-getter and Proxy regressions, including read-at-most-once
+  assertions.
 - `approveSuggestion` refuses before opening its transaction, and `major task approve`
   routes through it and exits with the policy-refusal code (4).
 
