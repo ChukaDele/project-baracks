@@ -90,12 +90,50 @@ export interface NewTaskInput {
 }
 
 /**
+ * Immutable, module-owned snapshot of a task-creation request. Untrusted
+ * input is mutable and potentially accessor-backed: a stateful getter or
+ * Proxy can return different values on successive reads, so a guard that
+ * reads a property and a persistence path that reads it again can be shown
+ * different worlds. Everything after snapshotTaskInput() must consult only
+ * this frozen plain object, never the caller's object.
+ */
+interface TaskInputSnapshot {
+  readonly projectId: string;
+  readonly title: string;
+  readonly description: string | undefined;
+  readonly complexity: TaskComplexity | undefined;
+  readonly roadmapItemId: string | undefined;
+  readonly suggestionId: string | undefined;
+  readonly completionCriteriaJson: string | undefined;
+}
+
+/**
+ * Read EVERY property of the caller-owned input exactly once — in particular
+ * suggestionId, the only suggestion-provenance field — and freeze the result.
+ * Validation and persistence both operate on the returned snapshot, so the
+ * value the suggestion-materialisation gate saw is the value that persists.
+ */
+function snapshotTaskInput(input: NewTaskInput): TaskInputSnapshot {
+  return Object.freeze({
+    projectId: input.projectId,
+    title: input.title,
+    description: input.description,
+    complexity: input.complexity,
+    roadmapItemId: input.roadmapItemId,
+    suggestionId: input.suggestionId,
+    completionCriteriaJson: input.completionCriteriaJson,
+  });
+}
+
+/**
  * Raw task insert. Module-PRIVATE and NOT exported: it is the only path that
  * can persist a task carrying suggestion provenance, and it is reachable only
  * through approveSuggestion (itself gated). Keeping it unexported means the
- * exported surface offers no alternate suggestion-materialisation route.
+ * exported surface offers no alternate suggestion-materialisation route. It
+ * accepts only a module-created TaskInputSnapshot — never the caller-owned
+ * object — so it cannot re-invoke a caller's getter or Proxy trap.
  */
-function insertTask(db: DbConn, input: NewTaskInput) {
+function insertTask(db: DbConn, input: TaskInputSnapshot) {
   if (input.completionCriteriaJson !== undefined) {
     parseCompletionCriteria(input.completionCriteriaJson); // fail loudly on invalid criteria
   }
@@ -126,10 +164,15 @@ function insertTask(db: DbConn, input: NewTaskInput) {
  * consulted. Ordinary human-created tasks (no suggestion provenance) remain
  * usable; roadmap-linked tasks (roadmapItemId) are not suggestion provenance
  * and remain usable.
+ *
+ * The input is snapshotted ONCE, up front: the gate and the insert both read
+ * the frozen snapshot, so a stateful getter or Proxy cannot show the gate
+ * `suggestionId: undefined` and persistence a real pending suggestion id.
  */
 export function addTask(db: DbConn, input: NewTaskInput) {
-  if (input.suggestionId !== undefined) assertApprovalEnabled();
-  return insertTask(db, input);
+  const snapshot = snapshotTaskInput(input);
+  if (snapshot.suggestionId !== undefined) assertApprovalEnabled();
+  return insertTask(db, snapshot);
 }
 
 export function getTask(db: DbConn, taskId: string) {
@@ -174,17 +217,21 @@ export function applyTransition(
   to: TaskStatus,
   opts: { fence?: ClaimFence } = {},
 ) {
+  // Read the caller-owned options' fence exactly once (see snapshotTaskInput):
+  // the capability gate and the live-claim check must see the same value even
+  // against a stateful accessor.
+  const fence = opts.fence;
   // Worker-owned downstream mutations are unavailable in this build: a
   // fence-carrying (worker-attributed) transition is refused outright,
   // regardless of the fence's validity (milestone M4 — fencing coverage is
   // incomplete). The live-claim check below is retained for M4.
-  if (opts.fence) assertCapabilityAvailable('worker-owned-downstream-mutations');
+  if (fence) assertCapabilityAvailable('worker-owned-downstream-mutations');
   // Automated task completion is unavailable in this build: NO service-layer
   // path reaches 'completed' (milestone M3 — completion criteria are mutable,
   // so the proof set cannot yet be trusted as task-specific and immutable).
   // The proof evaluation below is retained for M3.
   if (to === 'completed') assertCapabilityAvailable('automated-task-completion');
-  if (opts.fence) assertLiveClaim(db, opts.fence, taskId);
+  if (fence) assertLiveClaim(db, fence, taskId);
   const task = getTask(db, taskId);
   const guards: Parameters<typeof assertTransition>[2] = {
     incompleteDependencyCount: incompleteDependencyCount(db, taskId),
@@ -296,7 +343,21 @@ export type SuggestionOutcome =
  * approved. Duplicates of a pending suggestion are folded into it; scopes
  * that were already rejected are suppressed unless explicitly superseded.
  */
-export function addSuggestion(db: Db, input: NewSuggestionInput): SuggestionOutcome {
+export function addSuggestion(db: Db, rawInput: NewSuggestionInput): SuggestionOutcome {
+  // Single-read snapshot of the caller-owned input (see snapshotTaskInput):
+  // the dedup fingerprint, the supersede decision and the persisted row must
+  // all observe the same values even against a stateful getter or Proxy.
+  const input = Object.freeze({
+    projectId: rawInput.projectId,
+    title: rawInput.title,
+    description: rawInput.description,
+    rationale: rawInput.rationale,
+    suggestedBy: rawInput.suggestedBy,
+    sourceType: rawInput.sourceType,
+    sourceRef: rawInput.sourceRef,
+    roadmapItemId: rawInput.roadmapItemId,
+    supersedes: rawInput.supersedes,
+  });
   return db.transaction(
     (tx): SuggestionOutcome => {
       const fingerprint = scopeFingerprint(input.title, input.description);
@@ -393,7 +454,7 @@ export function approveSuggestion(db: Db, suggestionId: string, note?: string) {
       if (suggestion.roadmapItemId !== null) taskInput.roadmapItemId = suggestion.roadmapItemId;
       // Uses the private insertTask, not the public addTask: the suggestion gate
       // is enforced once, at approval entry (assertApprovalEnabled above).
-      const task = insertTask(tx, taskInput);
+      const task = insertTask(tx, snapshotTaskInput(taskInput));
       const result = tx
         .update(taskSuggestions)
         .set({

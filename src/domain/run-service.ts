@@ -64,7 +64,26 @@ export interface NewRunInput {
  * found it incomplete (approval scoping/consumption, fencing coverage), so it
  * must not be presented as an enforced boundary.
  */
-export function createRun(db: Db, input: NewRunInput) {
+export function createRun(db: Db, rawInput: NewRunInput) {
+  // Single-read snapshot of the caller-owned input (see task-service.ts
+  // snapshotTaskInput): the paid-billing and claim-bound capability gates
+  // below and the persisted row must observe the same values even against a
+  // stateful getter or Proxy that answers differently on successive reads.
+  const input = Object.freeze({
+    taskId: rawInput.taskId,
+    providerId: rawInput.providerId,
+    claimId: rawInput.claimId,
+    modelId: rawInput.modelId,
+    modelRef: rawInput.modelRef,
+    purpose: rawInput.purpose,
+    billingMode: rawInput.billingMode,
+    routingReason: rawInput.routingReason,
+    paidUsageDecisionId: rawInput.paidUsageDecisionId,
+    independenceLoss: rawInput.independenceLoss,
+    allowanceState: rawInput.allowanceState,
+    worktreeId: rawInput.worktreeId,
+    now: rawInput.now,
+  });
   if (PAID_BILLING_MODES.includes(input.billingMode)) {
     assertCapabilityAvailable('paid-provider-execution');
   }
@@ -335,18 +354,21 @@ export function recordVerificationRun(
     endedAt?: string;
   },
 ) {
-  const terminal = input.status === 'passed' || input.status === 'failed';
-  if (input.status === 'passed' && input.exitCode !== 0) {
-    throw new Error(`a passed verification run requires exit code 0, got ${input.exitCode}`);
+  // Single reads of the caller-owned fields the consistency check validates
+  // (see createRun): the check and the persisted row must agree.
+  const { status, exitCode, outputSummary } = input;
+  const terminal = status === 'passed' || status === 'failed';
+  if (status === 'passed' && exitCode !== 0) {
+    throw new Error(`a passed verification run requires exit code 0, got ${exitCode}`);
   }
   const row = {
     id: newId('vrun'),
     taskId: input.taskId,
     agentRunId: input.agentRunId ?? null,
     command: input.command,
-    status: input.status,
-    exitCode: input.exitCode ?? null,
-    outputSummary: input.outputSummary !== undefined ? redactText(input.outputSummary) : null,
+    status,
+    exitCode: exitCode ?? null,
+    outputSummary: outputSummary !== undefined ? redactText(outputSummary) : null,
     startedAt: input.startedAt ?? (terminal ? nowIso() : null),
     endedAt: input.endedAt ?? (terminal ? nowIso() : null),
   };
