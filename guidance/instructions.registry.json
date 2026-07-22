@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "instruction-precedence",
+      "title": "Instruction precedence rules",
+      "path": "guidance/instruction-precedence.md",
+      "status": "active"
+    },
+    {
+      "id": "security-and-permissions",
+      "title": "Security and permissions rules",
+      "path": "guidance/security-and-permissions.md",
+      "status": "active"
+    },
+    {
+      "id": "task-scope",
+      "title": "Task-scope rules",
+      "path": "guidance/task-scope.md",
+      "status": "active"
+    },
+    {
+      "id": "model-routing",
+      "title": "Model and provider routing rules",
+      "path": "guidance/model-routing.md",
+      "status": "active"
+    },
+    {
+      "id": "human-approval",
+      "title": "Human-approval rules",
+      "path": "guidance/human-approval.md",
+      "status": "active"
+    },
+    {
+      "id": "roadmap-sync",
+      "title": "Roadmap-synchronisation rules",
+      "path": "guidance/roadmap-sync.md",
+      "status": "active"
+    }
+  ]
+}

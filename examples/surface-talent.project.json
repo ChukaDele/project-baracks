@@ -1,0 +1,17 @@
+{
+  "name": "surface-talent",
+  "repoPath": "~/Projects/surface-talent",
+  "githubRepo": "surfacetalent/surface-talent",
+  "roadmapSource": {
+    "type": "google-sheets",
+    "spreadsheetId": "REPLACE_WITH_SPREADSHEET_ID",
+    "sheetName": "Roadmap",
+    "stableIdColumn": "ID",
+    "credentialsEnvVar": "GOOGLE_APPLICATION_CREDENTIALS"
+  },
+  "verificationCommands": ["pnpm lint", "pnpm typecheck", "pnpm test"],
+  "protectedPaths": [".github/", ".env", "infra/"],
+  "prohibitedCommands": ["\\bdocker\\s+system\\s+prune\\b"],
+  "protectedBranches": ["main"],
+  "approvalCategories": ["paid_usage", "merge", "deploy", "roadmap_done", "security_exception"]
+}

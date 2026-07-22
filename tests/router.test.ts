@@ -1,0 +1,172 @@
+import { describe, expect, it } from 'vitest';
+import type { ProviderInfo } from '../src/providers/types.js';
+import { route, targetClass } from '../src/routing/router.js';
+import { model } from './helpers.js';
+
+function claude(models: Parameters<typeof model>[0][]): ProviderInfo {
+  return { name: 'claude-code', installed: true, authenticated: true, models: models.map(model) };
+}
+
+function codex(): ProviderInfo {
+  return {
+    name: 'codex',
+    installed: true,
+    authenticated: true,
+    models: [model({ modelRef: 'codex-model', routingClass: 'codex' })],
+  };
+}
+
+const FULL_FLEET = [
+  claude([
+    { modelRef: 'fable', routingClass: 'fable' },
+    { modelRef: 'opus', routingClass: 'opus' },
+    { modelRef: 'sonnet', routingClass: 'sonnet' },
+  ]),
+  codex(),
+];
+
+describe('target class selection', () => {
+  it('routes architectural implementation to fable-class', () => {
+    expect(targetClass({ purpose: 'implementation', complexity: 'architectural' })).toBe('fable');
+  });
+  it('routes high-risk work to opus-class', () => {
+    expect(
+      targetClass({
+        purpose: 'implementation',
+        complexity: 'bounded',
+        riskLevel: 'security_sensitive',
+      }),
+    ).toBe('opus');
+  });
+  it('routes bounded work to sonnet-class', () => {
+    expect(targetClass({ purpose: 'repair', complexity: 'bounded' })).toBe('sonnet');
+  });
+  it('escalates after repeated repair failures', () => {
+    expect(targetClass({ purpose: 'repair', complexity: 'bounded', repairAttempts: 2 })).toBe(
+      'opus',
+    );
+    expect(targetClass({ purpose: 'repair', complexity: 'bounded', repairAttempts: 4 })).toBe(
+      'fable',
+    );
+  });
+});
+
+describe('provider and model fallback', () => {
+  it('falls back down the ladder when the target class is rate-limited', () => {
+    const providers = [
+      claude([
+        { modelRef: 'fable', routingClass: 'fable', availability: 'rate_limited' },
+        { modelRef: 'opus', routingClass: 'opus' },
+      ]),
+    ];
+    const decision = route({ purpose: 'implementation', complexity: 'architectural' }, providers);
+    expect(decision.kind).toBe('route');
+    if (decision.kind === 'route') {
+      expect(decision.modelRef).toBe('opus');
+      expect(decision.reason).toContain('target=fable');
+    }
+  });
+
+  it('checkpoints when everything is exhausted', () => {
+    const providers = [
+      claude([
+        { modelRef: 'fable', routingClass: 'fable', availability: 'exhausted' },
+        { modelRef: 'opus', routingClass: 'opus', availability: 'exhausted' },
+        { modelRef: 'sonnet', routingClass: 'sonnet', availability: 'exhausted' },
+      ]),
+    ];
+    const decision = route({ purpose: 'implementation', complexity: 'architectural' }, providers);
+    expect(decision.kind).toBe('checkpoint');
+  });
+
+  it('skips prohibited and unauthenticated models', () => {
+    const providers = [
+      claude([
+        { modelRef: 'fable', routingClass: 'fable', prohibited: true },
+        { modelRef: 'opus', routingClass: 'opus', authenticated: false },
+        { modelRef: 'sonnet', routingClass: 'sonnet' },
+      ]),
+    ];
+    const decision = route({ purpose: 'implementation', complexity: 'architectural' }, providers);
+    expect(decision.kind).toBe('route');
+    if (decision.kind === 'route') expect(decision.modelRef).toBe('sonnet');
+  });
+});
+
+describe('codex review reserve', () => {
+  it('never consumes codex for implementation work', () => {
+    const providers = [codex()];
+    const decision = route({ purpose: 'implementation', complexity: 'bounded' }, providers);
+    expect(decision.kind).toBe('checkpoint');
+  });
+
+  it('prefers codex for review', () => {
+    const decision = route(
+      { purpose: 'review', complexity: 'bounded', implementedByProvider: 'claude-code' },
+      FULL_FLEET,
+    );
+    expect(decision.kind).toBe('route');
+    if (decision.kind === 'route') {
+      expect(decision.provider).toBe('codex');
+      expect(decision.independenceLoss).toBeUndefined();
+    }
+  });
+
+  it('records independence loss when only the implementing provider can review', () => {
+    const providers = [claude([{ modelRef: 'opus', routingClass: 'opus' }])];
+    const decision = route(
+      { purpose: 'review', complexity: 'bounded', implementedByProvider: 'claude-code' },
+      providers,
+    );
+    expect(decision.kind).toBe('route');
+    if (decision.kind === 'route') {
+      expect(decision.provider).toBe('claude-code');
+      expect(decision.independenceLoss).toMatch(/no independent provider/);
+    }
+  });
+});
+
+describe('billing safety', () => {
+  const paidOnly = [
+    claude([
+      { modelRef: 'fable', routingClass: 'fable', billingMode: 'usage_credits' },
+      { modelRef: 'opus', routingClass: 'opus', billingMode: 'api_billing' },
+    ]),
+  ];
+
+  it('checkpoints rather than silently spending usage credits', () => {
+    const decision = route({ purpose: 'implementation', complexity: 'architectural' }, paidOnly);
+    expect(decision.kind).toBe('checkpoint');
+    if (decision.kind === 'checkpoint') {
+      expect(decision.reason).toMatch(/unapproved charge/);
+      expect(decision.paidOptionsAvailable.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('uses paid capacity only with explicit human approval', () => {
+    const decision = route(
+      { purpose: 'implementation', complexity: 'architectural', approvedPaidUsage: true },
+      paidOnly,
+    );
+    expect(decision.kind).toBe('route');
+    if (decision.kind === 'route') {
+      expect(decision.billingMode).toBe('usage_credits');
+      expect(decision.reason).toMatch(/human-approved/);
+    }
+  });
+
+  it('prefers subscription-included capacity over stronger paid capacity', () => {
+    const providers = [
+      claude([
+        { modelRef: 'fable', routingClass: 'fable', billingMode: 'api_billing' },
+        { modelRef: 'opus', routingClass: 'opus' },
+      ]),
+    ];
+    const decision = route(
+      { purpose: 'implementation', complexity: 'architectural', approvedPaidUsage: true },
+      providers,
+    );
+    expect(decision.kind).toBe('route');
+    if (decision.kind === 'route') expect(decision.billingMode).toBe('subscription_included');
+  });
+});
