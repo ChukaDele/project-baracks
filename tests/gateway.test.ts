@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -9,11 +16,19 @@ import {
   GatewayViolationError,
   type ExecutionPolicyDecision,
 } from '../src/security/gateway.js';
+import { TrustedExecutableRegistry } from '../src/security/trusted-executables.js';
 
 const NODE = process.execPath;
 
 function tempRoot(): string {
   return realpathSync(mkdtempSync(join(tmpdir(), 'major-gw-')));
+}
+
+/** A registry that already trusts the real node binary under the name 'node'. */
+function trustingNode(): TrustedExecutableRegistry {
+  const registry = new TrustedExecutableRegistry();
+  registry.pin(NODE);
+  return registry;
 }
 
 function makeGateway(overrides: Partial<ConstructorParameters<typeof ExecutionGateway>[0]> = {}) {
@@ -22,6 +37,7 @@ function makeGateway(overrides: Partial<ConstructorParameters<typeof ExecutionGa
   const gateway = new ExecutionGateway({
     allowedRoots: [root],
     commandPolicy: { allowedExecutables: ['node', 'git', 'which'] },
+    trustedExecutables: trustingNode(),
     baseEnv: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' },
     recordDecision: (d) => decisions.push(d),
     ...overrides,
@@ -36,6 +52,7 @@ describe('execution gateway construction', () => {
         new ExecutionGateway({
           allowedRoots: [],
           commandPolicy: { allowedExecutables: ['node'] },
+          trustedExecutables: new TrustedExecutableRegistry(),
           recordDecision: () => undefined,
         }),
     ).toThrow(GatewayViolationError);
@@ -47,9 +64,106 @@ describe('execution gateway construction', () => {
         new ExecutionGateway({
           allowedRoots: [tempRoot()],
           commandPolicy: {},
+          trustedExecutables: new TrustedExecutableRegistry(),
           recordDecision: () => undefined,
         }),
     ).toThrow(GatewayViolationError);
+  });
+
+  it('requires a trusted-executable registry', () => {
+    expect(
+      () =>
+        new ExecutionGateway({
+          allowedRoots: [tempRoot()],
+          commandPolicy: { allowedExecutables: ['node'] },
+          recordDecision: () => undefined,
+        } as never),
+    ).toThrow(/trustedExecutables/);
+  });
+});
+
+describe('trusted canonical executable binding', () => {
+  it('refuses an allowlisted name with no trusted installation registered', () => {
+    const { gateway, root, decisions } = makeGateway({
+      trustedExecutables: new TrustedExecutableRegistry(),
+    });
+    expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
+      /no trusted installation/,
+    );
+    expect(decisions[0]!.allowed).toBe(false);
+  });
+
+  it('refuses a shadow binary with an allowed basename at an untrusted path', () => {
+    const { gateway, root, decisions } = makeGateway();
+    const shadowDir = tempRoot();
+    const shadow = join(shadowDir, 'node');
+    writeFileSync(shadow, '#!/bin/sh\necho pwned\n');
+    chmodSync(shadow, 0o755);
+    expect(() => gateway.execute({ executable: shadow, args: ['-e', '1'], cwd: root })).toThrow(
+      /does not match the trusted canonical installation/,
+    );
+    expect(decisions[0]!.allowed).toBe(false);
+  });
+
+  it('spawns the trusted installation for a bare name, ignoring lookalike paths', async () => {
+    const { gateway, root } = makeGateway();
+    const handle = gateway.execute({
+      executable: 'node',
+      args: ['-e', 'console.log(JSON.stringify({type:"which",p:process.execPath}))'],
+      cwd: root,
+    });
+    const events = [];
+    for await (const e of handle.events) events.push(e);
+    const outcome = await handle.outcome;
+    expect(outcome.status).toBe('succeeded');
+    expect(realpathSync((events[0]!.data as { p: string }).p)).toBe(realpathSync(NODE));
+  });
+
+  it('accepts a path-qualified request that resolves to the trusted identity', async () => {
+    const { gateway, root } = makeGateway();
+    const linkDir = tempRoot();
+    const link = join(linkDir, 'node');
+    symlinkSync(NODE, link);
+    const outcome = await gateway.execute({ executable: link, args: ['-e', '1'], cwd: root })
+      .outcome;
+    expect(outcome.status).toBe('succeeded');
+  });
+
+  it('discovery trusts only the PATH-resolved binary; re-binding to another is refused', () => {
+    const registry = new TrustedExecutableRegistry();
+    const fakeDir = tempRoot();
+    const fake = join(fakeDir, 'mytool');
+    writeFileSync(fake, '#!/bin/sh\necho fake\n');
+    chmodSync(fake, 0o755);
+    const trusted = registry.discover('mytool', fakeDir);
+    expect(trusted?.canonicalPath).toBe(realpathSync(fake));
+
+    const otherDir = tempRoot();
+    const other = join(otherDir, 'mytool');
+    writeFileSync(other, '#!/bin/sh\necho other\n');
+    chmodSync(other, 0o755);
+    expect(() => registry.trust('mytool', other, 'pinned')).toThrow(/refusing to re-bind/);
+  });
+
+  it('a poisoned child PATH cannot shadow the trusted binary', async () => {
+    const evilDir = tempRoot();
+    const evil = join(evilDir, 'node');
+    writeFileSync(evil, '#!/bin/sh\necho SHADOWED\n');
+    chmodSync(evil, 0o755);
+    const { gateway, root } = makeGateway({
+      baseEnv: { PATH: `${evilDir}:${process.env.PATH ?? ''}` },
+    });
+    const handle = gateway.execute({
+      executable: 'node',
+      args: ['-e', 'console.log(JSON.stringify({type:"ok",p:process.execPath}))'],
+      cwd: root,
+    });
+    const events = [];
+    for await (const e of handle.events) events.push(e);
+    const outcome = await handle.outcome;
+    expect(outcome.status).toBe('succeeded');
+    // the pre-trusted canonical installation ran, not the PATH shadow
+    expect(realpathSync((events[0]!.data as { p: string }).p)).toBe(realpathSync(NODE));
   });
 });
 
@@ -281,6 +395,7 @@ describe('persisted audit trail', () => {
     const gateway = new ExecutionGateway({
       allowedRoots: [root],
       commandPolicy: { allowedExecutables: ['node'] },
+      trustedExecutables: trustingNode(),
       baseEnv: { PATH: process.env.PATH ?? '' },
       recordDecision: dbDecisionRecorder(db),
     });
@@ -311,6 +426,7 @@ describe('probes', () => {
     const decisions: ExecutionPolicyDecision[] = [];
     const gateway = ExecutionGateway.probeOnly({
       commandPolicy: { allowedExecutables: ['node'] },
+      trustedExecutables: new TrustedExecutableRegistry(),
       recordDecision: (d) => decisions.push(d),
     });
     expect(() =>

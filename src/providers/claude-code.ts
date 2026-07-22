@@ -29,7 +29,12 @@ export class ClaudeCodeProvider implements ProviderAdapter {
   }
 
   async discover(): Promise<ProviderInfo> {
-    const resolved = this.gateway.probeSync('which', [this.executable]);
+    // Establish the trusted canonical installation: an explicitly configured
+    // path is pinned; a bare name resolves via the gateway's supervisor-side
+    // PATH discovery. Execution later refuses anything but this identity.
+    const resolved = this.executable.includes('/')
+      ? this.gateway.pinExecutable(this.executable)
+      : this.gateway.probeSync('which', [this.executable]);
     const version = resolved ? this.gateway.probeSync(resolved, ['--version']) : undefined;
     const installed = Boolean(resolved && version);
     // Heuristic only: Claude Code does not expose a non-interactive auth
@@ -56,7 +61,9 @@ export class ClaudeCodeProvider implements ProviderAdapter {
     if (request.modelRef) args.push('--model', request.modelRef);
     if (request.resumeSessionRef) args.push('--resume', request.resumeSessionRef);
     const spec: Parameters<ExecutionGateway['execute']>[0] = {
-      executable: this.gateway.probeSync('which', [this.executable]) ?? this.executable,
+      // The gateway resolves this through the trusted-executable registry;
+      // an unregistered or shadowed installation is refused at spawn time.
+      executable: this.executable,
       args,
       cwd: request.cwd,
       detectRateLimit: (text) => RATE_LIMIT_PATTERN.test(text),

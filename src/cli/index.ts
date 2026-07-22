@@ -23,6 +23,7 @@ import { persistProviderDiscovery } from '../providers/discovery-store.js';
 import { route, type RoutingRequest } from '../routing/router.js';
 import { dbDecisionRecorder } from '../security/audit.js';
 import { ExecutionGateway } from '../security/gateway.js';
+import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
 import type { RunPurpose } from '../db/schema.js';
 
 /**
@@ -83,6 +84,7 @@ const PROBE_EXECUTABLES = [
 function probeGateway(database: Db): ExecutionGateway {
   return ExecutionGateway.probeOnly({
     commandPolicy: { allowedExecutables: PROBE_EXECUTABLES },
+    trustedExecutables: new TrustedExecutableRegistry(),
     recordDecision: dbDecisionRecorder(database),
   });
 }
