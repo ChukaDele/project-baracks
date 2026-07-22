@@ -65,4 +65,12 @@ export interface RoadmapAdapter {
   dryRun(proposal: UpdateProposal): Promise<DryRunResult>;
   /** Atomic, idempotent write. Must refuse when dryRun reports violations. */
   apply(proposal: UpdateProposal, options?: ApplyOptions): Promise<ApplyResult>;
+  /**
+   * Read-only reconciliation query: has this idempotency key already been
+   * applied to the source? Crash recovery consults this BEFORE any
+   * revision-based invalidation, so an update that reached the source but
+   * crashed before internal bookkeeping is reconciled, never misclassified
+   * as superseded.
+   */
+  wasApplied(idempotencyKey: string): Promise<boolean>;
 }

@@ -16,6 +16,7 @@ export type IdPrefix =
   | 'dreq'
   | 'evid'
   | 'rupd'
+  | 'rapl'
   | 'usage'
   | 'tclm'
   | 'dobs'

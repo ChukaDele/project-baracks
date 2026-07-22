@@ -37,6 +37,10 @@ export class MockSheetsAdapter implements RoadmapAdapter {
     return `rev-${this.revisionCounter}`;
   }
 
+  async wasApplied(idempotencyKey: string): Promise<boolean> {
+    return this.appliedKeys.has(idempotencyKey);
+  }
+
   /** Out-of-band mutation for tests: a human edited the spreadsheet. */
   setCell(stableId: string, column: string, value: string): void {
     const row = this.rows.get(stableId);
