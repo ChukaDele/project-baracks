@@ -2,11 +2,18 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { agentProviders } from '../src/db/schema.js';
+import { agentProviders, tasks } from '../src/db/schema.js';
 import { claimNextTask } from '../src/domain/claim-service.js';
 import { newId } from '../src/domain/ids.js';
 import { createRun } from '../src/domain/run-service.js';
-import { addTask, transitionTask } from '../src/domain/task-service.js';
+import {
+  addSuggestion,
+  addTask,
+  approveSuggestion,
+  getSuggestion,
+  SuggestionApprovalUnavailableError,
+  transitionTask,
+} from '../src/domain/task-service.js';
 import { ClaudeCodeProvider } from '../src/providers/claude-code.js';
 import { CodexProvider } from '../src/providers/codex.js';
 import {
@@ -160,6 +167,49 @@ describe('direct run creation surface', () => {
       transitionTask(db, task.id, 'queued', { fence: { claimId: 'x', workerId: 'w1' } }),
     ).toThrow(CapabilityUnavailableError);
     expect(() => transitionTask(db, task.id, 'completed')).toThrow(CapabilityUnavailableError);
+  });
+});
+
+describe('suggestion approval surface', () => {
+  it('refuses at the canonical mutation boundary, before any mutation', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const { suggestion } = addSuggestion(db, { projectId: project.id, title: 'promote me' });
+
+    expect(() => approveSuggestion(db, suggestion.id, 'go')).toThrow(
+      SuggestionApprovalUnavailableError,
+    );
+    // No task materialised, suggestion untouched.
+    expect(db.select().from(tasks).all()).toHaveLength(0);
+    const after = getSuggestion(db, suggestion.id);
+    expect(after.status).toBe('pending');
+    expect(after.approvedTaskId).toBeNull();
+    expect(after.decidedAt).toBeNull();
+  });
+
+  it('cannot be enabled by environment, configuration, database values or caller options', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const { suggestion } = addSuggestion(db, { projectId: project.id, title: 'still no' });
+
+    const names = ['MAJOR_ENABLE_APPROVAL', 'MAJOR_ALLOW_APPROVE', 'MAJOR_UNSAFE'];
+    const previous = names.map((n) => [n, process.env[n]] as const);
+    for (const n of names) process.env[n] = '1';
+    try {
+      // Hostile caller options are ignored: the gate consults nothing.
+      for (const note of [undefined, 'force', '']) {
+        expect(() => approveSuggestion(db, suggestion.id, note)).toThrow(
+          SuggestionApprovalUnavailableError,
+        );
+      }
+      expect(db.select().from(tasks).all()).toHaveLength(0);
+      expect(getSuggestion(db, suggestion.id).status).toBe('pending');
+    } finally {
+      for (const [n, v] of previous) {
+        if (v === undefined) delete process.env[n];
+        else process.env[n] = v;
+      }
+    }
   });
 });
 

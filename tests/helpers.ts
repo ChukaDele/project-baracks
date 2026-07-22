@@ -5,9 +5,15 @@ import { eq, sql } from 'drizzle-orm';
 import { openDb, type Db } from '../src/db/client.js';
 import { addProject } from '../src/config/project-service.js';
 import { projectConfigSchema } from '../src/config/project-config.js';
-import { agentProviders } from '../src/db/schema.js';
-import { newId } from '../src/domain/ids.js';
-import { addEvidence, transitionTask, getTask } from '../src/domain/task-service.js';
+import { agentProviders, taskSuggestions } from '../src/db/schema.js';
+import { newId, nowIso } from '../src/domain/ids.js';
+import {
+  addEvidence,
+  addTask,
+  getSuggestion,
+  transitionTask,
+  getTask,
+} from '../src/domain/task-service.js';
 import { createRun, recordVerificationRun, setRunStatus } from '../src/domain/run-service.js';
 import type { ModelState } from '../src/providers/types.js';
 
@@ -76,6 +82,36 @@ export function completeTaskProperly(db: Db, taskId: string) {
   recordQualifyingVerification(db, taskId);
   db.run(sql`UPDATE tasks SET status = 'completed', version = version + 1 WHERE id = ${taskId}`);
   return getTask(db, taskId);
+}
+
+/**
+ * TEST FIXTURE ONLY: materialise a pending suggestion into an approved draft
+ * task. Production approval (approveSuggestion) is disabled in this build
+ * (SuggestionApprovalUnavailableError), so this fixture performs the same
+ * relational writes directly to set up the DB state that the retained
+ * relational-model invariants are asserted against. It is not a production
+ * path — production code cannot approve a suggestion at all.
+ */
+export function materialiseApprovedSuggestion(db: Db, suggestionId: string, note?: string) {
+  const suggestion = getSuggestion(db, suggestionId);
+  const taskInput: Parameters<typeof addTask>[1] = {
+    projectId: suggestion.projectId,
+    suggestionId: suggestion.id,
+    title: suggestion.title,
+    description: suggestion.description,
+  };
+  if (suggestion.roadmapItemId !== null) taskInput.roadmapItemId = suggestion.roadmapItemId;
+  const task = addTask(db, taskInput);
+  db.update(taskSuggestions)
+    .set({
+      status: 'approved',
+      approvedTaskId: task.id,
+      decidedAt: nowIso(),
+      decisionNote: note ?? null,
+    })
+    .where(eq(taskSuggestions.id, suggestionId))
+    .run();
+  return { suggestion: getSuggestion(db, suggestionId), task };
 }
 
 export function seedProject(db: Db, name = 'demo') {

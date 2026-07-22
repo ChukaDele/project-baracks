@@ -24,6 +24,35 @@ export class ConcurrencyError extends Error {
 }
 
 /**
+ * Refusal raised by the canonical suggestion-approval boundary. Approving a
+ * suggestion materialises it into a live task that feeds the (disabled)
+ * execution pipeline; this dry-run / inspection-only foundation does not
+ * approve suggestions. Unconditional and self-contained — no configuration,
+ * environment variable, database value or caller option is consulted — so the
+ * only way to re-enable approval is a reviewed code change under a future
+ * supervised-approval milestone. Read-only suggestion inspection
+ * (getSuggestion / listTasks) and the underlying relational model are retained.
+ */
+export class SuggestionApprovalUnavailableError extends Error {
+  constructor() {
+    super(
+      'suggestion approval is unavailable in this disabled foundation: approving a suggestion ' +
+        'materialises a live task and is not permitted in this dry-run / inspection-only build',
+    );
+    this.name = 'SuggestionApprovalUnavailableError';
+  }
+}
+
+/**
+ * Fail closed on suggestion approval. Always throws in this build. Declared to
+ * return void (not never) so the retained approval groundwork below stays
+ * compiled and type-checked, mirroring assertCapabilityAvailable().
+ */
+function assertApprovalEnabled(): void {
+  throw new SuggestionApprovalUnavailableError();
+}
+
+/**
  * A worker's fencing token: a transition performed on behalf of a claim must
  * present it, and the claim must still be that worker's live (active,
  * unexpired) claim of THIS task, or the transition is refused as stale.
@@ -317,6 +346,13 @@ export function getSuggestion(db: DbConn, suggestionId: string) {
  * the tasks_suggestion_unique index backs this up at the DB level.
  */
 export function approveSuggestion(db: Db, suggestionId: string, note?: string) {
+  // Fail closed BEFORE opening any transaction or reading/writing a row: the
+  // disabled foundation never materialises a suggestion into a task. This is
+  // the canonical mutation boundary, so a direct lower-level call refuses here
+  // exactly as the CLI does — no argument, environment or database value can
+  // enable it. The transaction below is retained (and type-checked) groundwork
+  // for the future supervised-approval milestone, but is unreachable now.
+  assertApprovalEnabled();
   return db.transaction(
     (tx) => {
       const suggestion = getSuggestion(tx, suggestionId);

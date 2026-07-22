@@ -12,13 +12,13 @@ import {
 import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
 import { createRun, recordVerificationRun } from '../src/domain/run-service.js';
+import { addSuggestion, addTask, transitionTask } from '../src/domain/task-service.js';
 import {
-  addSuggestion,
-  addTask,
-  approveSuggestion,
-  transitionTask,
-} from '../src/domain/task-service.js';
-import { recordQualifyingVerification, seedProject, testDb } from './helpers.js';
+  materialiseApprovedSuggestion,
+  recordQualifyingVerification,
+  seedProject,
+  testDb,
+} from './helpers.js';
 
 describe('database-enforced invariants', () => {
   it("refuses persisting a task with status 'suggested'", () => {
@@ -58,7 +58,7 @@ describe('database-enforced invariants', () => {
     const db = testDb();
     const project = seedProject(db);
     const { suggestion } = addSuggestion(db, { projectId: project.id, title: 'once only' });
-    const { task } = approveSuggestion(db, suggestion.id);
+    const { task } = materialiseApprovedSuggestion(db, suggestion.id);
     expect(task.suggestionId).toBe(suggestion.id);
     expect(() =>
       db
@@ -134,7 +134,7 @@ describe('database-enforced invariants', () => {
     const projectA = seedProject(db, 'alpha');
     const projectB = seedProject(db, 'beta');
     const { suggestion } = addSuggestion(db, { projectId: projectA.id, title: 'origin' });
-    const { task } = approveSuggestion(db, suggestion.id);
+    const { task } = materialiseApprovedSuggestion(db, suggestion.id);
 
     expect(() =>
       db.update(tasks).set({ projectId: projectB.id }).where(eq(tasks.id, task.id)).run(),
@@ -148,7 +148,7 @@ describe('database-enforced invariants', () => {
     const db = testDb();
     const project = seedProject(db);
     const { suggestion } = addSuggestion(db, { projectId: project.id, title: 'decided' });
-    const { task } = approveSuggestion(db, suggestion.id);
+    const { task } = materialiseApprovedSuggestion(db, suggestion.id);
 
     expect(() =>
       db

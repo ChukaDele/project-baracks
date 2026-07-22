@@ -25,10 +25,12 @@ import {
   addSuggestion,
   addTask,
   approveSuggestion,
+  getSuggestion,
   getTask,
   queueableTasks,
   rejectSuggestion,
   scopeFingerprint,
+  SuggestionApprovalUnavailableError,
   transitionTask,
 } from '../src/domain/task-service.js';
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
@@ -46,33 +48,34 @@ function readyTask(db: ReturnType<typeof testDb>, projectId: string, title: stri
 }
 
 describe('suggestions', () => {
-  it('keeps suggestions out of the tasks table until approved', () => {
+  it('keeps suggestions out of the tasks table, and approval is disabled in this build', () => {
     const db = testDb();
     const project = seedProject(db);
     const created = addSuggestion(db, { projectId: project.id, title: 'Add caching' });
     expect(created.outcome).toBe('created');
     expect(db.select().from(tasks).all()).toHaveLength(0);
 
-    const { suggestion: approved, task } = approveSuggestion(
-      db,
-      created.suggestion.id,
-      'good idea',
+    // Approval is unavailable in this disabled foundation: it must refuse at the
+    // canonical mutation boundary WITHOUT materialising a task or mutating the
+    // suggestion. Read-only inspection of the suggestion remains available.
+    expect(() => approveSuggestion(db, created.suggestion.id, 'good idea')).toThrow(
+      SuggestionApprovalUnavailableError,
     );
-    expect(approved.status).toBe('approved');
-    expect(approved.approvedTaskId).toBe(task.id);
-    expect(task.status).toBe('draft');
-    expect(task.suggestionId).toBe(created.suggestion.id);
-    expect(db.select().from(tasks).all()).toHaveLength(1);
+    expect(db.select().from(tasks).all()).toHaveLength(0);
+    expect(getSuggestion(db, created.suggestion.id).status).toBe('pending');
+    expect(getSuggestion(db, created.suggestion.id).approvedTaskId).toBeNull();
   });
 
-  it('rejects suggestions without creating a task, and blocks double decisions', () => {
+  it('rejects suggestions without creating a task, and blocks double rejection', () => {
     const db = testDb();
     const project = seedProject(db);
     const { suggestion } = addSuggestion(db, { projectId: project.id, title: 'Rewrite in Rust' });
     const rejected = rejectSuggestion(db, suggestion.id, 'no');
     expect(rejected.status).toBe('rejected');
     expect(db.select().from(tasks).all()).toHaveLength(0);
-    expect(() => approveSuggestion(db, suggestion.id)).toThrow(/already rejected/);
+    // Approval refuses unconditionally (before any status check), and a second
+    // rejection is still blocked by the decided-status guard.
+    expect(() => approveSuggestion(db, suggestion.id)).toThrow(SuggestionApprovalUnavailableError);
     expect(() => rejectSuggestion(db, suggestion.id)).toThrow(/already rejected/);
   });
 
