@@ -1,7 +1,25 @@
 # Security model
 
 The binding rules live in `guidance/security-and-permissions.md`; this document describes
-the enforcement mechanics.
+the enforcement mechanics of THIS build.
+
+## The capability gate (`src/security/capabilities.ts`)
+
+This build's primary enforcement is subtraction: five capabilities are unavailable —
+live agent execution, paid provider execution, automated task completion, worker-owned
+downstream mutations, and external roadmap application. Each quarantined entry point
+(`gateway.execute`, `executeStreaming`, paid/claim-bound `createRun`, the `completed`
+transition and fenced transitions, claim operations, `applyRoadmapUpdate`/
+`reconcileRoadmapApplies`) refuses unconditionally with `CapabilityUnavailableError`
+before any side effect. The gate is a frozen code constant: no configuration file,
+environment variable, database row, CLI flag or constructor option is consulted, so
+nothing short of a reviewed code change can open it. `major doctor` REPORTS these
+capabilities; the report is diagnostic and never part of enforcement. Definitions of
+done for re-enabling each capability: `docs/deferred-security-milestones.md`.
+
+What remains fully implemented and verified in this build: redaction (below), the
+read-only probe path, the argv command policy, environment sanitisation, and the
+database invariants/backstops.
 
 ## Redaction (`src/security/redact.ts`)
 
@@ -32,7 +50,16 @@ Applied:
 Every external process passes through one boundary: `ExecutionGateway`. Provider
 adapters cannot spawn independently — they hold a gateway and ask it to `execute`
 (streamed agent runs) or `probeSync` (fixed-form discovery probes such as `which x`,
-`x --version`, `gh auth status`). Before any spawn the gateway:
+`x --version`, `gh auth status`).
+
+**In this build `execute()` is disabled**: it records a refusal and throws before any
+validation or spawn, on every gateway including a fully configured one. Only the
+read-only probe path is runnable. The pipeline described below is retained as
+**milestone M1 groundwork** — it is NOT a complete execution boundary. Independent
+review found two gaps that M1 must close before live execution can be considered:
+identity revalidation skips content hashing when file metadata appears unchanged, and
+no OS-level filesystem/network isolation is enforced (process-group containment only).
+With those caveats, the M1 groundwork the gateway will build on:
 
 1. **Canonicalises and contains paths** — allowed roots are mandatory and non-empty;
    roots and the working directory are resolved with `realpath` before the containment
@@ -46,11 +73,13 @@ adapters cannot spawn independently — they hold a gateway and ask it to `execu
    directory is skipped however early it appears, and with no configured directories
    discovery trusts nothing. `which` is a read-only reporting resolution and confers no
    execution trust. Each binding captures a stable identity (device, inode, size, mtime
-   and content hash); at the spawn boundary `verify()` re-checks it and **fails closed on
-   any replacement or in-place mutation** since trust, and a path-qualified request must
-   `realpath`-resolve to the trusted canonical identity (no same-basename shadow). What
-   actually spawns is always the trusted path — never the caller's string. An ESLint
-   boundary rule keeps `child_process` unreachable outside the gateway and its spawner.
+   and content hash); `verify()` re-checks it and refuses detected replacement or
+   in-place mutation — with the KNOWN M1 GAP that content hashing is skipped when file
+   metadata appears unchanged, so a preserved-metadata mutation is not yet caught. A
+   path-qualified request must `realpath`-resolve to the trusted canonical identity (no
+   same-basename shadow). What would spawn is always the trusted path — never the
+   caller's string. An ESLint boundary rule keeps `child_process` unreachable outside
+   the gateway and its spawner.
 3. **Confines path-bearing arguments** — absolute path arguments and the values of
    directory/file flags (`-C`, `--work-tree`, `--git-dir`, `--output`, …) must resolve
    inside the allowed roots, so a trusted binary cannot be aimed at the filesystem
@@ -77,27 +106,26 @@ adapters cannot spawn independently — they hold a gateway and ask it to `execu
    the append-only `execution_policy_decisions` table (`dbDecisionRecorder`).
 
 `ExecutionGateway.probeOnly()` exists for pre-project contexts (doctor): probes work,
-`execute` always refuses and records the refusal. `execute` also **fails closed unless a
-containment mechanism is configured**, so live agent execution stays disabled wherever
-the required containment is unavailable.
+`execute` always refuses and records the refusal — in this build EVERY gateway behaves
+that way for `execute`, via the capability gate.
 
-**Containment guarantee, stated precisely (no overclaiming):** the gateway guarantees
-WHICH binary runs (trusted canonical identity, content-revalidated at spawn), WHERE it
-starts (realpath-checked working directory inside the allowed roots), WITH WHAT
-arguments (policy-checked argv with path-bearing arguments confined to the roots, no
-shell), WITH WHAT environment (allowlisted, credential-stripped), and that the whole
-spawned process TREE is terminated together (POSIX process-group containment). It is
-**not** an OS-level filesystem or network sandbox: a spawned agent process and its
-descendants are not kernel-jailed to the allowed roots. That is exactly why only trusted
-canonical executables may be spawned at all, why `execute` fails closed without a
-containment mechanism, and why an OS filesystem sandbox (reported by
-`major doctor` as `liveExecutionReady`) remains a precondition before live execution is
-enabled.
+**What is and is not guaranteed:** in this build the only execution guarantee is that
+no agent process spawns at all. The retained pipeline is not an OS-level filesystem or
+network sandbox — a spawned agent process and its descendants would not be
+kernel-jailed to the allowed roots — and its identity revalidation has the
+preserved-metadata gap above. Both must be closed, and independently reviewed, before
+milestone M1 removes the gate (`docs/deferred-security-milestones.md`). The doctor's
+`liveExecutionReady` field is a diagnostic report of OS containment support, never an
+enforcement input.
 
 ## What Major will not do
 
+- No agent execution of any kind in this build: every spawn path refuses
+  (capability gate), and only read-only discovery probes run.
+- No paid usage of any kind in this build: paid routes checkpoint and paid run
+  records are refused, approval or not (see `docs/provider-routing.md`).
+- No task ever reaches `completed`, no work claim can be taken, and no external
+  roadmap write can occur in this build (capability gate).
 - No automatic merge, no automatic deployment: both are human-approval categories.
-- No automatic paid usage: the router checkpoints instead (see
-  `docs/provider-routing.md`).
 - No credential storage: configs carry env-var names, never values; `major doctor`
   reports presence only.

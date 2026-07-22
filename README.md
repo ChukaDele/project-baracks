@@ -1,14 +1,30 @@
 # Major
 
-Autonomous engineering supervisor for Surface Talent and future projects: Major plans
-engineering tasks against a human-owned roadmap, routes each piece of work to the right
-agent CLI and model class (Claude Code, Codex), monitors execution, and never merges,
-deploys, spends money, or marks work Done without evidence and human approval.
+Autonomous engineering supervisor for Surface Talent and future projects — planned to
+plan engineering tasks against a human-owned roadmap, route work to agent CLIs
+(Claude Code, Codex), monitor execution, and never merge, deploy, spend money, or mark
+work Done without evidence and human approval.
 
-This repository contains the tested vertical foundation: canonical guidance, the
-relational state model, the task lifecycle, provider contracts, the model-aware resource
-router, the roadmap adapter contract, and the `major` CLI. Live agent execution and live
-Google Sheets writes are deliberately later tracks.
+**This build is a disabled architectural foundation: dry-run and inspection only.**
+It contains the canonical guidance, the relational state model, the task lifecycle
+and run ledger, provider discovery contracts, the model-aware resource router, the
+roadmap adapter contract with dry-run proposals, and the `major` CLI. Secret-safe
+durable event handling (recursive, fail-closed redaction before persistence) is
+implemented and independently verified.
+
+What this build can NOT do — five capabilities are unavailable, enforced by a
+hard-coded gate (`src/security/capabilities.ts`) that no configuration, environment
+variable or CLI flag can open:
+
+- **no live agent execution** — every spawn path refuses before any subprocess;
+- **no paid provider execution** — paid billing modes and paid routes refuse, even
+  with an approved decision reference;
+- **no autonomous task completion** — no code path reaches `completed`;
+- **no worker-owned mutations** — nothing can acquire or exercise a work claim;
+- **no external roadmap writes** — apply/reconcile refuse before touching any adapter.
+
+Each capability returns in its own follow-up milestone with its own independent
+security review: see `docs/deferred-security-milestones.md`.
 
 ## Setup
 
@@ -54,9 +70,11 @@ pnpm format       # prettier
 ## Documentation
 
 - `docs/architecture.md` — stack decisions, layering, invariants, deferred tracks
+- `docs/deferred-security-milestones.md` — the five disabled capabilities and their
+  definitions of done
 - `docs/task-lifecycle.md` — canonical statuses, guarded transitions
 - `docs/provider-routing.md` — provider contracts, capability registry, router
-- `docs/security-model.md` — redaction, containment, command policy
+- `docs/security-model.md` — redaction, the capability gate, command policy
 - `docs/roadmap-sync.md` — proposal/dry-run/evidence flow
 - `docs/surface-talent-integration.md` — registering Surface Talent
 - `guidance/` — the binding rules (instruction precedence, security, task scope, model

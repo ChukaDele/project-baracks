@@ -42,8 +42,11 @@ stateDiagram-v2
 
 - **ready → queued** requires zero incomplete dependencies (`TaskDependency` rows whose
   target is not `completed`).
-- **→ completed** requires the **completion proof set** (`src/domain/completion.ts`),
-  evaluated inside the same transaction as the transition:
+- **→ completed** is DISABLED in this build: automated task completion is an
+  unavailable capability, so `transitionTask`/`applyTransition` refuse the transition
+  unconditionally — even for a task whose proof is fully satisfied. The proof set
+  below remains the live, tested model (milestone M3 re-enables the transition once
+  completion criteria are immutable). It requires:
   - at least one QUALIFYING **passed** `verification_runs` record: status `passed`
     with exit code 0, completed start/end timestamps, produced under a **succeeded
     agent run of this same task** (the composite FK guarantees the task linkage), and
@@ -60,10 +63,11 @@ stateDiagram-v2
   leases, `src/domain/claim-service.ts`).
 
 Both guards refuse when the guard data wasn't supplied, so the service layer
-(`transitionTask`) is the only practical entry point. Completion is additionally
-enforced at the database boundary (drizzle/0004): triggers refuse any write that sets
-`completed` from a status other than `ready_to_merge` or without a qualifying
-verification run and clean findings — a direct SQL update cannot bypass the proof.
+(`transitionTask`) is the only practical entry point. The database keeps a completion
+backstop (drizzle/0004, 0005): triggers refuse any direct write that sets `completed`
+from a status other than `ready_to_merge` or short of the recorded proof and criteria.
+KNOWN M3 GAP: the criteria themselves are still mutable, so the backstop can be
+weakened by a criteria update — one reason the completion transition stays disabled.
 Verification records themselves are consistency-checked (`passed` requires exit code 0
 and timestamps) and immutable once terminal.
 
@@ -71,20 +75,18 @@ and timestamps) and immutable once terminal.
 
 Every status change is a compare-and-swap on `(status, version)` inside a
 `BEGIN IMMEDIATE` transaction — a concurrent writer makes the loser fail with
-`ConcurrencyError` instead of silently clobbering. Execution is claimed through
-`task_claims`: `claimNextTask` atomically inserts an active claim (durable worker id,
-monotonic attempt number, lease expiry, heartbeat) and moves the task to `running`. The
-DB enforces at most one active claim per task (partial unique index) and immutable
-attempt history (triggers). `heartbeatClaim` extends the lease; `releaseClaim` hands the
-task back (requeue) or cancels it; `recoverExpiredClaims` idempotently expires lapsed
-leases and requeues their tasks after a crash — on the same connection or a fresh one
-after restart.
+`ConcurrencyError` instead of silently clobbering.
 
-The claim row (id + monotonic per-task attempt) is a **fencing token**: every owner
-mutation — heartbeat, completion, release — requires the claim to be active AND its
-lease still in the future, so a stalled worker is fenced out the instant its lease
-expires, before any recovery sweep runs. Downstream writes bind to the token too:
-`createRun` refuses a claim that is not the task's current active, unexpired claim.
+**Worker claims are DISABLED in this build**: worker-owned downstream mutations are an
+unavailable capability, so `claimNextTask`, `heartbeatClaim`, `completeClaim` and
+`releaseClaim` refuse unconditionally, as do fence-carrying transitions and claim-bound
+run creation. Only the supervisor-side `recoverExpiredClaims` sweep remains runnable.
+The claim model is retained for milestone M4: `task_claims` rows carry a durable worker
+id, monotonic attempt number, lease expiry and heartbeat; the DB enforces at most one
+active claim per task (partial unique index) and immutable attempt history (triggers),
+and fences run-linked writes on the claim's lease. KNOWN M4 GAP: that fencing does not
+yet cover every owner mutation and downstream write (evidence, optional fences, review
+and roadmap-proposal writes), which is why the capability stays disabled.
 
 ## Suggested vs. real tasks
 

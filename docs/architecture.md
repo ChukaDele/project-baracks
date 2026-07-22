@@ -1,8 +1,17 @@
 # Architecture
 
-Major is an autonomous engineering supervisor: it plans, dispatches, monitors, and
-verifies work performed by agent CLIs (Claude Code, Codex) across configured projects,
-starting with Surface Talent.
+Major is designed to become an autonomous engineering supervisor: planning,
+dispatching, monitoring and verifying work performed by agent CLIs (Claude Code,
+Codex) across configured projects, starting with Surface Talent.
+
+**This build is a disabled architectural foundation — dry-run and inspection only.**
+Five capabilities are unavailable, enforced by the hard-coded capability gate
+(`src/security/capabilities.ts`): live agent execution, paid provider execution,
+automated task completion, worker-owned downstream mutations, and external roadmap
+application. The gate consults no configuration, environment variable or flag, and
+every quarantined entry point refuses before any side effect. Each capability
+returns via its own milestone and independent review
+(`docs/deferred-security-milestones.md`).
 
 ## Stack decisions
 
@@ -68,32 +77,30 @@ TypeScript:
   (`src/domain/ids.ts`); roadmap rows are addressed by stable IDs from the source.
 - **No hard-coded model names** — routing classes come from the user-editable capability
   registry; a new model release is a config edit, not a code change.
-- **Billing authority** — a run's billing mode derives from authoritative persisted
-  model state, never from caller input: when the model is known, the run's billing must
-  equal the model's observed billing and an unobserved (`unknown`) model is unroutable
-  (`agent_runs_billing_matches_model`). Paid routes require an approved `paid_usage`
-  DecisionRequest re-validated inside the run-creation transaction — category, approval,
-  task, project, explicit provider/model scope (a missing scope authorises nothing),
-  unexpired, and unconsumed — then consumed exactly once (`consumed_by_run_id`, unique)
-  in that same transaction. DB triggers enforce project/scope/expiry/consumption again at
-  insert; otherwise the router checkpoints, and the checkpoint is persisted.
-- **DB-enforced completion proof** — `tasks_completion_requires_proof` enforces the full
-  task-specific `completion_criteria_json` at the SQLite boundary (minimum qualifying
-  verification runs, required artifact evidence, required approved decision categories),
-  equivalent to the service-layer proof, so a direct write cannot complete a task short
-  of its criteria.
-- **Lease fencing** — a claim (id + monotonic attempt) is the durable fencing token.
-  Beyond claim/heartbeat/release, DB triggers fence run status changes, run events,
-  usage and verification writes on the run's claim being active with an unexpired lease,
-  and worker-driven task transitions require a live fencing token; a lapsed worker is
-  refused immediately, before any recovery sweep, and recovery issues a strictly newer
-  attempt so zombies cannot write.
-- **One execution boundary** — every external process passes through the execution
-  gateway: trust is a supervisor-controlled canonical registry (no inherited-PATH
-  ordering) with a stable identity revalidated at the spawn boundary, path-bearing
-  arguments confined to the allowed roots, process-tree containment applied to the whole
-  descendant tree, and a fail-closed containment gate that keeps live execution disabled
-  until real OS containment is proven (`docs/security-model.md`).
+- **Billing safety (this build)** — paid provider execution is unavailable: `createRun`
+  refuses every paid billing mode unconditionally and the router never returns a paid
+  route — with only paid options remaining it checkpoints, approval or not. On the free
+  path, a run's billing must equal the model's authoritatively observed billing and an
+  unobserved (`unknown`) model is unroutable (`agent_runs_billing_matches_model`); DB
+  triggers additionally refuse forged paid inserts. The full paid-approval authority
+  (purpose scoping, SQLite-consumed one-use) is NOT yet enforced — it is milestone M2.
+- **Completion (this build)** — automated task completion is unavailable: no service
+  path reaches `completed`. The completion proof set remains a live, tested pure model
+  (`evaluateCompletionProof`), and `tasks_completion_requires_proof` remains a DB
+  backstop against direct writes; however completion criteria are still mutable, so the
+  proof is not yet trustworthy end-to-end — immutable criteria are milestone M3.
+- **Claims and fencing (this build)** — worker-owned downstream mutations are
+  unavailable: nothing can acquire or exercise a work claim, fence-carrying transitions
+  and claim-bound run creation refuse outright. The lease model (one active claim per
+  task, immutable attempt history, crash-recovery sweep) stays DB-enforced and tested;
+  comprehensive fencing of every downstream write is milestone M4.
+- **One (disabled) execution boundary** — every spawn path funnels through the
+  execution gateway, and in this build the gateway's `execute()` refuses
+  unconditionally before any validation or spawn. Read-only discovery probes remain.
+  The trust/containment pipeline behind the gate (supervisor-controlled canonical
+  registry, path-argument confinement, process-group containment) is retained as M1
+  groundwork with known gaps — it is not a complete execution boundary
+  (`docs/security-model.md`).
 
 ## CLI exit codes
 
@@ -104,11 +111,19 @@ versioned envelope: `{ "schemaVersion": 1, "kind": …, "data": … }`.
 
 ## Deliberate deferrals (later tracks)
 
-- Live agent execution loop (`major run` currently requires `--dry-run` and exits 4
-  otherwise).
-- Live Google Sheets adapter (contract + mock exist; live impl slots behind the same
-  interface).
-- Worktree lifecycle automation, verification orchestration, review adjudication loop.
+The five disabled capabilities and their definitions of done are recorded in
+`docs/deferred-security-milestones.md`:
+
+- **M1** trusted OS-isolated execution (re-enables live agent execution);
+- **M2** authoritative provider and billing control (re-enables paid execution);
+- **M3** immutable database completion proof (re-enables task completion);
+- **M4** complete worker fencing (re-enables worker-owned mutations);
+- **M5** crash-safe external roadmap application (re-enables roadmap writes, with the
+  live Google Sheets adapter — contract + mock exist; the live implementation slots
+  behind the same interface).
+
+Beyond those: worktree lifecycle automation, verification orchestration, and the
+review adjudication loop.
 
 ## Recorded follow-ups (from the independent PR #1 review, P2)
 

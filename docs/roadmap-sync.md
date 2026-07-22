@@ -50,28 +50,26 @@ A persisted `roadmap_updates` row binds the proposal to:
 Roadmap permission grants nothing else: no merge, deploy, paid-usage or destructive
 authority is ever inferred from the ability to propose roadmap updates.
 
-## Crash-consistent apply protocol
+## Apply protocol (DISABLED in this build)
 
-The external write and the internal `applied` record cannot be one atomic operation,
-so apply runs a claimed two-phase protocol (`applyRoadmapUpdate`):
+External roadmap application is an unavailable capability: `applyRoadmapUpdate` and
+`reconcileRoadmapApplies` refuse unconditionally before touching the adapter, so no
+external roadmap write can occur through any code path. Proposals and their recorded
+dry runs remain fully available (read-only against the source).
 
-1. validations (payload binding, dry run, evidence, decision);
-2. compare-and-swap `proposed → applying` under a fresh `apply_attempt_id` — exactly
-   one worker can win this claim; a second concurrent apply is refused
-   (`apply in progress`), and the DB refuses `applying` rows without an attempt id;
-3. `adapter.apply(...)` — a crash here leaves durable `applying` state;
-4. compare-and-swap `applying → applied/rejected` under the SAME attempt id.
-
-`reconcileRoadmapApplies` resolves any update stuck in `applying`: if
-`adapter.wasApplied(idempotencyKey)` the external write happened and the update is
-marked `applied`; otherwise it returns to `proposed` for a fresh, fully re-validated
-attempt. Repeated recovery is a no-op.
+The retained protocol is milestone M5 groundwork — a claimed two-phase apply
+(validate; CAS `proposed → applying` under a fresh `apply_attempt_id`; external
+`adapter.apply`; CAS `applying → applied/rejected` under the same attempt id) with
+idempotency-first reconciliation of stuck attempts. KNOWN M5 GAP: reconciliation does
+not compare-and-swap against the exact attempt token it inspected, so a delayed
+reconciler could displace a newer in-flight attempt. The protocol must not be treated
+as crash-safe until M5 closes that gap and is independently reviewed.
 
 ## Mock vs. live
 
 `MockSheetsAdapter` implements the full contract in memory (atomic apply, idempotency
 keys, formula maps) and is what tests and dry runs use — tests never perform live writes.
-The live Google Sheets adapter is a later track: it will implement the same interface
-using the Sheets batchUpdate API (atomic), value+formula reads (`valueRenderOption:
-FORMULA`) for formula detection, and the `roadmap_updates` table for idempotency and
-audit (proposal → dry-run diff → applied/rejected).
+No live Google Sheets adapter exists in this build; it arrives with milestone M5,
+implementing the same interface using the Sheets batchUpdate API (atomic),
+value+formula reads (`valueRenderOption: FORMULA`) for formula detection, and the
+`roadmap_updates` table for idempotency and audit.
