@@ -39,6 +39,24 @@ describe('major doctor', () => {
     expect(report.providers[0]?.models[0]?.modelRef).toBe('sonnet');
   });
 
+  it('reports the five unavailable capabilities (diagnostic; enforcement is in code)', async () => {
+    const report = await runDoctor({
+      providers: [healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      run: fullToolchain,
+      env: { GOOGLE_APPLICATION_CREDENTIALS: '/tmp/creds.json' },
+      fileExists: () => true,
+    });
+    expect(report.capabilities.map((c) => c.capability).sort()).toEqual([
+      'automated-task-completion',
+      'external-roadmap-application',
+      'live-agent-execution',
+      'paid-provider-execution',
+      'worker-owned-downstream-mutations',
+    ]);
+    expect(report.capabilities.every((c) => c.available === false)).toBe(true);
+  });
+
   it('reports live agent execution as not ready (no OS filesystem containment)', async () => {
     const report = await runDoctor({
       providers: [healthyProvider()],

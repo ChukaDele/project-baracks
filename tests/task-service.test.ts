@@ -8,10 +8,7 @@ import {
   roadmapItems,
   tasks,
 } from '../src/db/schema.js';
-import {
-  evaluateCompletionProof,
-  parseCompletionCriteria,
-} from '../src/domain/completion.js';
+import { evaluateCompletionProof, parseCompletionCriteria } from '../src/domain/completion.js';
 import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
 import {

@@ -74,12 +74,8 @@ describe('worker claim operations are disabled (worker-owned-downstream-mutation
     const task = queuedTask(db, project.id);
     transitionTask(db, task.id, 'running');
     const claim = seedClaim(db, task.id);
-    expect(() => heartbeatClaim(db, claim.id, claim.workerId)).toThrow(
-      CapabilityUnavailableError,
-    );
-    expect(() => completeClaim(db, claim.id, claim.workerId)).toThrow(
-      CapabilityUnavailableError,
-    );
+    expect(() => heartbeatClaim(db, claim.id, claim.workerId)).toThrow(CapabilityUnavailableError);
+    expect(() => completeClaim(db, claim.id, claim.workerId)).toThrow(CapabilityUnavailableError);
     expect(getClaim(db, claim.id).status).toBe('active');
   });
 });

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { platform, release } from 'node:os';
 import type { ProviderAdapter, ProviderInfo } from '../providers/types.js';
+import { unavailableCapabilityStatuses, type CapabilityStatus } from '../security/capabilities.js';
 import { detectContainment } from '../security/containment.js';
 import { redactText } from '../security/redact.js';
 
@@ -22,10 +23,13 @@ export interface DoctorReport {
   overnightSafe: boolean;
   overnightSafeReasons: string[];
   /** True only when the OS containment required for live agent execution is
-   * actually enforced. False in this foundation (no filesystem sandbox), which
-   * is why live agent execution stays disabled. */
+   * actually enforced. False in this foundation (no filesystem sandbox).
+   * DIAGNOSTIC ONLY: enforcement is the hard-coded capability gate
+   * (src/security/capabilities.ts), never this report or any flag. */
   liveExecutionReady: boolean;
   liveExecutionBlockers: string[];
+  /** Capabilities unavailable in this build (hard-coded, not configurable). */
+  capabilities: CapabilityStatus[];
 }
 
 export type CommandRunner = (executable: string, args: string[]) => string | undefined;
@@ -165,5 +169,6 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     overnightSafeReasons,
     liveExecutionReady: containment.liveExecutionReady,
     liveExecutionBlockers,
+    capabilities: unavailableCapabilityStatuses(),
   };
 }

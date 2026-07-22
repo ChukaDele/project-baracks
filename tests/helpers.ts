@@ -74,9 +74,7 @@ export function completeTaskProperly(db: Db, taskId: string) {
     transitionTask(db, taskId, status);
   }
   recordQualifyingVerification(db, taskId);
-  db.run(
-    sql`UPDATE tasks SET status = 'completed', version = version + 1 WHERE id = ${taskId}`,
-  );
+  db.run(sql`UPDATE tasks SET status = 'completed', version = version + 1 WHERE id = ${taskId}`);
   return getTask(db, taskId);
 }
 

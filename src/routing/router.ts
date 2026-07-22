@@ -182,7 +182,11 @@ export function route(
   // capacity (capability gate, milestone M2) — the router checkpoints instead
   // of ever creating a charge. The branch below is retained for M2 but is
   // unreachable until then.
-  if (paid.length > 0 && request.approvedPaidUsage && isCapabilityAvailable('paid-provider-execution')) {
+  if (
+    paid.length > 0 &&
+    request.approvedPaidUsage &&
+    isCapabilityAvailable('paid-provider-execution')
+  ) {
     const chosen = paid[0]!;
     const decision: RoutingDecision = {
       kind: 'route',

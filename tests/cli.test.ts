@@ -131,11 +131,51 @@ describe('major CLI', () => {
     expect(suppressed.stderr).toMatch(/suppressed/);
   });
 
-  it('doctor emits versioned JSON and a strict exit code (0 safe, 5 unsafe)', () => {
+  it('doctor emits versioned JSON, strict exit codes, and the unavailable capabilities', () => {
     const result = major('doctor', '--json');
     expect([0, 5]).toContain(result.status);
-    const parsed = JSON.parse(result.stdout) as { schemaVersion: number; kind: string };
+    const parsed = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      kind: string;
+      data: { capabilities: { capability: string; available: boolean }[] };
+    };
     expect(parsed.schemaVersion).toBe(1);
     expect(parsed.kind).toBe('doctor-report');
+    expect(parsed.data.capabilities.map((c) => c.capability).sort()).toEqual([
+      'automated-task-completion',
+      'external-roadmap-application',
+      'live-agent-execution',
+      'paid-provider-execution',
+      'worker-owned-downstream-mutations',
+    ]);
+    expect(parsed.data.capabilities.every((c) => c.available === false)).toBe(true);
   }, 90_000);
+
+  it('exposes no command that could complete tasks, claim work or apply roadmap writes', () => {
+    const listCommands = (helpText: string) =>
+      [...helpText.matchAll(/^ {2}([a-z]\S*)/gm)].map((m) => m[1]);
+
+    const help = major('--help');
+    expect(help.status).toBe(0);
+    // the full production command surface of this build:
+    expect(listCommands(help.stdout).sort()).toEqual([
+      'doctor',
+      'help',
+      'project',
+      'queue',
+      'run',
+      'task',
+    ]);
+
+    const taskHelp = major('task', '--help');
+    expect(listCommands(taskHelp.stdout).sort()).toEqual([
+      'add',
+      'approve',
+      'help',
+      'list',
+      'reject',
+      'show',
+      'suggest',
+    ]);
+  });
 });

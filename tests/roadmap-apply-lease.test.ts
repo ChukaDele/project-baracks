@@ -119,9 +119,7 @@ describe('roadmap apply is disabled (external-roadmap-application unavailable)',
       .run();
 
     const { wrapped, calls } = spying(adapter);
-    await expect(reconcileRoadmapApplies(db, wrapped)).rejects.toThrow(
-      CapabilityUnavailableError,
-    );
+    await expect(reconcileRoadmapApplies(db, wrapped)).rejects.toThrow(CapabilityUnavailableError);
     expect(calls).toEqual([]);
     const row = db.select().from(roadmapUpdates).where(eq(roadmapUpdates.id, update.id)).get()!;
     expect(row.status).toBe('applying'); // nothing was settled or requeued

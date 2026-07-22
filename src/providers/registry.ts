@@ -174,3 +174,21 @@ export function registryModels(
 
 /** Availability schema re-exported for consumers validating probe data. */
 export const modelAvailabilitySchema = z.enum(MODEL_AVAILABILITIES);
+
+/**
+ * Build capability availability, part of the capability registry's surface:
+ * live agent execution, paid provider execution, automated task completion,
+ * worker-owned downstream mutations and external roadmap application are
+ * UNAVAILABLE in this build. Unlike model rules these are NOT registry data:
+ * they are hard-coded constants — neither the registry file nor
+ * $MAJOR_MODEL_REGISTRY is consulted, so no configuration override can mark
+ * one available (any extra keys in a registry file are ignored by the schema
+ * above and grant nothing).
+ */
+export {
+  CapabilityUnavailableError,
+  UNAVAILABLE_CAPABILITIES,
+  unavailableCapabilityStatuses,
+  type CapabilityStatus,
+  type UnavailableCapability,
+} from '../security/capabilities.js';

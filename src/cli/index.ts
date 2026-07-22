@@ -22,6 +22,7 @@ import { CodexProvider } from '../providers/codex.js';
 import { persistProviderDiscovery } from '../providers/discovery-store.js';
 import { route, type RoutingRequest } from '../routing/router.js';
 import { dbDecisionRecorder } from '../security/audit.js';
+import { CapabilityUnavailableError } from '../security/capabilities.js';
 import { ExecutionGateway } from '../security/gateway.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
 import type { RunPurpose } from '../db/schema.js';
@@ -132,6 +133,9 @@ program
       );
       if (report.missingPrerequisites.length > 0) {
         console.log(`missing prerequisites: ${report.missingPrerequisites.join(', ')}`);
+      }
+      for (const cap of report.capabilities) {
+        console.log(`✗ capability ${cap.capability}: unavailable (${cap.milestone})`);
       }
       console.log(
         report.overnightSafe
@@ -359,7 +363,7 @@ program
 
 program
   .command('run')
-  .description('Plan (and later execute) an agent run for a task')
+  .description('Plan an agent run for a task (dry-run only: live execution is unavailable)')
   .requiredOption('--task <taskId>', 'task to run')
   .addOption(
     new Option('--purpose <purpose>', 'run purpose')
@@ -370,7 +374,15 @@ program
   .option('--json', 'emit versioned JSON')
   .action(async (opts: { task: string; purpose: RunPurpose; dryRun?: boolean; json?: boolean }) => {
     if (!opts.dryRun) {
-      fail('live execution is not enabled in this foundation build; use --dry-run', EXIT.refused);
+      // Fail closed before any routing, run creation or subprocess: live
+      // agent execution is an unavailable capability in this build, and the
+      // same hard-coded gate refuses again at every deeper boundary
+      // (gateway/exec/run-service) even if this check were bypassed.
+      fail(
+        'live execution is not enabled in this foundation build; use --dry-run — ' +
+          new CapabilityUnavailableError('live-agent-execution').message,
+        EXIT.refused,
+      );
     }
     const database = db();
     let taskRow;
