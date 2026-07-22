@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { assertCapabilityAvailable } from '../security/capabilities.js';
 import { assertWithinRoots } from '../security/paths.js';
 import { redactText } from '../security/redact.js';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from './types.js';
@@ -79,11 +80,14 @@ function defaultParseLine(line: string): ProviderEvent | null {
 }
 
 /**
- * Spawn a provider CLI non-interactively with streamed structured events,
- * cancellation and timeout. Never uses a shell; arguments are passed as an
- * array so prompts cannot inject shell syntax.
+ * QUARANTINED — always refuses. This is the raw streaming spawn engine for
+ * agent runs; live agent execution is unavailable in this build, so the gate
+ * below throws before any process can be created, unconditionally. The
+ * machinery is retained, compiled and type-checked for milestone M1
+ * (docs/deferred-security-milestones.md) but is unreachable until then.
  */
 export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
+  assertCapabilityAvailable('live-agent-execution');
   if (spec.allowedRoots) assertWithinRoots(spec.cwd, spec.allowedRoots);
 
   const queue = new EventQueue<ProviderEvent>();

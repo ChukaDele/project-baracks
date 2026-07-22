@@ -31,9 +31,7 @@ export class CodexProvider implements ProviderAdapter {
     // Establish the executable for discovery/reporting: an explicitly
     // configured path is PINNED as the trusted canonical installation (with a
     // stable identity); a bare name is only RESOLVED on PATH for reporting and
-    // read-only probes — PATH resolution never confers execution trust. Live
-    // execution therefore requires an explicitly pinned installation and is
-    // refused for a merely PATH-resolved binary.
+    // read-only probes — PATH resolution never confers execution trust.
     const resolved = this.executable.includes('/')
       ? this.gateway.pinExecutable(this.executable)
       : this.gateway.probeSync('which', [this.executable]);
@@ -56,6 +54,8 @@ export class CodexProvider implements ProviderAdapter {
     return this.discover();
   }
 
+  /** Unreachable in this build: gateway.execute() refuses unconditionally
+   * (live agent execution is an unavailable capability). */
   execute(request: ExecuteRequest): ExecuteHandle {
     const args = request.resumeSessionRef
       ? ['exec', 'resume', request.resumeSessionRef, '--json', request.prompt]

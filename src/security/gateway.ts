@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { isAbsolute, resolve } from 'node:path';
 import { executeStreaming, type StreamingSpawnSpec } from '../providers/exec.js';
 import type { ExecuteHandle } from '../providers/types.js';
+import { CapabilityUnavailableError, isCapabilityAvailable } from './capabilities.js';
 import { checkArgv, type CommandPolicy } from './commands.js';
 import type { Containment } from './containment.js';
 import { sanitizeEnv, type SanitizedEnv } from './env.js';
@@ -21,25 +22,24 @@ import {
 /**
  * The single boundary through which every external process must pass.
  * Provider adapters never spawn independently: they hold a gateway and ask it
- * to execute or probe. The gateway canonicalises paths, binds every spawn to
- * a trusted canonical executable installation (revalidated at the spawn
- * boundary), enforces the command allowlist, confines path-bearing arguments
- * to the allowed roots, sanitises the environment, applies process-tree
- * containment, redacts what it records, and records every policy decision.
+ * to execute or probe.
  *
- * Containment guarantee (stated precisely, no overclaiming): the gateway
- * guarantees WHICH binary runs (trusted canonical identity, content-revalidated
- * at spawn), WHERE it starts (realpath-checked working directory inside the
- * allowed roots), WITH WHAT arguments (policy-checked argv; path-bearing
- * arguments confined to the allowed roots; no shell), WITH WHAT environment
- * (allowlisted, credential-stripped), and that the COMPLETE spawned process
- * tree is terminated together (process-group containment; see providers/exec).
+ * IN THIS BUILD, execute() IS DISABLED. Live agent execution is an
+ * unavailable capability (src/security/capabilities.ts): every call records a
+ * refusal and throws CapabilityUnavailableError before any validation or
+ * spawn, unconditionally — no configuration, environment variable or
+ * constructor option can pass the gate. Only read-only discovery probes
+ * (probeSync) and trusted-installation pinning remain runnable.
  *
- * It is NOT an OS-level filesystem or network sandbox: a spawned agent process
- * and its descendants are not kernel-jailed to the allowed roots. Because that
- * isolation is not enforced, execute() FAILS CLOSED unless a containment
- * mechanism is configured, and live agent execution stays disabled until the
- * doctor proves real containment support (doctor.liveExecutionReady).
+ * The validation pipeline below the gate (path canonicalisation, trusted
+ * executable binding, argv policy, path-argument confinement, environment
+ * sanitisation, process-group containment) is retained as the starting point
+ * for milestone M1 (docs/deferred-security-milestones.md). It is groundwork,
+ * not a complete boundary: independent review found the executable identity
+ * check skips content hashing when file metadata appears unchanged, and no
+ * OS-level filesystem/network isolation is enforced. It must not be presented
+ * or relied on as a production execution boundary until M1 closes those gaps
+ * and is independently reviewed.
  */
 
 export interface ExecutionPolicyDecision {
@@ -271,15 +271,34 @@ export class ExecutionGateway {
     return sanitizeEnv(this.options.baseEnv ?? process.env, sanitizeOptions);
   }
 
-  /** Canonicalise + contain + policy-check + sanitise, then spawn streaming. */
+  /**
+   * QUARANTINED — always refuses. Live agent execution is unavailable in this
+   * build: the gate below records the refusal and throws before any spawn can
+   * occur, regardless of how the gateway was configured. The validation and
+   * spawn pipeline after the gate is retained, compiled and type-checked as
+   * the M1 starting point, but is unreachable until that milestone lands.
+   */
   execute(request: GatewayExecuteRequest): ExecuteHandle {
+    if (!isCapabilityAvailable('live-agent-execution')) {
+      const decision: Parameters<typeof this.record>[0] = {
+        kind: 'execute',
+        allowed: false,
+        executable: request.executable,
+        argv: request.args,
+        cwd: request.cwd,
+        reason: new CapabilityUnavailableError('live-agent-execution').message,
+        strippedEnv: [],
+        authorizedEnv: [],
+      };
+      this.record(decision);
+      throw new CapabilityUnavailableError('live-agent-execution');
+    }
+
     if (this.probeOnly) {
       this.refuse('execute', request, 'this gateway is probe-only: no allowed roots configured');
     }
 
     // Fail closed unless a containment mechanism is configured and enforced.
-    // This is what keeps live agent execution disabled on any platform where
-    // the required process containment is unavailable.
     if (!this.options.containment?.enforced) {
       this.refuse(
         'execute',
