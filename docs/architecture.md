@@ -68,13 +68,32 @@ TypeScript:
   (`src/domain/ids.ts`); roadmap rows are addressed by stable IDs from the source.
 - **No hard-coded model names** — routing classes come from the user-editable capability
   registry; a new model release is a config edit, not a code change.
-- **Billing safety** — unknown billing is unroutable; paid routes require an approved
-  `paid_usage` DecisionRequest, re-validated inside the run-creation transaction
-  (category, approval status, task, project and provider/model scope) and again by DB
-  triggers (unknown billing and unapproved paid references are refused at insert);
-  otherwise the router checkpoints, and the checkpoint is persisted.
+- **Billing authority** — a run's billing mode derives from authoritative persisted
+  model state, never from caller input: when the model is known, the run's billing must
+  equal the model's observed billing and an unobserved (`unknown`) model is unroutable
+  (`agent_runs_billing_matches_model`). Paid routes require an approved `paid_usage`
+  DecisionRequest re-validated inside the run-creation transaction — category, approval,
+  task, project, explicit provider/model scope (a missing scope authorises nothing),
+  unexpired, and unconsumed — then consumed exactly once (`consumed_by_run_id`, unique)
+  in that same transaction. DB triggers enforce project/scope/expiry/consumption again at
+  insert; otherwise the router checkpoints, and the checkpoint is persisted.
+- **DB-enforced completion proof** — `tasks_completion_requires_proof` enforces the full
+  task-specific `completion_criteria_json` at the SQLite boundary (minimum qualifying
+  verification runs, required artifact evidence, required approved decision categories),
+  equivalent to the service-layer proof, so a direct write cannot complete a task short
+  of its criteria.
+- **Lease fencing** — a claim (id + monotonic attempt) is the durable fencing token.
+  Beyond claim/heartbeat/release, DB triggers fence run status changes, run events,
+  usage and verification writes on the run's claim being active with an unexpired lease,
+  and worker-driven task transitions require a live fencing token; a lapsed worker is
+  refused immediately, before any recovery sweep, and recovery issues a strictly newer
+  attempt so zombies cannot write.
 - **One execution boundary** — every external process passes through the execution
-  gateway (`docs/security-model.md`).
+  gateway: trust is a supervisor-controlled canonical registry (no inherited-PATH
+  ordering) with a stable identity revalidated at the spawn boundary, path-bearing
+  arguments confined to the allowed roots, process-tree containment applied to the whole
+  descendant tree, and a fail-closed containment gate that keeps live execution disabled
+  until real OS containment is proven (`docs/security-model.md`).
 
 ## CLI exit codes
 
