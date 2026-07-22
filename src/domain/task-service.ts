@@ -9,6 +9,8 @@ import {
   type SuggestionSourceType,
   type TaskComplexity,
 } from '../db/schema.js';
+import { taskClaims } from '../db/schema.js';
+import { StaleClaimError } from './claim-service.js';
 import { evaluateCompletionProof, parseCompletionCriteria } from './completion.js';
 import { newId, nowIso } from './ids.js';
 import { assertTransition, type TaskStatus, TERMINAL_STATUSES } from './lifecycle.js';
@@ -17,6 +19,33 @@ export class ConcurrencyError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ConcurrencyError';
+  }
+}
+
+/**
+ * A worker's fencing token: a transition performed on behalf of a claim must
+ * present it, and the claim must still be that worker's live (active,
+ * unexpired) claim of THIS task, or the transition is refused as stale.
+ */
+export interface ClaimFence {
+  claimId: string;
+  workerId: string;
+  now?: () => Date;
+}
+
+function assertLiveClaim(db: DbConn, fence: ClaimFence, taskId: string) {
+  const nowIso = (fence.now?.() ?? new Date()).toISOString();
+  const claim = db.select().from(taskClaims).where(eq(taskClaims.id, fence.claimId)).get();
+  if (
+    !claim ||
+    claim.workerId !== fence.workerId ||
+    claim.taskId !== taskId ||
+    claim.status !== 'active' ||
+    claim.leaseExpiresAt <= nowIso
+  ) {
+    throw new StaleClaimError(
+      `claim ${fence.claimId} is not the live claim of worker ${fence.workerId} on task ${taskId}`,
+    );
   }
 }
 
@@ -85,7 +114,16 @@ export function incompleteDependencyCount(db: DbConn, taskId: string): number {
  * Callers that need atomicity with other writes run this inside their own
  * BEGIN IMMEDIATE transaction (see claim-service, approveSuggestion).
  */
-export function applyTransition(db: DbConn, taskId: string, to: TaskStatus) {
+export function applyTransition(
+  db: DbConn,
+  taskId: string,
+  to: TaskStatus,
+  opts: { fence?: ClaimFence } = {},
+) {
+  // A worker-driven transition must hold a live fencing token: an expired or
+  // superseded claimant is refused here, in the same transaction as the
+  // compare-and-swap, before it can advance the task it no longer owns.
+  if (opts.fence) assertLiveClaim(db, opts.fence, taskId);
   const task = getTask(db, taskId);
   const guards: Parameters<typeof assertTransition>[2] = {
     incompleteDependencyCount: incompleteDependencyCount(db, taskId),
@@ -118,8 +156,13 @@ export function applyTransition(db: DbConn, taskId: string, to: TaskStatus) {
  * The ONLY sanctioned way to change a task's status from non-transactional
  * code: wraps applyTransition in its own immediate transaction.
  */
-export function transitionTask(db: Db, taskId: string, to: TaskStatus) {
-  return db.transaction((tx) => applyTransition(tx, taskId, to), { behavior: 'immediate' });
+export function transitionTask(
+  db: Db,
+  taskId: string,
+  to: TaskStatus,
+  opts: { fence?: ClaimFence } = {},
+) {
+  return db.transaction((tx) => applyTransition(tx, taskId, to, opts), { behavior: 'immediate' });
 }
 
 export function addDependency(db: DbConn, taskId: string, dependsOnTaskId: string) {
