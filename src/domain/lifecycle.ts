@@ -32,7 +32,9 @@ const TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
   draft: ['ready', 'cancelled'],
   ready: ['queued', 'draft', 'cancelled'],
   queued: ['running', 'ready', 'cancelled'],
-  running: ['verifying', 'needs_decision', 'failed', 'cancelled'],
+  // running -> queued exists ONLY for crash recovery: an expired claim
+  // requeues the task (see domain/claim-service.ts).
+  running: ['verifying', 'queued', 'needs_decision', 'failed', 'cancelled'],
   verifying: ['reviewing', 'repairing', 'needs_decision', 'failed', 'cancelled'],
   reviewing: ['ready_to_merge', 'repairing', 'needs_decision', 'failed', 'cancelled'],
   repairing: ['verifying', 'needs_decision', 'failed', 'cancelled'],
@@ -43,12 +45,18 @@ const TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
   cancelled: [],
 };
 
+/** Result of evaluating the completion proof set (domain/completion.ts). */
+export interface CompletionProof {
+  ok: boolean;
+  failures: readonly string[];
+}
+
 /** Guard data supplied by the service layer; the machine itself is pure. */
 export interface TransitionGuards {
   /** Number of dependencies not yet completed. Required for ready -> queued. */
   incompleteDependencyCount?: number;
-  /** Number of Evidence rows attached to the task. Required for -> completed. */
-  evidenceCount?: number;
+  /** Evaluated completion proof set. Required for -> completed. */
+  completionProof?: CompletionProof;
 }
 
 export type TransitionResult = { ok: true } | { ok: false; reason: string };
@@ -71,12 +79,15 @@ export function validateTransition(
     }
   }
   if (to === 'completed') {
-    const evidence = guards.evidenceCount;
-    if (evidence === undefined) {
-      return { ok: false, reason: 'transition to completed requires evidence check' };
+    const proof = guards.completionProof;
+    if (proof === undefined) {
+      return { ok: false, reason: 'transition to completed requires the completion proof set' };
     }
-    if (evidence < 1) {
-      return { ok: false, reason: 'refusing to complete without at least one evidence record' };
+    if (!proof.ok) {
+      return {
+        ok: false,
+        reason: `completion proof not satisfied: ${proof.failures.join('; ')}`,
+      };
     }
   }
   return { ok: true };

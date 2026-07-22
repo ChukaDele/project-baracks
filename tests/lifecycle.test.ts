@@ -21,9 +21,18 @@ describe('task lifecycle', () => {
     ] as const;
     for (const [from, to] of path) {
       expect(
-        validateTransition(from, to, { incompleteDependencyCount: 0, evidenceCount: 1 }),
+        validateTransition(from, to, {
+          incompleteDependencyCount: 0,
+          completionProof: { ok: true, failures: [] },
+        }),
       ).toEqual({ ok: true });
     }
+  });
+
+  it('allows running -> queued only as the crash-recovery requeue path', () => {
+    expect(validateTransition('running', 'queued').ok).toBe(true);
+    expect(validateTransition('verifying', 'queued').ok).toBe(false);
+    expect(validateTransition('reviewing', 'queued').ok).toBe(false);
   });
 
   it('rejects illegal transitions', () => {
@@ -45,10 +54,12 @@ describe('task lifecycle', () => {
     if (!result.ok) expect(result.reason).toMatch(/blocked by 2/);
   });
 
-  it('refuses completion without evidence', () => {
-    const result = validateTransition('ready_to_merge', 'completed', { evidenceCount: 0 });
+  it('refuses completion when the proof set is not satisfied', () => {
+    const result = validateTransition('ready_to_merge', 'completed', {
+      completionProof: { ok: false, failures: ['no evidence records'] },
+    });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toMatch(/without.*evidence/);
+    if (!result.ok) expect(result.reason).toMatch(/completion proof.*no evidence records/);
   });
 
   it('refuses guarded transitions when guard data was not supplied', () => {
