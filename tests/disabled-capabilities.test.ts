@@ -2,7 +2,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { agentProviders, tasks } from '../src/db/schema.js';
+import { eq } from 'drizzle-orm';
+import { agentProviders, tasks, taskSuggestions } from '../src/db/schema.js';
 import { claimNextTask } from '../src/domain/claim-service.js';
 import { newId } from '../src/domain/ids.js';
 import { createRun } from '../src/domain/run-service.js';
@@ -210,6 +211,77 @@ describe('suggestion approval surface', () => {
         else process.env[n] = v;
       }
     }
+  });
+});
+
+describe('suggestion materialisation via addTask (lower-level production API)', () => {
+  it('refuses a task carrying a pending suggestionId before any write, and mutates nothing', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const { suggestion } = addSuggestion(db, { projectId: project.id, title: 'materialise me' });
+
+    // The exported production task-creation API must not be an alternate
+    // suggestion-materialisation route: passing suggestion provenance refuses
+    // at the same gate as approveSuggestion.
+    expect(() =>
+      addTask(db, {
+        projectId: project.id,
+        title: suggestion.title,
+        suggestionId: suggestion.id,
+      }),
+    ).toThrow(SuggestionApprovalUnavailableError);
+
+    // No task inserted…
+    expect(db.select().from(tasks).all()).toHaveLength(0);
+    // …suggestion still pending and unchanged (no approval/relationship record)…
+    const after = getSuggestion(db, suggestion.id);
+    expect(after.status).toBe('pending');
+    expect(after.approvedTaskId).toBeNull();
+    expect(after.decidedAt).toBeNull();
+    // …and no task references the suggestion.
+    expect(db.select().from(tasks).where(eq(tasks.suggestionId, suggestion.id)).all()).toHaveLength(
+      0,
+    );
+    expect(
+      db.select().from(taskSuggestions).where(eq(taskSuggestions.status, 'approved')).all(),
+    ).toHaveLength(0);
+  });
+
+  it('cannot be enabled by environment, configuration, database values or caller options', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const { suggestion } = addSuggestion(db, { projectId: project.id, title: 'still gated' });
+
+    const names = ['MAJOR_ENABLE_APPROVAL', 'MAJOR_ALLOW_APPROVE', 'MAJOR_UNSAFE'];
+    const previous = names.map((n) => [n, process.env[n]] as const);
+    for (const n of names) process.env[n] = '1';
+    try {
+      expect(() =>
+        addTask(db, {
+          projectId: project.id,
+          title: suggestion.title,
+          suggestionId: suggestion.id,
+          complexity: 'complex',
+        }),
+      ).toThrow(SuggestionApprovalUnavailableError);
+      expect(db.select().from(tasks).all()).toHaveLength(0);
+      expect(getSuggestion(db, suggestion.id).status).toBe('pending');
+    } finally {
+      for (const [n, v] of previous) {
+        if (v === undefined) delete process.env[n];
+        else process.env[n] = v;
+      }
+    }
+  });
+
+  it('retained foundation contract: ordinary tasks without suggestion provenance still work', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    // A plain human-created task is unaffected.
+    const task = addTask(db, { projectId: project.id, title: 'ordinary work' });
+    expect(task.status).toBe('draft');
+    expect(task.suggestionId).toBeNull();
+    expect(db.select().from(tasks).all()).toHaveLength(1);
   });
 });
 

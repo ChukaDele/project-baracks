@@ -5,15 +5,9 @@ import { eq, sql } from 'drizzle-orm';
 import { openDb, type Db } from '../src/db/client.js';
 import { addProject } from '../src/config/project-service.js';
 import { projectConfigSchema } from '../src/config/project-config.js';
-import { agentProviders, taskSuggestions } from '../src/db/schema.js';
+import { agentProviders, tasks, taskSuggestions } from '../src/db/schema.js';
 import { newId, nowIso } from '../src/domain/ids.js';
-import {
-  addEvidence,
-  addTask,
-  getSuggestion,
-  transitionTask,
-  getTask,
-} from '../src/domain/task-service.js';
+import { addEvidence, getSuggestion, transitionTask, getTask } from '../src/domain/task-service.js';
 import { createRun, recordVerificationRun, setRunStatus } from '../src/domain/run-service.js';
 import type { ModelState } from '../src/providers/types.js';
 
@@ -94,24 +88,31 @@ export function completeTaskProperly(db: Db, taskId: string) {
  */
 export function materialiseApprovedSuggestion(db: Db, suggestionId: string, note?: string) {
   const suggestion = getSuggestion(db, suggestionId);
-  const taskInput: Parameters<typeof addTask>[1] = {
-    projectId: suggestion.projectId,
-    suggestionId: suggestion.id,
-    title: suggestion.title,
-    description: suggestion.description,
-  };
-  if (suggestion.roadmapItemId !== null) taskInput.roadmapItemId = suggestion.roadmapItemId;
-  const task = addTask(db, taskInput);
+  // Raw insert: production task creation (addTask) now refuses any task carrying
+  // suggestion provenance while approval is disabled, so this fixture writes the
+  // approved-materialisation state directly at the relational level.
+  const taskId = newId('task');
+  db.insert(tasks)
+    .values({
+      id: taskId,
+      projectId: suggestion.projectId,
+      roadmapItemId: suggestion.roadmapItemId,
+      suggestionId: suggestion.id,
+      title: suggestion.title,
+      description: suggestion.description,
+      status: 'draft',
+    })
+    .run();
   db.update(taskSuggestions)
     .set({
       status: 'approved',
-      approvedTaskId: task.id,
+      approvedTaskId: taskId,
       decidedAt: nowIso(),
       decisionNote: note ?? null,
     })
     .where(eq(taskSuggestions.id, suggestionId))
     .run();
-  return { suggestion: getSuggestion(db, suggestionId), task };
+  return { suggestion: getSuggestion(db, suggestionId), task: getTask(db, taskId) };
 }
 
 export function seedProject(db: Db, name = 'demo') {

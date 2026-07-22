@@ -89,7 +89,13 @@ export interface NewTaskInput {
   completionCriteriaJson?: string;
 }
 
-export function addTask(db: DbConn, input: NewTaskInput) {
+/**
+ * Raw task insert. Module-PRIVATE and NOT exported: it is the only path that
+ * can persist a task carrying suggestion provenance, and it is reachable only
+ * through approveSuggestion (itself gated). Keeping it unexported means the
+ * exported surface offers no alternate suggestion-materialisation route.
+ */
+function insertTask(db: DbConn, input: NewTaskInput) {
   if (input.completionCriteriaJson !== undefined) {
     parseCompletionCriteria(input.completionCriteriaJson); // fail loudly on invalid criteria
   }
@@ -106,6 +112,24 @@ export function addTask(db: DbConn, input: NewTaskInput) {
   };
   db.insert(tasks).values(row).run();
   return getTask(db, row.id);
+}
+
+/**
+ * Create a task directly (draft status). This is the canonical production
+ * mutation boundary for task creation, so the suggestion-materialisation gate
+ * lives HERE, not only in the CLI: a task carrying suggestion provenance
+ * (suggestionId) is exactly what approveSuggestion produces, and approval is
+ * disabled in this build. Such a request is refused BEFORE any write — no
+ * transaction, no task insert, no suggestion change, no relationship/approval
+ * record — so the exported API cannot be used to bypass approveSuggestion. No
+ * environment variable, config file, database value or caller option is
+ * consulted. Ordinary human-created tasks (no suggestion provenance) remain
+ * usable; roadmap-linked tasks (roadmapItemId) are not suggestion provenance
+ * and remain usable.
+ */
+export function addTask(db: DbConn, input: NewTaskInput) {
+  if (input.suggestionId !== undefined) assertApprovalEnabled();
+  return insertTask(db, input);
 }
 
 export function getTask(db: DbConn, taskId: string) {
@@ -367,7 +391,9 @@ export function approveSuggestion(db: Db, suggestionId: string, note?: string) {
         description: suggestion.description,
       };
       if (suggestion.roadmapItemId !== null) taskInput.roadmapItemId = suggestion.roadmapItemId;
-      const task = addTask(tx, taskInput);
+      // Uses the private insertTask, not the public addTask: the suggestion gate
+      // is enforced once, at approval entry (assertApprovalEnabled above).
+      const task = insertTask(tx, taskInput);
       const result = tx
         .update(taskSuggestions)
         .set({
