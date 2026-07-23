@@ -1,8 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { executeStreaming } from './exec.js';
+import type { ExecutionGateway } from '../security/gateway.js';
 import { loadModelRegistry, registryModels, type ModelRegistry } from './registry.js';
 import type { ExecuteHandle, ExecuteRequest, ProviderAdapter, ProviderInfo } from './types.js';
 
@@ -10,70 +6,68 @@ const RATE_LIMIT_PATTERN = /rate.?limit|overloaded|429|too many requests/i;
 const EXHAUSTION_PATTERN =
   /usage limit|out of credits|allowance (reached|exhausted)|quota exceeded/i;
 
-export function which(executable: string): string | undefined {
-  try {
-    const out = execFileSync('which', [executable], { encoding: 'utf8' }).trim();
-    return out || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function cliVersion(executable: string): string | undefined {
-  try {
-    return execFileSync(executable, ['--version'], { encoding: 'utf8', timeout: 15000 }).trim();
-  } catch {
-    return undefined;
-  }
-}
+/** Canonical executable name resolved for reporting. Environment overrides are
+ * deliberately NOT consulted for discovery in this build. */
+const CLAUDE_EXECUTABLE = 'claude';
 
 export interface ClaudeCodeOptions {
+  /** Every spawn — probe or execution — goes through this gateway. */
+  gateway: ExecutionGateway;
   executable?: string;
   registry?: ModelRegistry;
-  allowedRoots?: readonly string[];
 }
 
 export class ClaudeCodeProvider implements ProviderAdapter {
   readonly name = 'claude-code';
+  private readonly gateway: ExecutionGateway;
   private readonly executable: string;
   private readonly registry: ModelRegistry;
-  private readonly allowedRoots: readonly string[] | undefined;
 
-  constructor(options: ClaudeCodeOptions = {}) {
-    this.executable = options.executable ?? process.env.MAJOR_CLAUDE_BIN ?? 'claude';
+  constructor(options: ClaudeCodeOptions) {
+    this.gateway = options.gateway;
+    // An explicit executable path is retained ONLY for the quarantined execute()
+    // path (milestone M1); discovery never consults it. Environment overrides
+    // (MAJOR_CLAUDE_BIN) are ignored entirely.
+    this.executable = options.executable ?? CLAUDE_EXECUTABLE;
     this.registry = options.registry ?? loadModelRegistry();
-    this.allowedRoots = options.allowedRoots;
   }
 
   async discover(): Promise<ProviderInfo> {
-    const resolved = which(this.executable);
-    const version = resolved ? cliVersion(resolved) : undefined;
-    const installed = Boolean(resolved && version);
-    // Heuristic only: Claude Code does not expose a non-interactive auth
-    // status command; presence of its state file is a best-effort signal.
-    const authenticated = installed ? existsSync(join(homedir(), '.claude.json')) : false;
+    // DISABLED FOUNDATION: discovery is RESOLUTION-ONLY and PROCESS-FREE. The
+    // CLI is never executed — no --version, no `which` subprocess, no spawn —
+    // so we cannot verify that a resolvable binary is genuine, installed or
+    // runnable; that needs OS-isolated execution (milestone M1). Only the
+    // canonical name is resolved on PATH for reporting; environment overrides
+    // are ignored for discovery and never touched.
+    const resolved = this.gateway.resolveExecutable(CLAUDE_EXECUTABLE);
     const info: ProviderInfo = {
       name: this.name,
-      installed,
-      authenticated,
-      models: registryModels(this.registry, this.name, { visible: installed, authenticated }),
+      // Cannot be confirmed without executing the binary → reported truthfully
+      // as unverified, never as installed/authenticated/available.
+      installed: false,
+      authenticated: false,
+      executableUnverified: true,
+      models: registryModels(this.registry, this.name, { visible: false, authenticated: false }),
     };
     if (resolved !== undefined) info.executable = resolved;
-    if (version !== undefined) info.version = version;
     return info;
   }
 
   async probe(): Promise<ProviderInfo> {
-    // Deliberately identical to discover(): safe, no tokens consumed.
+    // Deliberately identical to discover(): resolution-only, process-free.
     return this.discover();
   }
 
+  /** Unreachable in this build: gateway.execute() refuses unconditionally
+   * (live agent execution is an unavailable capability). */
   execute(request: ExecuteRequest): ExecuteHandle {
     const args = ['-p', request.prompt, '--output-format', 'stream-json', '--verbose'];
     if (request.modelRef) args.push('--model', request.modelRef);
     if (request.resumeSessionRef) args.push('--resume', request.resumeSessionRef);
-    const spec: Parameters<typeof executeStreaming>[0] = {
-      executable: which(this.executable) ?? this.executable,
+    const spec: Parameters<ExecutionGateway['execute']>[0] = {
+      // The gateway resolves this through the trusted-executable registry;
+      // an unregistered or shadowed installation is refused at spawn time.
+      executable: this.executable,
       args,
       cwd: request.cwd,
       detectRateLimit: (text) => RATE_LIMIT_PATTERN.test(text),
@@ -88,7 +82,6 @@ export class ClaudeCodeProvider implements ProviderAdapter {
       },
     };
     if (request.timeoutMs !== undefined) spec.timeoutMs = request.timeoutMs;
-    if (this.allowedRoots !== undefined) spec.allowedRoots = this.allowedRoots;
-    return executeStreaming(spec);
+    return this.gateway.execute(spec);
   }
 }

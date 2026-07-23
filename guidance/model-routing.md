@@ -21,8 +21,13 @@ Marketing model names are configuration, never code.
 Every model is tracked on orthogonal dimensions (see `agent_models` and `ModelState`):
 visible; authenticated; availability (available / rate-limited / exhausted / unknown);
 billing mode (subscription-included / usage-credits / API-billing / unknown); prohibited
-(with reason). A model is routable only when visible, authenticated, available, and not
-prohibited.
+(with reason). A model is routable only when visible, authenticated, available, not
+prohibited, **and its billing mode is known** — unknown billing is unroutable.
+
+State is never merely asserted: every discovery persists an observation with source,
+confidence and time (`discovery_observations`). Observed exhaustion/rate limits carry a
+`nextProbeAt` backoff; nothing re-probes or retries a model before it, and an
+optimistic re-discover does not erase an observed exhaustion.
 
 ## Quality policy
 
@@ -40,10 +45,13 @@ prohibited.
 ## Billing safety
 
 - Never activate API billing automatically. Never consume usage credits automatically.
-- Never continue Fable-class work onto paid usage credits without an explicit approved
-  `paid_usage` DecisionRequest.
+  No environment variable may silently switch a run onto API billing: the execution
+  gateway strips billing-related variables from every child environment.
+- Any paid route requires an approved `paid_usage` DecisionRequest, referenced by id and
+  verified against the database; the run record stores the decision id (DB-enforced).
 - When included allowance for the target class is unavailable, fall down the class ladder;
   when only paid options remain, checkpoint the task and pause rather than create an
-  unapproved charge.
+  unapproved charge. Checkpoints are persisted (`routing_checkpoints`) as explicit
+  records for a human to act on.
 - Every run records provider, model, billing mode, routing reason, and allowance state
   (`agent_runs`), plus usage observations (`usage_observations`).

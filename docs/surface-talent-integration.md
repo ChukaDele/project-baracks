@@ -14,7 +14,9 @@ generic project adapter — nothing Surface-Talent-specific is hard-coded in Maj
 2. Export `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service-account file (the config
    stores only the env-var name, never a path to or contents of credentials).
 3. `major project add ./surface-talent.project.json`
-4. `major doctor` — confirm the project is listed and overnight execution is safe.
+4. `major doctor` — confirm the project is listed and the inspection/dry-run environment
+   is healthy. Overnight/live execution is reported as UNAVAILABLE in this foundation
+   (it is a disabled capability) and is never reported as safe.
 
 ## What the config controls
 

@@ -49,6 +49,18 @@ describe('capability registry', () => {
     expect(state?.prohibitedReason).toMatch(/manually prohibited/);
   });
 
+  it('never presents configured billing as observed: registry billing is unknown', () => {
+    const models = registryModels(DEFAULT_MODEL_REGISTRY, 'claude-code', {
+      visible: true,
+      authenticated: true,
+    });
+    expect(models.length).toBeGreaterThan(0);
+    for (const state of models) {
+      expect(state.billingMode).toBe('unknown'); // unroutable until observed
+      expect(state.expectedBillingMode).toBe('subscription_included'); // display only
+    }
+  });
+
   it('derives availability from visibility and authentication', () => {
     const [visible] = registryModels(DEFAULT_MODEL_REGISTRY, 'claude-code', {
       visible: true,

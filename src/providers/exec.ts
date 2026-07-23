@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { assertCapabilityAvailable } from '../security/capabilities.js';
 import { assertWithinRoots } from '../security/paths.js';
 import { redactText } from '../security/redact.js';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from './types.js';
@@ -40,9 +41,21 @@ export interface StreamingSpawnSpec {
   executable: string;
   args: string[];
   cwd: string;
+  /**
+   * Exact child environment. Mandatory: children never inherit the parent
+   * environment implicitly — callers must pass a sanitised env (the
+   * execution gateway builds one via src/security/env.ts).
+   */
+  env: Record<string, string>;
   timeoutMs?: number;
   /** When set, cwd must resolve inside one of these roots. */
   allowedRoots?: readonly string[];
+  /**
+   * Spawn as a process-group leader so the WHOLE descendant tree can be
+   * signalled and terminated together (not only the direct child). Set by the
+   * execution gateway's process-tree containment.
+   */
+  detached?: boolean;
   /** Map one stdout line (usually NDJSON) to an event; null skips the line. */
   parseLine?: (line: string) => ProviderEvent | null;
   /** Provider-specific detection over stderr + parsed events. */
@@ -67,11 +80,14 @@ function defaultParseLine(line: string): ProviderEvent | null {
 }
 
 /**
- * Spawn a provider CLI non-interactively with streamed structured events,
- * cancellation and timeout. Never uses a shell; arguments are passed as an
- * array so prompts cannot inject shell syntax.
+ * QUARANTINED — always refuses. This is the raw streaming spawn engine for
+ * agent runs; live agent execution is unavailable in this build, so the gate
+ * below throws before any process can be created, unconditionally. The
+ * machinery is retained, compiled and type-checked for milestone M1
+ * (docs/deferred-security-milestones.md) but is unreachable until then.
  */
 export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
+  assertCapabilityAvailable('live-agent-execution');
   if (spec.allowedRoots) assertWithinRoots(spec.cwd, spec.allowedRoots);
 
   const queue = new EventQueue<ProviderEvent>();
@@ -82,15 +98,30 @@ export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
   let cancelled = false;
   let timedOut = false;
 
+  const detached = spec.detached ?? false;
   const child = spawn(spec.executable, spec.args, {
     cwd: spec.cwd,
+    env: spec.env,
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
+    // A detached child is its own process-group leader; killing the negative
+    // pid then signals the entire group — the whole descendant tree.
+    detached,
   });
 
+  // Signal the whole process group when detached, so descendants launched by
+  // the agent CLI are terminated too — never just the direct child.
+  const signalTree = (signal: NodeJS.Signals) => {
+    try {
+      if (detached && typeof child.pid === 'number') process.kill(-child.pid, signal);
+      else child.kill(signal);
+    } catch {
+      /* group already gone */
+    }
+  };
   const killChild = () => {
-    child.kill('SIGTERM');
-    setTimeout(() => child.kill('SIGKILL'), 5000).unref();
+    signalTree('SIGTERM');
+    setTimeout(() => signalTree('SIGKILL'), 5000).unref();
   };
 
   const timeout = setTimeout(() => {

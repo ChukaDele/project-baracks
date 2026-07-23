@@ -47,11 +47,38 @@ export interface ApplyResult {
   violations: string[];
 }
 
+export interface ApplyOptions {
+  /**
+   * The diff produced by the prior dry run. When present, apply re-checks
+   * that every affected cell still holds the `from` value observed then —
+   * changed source state rejects the write.
+   */
+  expectedDiff?: DiffEntry[];
+}
+
 export interface RoadmapAdapter {
   readRow(stableId: string): Promise<RoadmapRow | undefined>;
   readAll(): Promise<RoadmapRow[]>;
+  /** Opaque revision of the source; changes whenever the source changes. */
+  revision(): Promise<string>;
   /** Compute the diff and violations without writing anything. */
   dryRun(proposal: UpdateProposal): Promise<DryRunResult>;
-  /** Atomic, idempotent write. Must refuse when dryRun reports violations. */
-  apply(proposal: UpdateProposal): Promise<ApplyResult>;
+  /**
+   * Atomic, idempotent write. Must refuse when dryRun reports violations.
+   *
+   * CONTRACT: idempotency is mandatory, not best-effort. Applying the same
+   * idempotencyKey more than once MUST be a no-op at the source (returning
+   * `already_applied`), and `wasApplied(key)` MUST report true afterwards.
+   * The crash-consistent apply/reconcile protocol relies on this: it is what
+   * makes a reclaimed-but-actually-in-flight attempt safe to retry.
+   */
+  apply(proposal: UpdateProposal, options?: ApplyOptions): Promise<ApplyResult>;
+  /**
+   * Read-only reconciliation query: has this idempotency key already been
+   * applied to the source? Crash recovery consults this BEFORE any
+   * revision-based invalidation, so an update that reached the source but
+   * crashed before internal bookkeeping is reconciled, never misclassified
+   * as superseded.
+   */
+  wasApplied(idempotencyKey: string): Promise<boolean>;
 }

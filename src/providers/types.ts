@@ -11,20 +11,35 @@ export interface ModelState {
   visible: boolean;
   authenticated: boolean;
   availability: ModelAvailability;
+  /** Authoritative billing state. 'unknown' (unroutable) until a human
+   * attestation or observed run outcome proves it — configuration defaults
+   * never populate this field. */
   billingMode: BillingMode;
+  /** What configuration EXPECTS billing to be; display/diagnostic only,
+   * never consulted by routing. */
+  expectedBillingMode?: BillingMode;
   prohibited: boolean;
   prohibitedReason?: string;
-  /** Where this knowledge came from: 'registry' config, 'cli' discovery, or 'probe'. */
-  source: 'registry' | 'cli' | 'probe';
+  /** Where this knowledge came from: 'registry' config, 'cli' discovery,
+   * 'probe', or the persisted observation store ('persisted'). */
+  source: 'registry' | 'cli' | 'probe' | 'persisted';
 }
 
 export interface ProviderInfo {
   name: string;
+  /** Path resolved on PATH for REPORTING ONLY. Not evidence of installation:
+   * in the disabled foundation the binary is never executed, so a resolvable
+   * path is unverified. */
   executable?: string;
   version?: string;
   installed: boolean;
   /** Best-effort. Undefined when authentication state is not detectable. */
   authenticated?: boolean;
+  /** True in the disabled foundation: executable availability could not be
+   * verified because verifying it requires executing the binary (deferred to
+   * milestone M1 — trusted OS-isolated execution). Presence on PATH is
+   * reported via `executable`, but is never treated as installed/available. */
+  executableUnverified?: boolean;
   models: ModelState[];
 }
 

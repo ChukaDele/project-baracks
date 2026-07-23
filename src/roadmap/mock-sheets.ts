@@ -1,5 +1,6 @@
 import { evaluateProposal, type ProposalPolicy } from './validate.js';
 import type {
+  ApplyOptions,
   ApplyResult,
   DryRunResult,
   RoadmapAdapter,
@@ -16,6 +17,7 @@ export class MockSheetsAdapter implements RoadmapAdapter {
   private readonly rows: Map<string, RoadmapRow>;
   private readonly appliedKeys = new Set<string>();
   private readonly policy: ProposalPolicy;
+  private revisionCounter = 0;
 
   constructor(rows: RoadmapRow[] = [], policy: ProposalPolicy = {}) {
     this.rows = new Map(rows.map((r) => [r.stableId, structuredClone(r)]));
@@ -31,16 +33,32 @@ export class MockSheetsAdapter implements RoadmapAdapter {
     return [...this.rows.values()].map((r) => structuredClone(r));
   }
 
+  async revision(): Promise<string> {
+    return `rev-${this.revisionCounter}`;
+  }
+
+  async wasApplied(idempotencyKey: string): Promise<boolean> {
+    return this.appliedKeys.has(idempotencyKey);
+  }
+
+  /** Out-of-band mutation for tests: a human edited the spreadsheet. */
+  setCell(stableId: string, column: string, value: string): void {
+    const row = this.rows.get(stableId);
+    if (!row) throw new Error(`row not found: ${stableId}`);
+    row.values[column] = value;
+    this.revisionCounter++;
+  }
+
   async dryRun(proposal: UpdateProposal): Promise<DryRunResult> {
     const { diff, violations } = evaluateProposal(proposal, this.rows, this.policy);
     return { ok: violations.length === 0, diff, violations };
   }
 
-  async apply(proposal: UpdateProposal): Promise<ApplyResult> {
+  async apply(proposal: UpdateProposal, options: ApplyOptions = {}): Promise<ApplyResult> {
     if (this.appliedKeys.has(proposal.idempotencyKey)) {
       return { status: 'already_applied', violations: [] };
     }
-    const { violations } = evaluateProposal(proposal, this.rows, this.policy);
+    const { violations } = evaluateProposal(proposal, this.rows, this.policy, options.expectedDiff);
     if (violations.length > 0) return { status: 'rejected', violations };
 
     // Atomic: validation passed for every change, so write them all.
@@ -50,6 +68,7 @@ export class MockSheetsAdapter implements RoadmapAdapter {
       Object.assign(row.values, change.columns);
     }
     this.appliedKeys.add(proposal.idempotencyKey);
+    this.revisionCounter++;
     return { status: 'applied', violations: [] };
   }
 }

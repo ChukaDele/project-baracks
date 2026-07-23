@@ -36,6 +36,27 @@ describe('secret redaction', () => {
     expect(value.config.host).toBe('db.local');
     expect(value.config.password).not.toContain('topsecret');
   });
+
+  it('structurally removes COMPLETE values under sensitive keys, whatever their shape', () => {
+    const value = redactValue({
+      apiKey: 'multi word secret value',
+      auth: { user: 'u', pass: 'p', hosts: ['a', 'b'] },
+      tokens: ['one two', 'three four'],
+      plain: 'kept',
+    });
+    const serialised = JSON.stringify(value);
+    for (const fragment of ['multi word', 'secret value', '"u"', '"p"', 'one two', 'three four']) {
+      expect(serialised).not.toContain(fragment);
+    }
+    expect(value.plain).toBe('kept');
+  });
+
+  it('redacts quoted multi-word values in free text without breaking JSON', () => {
+    const line = JSON.stringify({ msg: 'x', secret: 'alpha beta gamma' });
+    const redacted = redactText(line);
+    expect(redacted).not.toContain('alpha beta');
+    expect(() => JSON.parse(redacted) as unknown).not.toThrow();
+  });
 });
 
 describe('structured JSON logs', () => {

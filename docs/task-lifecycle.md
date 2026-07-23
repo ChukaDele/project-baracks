@@ -42,11 +42,51 @@ stateDiagram-v2
 
 - **ready → queued** requires zero incomplete dependencies (`TaskDependency` rows whose
   target is not `completed`).
-- **→ completed** requires at least one Evidence record. There is no evidence-free path
-  to completion, mirroring the roadmap rule that nothing is marked Done without evidence.
+- **→ completed** is DISABLED in this build: automated task completion is an
+  unavailable capability, so `transitionTask`/`applyTransition` refuse the transition
+  unconditionally — even for a task whose proof is fully satisfied. The proof set
+  below remains the live, tested model (milestone M3 re-enables the transition once
+  completion criteria are immutable). It requires:
+  - at least one QUALIFYING **passed** `verification_runs` record: status `passed`
+    with exit code 0, completed start/end timestamps, produced under a **succeeded
+    agent run of this same task** (the composite FK guarantees the task linkage), and
+    cited by an append-only evidence row — a bare `passed` label proves nothing;
+  - no open critical/major review findings — each must be fixed or carry an explicit
+    disposition;
+  - at least one evidence record whose relationships verify (a `verification_run`
+    evidence must reference a real verification run of the same task — DB triggers
+    refuse fabricated references at insert time);
+  - any task-specific criteria from `tasks.completionCriteriaJson`: `requireArtifact`
+    (a commit/branch/PR evidence ref) and `requiredDecisionCategories` (each category
+    needs an approved DecisionRequest for this task).
+- **running → queued** exists only as the crash-recovery requeue path (expired claim
+  leases, `src/domain/claim-service.ts`).
 
 Both guards refuse when the guard data wasn't supplied, so the service layer
-(`transitionTask`) is the only practical entry point.
+(`transitionTask`) is the only practical entry point. The database keeps a completion
+backstop (drizzle/0004, 0005): triggers refuse any direct write that sets `completed`
+from a status other than `ready_to_merge` or short of the recorded proof and criteria.
+KNOWN M3 GAP: the criteria themselves are still mutable, so the backstop can be
+weakened by a criteria update — one reason the completion transition stays disabled.
+Verification records themselves are consistency-checked (`passed` requires exit code 0
+and timestamps) and immutable once terminal.
+
+## Transactions, claims and crash recovery
+
+Every status change is a compare-and-swap on `(status, version)` inside a
+`BEGIN IMMEDIATE` transaction — a concurrent writer makes the loser fail with
+`ConcurrencyError` instead of silently clobbering.
+
+**Worker claims are DISABLED in this build**: worker-owned downstream mutations are an
+unavailable capability, so `claimNextTask`, `heartbeatClaim`, `completeClaim` and
+`releaseClaim` refuse unconditionally, as do fence-carrying transitions and claim-bound
+run creation. Only the supervisor-side `recoverExpiredClaims` sweep remains runnable.
+The claim model is retained for milestone M4: `task_claims` rows carry a durable worker
+id, monotonic attempt number, lease expiry and heartbeat; the DB enforces at most one
+active claim per task (partial unique index) and immutable attempt history (triggers),
+and fences run-linked writes on the claim's lease. KNOWN M4 GAP: that fencing does not
+yet cover every owner mutation and downstream write (evidence, optional fences, review
+and roadmap-proposal writes), which is why the capability stays disabled.
 
 ## Suggested vs. real tasks
 

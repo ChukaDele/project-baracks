@@ -137,7 +137,17 @@ export function classifyModel(
   return { routingClass: 'unknown', billingMode: 'unknown', prohibited: false };
 }
 
-/** Models the registry expects for a provider, before any live probing. */
+/**
+ * Models the registry expects for a provider, before any live probing.
+ *
+ * Billing is DELIBERATELY 'unknown' here: a registry rule's billingMode is a
+ * configuration expectation, never discovery evidence. Routing treats
+ * 'unknown' as unroutable, so nothing can spend money on the strength of a
+ * config file (or an environment-supplied registry path). Billing becomes
+ * routable only through an authoritative observation — a human attestation
+ * or an observed run outcome (see providers/discovery-store.ts
+ * recordBillingObservation).
+ */
 export function registryModels(
   registry: ModelRegistry,
   provider: string,
@@ -152,7 +162,8 @@ export function registryModels(
       visible: base.visible,
       authenticated: base.authenticated,
       availability: base.visible && base.authenticated ? 'available' : 'unknown',
-      billingMode: cls.billingMode,
+      billingMode: 'unknown',
+      expectedBillingMode: cls.billingMode,
       prohibited: cls.prohibited,
       source: 'registry',
     };
@@ -163,3 +174,21 @@ export function registryModels(
 
 /** Availability schema re-exported for consumers validating probe data. */
 export const modelAvailabilitySchema = z.enum(MODEL_AVAILABILITIES);
+
+/**
+ * Build capability availability, part of the capability registry's surface:
+ * live agent execution, paid provider execution, automated task completion,
+ * worker-owned downstream mutations and external roadmap application are
+ * UNAVAILABLE in this build. Unlike model rules these are NOT registry data:
+ * they are hard-coded constants — neither the registry file nor
+ * $MAJOR_MODEL_REGISTRY is consulted, so no configuration override can mark
+ * one available (any extra keys in a registry file are ignored by the schema
+ * above and grant nothing).
+ */
+export {
+  CapabilityUnavailableError,
+  UNAVAILABLE_CAPABILITIES,
+  unavailableCapabilityStatuses,
+  type CapabilityStatus,
+  type UnavailableCapability,
+} from '../security/capabilities.js';

@@ -1,48 +1,238 @@
-import { desc, eq } from 'drizzle-orm';
-import type { Db } from '../db/client.js';
-import { agentRunEvents, agentRuns, usageObservations, type BillingMode } from '../db/schema.js';
+import { createHash } from 'node:crypto';
+import { and, desc, eq, isNull } from 'drizzle-orm';
+import type { Db, DbConn } from '../db/client.js';
+import {
+  agentModels,
+  agentProviders,
+  agentRunEvents,
+  agentRuns,
+  decisionRequests,
+  taskClaims,
+  tasks,
+  usageObservations,
+  verificationRuns,
+  type BillingMode,
+} from '../db/schema.js';
+import { assertCapabilityAvailable } from '../security/capabilities.js';
+import { redactText, redactValue } from '../security/redact.js';
+import { StaleClaimError } from './claim-service.js';
+import { isApprovedDecision } from './decision-service.js';
 import { newId, nowIso } from './ids.js';
+
+export class RunAuthorisationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RunAuthorisationError';
+  }
+}
+
+const PAID_BILLING_MODES: readonly BillingMode[] = ['usage_credits', 'api_billing'];
 
 export interface NewRunInput {
   taskId: string;
   providerId: string;
+  claimId?: string;
   modelId?: string;
   modelRef: string;
   purpose: (typeof agentRuns.$inferInsert)['purpose'];
   billingMode: BillingMode;
   routingReason: string;
+  /** Mandatory when billingMode is paid: id of an APPROVED 'paid_usage'
+   * DecisionRequest bound to this exact task/project and covering this
+   * provider/model. Validated inside the run-creation transaction. */
+  paidUsageDecisionId?: string;
   independenceLoss?: string;
   allowanceState?: string;
   worktreeId?: string;
+  now?: () => Date;
 }
 
-export function createRun(db: Db, input: NewRunInput) {
-  const row = {
-    id: newId('arun'),
-    taskId: input.taskId,
-    providerId: input.providerId,
-    modelId: input.modelId ?? null,
-    modelRef: input.modelRef,
-    purpose: input.purpose,
-    billingMode: input.billingMode,
-    routingReason: input.routingReason,
-    independenceLoss: input.independenceLoss ?? null,
-    allowanceState: input.allowanceState ?? null,
-    worktreeId: input.worktreeId ?? null,
-    status: 'pending' as const,
-  };
-  db.insert(agentRuns).values(row).run();
-  return row;
+/**
+ * Create a run record inside one immediate transaction. In this build a run
+ * row is ledger/planning state only — nothing executes it (live agent
+ * execution is an unavailable capability, see src/security/capabilities.ts).
+ *
+ * Validations that remain live: the task exists, and the billing mode is
+ * known (an 'unknown' cost basis is unroutable) and must match the model's
+ * authoritatively observed billing.
+ *
+ * QUARANTINED paths: a PAID billing mode is refused unconditionally (paid
+ * provider execution is unavailable — M2), and a claim-bound run is refused
+ * unconditionally (worker-owned downstream mutations are unavailable — M4).
+ * The validation code for those paths below the gates is retained as the
+ * milestone starting point but is unreachable until then; independent review
+ * found it incomplete (approval scoping/consumption, fencing coverage), so it
+ * must not be presented as an enforced boundary.
+ */
+export function createRun(db: Db, rawInput: NewRunInput) {
+  // Single-read snapshot of the caller-owned input (see task-service.ts
+  // snapshotTaskInput): the paid-billing and claim-bound capability gates
+  // below and the persisted row must observe the same values even against a
+  // stateful getter or Proxy that answers differently on successive reads.
+  const input = Object.freeze({
+    taskId: rawInput.taskId,
+    providerId: rawInput.providerId,
+    claimId: rawInput.claimId,
+    modelId: rawInput.modelId,
+    modelRef: rawInput.modelRef,
+    purpose: rawInput.purpose,
+    billingMode: rawInput.billingMode,
+    routingReason: rawInput.routingReason,
+    paidUsageDecisionId: rawInput.paidUsageDecisionId,
+    independenceLoss: rawInput.independenceLoss,
+    allowanceState: rawInput.allowanceState,
+    worktreeId: rawInput.worktreeId,
+    now: rawInput.now,
+  });
+  if (PAID_BILLING_MODES.includes(input.billingMode)) {
+    assertCapabilityAvailable('paid-provider-execution');
+  }
+  if (input.claimId !== undefined) {
+    assertCapabilityAvailable('worker-owned-downstream-mutations');
+  }
+  return db.transaction(
+    (tx) => {
+      const task = tx.select().from(tasks).where(eq(tasks.id, input.taskId)).get();
+      if (!task) throw new Error(`task not found: ${input.taskId}`);
+
+      if (input.billingMode === 'unknown') {
+        throw new RunAuthorisationError(
+          'billing mode is unknown: refusing to create a run whose cost basis is unproven',
+        );
+      }
+
+      // Billing derives from authoritative persisted model state, never from
+      // caller input: when the model is persisted, the run's billing must
+      // equal the model's observed billing, and an unobserved ('unknown')
+      // model is unroutable. Configuration/installation/heuristics prove
+      // nothing about cost.
+      const model = tx
+        .select()
+        .from(agentModels)
+        .where(
+          and(
+            eq(agentModels.providerId, input.providerId),
+            eq(agentModels.modelRef, input.modelRef),
+          ),
+        )
+        .get();
+      if (model) {
+        if (model.billingMode === 'unknown') {
+          throw new RunAuthorisationError(
+            `model ${input.modelRef} has no authoritative billing observation: unroutable`,
+          );
+        }
+        if (model.billingMode !== input.billingMode) {
+          throw new RunAuthorisationError(
+            `run billing '${input.billingMode}' does not match the authoritative persisted ` +
+              `billing '${model.billingMode}' of model ${input.modelRef}`,
+          );
+        }
+        if (input.modelId !== undefined && input.modelId !== model.id) {
+          throw new RunAuthorisationError(
+            `modelId ${input.modelId} does not match ${input.modelRef}`,
+          );
+        }
+      }
+
+      if (input.claimId !== undefined) {
+        const claim = tx.select().from(taskClaims).where(eq(taskClaims.id, input.claimId)).get();
+        const nowIsoStr = (input.now?.() ?? new Date()).toISOString();
+        if (
+          !claim ||
+          claim.taskId !== input.taskId ||
+          claim.status !== 'active' ||
+          claim.leaseExpiresAt <= nowIsoStr
+        ) {
+          throw new StaleClaimError(
+            `claim ${input.claimId} is not the current active, unexpired claim of task ${input.taskId}`,
+          );
+        }
+      }
+
+      if (PAID_BILLING_MODES.includes(input.billingMode)) {
+        if (!input.paidUsageDecisionId) {
+          throw new RunAuthorisationError(
+            'paid billing requires an approved paid_usage DecisionRequest',
+          );
+        }
+        const provider = tx
+          .select()
+          .from(agentProviders)
+          .where(eq(agentProviders.id, input.providerId))
+          .get();
+        const now = input.now?.();
+        const authorised = isApprovedDecision(tx, input.paidUsageDecisionId, {
+          category: 'paid_usage',
+          taskId: input.taskId,
+          projectId: task.projectId,
+          scope: { provider: provider?.name ?? '', modelRef: input.modelRef },
+          requireExpiry: true,
+          requireUnconsumed: true,
+          ...(now ? { now } : {}),
+        });
+        if (!authorised) {
+          throw new RunAuthorisationError(
+            `DecisionRequest ${input.paidUsageDecisionId} does not authorise paid usage for ` +
+              `this task, project and provider/model scope (approved, unexpired, unconsumed, scoped)`,
+          );
+        }
+      }
+
+      const row = {
+        id: newId('arun'),
+        taskId: input.taskId,
+        providerId: input.providerId,
+        claimId: input.claimId ?? null,
+        modelId: input.modelId ?? null,
+        modelRef: input.modelRef,
+        purpose: input.purpose,
+        billingMode: input.billingMode,
+        routingReason: input.routingReason,
+        paidUsageDecisionId: input.paidUsageDecisionId ?? null,
+        independenceLoss: input.independenceLoss ?? null,
+        allowanceState: input.allowanceState ?? null,
+        worktreeId: input.worktreeId ?? null,
+        status: 'pending' as const,
+      };
+      tx.insert(agentRuns).values(row).run();
+
+      // Consume the paid approval EXACTLY ONCE, atomically in this same
+      // transaction. The compare-and-swap on a NULL consumed_by_run_id means a
+      // second run under the same approval finds it consumed and fails; the
+      // insert above already checked unconsumed, so the stamp closes the
+      // window between check and use.
+      if (PAID_BILLING_MODES.includes(input.billingMode) && input.paidUsageDecisionId) {
+        const consumed = tx
+          .update(decisionRequests)
+          .set({ consumedByRunId: row.id })
+          .where(
+            and(
+              eq(decisionRequests.id, input.paidUsageDecisionId),
+              isNull(decisionRequests.consumedByRunId),
+            ),
+          )
+          .run();
+        if (consumed.changes !== 1) {
+          throw new RunAuthorisationError(
+            `paid approval ${input.paidUsageDecisionId} was already consumed by another run`,
+          );
+        }
+      }
+      return row;
+    },
+    { behavior: 'immediate' },
+  );
 }
 
-export function getRun(db: Db, runId: string) {
+export function getRun(db: DbConn, runId: string) {
   const row = db.select().from(agentRuns).where(eq(agentRuns.id, runId)).get();
   if (!row) throw new Error(`agent run not found: ${runId}`);
   return row;
 }
 
 export function setRunStatus(
-  db: Db,
+  db: DbConn,
   runId: string,
   status: (typeof agentRuns.$inferInsert)['status'],
 ) {
@@ -54,27 +244,89 @@ export function setRunStatus(
   return getRun(db, runId);
 }
 
-/** Append an event to the run's immutable history. Sequence numbers are per-run. */
-export function appendRunEvent(db: Db, runId: string, type: string, payload: unknown = {}) {
-  const last = db
-    .select({ seq: agentRunEvents.seq })
-    .from(agentRunEvents)
-    .where(eq(agentRunEvents.runId, runId))
-    .orderBy(desc(agentRunEvents.seq))
-    .limit(1)
-    .get();
-  const row = {
-    id: newId('aevt'),
-    runId,
-    seq: (last?.seq ?? 0) + 1,
-    type,
-    payloadJson: JSON.stringify(payload),
-  };
-  db.insert(agentRunEvents).values(row).run();
+export class ConflictingEventError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictingEventError';
+  }
+}
+
+function hashEventPayload(type: string, payloadJson: string): string {
+  return createHash('sha256').update(`${type}\n${payloadJson}`).digest('hex');
+}
+
+export interface AppendedEvent {
+  event: typeof agentRunEvents.$inferSelect;
+  /** True when an identical event with the same eventKey already existed. */
+  duplicate: boolean;
+}
+
+/**
+ * Append an event to the run's immutable history. The payload is redacted
+ * BEFORE persistence — secrets never reach durable storage. Sequence numbers
+ * are assigned inside the same immediate transaction as the insert, so
+ * concurrent appenders cannot collide. With an eventKey, redelivery of the
+ * identical event is an idempotent no-op; a *different* payload under the
+ * same key is rejected as a conflicting replacement.
+ */
+export function appendRunEvent(
+  db: Db,
+  runId: string,
+  type: string,
+  payload: unknown = {},
+  options: { eventKey?: string } = {},
+): AppendedEvent {
+  const payloadJson = JSON.stringify(redactValue(payload ?? {}));
+  const payloadHash = hashEventPayload(type, payloadJson);
+  return db.transaction(
+    (tx): AppendedEvent => {
+      if (options.eventKey !== undefined) {
+        const existing = tx
+          .select()
+          .from(agentRunEvents)
+          .where(
+            and(eq(agentRunEvents.runId, runId), eq(agentRunEvents.eventKey, options.eventKey)),
+          )
+          .get();
+        if (existing) {
+          if (existing.payloadHash === payloadHash && existing.type === type) {
+            return { event: existing, duplicate: true };
+          }
+          throw new ConflictingEventError(
+            `event key ${options.eventKey} of run ${runId} already exists with different content`,
+          );
+        }
+      }
+      const last = tx
+        .select({ seq: agentRunEvents.seq })
+        .from(agentRunEvents)
+        .where(eq(agentRunEvents.runId, runId))
+        .orderBy(desc(agentRunEvents.seq))
+        .limit(1)
+        .get();
+      const row = {
+        id: newId('aevt'),
+        runId,
+        seq: (last?.seq ?? 0) + 1,
+        type,
+        eventKey: options.eventKey ?? null,
+        payloadHash,
+        payloadJson,
+      };
+      tx.insert(agentRunEvents).values(row).run();
+      return { event: getEvent(tx, row.id), duplicate: false };
+    },
+    { behavior: 'immediate' },
+  );
+}
+
+function getEvent(db: DbConn, eventId: string) {
+  const row = db.select().from(agentRunEvents).where(eq(agentRunEvents.id, eventId)).get();
+  if (!row) throw new Error(`run event not found: ${eventId}`);
   return row;
 }
 
-export function listRunEvents(db: Db, runId: string) {
+export function listRunEvents(db: DbConn, runId: string) {
   return db
     .select()
     .from(agentRunEvents)
@@ -83,8 +335,49 @@ export function listRunEvents(db: Db, runId: string) {
     .all();
 }
 
+/**
+ * Record a deterministic verification run (the completion proof's backbone).
+ * A 'passed' record must be internally consistent: exit code 0 and completed
+ * timestamps (defaulted to now when the caller ran the command synchronously)
+ * — a bare 'passed' label proves nothing and is refused here and by the DB.
+ */
+export function recordVerificationRun(
+  db: DbConn,
+  input: {
+    taskId: string;
+    command: string;
+    status: (typeof verificationRuns.$inferInsert)['status'];
+    exitCode?: number;
+    outputSummary?: string;
+    agentRunId?: string;
+    startedAt?: string;
+    endedAt?: string;
+  },
+) {
+  // Single reads of the caller-owned fields the consistency check validates
+  // (see createRun): the check and the persisted row must agree.
+  const { status, exitCode, outputSummary } = input;
+  const terminal = status === 'passed' || status === 'failed';
+  if (status === 'passed' && exitCode !== 0) {
+    throw new Error(`a passed verification run requires exit code 0, got ${exitCode}`);
+  }
+  const row = {
+    id: newId('vrun'),
+    taskId: input.taskId,
+    agentRunId: input.agentRunId ?? null,
+    command: input.command,
+    status,
+    exitCode: exitCode ?? null,
+    outputSummary: outputSummary !== undefined ? redactText(outputSummary) : null,
+    startedAt: input.startedAt ?? (terminal ? nowIso() : null),
+    endedAt: input.endedAt ?? (terminal ? nowIso() : null),
+  };
+  db.insert(verificationRuns).values(row).run();
+  return row;
+}
+
 export function recordUsage(
-  db: Db,
+  db: DbConn,
   input: {
     providerId: string;
     modelId?: string;
@@ -99,7 +392,7 @@ export function recordUsage(
     modelId: input.modelId ?? null,
     agentRunId: input.agentRunId ?? null,
     kind: input.kind,
-    dataJson: JSON.stringify(input.data ?? {}),
+    dataJson: JSON.stringify(redactValue(input.data ?? {})),
   };
   db.insert(usageObservations).values(row).run();
   return row;

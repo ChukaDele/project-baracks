@@ -16,24 +16,35 @@ recorded as a `security_exception` DecisionRequest.
 
 ## Subprocess containment
 
-- Subprocesses run only inside configured project roots
-  (`src/security/paths.ts#assertWithinRoots`). A cwd outside every registered root is a
-  hard error.
-- Provider CLIs are spawned without a shell; prompts are passed as argv entries and can
-  never inject shell syntax.
+- Every external process passes through the execution gateway
+  (`src/security/gateway.ts`); provider adapters never spawn independently.
+- Allowed project roots are mandatory and non-empty; roots and working directories are
+  canonicalised with realpath before the containment check, so symlinks and `..`
+  traversal cannot escape a root.
+- The gateway accepts only structured executable + argv values — never shell command
+  strings — and provider CLIs are spawned without a shell, so prompts can never inject
+  shell syntax. Invoking a shell with `-c` is itself prohibited.
+- Child processes receive a sanitised environment allowlist. API keys, paid-credit
+  toggles and billing-related variables are stripped unless a valid, verified
+  DecisionRequest explicitly authorises named variables.
+- Every execution-policy decision — allowed or refused — is recorded (redacted) in the
+  append-only `execution_policy_decisions` table.
 
 ## Prohibited operations
 
-Enforced by `src/security/commands.ts` regardless of configuration:
+Enforced at spawn time by the gateway's argv policy (`src/security/commands.ts`)
+regardless of configuration:
 
-- direct pushes to protected branches (default: `main`, `master`);
-- force pushes (`--force`, `-f`, `--force-with-lease`);
+- direct pushes to protected branches (default: `main`, `master`), in any argv
+  spelling including refspecs (`HEAD:main`) — bare `git push` is refused because
+  upstream tracking could target a protected branch;
+- force pushes (`--force`, `-f`, `--force-with-lease`, `--force-if-includes`);
 - destructive database commands (`DROP TABLE/DATABASE/SCHEMA`, `TRUNCATE`);
-- recursive force deletion (`rm -rf` and variants).
+- recursive force deletion (`rm -rf` and all flag arrangements);
+- access outside configured project roots.
 
-Projects add their own prohibitions via `prohibitedCommands` (regex patterns) and, in
-preference to blocklists, an `allowedExecutables` allowlist: when an allowlist is present,
-anything not on it is refused.
+The project's `allowedExecutables` allowlist is mandatory: anything not on it is
+refused. Projects add further prohibitions via `prohibitedCommands` (regex patterns).
 
 ## No automatic promotion
 
