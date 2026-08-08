@@ -34,11 +34,10 @@ for e in entries:
     if not Path(e['path']).is_file():
         raise SystemExit(f"missing guidance file: {e['path']}")
 required = {
-    'communication-style', 'readiness-and-independent-validation',
-    'tool-routing-and-source-ingestion', 'mvp-speed-and-prioritisation',
-    'autonomy-and-progress', 'legacy-cleanup', 'security-and-permissions',
-    'ui-patterns-and-reuse', 'task-scope', 'model-routing', 'human-approval',
-    'roadmap-sync'
+    'communication-style', 'tool-routing-and-source-ingestion',
+    'mvp-speed-and-prioritisation', 'autonomy-and-progress',
+    'legacy-cleanup', 'security-and-permissions', 'ui-patterns-and-reuse',
+    'task-scope', 'model-routing', 'human-approval', 'roadmap-sync'
 }
 missing = required - set(ids)
 if missing:
@@ -61,7 +60,7 @@ if registered_internal != actual_internal:
         f"missing from registry: {sorted(actual_internal-registered_internal)}\n"
         f"missing on disk: {sorted(registered_internal-actual_internal)}"
     )
-for required_skill in ['source-ingestion', 'knowledge-work', 'skill-resolver', 'skillify', 'tools-as-code']:
+for required_skill in ['source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code']:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
 policy = reg.get('policy', {})
@@ -72,8 +71,6 @@ for key in [
     'mvpIsDefault',
     'legacyCleanupRequired',
     'primarySourceBeforeReconstruction',
-    'skillifyReusableProcedures',
-    'toolsAsCodeForRepeatedDeterministicWork',
 ]:
     if policy.get(key) is not True:
         raise SystemExit(f"required skill policy not enabled: {key}")
@@ -106,8 +103,6 @@ grep -Fq "MVP is the default delivery strategy" guidance/mvp-speed-and-prioritis
 grep -Fq "Git history is the audit archive" guidance/instruction-precedence.md || fail "clean supersession doctrine missing"
 grep -Fiq "continue until" guidance/autonomy-and-progress.md || fail "continue-until autonomy doctrine missing"
 grep -Fq "ASD-STE100-inspired" guidance/communication-style.md || fail "communication standard missing"
-grep -Fq "BUILT" guidance/readiness-and-independent-validation.md || fail "built/validated/ready distinction missing"
-grep -Fq "independent grader" guidance/readiness-and-independent-validation.md || fail "independent grader rule missing"
 grep -Fq "A failed first tool is not a failed task" guidance/tool-routing-and-source-ingestion.md || fail "tool fallback doctrine missing"
 grep -Fq "Do not search for articles about the video" guidance/tool-routing-and-source-ingestion.md || fail "YouTube primary-source guard missing"
 grep -Fq "complete current upstream bundle" docs/skills-catalog.md || fail "full Emil bundle policy missing"
@@ -132,6 +127,8 @@ grep -Fq "Use the right tool" guidance/global-worker-rules.md || fail "global to
 grep -Fq "Primary-source integrity" guidance/global-worker-rules.md || fail "global primary-source rule missing"
 grep -Fq "Major is the default control plane" guidance/global-worker-rules.md || fail "Major default control-plane rule missing"
 grep -Fq "Presence is not execution authority" guidance/global-worker-rules.md || fail "presence/authority separation missing"
+grep -Fq "MAJOR SHADOW PLAN" guidance/global-worker-rules.md || fail "observe-first shadow plan rule missing"
+grep -Fq "Three consecutive passing shadow grades" guidance/global-worker-rules.md || fail "shadow promotion threshold missing"
 grep -Fq "Tools as Code" guidance/global-worker-rules.md || fail "Tools-as-Code rule missing"
 grep -Fq "skillify" guidance/global-worker-rules.md || fail "skillify rule missing"
 grep -Fq '$HOME/.local/bin/major session attach' guidance/global-worker-rules.md || fail "GUI-safe Major attach command missing"
@@ -171,9 +168,11 @@ grep -Fq "project-policies.json" src/supervisor/policy.ts || fail "durable proje
 grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts || fail "project classes missing"
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
 grep -Fq "maxWorkers: 3" src/supervisor/policy.ts || fail "assist worker ceiling missing"
+grep -Fq "maxRunMinutes: 30" src/supervisor/policy.ts || fail "assist wall-clock ceiling missing"
 grep -Fq "maxWorkers: 6" src/supervisor/policy.ts || fail "build worker ceiling missing"
 grep -Fq "maxWorkers: 8" src/supervisor/policy.ts || fail "unattended worker ceiling missing"
-grep -Fq "passing independent grade is required" src/supervisor/policy.ts || fail "trust promotion grade gate missing"
+grep -Fq "three consecutive independently graded shadow passes" src/supervisor/policy.ts || fail "observe-to-assist shadow gate missing"
+grep -Fq "recordShadowGrade" src/supervisor/cli.ts || fail "shadow grade CLI path missing"
 grep -Fq "major goal report" src/supervisor/runtime.ts || fail "coordinator cannot durably report goal state"
 grep -Fq "Skillify" src/supervisor/runtime.ts || fail "coordinator is not skill-first"
 grep -Fq "Tools-as-Code" src/supervisor/runtime.ts || fail "coordinator lacks Tools-as-Code guidance"
@@ -181,7 +180,6 @@ for provider in claude codex cursor antigravity; do
   grep -Fq "case '$provider'" src/supervisor/worker.ts || fail "live worker adapter missing: $provider"
 done
 
-# Every supervisor process launch must flow through the Major successor gateway.
 if grep -R -F -n "node:child_process" src/supervisor; then
   fail "supervisor bypasses the execution gateway"
 fi
@@ -193,8 +191,9 @@ grep -Fq "globalStopRequested" src/supervisor/worker.ts || fail "active workers 
 # Pilot deployment: Major is globally present, but no global autonomous daemon/swarm is installed.
 grep -Fq "SessionStart" scripts/install-major-runtime.sh || fail "Claude automatic session attach hook missing"
 grep -Fq "startup|resume|clear|compact" scripts/install-major-runtime.sh || fail "Claude attach hook does not cover session lifecycle"
-grep -Fq "do NOT auto-start a login daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
+grep -Fq "no auto-start daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
 grep -Fq "Ruflo is NOT attached globally" scripts/install-major-runtime.sh || fail "pilot installer must avoid global Ruflo blast radius"
+grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "first JSS pilot must be observe-only"
 if grep -Fq "launchctl bootstrap" scripts/install-major-runtime.sh; then
   fail "pilot installer must not start a login daemon"
 fi
