@@ -1,98 +1,56 @@
-# Major harness migration
+# Major 2.0 migration
 
-This branch evolves the existing Major repository into the cross-project engineering harness it was originally intended to be.
+**Bottom line:** the Major 2.0 policy, skills, bootstrap, communication standard and reusable knowledge are being made canonical in this branch. The migration is **not runtime-complete** until Ruflo-backed execution replaces the old disabled Major v1 execution path and the remaining v1 code is deleted.
 
-The old repository is preserved in-place so its Git history, guidance, security work, routing logic and lessons remain auditable. Do not delete the old implementation until each useful capability has been classified as retained, adapted, superseded or rejected.
+## Target
 
-## Architectural role
+Major is the standalone cross-project engineering harness for Bredge, client, personal and external projects.
 
-Major is the operating system and human-reviewable source of engineering policy.
+- Major owns human-reviewable policy, project bootstrap, skill catalog and verified reusable learning.
+- Ruflo provides the planned orchestration/memory substrate.
+- Claude Code, Codex, Google Antigravity and Cursor are worker pools.
+- Individual repositories such as JSS are consumers, not owners of Major.
 
-Ruflo is an orchestration/memory/learning substrate beneath Major. Claude Code, Codex, Google Antigravity CLI and Cursor Agent CLI are worker capacity. Individual product repositories such as JSS remain projects consumed/supervised by Major; they do not own Major.
+## Decisions already made
 
-## Retain from old Major
+- **MVP/speed is the default.** Large briefs become P0 MVP / P1 next / P2 later; P0 is built end to end before broad expansion.
+- **Proof-first, not Figma-first.** Use the fastest credible medium for the biggest uncertainty.
+- **Visible progress matters.** UI/interaction proof may lead backend via explicit replaceable mocks/contracts.
+- **Normal substantive concurrency:** 4–6 useful workers, capacity up to 8 when independent work shortens the critical path.
+- **Worker pools:** Claude, Codex, Antigravity and Cursor; route by task fit, subscription capacity and observed outcomes.
+- **Skills:** Major internal catalog + complete current Emil bundle for UI + selected Anthropic/OpenAI/graph skills by profile/trigger.
+- **Communication:** BLUF + ASD-STE100-inspired simplified technical English across supported worker global/project instructions.
+- **Security:** minimum safety floor plus risk-proportional hardening, not enterprise ceremony before proof.
+- **Autonomy:** safe reversible work continues until acceptance or a genuine owner-only gate.
+- **Legacy:** Git is the archive; verified replacements delete obsolete active code/docs/config/names.
+- **Memory:** Major Git/Markdown is human-reviewable truth; Ruflo/AgentDB is a derived retrieval/index layer; project-sensitive knowledge stays isolated.
 
-- instruction precedence and supersession/version history
-- secret redaction and execution containment concepts
-- explicit human authority for genuinely irreversible/high-risk actions
-- durable task/run/evidence ledger
-- model-level routing rather than provider-brand hard-coding
-- orthogonal model state: visible, authenticated, available/rate-limited/exhausted, billing mode, prohibited
-- subscription-included vs credits/API billing awareness
-- task dependencies as explicit data rather than prose
-- objective completion evidence rather than agent self-report
-- configurable project boundaries and protected resources
+## Completed in this migration layer
 
-## Adapt
+- binding Major guidance and precedence;
+- provider-neutral project state/roadmap rule;
+- reusable verified learning corpus;
+- canonical internal/external skill registry;
+- profile-based skill installer with lock/validation;
+- project bootstrap templates and provider-neutral `AGENTS.md` contract;
+- global communication installer for Claude Code, Codex and Antigravity, with Cursor User Rule handoff;
+- explicit legacy cleanup protocol and migration receipt;
+- static Major validation script wired into CI;
+- removal/replacement of stale v1 docs and Surface Talent-specific core examples.
 
-- Replace the hard-disabled live execution foundation with Ruflo-backed orchestration and native provider CLIs.
-- Make agent count adaptive: normal substantive builds should exploit useful parallelism; the system may scale to 8 normal development workers while contracting for small/local work.
-- Use isolated worktrees and explicit write ownership for concurrent implementation.
-- Replace the old Codex-review-only reserve with task-fit routing: Codex can be a primary implementation lane as well as an independent reviewer.
-- Add Google Antigravity CLI as a lower-cost/subscription-capacity execution lane for bounded implementation, research, tests, documentation, browser work and overflow where appropriate.
-- Add Cursor Agent CLI as another headless execution/review lane and model-capacity fallback.
-- Prefer subscription-included capacity before any paid API route; paid API/credit usage remains a separate explicit authority decision.
-- Keep bounded retry/repair loops. After two materially unchanged failed strategies, change strategy or escalate rather than repeat.
-- Allow safe autonomous local work, branches, worktrees, tests and evidence collection. Revisit which merge/deploy actions require human approval instead of inheriting the old blanket prohibition unchanged.
+## Remaining runtime work
 
-## Import from newer project learnings
+1. Integrate Ruflo as the orchestration/memory substrate.
+2. Implement/verify live worker adapters for Claude Code, Codex, Antigravity and Cursor.
+3. Enable bounded real execution, adaptive worktrees and continue-until loops.
+4. Import/index approved Major/project memories with namespace boundaries.
+5. Run the global communication/style installer on the development Mac and configure Cursor global User Rules.
+6. Bootstrap and execute a real managed project as the harness smoke test.
+7. Verify provider/rate-limit failover and objective completion evidence.
+8. Delete old v1 disabled execution gates, obsolete tests/schema/docs/flags that no longer serve the target runtime.
+9. Run the stale-reference, CI and end-to-end cleanup gate.
+10. Rename the repository from the legacy `project-baracks` name to `major` when the repo-control path is available.
 
-JSS currently contains a stronger reusable engineering corpus than old Major. Migrate its transferable material into Major's canonical global skill/memory library, including:
+## Completion definition
 
-- project-start
-- competitive-product-audit
-- open-source-leverage
-- nontechnical-ux
-- simple-modular-code
-- lean-graph-engineering / graph-engineering
-- behavior-reward-system
-- vertical-slice-delivery
-- root-cause-qa
-- exact-head-pr-review
-- rapid-ui-prototype
-- data-learning-loop
-- source-adapter-engineering
-- pdf-reporting-qa
-- cost-control
-- the lean quality/evidence strategy
-- inherited reusable lessons from JSS `LEARNINGS.md`
-- the complete approved external skill bundle (Emil, Anthropic, OpenAI, graph-engineering)
-
-Do not migrate JSS-specific business rules, credentials, candidate data or domain state into Major global memory.
-
-## Skill loading
-
-Major may install a broad reusable skill library, but agents should load only trigger-matched skills into active context. Availability is not context injection.
-
-Maintain a lock/manifest containing source, commit/version, licence status and installed capability.
-
-## Exploratory / Awwwards profile
-
-When a project is explicitly described as exploratory, experimental, Awwwards/FWA-style, heavy-motion, illustrative or similarly creative, activate a dedicated creative-development profile rather than normal product-UI defaults.
-
-The profile should:
-
-- study a small set of exceptional live references and reverse-engineer composition, typography, pacing, motion, interaction, illustration/3D and transition language
-- define an explicit visual grammar and motion storyboard
-- prototype the hardest/signature interaction before commodity page structure
-- use specialised parallel agents for creative direction, layout/frontend, motion, WebGL/3D when justified, performance and browser/visual QA
-- deploy previews early and visually inspect the rendered result, iterating until the experience meets the intended bar
-- reject generic AI/SaaS design defaults, gratuitous animation and gratuitous 3D
-
-Baseline runtime/tooling for this profile: Figma/references, image generation/SVG, GSAP + ScrollTrigger, Lenis, Motion, GitHub, Vercel and browser/Playwright QA. Add Three.js/React Three Fiber, Rive, Spline or Remotion only when the concept actually requires them.
-
-Create a dedicated `exploratory-creative-dev` skill that orchestrates these existing capabilities rather than duplicating all underlying skill text.
-
-## Global memory
-
-Human-reviewable policy, approved skills and verified reusable lessons live in this repository. Ruflo/AgentDB may index them for semantic retrieval but is a derived retrieval layer rather than the only source of truth.
-
-Project-local memories remain namespaced/project-local. Only sanitized transferable learnings may be promoted globally.
-
-## Decisions still requiring approval
-
-1. Exact canonical recurring skill bundle.
-2. Which old Major approval gates remain human-only versus safe autonomous actions.
-3. Default provider/task routing weights and concurrency policy.
-4. Global-memory promotion threshold and review flow.
-5. Exact exploratory/Awwwards skill wording and automatic runtime dependency install policy.
+Use `docs/migrations/major-v2-legacy-receipt.md` as the migration gate. Major 2.0 is ready only when the new runtime completes a real bounded multi-agent task with evidence **and** the obsolete v1 execution path has been removed.
