@@ -1,4 +1,3 @@
-import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -14,7 +13,7 @@ import {
   type WorkerHost,
 } from './state.js';
 import { runDaemon, runGoalCycle, supervisorSnapshot } from './runtime.js';
-import { runWorker } from './worker.js';
+import { runGatewayCommand, runWorker } from './worker.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -38,23 +37,12 @@ function validHost(value: string): WorkerHost {
   return value as WorkerHost;
 }
 
-function kickGoal(goalId: string): void {
-  const entry = process.argv[1];
-  if (!entry) return;
-  const child = spawn(process.execPath, [entry, 'supervisor', 'cycle', '--goal-id', goalId], {
-    detached: true,
-    stdio: 'ignore',
-    env: process.env,
-  });
-  if (child.pid) updateGoal(goalId, { activePid: child.pid, status: 'running' });
-  child.unref();
-}
-
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
-  return Buffer.concat(chunks).toString('utf8');
+  process.stdin.setEncoding('utf8');
+  let text = '';
+  for await (const chunk of process.stdin) text += String(chunk);
+  return text;
 }
 
 export async function runSupervisorCli(args: string[]): Promise<boolean> {
@@ -78,7 +66,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     console.log(`repo: ${goal.repoPath}`);
     console.log(`goal: ${goal.goal}`);
     console.log(`autonomous: ${goal.autonomous ? 'yes' : 'no'}`);
-    if (goal.autonomous) kickGoal(goal.id);
+    if (goal.autonomous) {
+      console.log('supervisor: queued for the persistent Major daemon');
+    }
     return true;
   }
 
@@ -153,14 +143,14 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       const stamp = Date.now();
       runCwd = join(root, `${stamp}-${safe}`);
       const branch = `major/${stamp}-${safe}`;
-      const git = spawnSync('git', ['worktree', 'add', '-b', branch, runCwd], {
+      const git = await runGatewayCommand({
+        executable: 'git',
+        args: ['worktree', 'add', '-b', branch, runCwd],
         cwd,
-        encoding: 'utf8',
+        timeoutMs: 5 * 60 * 1000,
       });
-      if (git.status !== 0) {
-        throw new Error(
-          `worktree setup failed: ${git.stderr || git.stdout || 'unknown git error'}`,
-        );
+      if (git.status !== 'succeeded') {
+        throw new Error(`worktree setup failed: ${git.stderr || git.stdout || 'unknown git error'}`);
       }
       console.error(`Major worktree: ${runCwd} (${branch})`);
     }
