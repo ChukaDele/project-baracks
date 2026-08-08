@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 import { executeMajorStreaming } from '../providers/exec.js';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
 import { checkArgv } from './commands.js';
