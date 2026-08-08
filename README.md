@@ -1,8 +1,6 @@
 # Major
 
-**Major is the default cross-project supervisor for software delivery and evidence-based knowledge work.** It owns durable goals, routes work across agents/tools, keeps the critical path moving, verifies outcomes and carries reusable learning across projects.
-
-Major is the coordination/policy layer. Ruflo is a swarm/memory substrate beneath it. Claude Code, Codex, Google Antigravity and Cursor are worker pools rather than separate operating systems.
+**Major is a thin cross-project control plane for software delivery and evidence-based knowledge work.** It owns durable goals, project trust, tool/worker routing, evidence, stop controls and reusable learning. It should not become a giant hard-coded workflow factory.
 
 ## Prime directive
 
@@ -14,76 +12,135 @@ For software:
 2. reduce broad scope to P0 MVP / P1 next / P2 later;
 3. test the biggest uncertainty in the fastest credible medium;
 4. build the P0 value loop end to end;
-5. keep progress demonstrable while supporting infrastructure catches up;
+5. keep progress demonstrable;
 6. verify the real path;
 7. keep working the highest-impact missing P0 node until the goal is true or a genuine owner gate remains.
 
-For knowledge work, use the equivalent rule: **minimum credible evidence for the next good decision**.
+For knowledge work: **minimum credible evidence for the next good decision**.
 
-## Major is the default state
+## Thin kernel, fat skills
 
-The target behavior is not “remember to run Major.” Major is installed once and remains present:
+Permanent Major code should stay focused on deterministic control-plane concerns:
 
-- a persistent supervisor daemon starts at Mac login;
-- Claude Code attaches on every startup/resume/clear/compact through a `SessionStart` hook;
-- Codex, Cursor and Antigravity receive global Major instructions and attach before substantive work;
-- Ruflo MCP is registered globally for the supported worker hosts;
-- broad/multi-step requests become durable Major goals rather than isolated chats;
-- small bounded requests may remain in the current agent session under Major rules.
+- durable goal/project state;
+- project class and trust;
+- worker/tool availability;
+- worktree/process lifecycle;
+- kill switch;
+- evidence/audit boundaries;
+- owner gates;
+- provider/cost restrictions.
 
-Install the live runtime on the development Mac:
+Reusable procedure belongs in tested skills. Repeated deterministic mechanics can be composed at runtime with `tools-as-code`. A successful novel procedure becomes a reusable skill only after it works, via `skillify`.
+
+```text
+user goal
+  ↓
+Major kernel
+  ↓
+skill resolver
+  ↓
+relevant skill packs
+  ↓
+agent
+  ↓
+reason | native tool | Tools-as-Code | dynamic worker graph
+  ↓
+evidence / independent grade
+  ↓
+reusable success? → skillify
+```
+
+## Always present ≠ always autonomous
+
+Major's communication/routing/project context should be present across supported agent tools, but execution authority is **project-scoped**.
+
+Project classes:
+
+- `unknown`
+- `workshop`
+- `client`
+- `knowledge`
+
+Trust levels:
+
+- `observe` — no delegated execution;
+- `assist` — visible foreground pilot, max 3 useful workers;
+- `build` — validated build mode, max 6 useful workers;
+- `unattended` — max 8 useful workers and background continuation.
+
+Unknown projects default to observe. Client/candidate/PII projects stay isolated until explicitly classified/promoted.
+
+Trust beyond assist requires a passing independent grade.
+
+## Pilot deployment
+
+Install the v0.4 pilot runtime:
 
 ```sh
 bash scripts/install-major-runtime.sh
 ```
 
-After installation:
+This installs:
+
+- global `major` CLI;
+- global Major rules for Claude/Codex/Cursor/Antigravity;
+- deterministic Claude `SessionStart` attach;
+- durable goal/policy state;
+- scoped worker adapters and execution gateway.
+
+It **does not** auto-start a Mac login daemon and **does not** attach Ruflo globally.
+
+Recommended first classification:
 
 ```sh
-major status
-major run jss-tool --goal "Ship the smallest credible end-to-end JSS MVP" --autonomous
-major status jss-tool
+major project configure jss-tool --class workshop --trust assist
+major project configure surface-talent --class client --trust observe
 ```
 
-The CLI state lives under `~/.major/`, including `supervisor-state.json` and daemon logs. Goals survive individual agent sessions and Mac restarts.
+Run the first real JSS pilot visibly:
 
-## Supervisor loop
-
-```text
-user outcome
-   ↓
-durable Major goal
-   ↓
-read current project truth
-   ↓
-choose current critical path / coordinator
-   ↓
-delegate Claude | Codex | Cursor | Antigravity
-   ↓
-worktrees for concurrent writers
-   ↓
-verify browser / tests / provider / persisted state / exact SHA
-   ↓
-what is the next missing P0 outcome?
-   ↓
-continue automatically
-   ↓
-done OR genuine owner-only gate
+```sh
+major run jss-tool \
+  --goal "Ship the smallest credible end-to-end JSS MVP" \
+  --foreground
 ```
 
-Normal substantive work uses **4–6 useful workers**, with capacity up to **8** when work is genuinely independent. Duplicate agents are not a goal.
+Emergency stop:
+
+```sh
+major stop
+```
+
+Resume after inspection:
+
+```sh
+major start
+```
+
+## Built, validated, ready
+
+Major uses these terms deliberately:
+
+- **BUILT** — implementation exists.
+- **VALIDATED** — relevant deterministic checks plus an independent grader support the claim.
+- **READY** — a representative real-world outcome succeeded under the intended trust profile.
+
+Builder-authored CI is useful but does not make Major ready.
+
+The first readiness gate is JSS in `workshop/assist`: Major must make correct real product progress in a visible foreground cycle, respect the 3-worker ceiling, persist state, respect owner gates, and leave objective evidence. A different provider then grades the exact result before Major is promoted to `build`.
+
+Surface Talent remains `client/observe` during this pilot.
 
 ## One kernel, two profiles
 
 ### Major Build
 
-Software workshop: autonomous implementation, worktrees, browser QA, previews, repair loops, CI recovery and runtime evidence.
+Software delivery: MVP planning, implementation, worktrees, browser QA, previews, repair loops, CI recovery and objective runtime evidence.
 
 ### Major Knowledge
 
-Research/strategy/synthesis: primary-source ingestion, task-specific tool routing, materially different research angles, independent skeptic review when justified, source provenance and decision-focused synthesis.
-
-These are profiles of one Major kernel, not separate harnesses.
+Research/strategy/synthesis: primary-source ingestion, source-specific tool routing, Tools-as-Code for repeated retrieval mechanics, materially different research angles, skeptic review where justified and decision-focused synthesis.
 
 ## Tool/capability router
 
@@ -99,37 +156,25 @@ PDF/document/spreadsheet → native parser/skill
 reasoning/synthesis → routed model(s)
 ```
 
-**A failed first tool is not a failed task.** If the user names a primary source, Major obtains that source or a faithful transcript/content before claiming to analyze it.
+**A failed first tool is not a failed task.**
 
-## Rules and skills
+## Ruflo
 
-Binding operating rules live in `guidance/instructions.registry.json`. Cross-tool defaults live in `guidance/global-worker-rules.md`.
+Ruflo is optional subordinate infrastructure, not Major's source of truth and not a global pilot dependency. It can be enabled later for trusted workshop projects if real runs show that its swarm/memory primitives improve outcomes enough to justify coordination and blast-radius cost.
 
-The recurring skill catalog lives in `guidance/skills.registry.json` and `docs/skills-catalog.md`:
+## Rules, skills and memory
 
-- Major internal project/MVP/autonomy/QA/learning/tool-routing skills;
-- the complete current Emil Kowalski design/motion bundle for UI projects;
-- selected Anthropic/OpenAI/graph skills by profile/trigger;
-- knowledge and exploratory profiles without injecting every specialist skill into every prompt.
-
-External skills provide technique. Major policy has higher authority.
-
-## Memory
-
-Human-reviewable policy and verified reusable lessons live in Git. Project/private knowledge stays namespaced. Ruflo/AgentDB/runtime state is the searchable/operational layer, not the only source of truth.
+- binding policy: `guidance/instructions.registry.json`;
+- global worker rules: `guidance/global-worker-rules.md`;
+- recurring skill registry: `guidance/skills.registry.json`;
+- internal skills: `skills/internal/`;
+- human-reviewable reusable knowledge: Git/Markdown;
+- project/private knowledge: project-local namespaces;
+- client/candidate/PII data never enters global Major/Ruflo memory.
 
 ## Runtime migration boundary
 
-The new default supervisor runtime is the successor to Major v1's deliberately disabled execution foundation. The v1 code remains temporarily in the repository so we can compare behavior and keep existing tests while the successor is proven.
-
-**Do not call Major fully complete merely because this branch builds.** The release gate is a real project:
-
-1. install the runtime on the Mac;
-2. start a JSS product-level autonomous goal once;
-3. prove Major itself delegates, reroutes, continues and updates durable status without repeated user prompts;
-4. prove restart/resume;
-5. then delete the obsolete v1 disabled execution path and stale tests/code under the legacy-cleanup protocol;
-6. validate Surface Talent as the second real project.
+Major v0.4 is **built**, not yet **ready**. The v1 runtime remains temporarily as a migration reference until the JSS assist pilot and independent grade pass. Then obsolete v1 code/tests/docs are removed under the legacy-cleanup protocol.
 
 See `docs/migrations/major-v2-legacy-receipt.md`.
 
