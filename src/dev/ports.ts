@@ -78,6 +78,7 @@ export async function allocateDevPort(input: {
       .filter((candidate) => candidate.project !== input.project)
       .map((candidate) => candidate.port),
   );
+  if (input.reassign && existing) reserved.add(existing.port);
 
   let selected: number | undefined;
   for (let port = start; port <= end; port += 1) {
