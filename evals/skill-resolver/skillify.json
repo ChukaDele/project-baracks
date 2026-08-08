@@ -1,0 +1,16 @@
+{
+  "skill": "skillify",
+  "should_trigger": [
+    "We solved this same deployment failure again. Turn the working procedure into something every agent can reuse.",
+    "This workflow now works across two projects. Skillify it with tests so agents stop rediscovering it.",
+    "The YouTube fallback finally works reliably. Make the successful procedure reusable after we finish this task."
+  ],
+  "should_not_trigger": [
+    "Fix this one button alignment issue and ship it.",
+    "The production deploy is failing right now. Diagnose and fix the real blocker first.",
+    "Write a one-off thank-you note for this meeting."
+  ],
+  "conflicts": [
+    "skill-creator can help author/evaluate the package; skillify owns deciding when a proven procedure becomes a durable Major capability."
+  ]
+}
