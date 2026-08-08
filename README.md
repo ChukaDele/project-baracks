@@ -1,101 +1,103 @@
 # Major
 
-Autonomous engineering supervisor for Surface Talent and future projects — planned to
-plan engineering tasks against a human-owned roadmap, route work to agent CLIs
-(Claude Code, Codex), monitor execution, and never merge, deploy, spend money, or mark
-work Done without evidence and human approval.
+**Major is the cross-project engineering harness.** It coordinates coding agents, reusable skills, project state, verification and cross-project learning for Bredge, client, personal and external software projects.
 
-**This build is a disabled architectural foundation: dry-run and inspection only.**
-It contains the canonical guidance, the relational state model, the task lifecycle
-and run ledger, provider discovery contracts, the model-aware resource router, the
-roadmap adapter contract with dry-run proposals, and the `major` CLI. Secret-safe
-durable event handling (recursive, fail-closed redaction before persistence) is
-implemented and independently verified.
+Major is provider-neutral. Ruflo is the planned orchestration/memory substrate; Claude Code, Codex, Google Antigravity and Cursor are worker pools.
 
-What this build can NOT do — five capabilities are unavailable, enforced by a
-hard-coded gate (`src/security/capabilities.ts`) that no configuration, environment
-variable or CLI flag can open:
+## Prime directive
 
-- **no live agent execution** — every spawn path refuses before any subprocess, and
-  discovery is process-free: it resolves names on PATH but never runs a binary (no
-  `--version`, no `which` subprocess, no `execFile`/`spawn`), so executable
-  availability is reported as UNVERIFIED;
-- **no paid provider execution** — paid billing modes and paid routes refuse, even
-  with an approved decision reference;
-- **no autonomous task completion** — no code path reaches `completed`;
-- **no worker-owned mutations** — nothing can acquire or exercise a work claim;
-- **no external roadmap writes** — apply/reconcile refuse before touching any adapter.
+**Get to a credible MVP proof fast.**
 
-Beyond the five, **suggestion materialisation is also disabled** in this dry-run /
-inspection foundation. Refusal happens at the canonical task-creation boundary, not
-only in the CLI: `addTask` snapshots the caller's input into an immutable object up
-front — every field, including `suggestionId`, is read exactly once — then refuses any
-task carrying suggestion provenance before any write, and `approveSuggestion` /
-`major task approve` refuse before any mutation (exit 4). Because validation and
-persistence both consult only that frozen snapshot, a stateful getter or Proxy cannot
-show the guard one value and persistence another. A pending suggestion therefore
-cannot be turned into a task through any exported path. Ordinary human-created tasks
-(no suggestion provenance) remain usable.
+For a new project or a large feature list, Major should:
 
-Each capability returns in its own follow-up milestone with its own independent
-security review: see `docs/deferred-security-milestones.md`.
+1. identify the core user/business outcome;
+2. reduce scope to P0 MVP / P1 next / P2 later;
+3. test the biggest uncertainty in the fastest credible medium;
+4. build the P0 value loop end to end;
+5. keep progress demonstrable while backend/infrastructure catches up;
+6. verify the real path;
+7. expand from evidence, not from the original wish list by default.
 
-## Setup
+Major should not build every requested feature fractionally or front-load enterprise hardening before the core workflow is proven.
 
-```sh
-corepack enable        # provides pnpm
-pnpm install
-pnpm major doctor      # check prerequisites and providers
+## Operating model
+
+```text
+Goal / brief
+    ↓
+Major policy + project state + memory
+    ↓
+Ruflo orchestration / routing
+    ↓
+Claude | Codex | Antigravity | Cursor
+    ↓
+isolated worktrees / explicit ownership
+    ↓
+build → browser/runtime verify → repair
+    ↓
+objective evidence
+    ↓
+verified reusable learning
 ```
 
-## Commands
+Normal substantive builds can use 4–6 useful parallel workers, with capacity up to 8 when work is genuinely independent. Small/local work contracts naturally.
 
-```sh
-major doctor                       # environment, providers, models; overnight execution
-                                   #   is reported UNAVAILABLE (disabled), never "safe"
-major project add <config.json>   # register a project (see examples/)
-major project list
-major task add --project <name> --title <t> [--complexity routine|bounded|complex|architectural]
-major task suggest --project <name> --title <t> [--rationale <r>]
-major task approve <suggestionId> # DISABLED in this foundation: refuses with exit 4
-                                   #   (approving a suggestion is not permitted)
-major task reject <suggestionId>
-major task list [--project <name>]
-major task show <taskId>
-major queue                        # tasks eligible to run next
-major run --task <taskId> --dry-run [--purpose implementation|review|...]
-```
+## Core rules
 
-During development run them as `pnpm major <command>`; `pnpm build` produces
-`dist/cli/index.js` (the `major` bin). State lives in `~/.major/major.db`
-(`MAJOR_DB_PATH` overrides).
+Binding rules live in `guidance/instructions.registry.json` and cover:
 
-Exit codes are stable: `0` success, `1` unexpected error, `2` usage error, `3` not
-found, `4` policy refusal, `5` unsafe environment (doctor). `--json` flags emit a
-versioned envelope (`{ "schemaVersion": 1, ... }`).
+- BLUF + simplified technical communication;
+- risk-proportional security;
+- proof-first MVP prioritisation;
+- autonomy and recovery;
+- legacy cleanup;
+- UI competitor learning + component reuse;
+- outcome-oriented task scope;
+- model/provider routing;
+- human-only authority gates;
+- provider-neutral project-state synchronization.
+
+External skills are subordinate to these Major rules.
+
+## Skills
+
+Major owns the canonical reusable skill registry in `guidance/skills.registry.json`.
+
+- Internal skills live in `skills/internal/`.
+- Emil Kowalski's complete current design/motion bundle is installed for UI projects.
+- Approved Anthropic/OpenAI/graph skills are fetched by `scripts/install-major-skills.sh`.
+- Skills are installed/available broadly but loaded into active context only when triggered.
+
+## Memory
+
+Human-reviewable policy and verified global lessons live in this repository. Runtime/vector memory is a derived retrieval layer, not the only source of truth.
+
+Project-specific confidential facts stay in project namespaces. Only sanitized reusable lessons are promoted globally.
+
+## Current Major 2.0 migration status
+
+The **policy, skills and knowledge migration is active on `major-v2-harness`**. The old Major v1 runtime is still present underneath it and intentionally does not yet represent the target execution system.
+
+Before Major 2.0 is production-ready we must:
+
+1. integrate Ruflo;
+2. implement/verify Claude, Codex, Antigravity and Cursor worker adapters;
+3. enable bounded real execution and adaptive multi-agent worktrees;
+4. verify memory/skill retrieval;
+5. test Major against a real project;
+6. remove the old disabled execution gates and other v1 legacy code;
+7. run the stale-reference/CI/E2E cleanup gate.
+
+See `docs/migrations/major-v2-legacy-receipt.md` for the explicit cleanup contract.
 
 ## Development
 
 ```sh
-pnpm test         # vitest (hermetic: in-memory SQLite, no network, no live CLIs)
-pnpm typecheck    # strict TypeScript
-pnpm lint         # eslint (type-checked rules)
-pnpm format       # prettier
+corepack enable
+pnpm install
+pnpm test
+pnpm typecheck
+pnpm lint
 ```
 
-CI (`.github/workflows/ci.yml`) runs these same canonical commands — format check,
-lint, strict type-check, full test suite, production build — on every pull request and
-push to `main`, with a read-only token, no secrets, and no live provider execution.
-
-## Documentation
-
-- `docs/architecture.md` — stack decisions, layering, invariants, deferred tracks
-- `docs/deferred-security-milestones.md` — the five disabled capabilities and their
-  definitions of done
-- `docs/task-lifecycle.md` — canonical statuses, guarded transitions
-- `docs/provider-routing.md` — provider contracts, capability registry, router
-- `docs/security-model.md` — redaction, the capability gate, command policy
-- `docs/roadmap-sync.md` — proposal/dry-run/evidence flow
-- `docs/surface-talent-integration.md` — registering Surface Talent
-- `guidance/` — the binding rules (instruction precedence, security, task scope, model
-  routing, human approval, roadmap sync) plus machine-readable registries
+Do not infer Major 2.0 runtime readiness merely because the v1 CLI builds. Completion is the migration receipt's end-to-end gate, not compilation alone.
