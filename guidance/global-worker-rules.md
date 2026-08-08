@@ -8,20 +8,19 @@ Apply these defaults across projects unless a project/user instruction is more s
 - Major's canonical local CLI is `$HOME/.local/bin/major`.
 - At session start, attach to Major. Claude does this through a SessionStart hook. In Codex, Cursor and Antigravity, before substantive work run `$HOME/.local/bin/major session attach --cwd "$PWD" --host <codex|cursor|antigravity>` if the session has not already shown `MAJOR CONTROL PLANE: ACTIVE`.
 - Do not make the user remember or repeatedly invoke Major.
-- **Presence is not execution authority.** Read the current project trust profile before delegating or starting background work.
-- Unknown projects default to `unknown/observe`. Client/candidate/PII projects default to `client/observe` until explicitly classified/promoted.
+- **Presence is not execution authority.** Read the project trust profile before delegating or starting background work.
+- Unknown projects default to `unknown/observe`. Client/candidate/PII projects remain `client/observe` until deliberately promoted through a separate client-safe validation path.
 - If an active Major goal exists, preserve the durable outcome across the session rather than treating the latest message as an isolated micro-task.
-- A small bounded request may execute directly under the current project trust profile. A broad/multi-step outcome should become a durable Major goal.
 - Use `$HOME/.local/bin/major status <project>` before declaring a project complete or blocked.
 
 ## Trust levels
 
-- `observe`: context/planning/inspection only; no delegated execution.
-- `assist`: foreground pilot, maximum 3 useful workers, no unattended loop.
-- `build`: validated autonomous build work, maximum 6 useful workers; no login/unattended execution by default.
-- `unattended`: maximum 8 useful workers; background continuation is allowed only after representative real-output validation and an independent grade.
+- `observe`: no Major worker execution. Create a concise **MAJOR SHADOW PLAN** containing current P0, proposed workers/tools, expected evidence, owner gates and stop conditions. A human/gstack driver performs the real task. A different provider grades the shadow plan against the actual work. **Three consecutive passing shadow grades are required before assist.**
+- `assist`: visible foreground pilot only, maximum 3 useful workers and maximum 30 minutes per coordinator run. Paid spend, external writes and cross-project memory remain off unless explicitly granted.
+- `build`: independently validated foreground coordination, maximum 6 useful workers. Promotion requires a passing independent execution grade from assist.
+- `unattended`: maximum 8 useful workers with background continuation only after a further representative real-output pass and independent execution grade.
 
-Do not promote trust because configuration exists or self-authored tests are green.
+Do not promote trust because configuration exists, a branch builds, or self-authored tests are green.
 
 ## Communication
 
@@ -78,11 +77,12 @@ Do not expect the current model to do every part of a task.
 
 ## Autonomy
 
-- Continue safe, reversible work until acceptance criteria are met or a genuine owner-only gate remains.
-- Do not stop merely because one command failed, one subtask ended, one PR merged, or one dependency is blocked while independent P0 work remains.
+- Authority comes from project trust, not from Major merely being loaded.
+- In `observe`, do not call `major delegate`, do not start the daemon, and do not mutate external systems through Major.
+- In higher trust levels, continue safe reversible work until acceptance criteria are met or a genuine owner-only gate remains.
 - Concurrent writers require isolated worktrees and explicit ownership.
 - After two materially unchanged failed approaches, change strategy/tool/provider rather than repeat.
-- Respect the project trust-level worker ceiling; never treat the global maximum of 8 as the default.
+- Respect the project trust-level worker and run-time ceilings; never treat the global maximum of 8 as the default.
 
 ## Evidence and readiness language
 
@@ -97,15 +97,22 @@ Do not expect the current model to do every part of a task.
 ## Safety / blast radius
 
 - Never expose or commit secrets.
-- Do not create new paid API/credit spend without authority.
+- Do not create paid API/credit spend without explicit authority.
 - Do not perform destructive/irreversible production-data, credential/ownership/DNS or production security-policy actions without the required authority.
-- Client/candidate/PII data stays project-local and must not be promoted into global Major/Ruflo memory.
+- Client/candidate/PII data stays project-local and must not be promoted into global Major/GBrain/Ruflo memory.
 - Ruflo or other experimental swarm/memory machinery is not globally authorized merely because Major is present.
 - Ordinary reversible development may proceed only when the project trust profile permits execution.
 
 ## Emergency stop
 
-`$HOME/.local/bin/major stop` activates the global kill switch. New worker execution must stop and active Major gateway workers must be cancelled. Resume only with `$HOME/.local/bin/major start` after inspection.
+`$HOME/.local/bin/major stop` activates the global kill switch. New Major worker execution is blocked until `$HOME/.local/bin/major start` is deliberately run after inspection.
+
+## Learning
+
+- Solve the real problem first. Prove the solution. Skillify only when the procedure is likely reusable.
+- Prefer a tested skill or deterministic tool over adding another permanent supervisor workflow.
+- Rules prevent; tested skills institutionalize; memory reminds.
+- Retire duplicate/obsolete custom skills when an upstream capability proves better.
 
 ## Legacy cleanup
 
