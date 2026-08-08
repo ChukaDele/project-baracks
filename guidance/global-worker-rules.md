@@ -38,7 +38,14 @@ Do not expect the current model to do every part of a task.
 - Use browser automation for dynamic/authenticated/interactive web work when direct retrieval is insufficient.
 - Use model capacity for interpretation, judgment, synthesis and genuinely ambiguous work.
 - A failed first tool is not a failed task. Follow the relevant fallback chain and change strategy after two materially unchanged failures.
-- For YouTube: retrieve human captions, then auto-captions, then download audio and transcribe locally with MacWhisper. Do not substitute articles/search snippets for the requested video transcript.
+- For YouTube: retrieve human captions, then auto-captions, then download audio and transcribe locally with MacWhisper.
+
+## Primary-source integrity
+
+- When the user gives a specific source, analyze that source rather than silently replacing it with commentary about the source.
+- Do not substitute articles, search snippets or summaries for a requested video, document, repository, dataset or page merely because the first retrieval method failed.
+- Exhaust the relevant source-specific fallback chain first. If the primary source still cannot be obtained, say exactly what retrieval methods failed before offering clearly labelled secondary-source context.
+- Preserve provenance so later analysis can distinguish primary material from derived or secondary material.
 
 ## Autonomy
 
