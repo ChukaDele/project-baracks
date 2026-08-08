@@ -9,6 +9,7 @@ import {
   configureProjectPolicy,
   getProjectPolicy,
   recordIndependentGrade,
+  recordShadowGrade,
   requestGlobalStop,
   type ProjectClass,
   type TrustLevel,
@@ -78,7 +79,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'stop') {
     requestGlobalStop(flag(args, '--reason') ?? 'manual kill switch');
     console.log('Major global kill switch: ACTIVE');
-    console.log('New worker execution is blocked; active gateway workers are cancelled on the next stop check.');
+    console.log('New worker execution is blocked.');
     return true;
   }
 
@@ -98,6 +99,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       projectClass,
       trust,
       ...(hasFlag(args, '--allow-external-writes') ? { allowExternalWrites: true } : {}),
+      ...(hasFlag(args, '--allow-paid-spend') ? { allowPaidSpend: true } : {}),
     });
     console.log(JSON.stringify(policy, null, 2));
     return true;
@@ -106,6 +108,32 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'project' && args[1] === 'show') {
     const project = resolveProject(args[2] ?? 'current');
     console.log(JSON.stringify(getProjectPolicy(project.project, project.repoPath), null, 2));
+    return true;
+  }
+
+  if (command === 'project' && args[1] === 'shadow-grade') {
+    const project = resolveProject(args[2] ?? 'current');
+    const planner = validHost(requireFlag(args, '--planner'));
+    const provider = validHost(requireFlag(args, '--provider'));
+    const resultRaw = requireFlag(args, '--result');
+    if (resultRaw !== 'pass' && resultRaw !== 'fail') {
+      throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
+    }
+    const goalId = requireFlag(args, '--goal-id');
+    const goal = getGoal(goalId);
+    if (!goal || goal.project !== project.project) {
+      throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
+    }
+    const policy = recordShadowGrade({
+      project: project.project,
+      repoPath: project.repoPath,
+      planner,
+      provider,
+      result: resultRaw,
+      evidence: requireFlag(args, '--evidence'),
+      goalId,
+    });
+    console.log(JSON.stringify(policy, null, 2));
     return true;
   }
 
@@ -150,7 +178,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const requestedAutonomy = hasFlag(args, '--autonomous');
     if (requestedAutonomy && !policy.allowBackground) {
       throw new Error(
-        `project ${project.project} is ${policy.projectClass}/${policy.trust}; unattended execution is not allowed. Use --foreground for a visible pilot cycle or earn/promote unattended trust after independent validation.`,
+        `project ${project.project} is ${policy.projectClass}/${policy.trust}; unattended execution is not allowed`,
       );
     }
     const goal = startGoal({
@@ -163,8 +191,24 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     console.log(`Major goal active: ${goal.id}`);
     console.log(`project: ${goal.project}`);
     console.log(`repo: ${goal.repoPath}`);
-    console.log(`policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers}`);
+    console.log(
+      `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} maxRunMinutes=${policy.maxRunMinutes}`,
+    );
     console.log(`autonomous: ${goal.autonomous ? 'yes' : 'no'}`);
+
+    if (policy.trust === 'observe') {
+      if (hasFlag(args, '--foreground') || requestedAutonomy) {
+        throw new Error(
+          `project ${project.project} is observe-only: Major may persist the goal and propose a shadow plan, but it may not dispatch workers`,
+        );
+      }
+      console.log('mode: SHADOW / OBSERVE');
+      console.log(
+        `Major will not dispatch workers. In the active agent session, produce a "MAJOR SHADOW PLAN" for this goal, then have a different provider grade that plan against the work actually performed. Three consecutive passing shadow grades are required before assist mode can be enabled.`,
+      );
+      return true;
+    }
+
     if (hasFlag(args, '--foreground')) {
       console.log('supervisor: running one visible foreground cycle');
       await runGoalCycle(goal.id);
@@ -229,7 +273,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       : 'No git project detected in this session.';
     const policy = project ? getProjectPolicy(project.project, project.repoPath) : undefined;
     console.log(
-      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers}\n` : ''}${active}\n\nMajor being present does not imply autonomous authority. Preserve the user outcome as the durable goal. Execute only within the project trust profile. Unknown/client projects default to observe until explicitly classified/promoted.`,
+      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers}\n` : ''}${active}\n\nMajor being present does not imply autonomous authority. In observe mode, do not dispatch workers: create a MAJOR SHADOW PLAN and let the human/gstack driver perform the work. Preserve the user outcome as the durable goal.`,
     );
     return true;
   }
