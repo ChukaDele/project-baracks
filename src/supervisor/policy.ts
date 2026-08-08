@@ -134,9 +134,9 @@ export function configureProjectPolicy(input: {
     projectClass: input.projectClass,
     trust: input.trust,
     ...limitsFor(input.trust),
-    allowExternalWrites:
-      input.allowExternalWrites ?? (input.projectClass === 'workshop' && input.trust !== 'observe'),
-    allowCrossProjectMemory: input.projectClass !== 'client' && input.trust !== 'observe',
+    allowExternalWrites: input.allowExternalWrites ?? false,
+    allowCrossProjectMemory:
+      input.projectClass !== 'client' && (input.trust === 'build' || input.trust === 'unattended'),
     updatedAt: new Date().toISOString(),
     ...(existing?.lastGrade ? { lastGrade: existing.lastGrade } : {}),
   };
