@@ -35,7 +35,7 @@ for e in entries:
 required = {
     'communication-style', 'mvp-speed-and-prioritisation', 'autonomy-and-progress',
     'legacy-cleanup', 'security-and-permissions', 'ui-patterns-and-reuse',
-    'task-scope', 'model-routing', 'human-approval'
+    'task-scope', 'model-routing', 'human-approval', 'roadmap-sync'
 }
 missing = required - set(ids)
 if missing:
@@ -76,22 +76,23 @@ for path in \
   [ ! -e "$path" ] || fail "obsolete v1 file returned: $path"
 done
 
-# 5. Stale concepts must not appear in active rules/templates/README.
+# 5. Stale concepts must not appear in active rules/templates/README/PR template.
 for phrase in \
   "disabled architectural foundation" \
   "Codex is skipped entirely" \
   "Never delete a guidance file" \
   "Google Sheets for Surface Talent" \
-  "Figma-first"; do
-  if grep -R -F -n --exclude='validate-major.sh' "$phrase" README.md guidance templates 2>/dev/null; then
+  "Figma-first" \
+  "No live agent execution, merge, deploy"; do
+  if grep -R -F -n --exclude='validate-major.sh' "$phrase" README.md guidance templates .github/PULL_REQUEST_TEMPLATE.md 2>/dev/null; then
     fail "stale active phrase found: $phrase"
   fi
 done
 
-# 6. Explicit doctrine checks: keep these small and hard to game.
+# 6. Explicit doctrine checks: small invariants, not wording-heavy snapshots.
 grep -Fq "MVP is the default delivery strategy" guidance/mvp-speed-and-prioritisation.md || fail "MVP default doctrine missing"
 grep -Fq "Git history is the audit archive" guidance/instruction-precedence.md || fail "clean supersession doctrine missing"
-grep -Fq "continue until" guidance/autonomy-and-progress.md || fail "continue-until autonomy doctrine missing"
+grep -Fiq "continue until" guidance/autonomy-and-progress.md || fail "continue-until autonomy doctrine missing"
 grep -Fq "ASD-STE100-inspired" guidance/communication-style.md || fail "communication standard missing"
 grep -Fq "complete current upstream bundle" docs/skills-catalog.md || fail "full Emil bundle policy missing"
 grep -Fq "Remove only skills previously installed by Major" scripts/install-major-skills.sh || fail "stale skill cleanup missing"
@@ -106,5 +107,15 @@ fi
 [ -f scripts/bootstrap-major-project.sh ] || fail "project bootstrap missing"
 grep -Fq "AGENTS.md" scripts/bootstrap-major-project.sh || fail "provider-neutral AGENTS bootstrap missing"
 grep -Fq "install-major-skills.sh" scripts/bootstrap-major-project.sh || fail "skill-profile bootstrap missing"
+
+# 9. Cross-tool global style installer must cover the supported global-rule surfaces.
+[ -f scripts/install-major-global-style.sh ] || fail "global communication installer missing"
+grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-style.sh || fail "Claude global style target missing"
+grep -Fq '.codex' scripts/install-major-global-style.sh || fail "Codex global style target missing"
+grep -Fq '.gemini/GEMINI.md' scripts/install-major-global-style.sh || fail "Antigravity global style target missing"
+
+# 10. Migration must stay explicitly incomplete until the old runtime is actually replaced.
+grep -Fiq "migration is incomplete" docs/architecture.md || fail "runtime migration caveat missing"
+grep -Fq "DELETE after successor verification" docs/migrations/major-v2-legacy-receipt.md || fail "legacy deletion gate missing"
 
 echo "Major validation passed."
