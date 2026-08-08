@@ -103,11 +103,9 @@ describe('Codex routing', () => {
 
   it('can explicitly preserve Codex for review for a project that requests it', () => {
     const providers = [codex()];
-    const decision = route(
-      { purpose: 'implementation', complexity: 'bounded' },
-      providers,
-      { preserveCodexForReview: true },
-    );
+    const decision = route({ purpose: 'implementation', complexity: 'bounded' }, providers, {
+      preserveCodexForReview: true,
+    });
     expect(decision.kind).toBe('checkpoint');
   });
 
