@@ -151,11 +151,11 @@ grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability 
 [ -f src/supervisor/runtime.ts ] || fail "supervisor goal loop missing"
 [ -f src/supervisor/worker.ts ] || fail "multi-provider worker runtime missing"
 [ -f src/supervisor/cli.ts ] || fail "supervisor CLI missing"
+[ -f src/security/major-gateway.ts ] || fail "Major successor execution gateway missing"
 [ -f scripts/install-major-runtime.sh ] || fail "runtime installer missing"
 [ -f scripts/major-antigravity-worker.py ] || fail "Antigravity SDK worker missing"
 
 grep -Fq '"major": "./dist/entry.js"' package.json || fail "package bin must enter the supervisor runtime"
-grep -Fq "run <project>" /dev/null 2>/dev/null || true # semantic behavior covered by TypeScript tests/CLI smoke later
 grep -Fq "supervisor-state.json" src/supervisor/state.ts || fail "durable cross-session goal state missing"
 grep -Fq "Ship the smallest credible end-to-end" tests/supervisor-runtime.test.ts || fail "end-to-end coordinator contract test missing"
 grep -Fq "major goal report" src/supervisor/runtime.ts || fail "coordinator cannot durably report goal state"
@@ -164,7 +164,21 @@ grep -Fq "max 8" src/supervisor/runtime.ts || fail "eight-worker capacity rule m
 for provider in claude codex cursor antigravity; do
   grep -Fq "case '$provider'" src/supervisor/worker.ts || fail "live worker adapter missing: $provider"
 done
-grep -Fq "git', ['worktree', 'add'" src/supervisor/cli.ts || fail "deterministic worktree isolation missing"
+
+# Every supervisor process launch must flow through the Major successor gateway.
+if grep -R -F -n "node:child_process" src/supervisor; then
+  fail "supervisor bypasses the execution gateway"
+fi
+grep -Fq "executeMajorCommand" src/supervisor/worker.ts || fail "workers are not using the successor gateway"
+grep -Fq "runGatewayCommand" src/supervisor/cli.ts || fail "worktree setup is not using the successor gateway"
+grep -Fq "executable: 'git'" src/supervisor/cli.ts || fail "git worktree command missing"
+grep -Fq "'worktree', 'add'" src/supervisor/cli.ts || fail "deterministic worktree isolation missing"
+grep -Fq "executeMajorStreaming" src/security/major-gateway.ts || fail "successor gateway does not own streaming execution"
+grep -Fq "sanitizeEnv" src/security/major-gateway.ts || fail "successor gateway does not sanitize environment"
+grep -Fq "TrustedExecutableRegistry" src/security/major-gateway.ts || fail "successor gateway lacks executable binding"
+grep -Fq "execution-policy.jsonl" src/security/major-gateway.ts || fail "successor gateway lacks execution audit"
+
+# Startup/default-state integrations.
 grep -Fq "SessionStart" scripts/install-major-runtime.sh || fail "Claude automatic session attach hook missing"
 grep -Fq "startup|resume|clear|compact" scripts/install-major-runtime.sh || fail "Claude attach hook does not cover session lifecycle"
 grep -Fq "RunAtLoad" scripts/install-major-runtime.sh || fail "Major daemon must start at Mac login"
