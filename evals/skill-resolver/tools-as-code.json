@@ -1,0 +1,16 @@
+{
+  "skill": "tools-as-code",
+  "should_trigger": [
+    "Search these 60 companies, dedupe the results, filter by UK presence and rank the top 10 by evidence quality.",
+    "Pull every open GitHub issue in these repositories, group duplicates and summarize the recurring failure classes.",
+    "Process this batch of video links, retrieve transcripts where available and normalize the outputs into one evidence table."
+  ],
+  "should_not_trigger": [
+    "Open this one webpage and tell me what it says.",
+    "Explain why this TypeScript function is failing.",
+    "Choose between these two hero designs and explain the tradeoff."
+  ],
+  "conflicts": [
+    "source-ingestion owns source-specific retrieval fallbacks; tools-as-code composes repeated primitives when batching/transforming many operations is the real problem."
+  ]
+}
