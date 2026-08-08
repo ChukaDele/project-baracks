@@ -22,6 +22,7 @@ export interface IndependentGrade {
   evidence: string;
   at: string;
   goalId?: string | undefined;
+  kind: 'shadow' | 'execution';
 }
 
 export interface ProjectPolicy {
@@ -30,9 +31,13 @@ export interface ProjectPolicy {
   projectClass: ProjectClass;
   trust: TrustLevel;
   maxWorkers: number;
+  maxRunMinutes: number;
   allowBackground: boolean;
   allowExternalWrites: boolean;
   allowCrossProjectMemory: boolean;
+  allowPaidSpend: boolean;
+  shadowRuns: number;
+  shadowPasses: number;
   updatedAt: string;
   lastGrade?: IndependentGrade | undefined;
 }
@@ -54,21 +59,33 @@ export function stopPath(): string {
     : join(majorHome(), 'STOP');
 }
 
-function limitsFor(trust: TrustLevel): Pick<ProjectPolicy, 'maxWorkers' | 'allowBackground'> {
+function limitsFor(
+  trust: TrustLevel,
+): Pick<ProjectPolicy, 'maxWorkers' | 'maxRunMinutes' | 'allowBackground'> {
   switch (trust) {
     case 'observe':
-      return { maxWorkers: 0, allowBackground: false };
+      return { maxWorkers: 0, maxRunMinutes: 0, allowBackground: false };
     case 'assist':
-      return { maxWorkers: 3, allowBackground: false };
+      return { maxWorkers: 3, maxRunMinutes: 30, allowBackground: false };
     case 'build':
-      return { maxWorkers: 6, allowBackground: false };
+      return { maxWorkers: 6, maxRunMinutes: 120, allowBackground: false };
     case 'unattended':
-      return { maxWorkers: 8, allowBackground: true };
+      return { maxWorkers: 8, maxRunMinutes: 480, allowBackground: true };
   }
 }
 
 function emptyStore(): PolicyStore {
   return { version: 1, projects: [] };
+}
+
+function normalizePolicy(policy: ProjectPolicy): ProjectPolicy {
+  return {
+    ...policy,
+    maxRunMinutes: policy.maxRunMinutes ?? limitsFor(policy.trust).maxRunMinutes,
+    allowPaidSpend: policy.allowPaidSpend ?? false,
+    shadowRuns: policy.shadowRuns ?? 0,
+    shadowPasses: policy.shadowPasses ?? 0,
+  };
 }
 
 function readStore(): PolicyStore {
@@ -78,6 +95,7 @@ function readStore(): PolicyStore {
   if (parsed.version !== 1 || !Array.isArray(parsed.projects)) {
     throw new Error(`invalid Major project-policy store: ${path}`);
   }
+  parsed.projects = parsed.projects.map(normalizePolicy);
   return parsed;
 }
 
@@ -98,6 +116,9 @@ export function defaultProjectPolicy(project: string, repoPath: string): Project
     ...limitsFor('observe'),
     allowExternalWrites: false,
     allowCrossProjectMemory: false,
+    allowPaidSpend: false,
+    shadowRuns: 0,
+    shadowPasses: 0,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -115,17 +136,31 @@ export function configureProjectPolicy(input: {
   projectClass: ProjectClass;
   trust: TrustLevel;
   allowExternalWrites?: boolean;
+  allowPaidSpend?: boolean;
 }): ProjectPolicy {
   const store = readStore();
   const existing = store.projects.find((candidate) => candidate.project === input.project);
 
-  if (
-    (input.trust === 'build' || input.trust === 'unattended') &&
-    existing?.lastGrade?.result !== 'pass'
-  ) {
-    throw new Error(
-      `cannot promote ${input.project} to ${input.trust}: a passing independent grade is required first`,
-    );
+  if (input.trust === 'assist') {
+    if (!existing || existing.shadowPasses < 3 || existing.lastGrade?.result !== 'pass') {
+      throw new Error(
+        `cannot promote ${input.project} to assist: three consecutive independently graded shadow passes are required first`,
+      );
+    }
+  }
+  if (input.trust === 'build') {
+    if (existing?.trust !== 'assist' || existing.lastGrade?.kind !== 'execution' || existing.lastGrade.result !== 'pass') {
+      throw new Error(
+        `cannot promote ${input.project} to build: it must first run at assist and pass an independent execution grade`,
+      );
+    }
+  }
+  if (input.trust === 'unattended') {
+    if (existing?.trust !== 'build' || existing.lastGrade?.kind !== 'execution' || existing.lastGrade.result !== 'pass') {
+      throw new Error(
+        `cannot promote ${input.project} to unattended: it must first run at build and pass a fresh independent execution grade`,
+      );
+    }
   }
 
   const policy: ProjectPolicy = {
@@ -137,6 +172,9 @@ export function configureProjectPolicy(input: {
     allowExternalWrites: input.allowExternalWrites ?? false,
     allowCrossProjectMemory:
       input.projectClass !== 'client' && (input.trust === 'build' || input.trust === 'unattended'),
+    allowPaidSpend: input.allowPaidSpend ?? false,
+    shadowRuns: existing?.shadowRuns ?? 0,
+    shadowPasses: existing?.shadowPasses ?? 0,
     updatedAt: new Date().toISOString(),
     ...(existing?.lastGrade ? { lastGrade: existing.lastGrade } : {}),
   };
@@ -148,6 +186,58 @@ export function configureProjectPolicy(input: {
   return policy;
 }
 
+function storeGrade(input: {
+  project: string;
+  repoPath: string;
+  provider: WorkerHost;
+  result: 'pass' | 'fail';
+  evidence: string;
+  kind: 'shadow' | 'execution';
+  goalId?: string;
+}): ProjectPolicy {
+  const store = readStore();
+  const index = store.projects.findIndex((candidate) => candidate.project === input.project);
+  const current =
+    index >= 0 ? store.projects[index]! : defaultProjectPolicy(input.project, input.repoPath);
+  const grade: IndependentGrade = {
+    provider: input.provider,
+    result: input.result,
+    evidence: input.evidence,
+    at: new Date().toISOString(),
+    kind: input.kind,
+    ...(input.goalId ? { goalId: input.goalId } : {}),
+  };
+  const next: ProjectPolicy = {
+    ...current,
+    repoPath: resolve(input.repoPath),
+    lastGrade: grade,
+    updatedAt: new Date().toISOString(),
+  };
+  if (input.kind === 'shadow') {
+    next.shadowRuns = current.shadowRuns + 1;
+    next.shadowPasses = input.result === 'pass' ? current.shadowPasses + 1 : 0;
+  }
+  if (index >= 0) store.projects[index] = next;
+  else store.projects.push(next);
+  writeStore(store);
+  return next;
+}
+
+export function recordShadowGrade(input: {
+  project: string;
+  repoPath: string;
+  planner: WorkerHost;
+  provider: WorkerHost;
+  result: 'pass' | 'fail';
+  evidence: string;
+  goalId?: string;
+}): ProjectPolicy {
+  if (input.planner === input.provider) {
+    throw new Error(`shadow grade must be independent: planner and grader are both ${input.provider}`);
+  }
+  return storeGrade({ ...input, kind: 'shadow' });
+}
+
 export function recordIndependentGrade(input: {
   project: string;
   repoPath: string;
@@ -156,26 +246,7 @@ export function recordIndependentGrade(input: {
   evidence: string;
   goalId?: string;
 }): ProjectPolicy {
-  const store = readStore();
-  const index = store.projects.findIndex((candidate) => candidate.project === input.project);
-  const current =
-    index >= 0 ? store.projects[index]! : defaultProjectPolicy(input.project, input.repoPath);
-  const next: ProjectPolicy = {
-    ...current,
-    repoPath: resolve(input.repoPath),
-    lastGrade: {
-      provider: input.provider,
-      result: input.result,
-      evidence: input.evidence,
-      at: new Date().toISOString(),
-      ...(input.goalId ? { goalId: input.goalId } : {}),
-    },
-    updatedAt: new Date().toISOString(),
-  };
-  if (index >= 0) store.projects[index] = next;
-  else store.projects.push(next);
-  writeStore(store);
-  return next;
+  return storeGrade({ ...input, kind: 'execution' });
 }
 
 export function requestGlobalStop(reason = 'manual kill switch'): void {
