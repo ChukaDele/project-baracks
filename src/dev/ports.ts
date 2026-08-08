@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { majorHome } from '../supervisor/state.js';
@@ -110,5 +104,7 @@ export async function allocateDevPort(input: {
 }
 
 export function listDevPorts(): DevPortAssignment[] {
-  return readStore().assignments.slice().sort((a, b) => a.port - b.port);
+  return readStore()
+    .assignments.slice()
+    .sort((a, b) => a.port - b.port);
 }
