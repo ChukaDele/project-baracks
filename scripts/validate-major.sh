@@ -18,11 +18,13 @@ for p in Path('.').rglob('*.json'):
         raise SystemExit(f"invalid JSON: {p}: {e}")
 PY
 
-# 2. Active guidance registry: every path exists, ids are unique, and critical Major rules are active.
+# 2. Active guidance registry: valid schema version, every path exists, unique ids, critical rules active.
 python3 - <<'PY'
 import json
 from pathlib import Path
 reg = json.loads(Path('guidance/instructions.registry.json').read_text())
+if reg.get('version') != 1:
+    raise SystemExit('guidance registry schema version must remain 1; use Git for document revision history')
 entries = reg['entries']
 ids = [e['id'] for e in entries]
 if len(ids) != len(set(ids)):
