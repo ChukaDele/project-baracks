@@ -78,7 +78,9 @@ function recordExecution(input: {
     reason: input.reason,
     strippedEnv: input.strippedEnv,
   };
-  appendFileSync(join(dir, 'execution-policy.jsonl'), `${JSON.stringify(record)}\n`, { mode: 0o600 });
+  appendFileSync(join(dir, 'execution-policy.jsonl'), `${JSON.stringify(record)}\n`, {
+    mode: 0o600,
+  });
 }
 
 /**
