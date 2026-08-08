@@ -9,6 +9,12 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import {
+  assertExecutionAllowed,
+  getProjectPolicy,
+  globalStopRequested,
+  type ProjectPolicy,
+} from './policy.js';
+import {
   activeGoals,
   getGoal,
   majorHome,
@@ -45,8 +51,32 @@ function coordinatorFor(goal: SupervisorGoal): WorkerHost {
   return available[(start + goal.consecutiveFailures) % available.length] ?? available[0]!;
 }
 
+function trustContract(policy: ProjectPolicy): string {
+  const external = policy.allowExternalWrites
+    ? 'External writes may occur only when already authorized by project/user policy.'
+    : 'Do not mutate external/production systems. Keep work local, in branches/worktrees, tests, previews, or read-only inspection.';
+  const memory = policy.allowCrossProjectMemory
+    ? 'Sanitized reusable lessons may be proposed for global Major learning.'
+    : 'Do not promote project data into cross-project memory.';
+
+  return `PROJECT TRUST PROFILE:
+- class: ${policy.projectClass}
+- trust: ${policy.trust}
+- maximum concurrent workers: ${policy.maxWorkers}
+- background/unattended execution: ${policy.allowBackground ? 'allowed' : 'not allowed'}
+- ${external}
+- ${memory}
+- Client data and PII stay inside the project boundary. Never use client/candidate data as global training/memory material.`;
+}
+
 export function coordinatorPrompt(goal: SupervisorGoal): string {
   const context = readProjectContext(goal.repoPath);
+  const policy = getProjectPolicy(goal.project, goal.repoPath);
+  const workerLanguage =
+    policy.maxWorkers <= 1
+      ? 'Keep this single-worker unless a genuine blocker requires escalation.'
+      : `Use up to ${policy.maxWorkers} useful workers when work is genuinely independent. Do not spawn redundant workers.`;
+
   return `You are the active Major coordinator for project ${goal.project}.
 
 BOTTOM LINE: own this goal until the smallest credible end-to-end outcome is demonstrated or a genuine owner-only gate remains.
@@ -54,15 +84,16 @@ BOTTOM LINE: own this goal until the smallest credible end-to-end outcome is dem
 GOAL:
 ${goal.goal}
 
+${trustContract(policy)}
+
 MAJOR OPERATING CONTRACT:
 - Speed and MVP are the default. Reduce broad scope to the smallest end-to-end P0 that proves value, then keep expanding only while P0 gaps remain.
 - Do not stop after one PR, migration, fix, test, or subtask. After each result ask: what is now the highest-impact missing piece blocking the goal?
-- Use 4–6 useful workers for substantive parallel work, max 8 when genuinely independent. Do not spawn redundant workers.
-- Delegate independent work across providers with the Major CLI. Examples:
-  major delegate --provider codex --cwd "${goal.repoPath}" --prompt "..."
-  major delegate --provider cursor --cwd "${goal.repoPath}" --prompt "..." --worktree "ui-qa"
-  major delegate --provider antigravity --cwd "${goal.repoPath}" --prompt "..."
-- Prefer lower-cost/abundant capacity for bounded tasks. Use stronger reasoning for architecture, hard bugs, integration, and adjudication.
+- ${workerLanguage}
+- Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
+- Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, propose Skillify rather than growing the permanent supervisor workflow.
+- Delegate independent work across providers with the Major CLI only within the project trust limit.
+- Prefer lower-cost/abundant subscription capacity for bounded tasks. Use stronger reasoning for architecture, hard bugs, integration, and adjudication.
 - Concurrent writers must use isolated worktrees. Keep one integration owner.
 - Validate with objective evidence: browser/runtime behavior, tests, persisted state, exact SHA/PR, provider response, or deployed result.
 - After two materially unchanged failures, change strategy/provider/tool.
@@ -71,12 +102,18 @@ MAJOR OPERATING CONTRACT:
 - Stop only for a genuine owner gate: MFA/CAPTCHA, unavailable credentials, new paid spend, destructive production data, DNS/ownership, or irreversible security-policy changes.
 - Keep communication BLUF and concise.
 
+READINESS LANGUAGE:
+- BUILT = implementation exists.
+- VALIDATED = deterministic checks plus an independent grader support the claim.
+- READY = a representative real-world outcome has succeeded under the intended trust profile.
+Never use these terms interchangeably.
+
 DURABLE CONTROL:
-Before ending this coordinator turn, you MUST report the goal back to Major with exactly one of:
+Before ending this coordinator turn, report the goal back to Major with exactly one of:
   major goal report --id "${goal.id}" --status active --summary "<what now works and next critical path>"
   major goal report --id "${goal.id}" --status done --summary "<objective completion evidence>"
   major goal report --id "${goal.id}" --status blocked --summary "<what is complete>" --owner-gate "<exact owner action>"
-Do not mark done unless the end-to-end goal is demonstrably true.
+Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
 
 CURRENT PROJECT CONTEXT:
 ${context || '(No canonical project context files found. Inspect the repository directly.)'}
@@ -87,6 +124,8 @@ export async function runGoalCycle(goalId: string): Promise<void> {
   const goal = getGoal(goalId);
   if (!goal) throw new Error(`goal not found: ${goalId}`);
   if (goal.status === 'done' || goal.status === 'paused') return;
+  const policy = getProjectPolicy(goal.project, goal.repoPath);
+  assertExecutionAllowed(policy);
 
   const host = coordinatorFor(goal);
   updateGoal(goal.id, {
@@ -94,6 +133,7 @@ export async function runGoalCycle(goalId: string): Promise<void> {
     cycle: goal.cycle + 1,
     lastStartedAt: new Date().toISOString(),
     activePid: process.pid,
+    lastCoordinator: host,
   });
 
   const outcome = await runWorker({
@@ -177,8 +217,14 @@ export async function runDaemon(): Promise<void> {
   });
 
   for (;;) {
+    if (globalStopRequested()) {
+      await new Promise((resolveSleep) => setTimeout(resolveSleep, 2_000));
+      continue;
+    }
     const now = Date.now();
     const candidates = activeGoals().filter((goal) => {
+      const policy = getProjectPolicy(goal.project, goal.repoPath);
+      if (policy.trust !== 'unattended' || !policy.allowBackground) return false;
       if (!goal.autonomous || goal.status === 'blocked') return false;
       if (goal.activePid && pidAlive(goal.activePid)) return false;
       return !goal.nextRunAt || Date.parse(goal.nextRunAt) <= now;
@@ -191,16 +237,22 @@ export async function runDaemon(): Promise<void> {
 export function supervisorSnapshot(project?: string): string {
   const state = readSupervisorState();
   const goals = state.goals.filter((goal) => project === undefined || goal.project === project);
-  if (goals.length === 0) return 'No Major goals found.';
-  return goals
-    .map((goal) => {
-      const lines = [
-        `${goal.project}: ${goal.status.toUpperCase()} — ${goal.goal}`,
-        `goal=${goal.id} cycle=${goal.cycle} failures=${goal.consecutiveFailures}`,
-      ];
-      if (goal.lastSummary) lines.push(`last: ${trim(goal.lastSummary, 1_500)}`);
-      if (goal.ownerGate) lines.push(`OWNER GATE: ${goal.ownerGate}`);
-      return lines.join('\n');
-    })
-    .join('\n\n');
+  const stop = globalStopRequested() ? 'GLOBAL STOP: ACTIVE\n\n' : '';
+  if (goals.length === 0) return `${stop}No Major goals found.`;
+  return (
+    stop +
+    goals
+      .map((goal) => {
+        const policy = getProjectPolicy(goal.project, goal.repoPath);
+        const lines = [
+          `${goal.project}: ${goal.status.toUpperCase()} — ${goal.goal}`,
+          `policy=${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} background=${policy.allowBackground ? 'yes' : 'no'}`,
+          `goal=${goal.id} cycle=${goal.cycle} failures=${goal.consecutiveFailures}`,
+        ];
+        if (goal.lastSummary) lines.push(`last: ${trim(goal.lastSummary, 1_500)}`);
+        if (goal.ownerGate) lines.push(`OWNER GATE: ${goal.ownerGate}`);
+        return lines.join('\n');
+      })
+      .join('\n\n')
+  );
 }
