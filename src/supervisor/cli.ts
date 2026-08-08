@@ -2,6 +2,18 @@ import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import {
+  PROJECT_CLASSES,
+  TRUST_LEVELS,
+  assertExecutionAllowed,
+  clearGlobalStop,
+  configureProjectPolicy,
+  getProjectPolicy,
+  recordIndependentGrade,
+  requestGlobalStop,
+  type ProjectClass,
+  type TrustLevel,
+} from './policy.js';
+import {
   attachSession,
   getGoal,
   resolveProject,
@@ -37,6 +49,20 @@ function validHost(value: string): WorkerHost {
   return value as WorkerHost;
 }
 
+function validProjectClass(value: string): ProjectClass {
+  if (!PROJECT_CLASSES.includes(value as ProjectClass)) {
+    throw new Error(`unsupported project class: ${value}`);
+  }
+  return value as ProjectClass;
+}
+
+function validTrust(value: string): TrustLevel {
+  if (!TRUST_LEVELS.includes(value as TrustLevel)) {
+    throw new Error(`unsupported trust level: ${value}`);
+  }
+  return value as TrustLevel;
+}
+
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
   process.stdin.setEncoding('utf8');
@@ -49,25 +75,103 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   const command = args[0];
   if (!command) return false;
 
+  if (command === 'stop') {
+    requestGlobalStop(flag(args, '--reason') ?? 'manual kill switch');
+    console.log('Major global kill switch: ACTIVE');
+    console.log('New worker execution is blocked; active gateway workers are cancelled on the next stop check.');
+    return true;
+  }
+
+  if (command === 'start') {
+    clearGlobalStop();
+    console.log('Major global kill switch: CLEARED');
+    return true;
+  }
+
+  if (command === 'project' && args[1] === 'configure') {
+    const project = resolveProject(args[2] ?? 'current');
+    const projectClass = validProjectClass(requireFlag(args, '--class'));
+    const trust = validTrust(requireFlag(args, '--trust'));
+    const policy = configureProjectPolicy({
+      project: project.project,
+      repoPath: project.repoPath,
+      projectClass,
+      trust,
+      ...(hasFlag(args, '--allow-external-writes') ? { allowExternalWrites: true } : {}),
+    });
+    console.log(JSON.stringify(policy, null, 2));
+    return true;
+  }
+
+  if (command === 'project' && args[1] === 'show') {
+    const project = resolveProject(args[2] ?? 'current');
+    console.log(JSON.stringify(getProjectPolicy(project.project, project.repoPath), null, 2));
+    return true;
+  }
+
+  if (command === 'project' && args[1] === 'grade') {
+    const project = resolveProject(args[2] ?? 'current');
+    const provider = validHost(requireFlag(args, '--provider'));
+    const resultRaw = requireFlag(args, '--result');
+    if (resultRaw !== 'pass' && resultRaw !== 'fail') {
+      throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
+    }
+    const goalId = requireFlag(args, '--goal-id');
+    const goal = getGoal(goalId);
+    if (!goal || goal.project !== project.project) {
+      throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
+    }
+    if (!goal.lastCoordinator) {
+      throw new Error(`goal ${goalId} has no recorded builder/coordinator yet; it cannot be independently graded`);
+    }
+    if (goal.lastCoordinator === provider) {
+      throw new Error(
+        `independent grade refused: ${provider} was the last coordinator for goal ${goalId}`,
+      );
+    }
+    const policy = recordIndependentGrade({
+      project: project.project,
+      repoPath: project.repoPath,
+      provider,
+      result: resultRaw,
+      evidence: requireFlag(args, '--evidence'),
+      goalId,
+    });
+    console.log(JSON.stringify(policy, null, 2));
+    return true;
+  }
+
   if (command === 'run' && args[1] && !args.includes('--task')) {
     const projectArg = args[1];
     const goalText = requireFlag(args, '--goal');
     const project = resolveProject(projectArg);
+    const policy = getProjectPolicy(project.project, project.repoPath);
     const preferredRaw = flag(args, '--coordinator');
+    const requestedAutonomy = hasFlag(args, '--autonomous');
+    if (requestedAutonomy && !policy.allowBackground) {
+      throw new Error(
+        `project ${project.project} is ${policy.projectClass}/${policy.trust}; unattended execution is not allowed. Use --foreground for a visible pilot cycle or earn/promote unattended trust after independent validation.`,
+      );
+    }
     const goal = startGoal({
       project: project.project,
       repoPath: project.repoPath,
       goal: goalText,
-      autonomous: hasFlag(args, '--autonomous'),
+      autonomous: requestedAutonomy,
       ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
     });
     console.log(`Major goal active: ${goal.id}`);
     console.log(`project: ${goal.project}`);
     console.log(`repo: ${goal.repoPath}`);
-    console.log(`goal: ${goal.goal}`);
+    console.log(`policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers}`);
     console.log(`autonomous: ${goal.autonomous ? 'yes' : 'no'}`);
-    if (goal.autonomous) {
-      console.log('supervisor: queued for the persistent Major daemon');
+    if (hasFlag(args, '--foreground')) {
+      console.log('supervisor: running one visible foreground cycle');
+      await runGoalCycle(goal.id);
+    } else if (goal.autonomous) {
+      console.log('supervisor: queued for an explicitly started Major daemon');
+    } else {
+      console.log('supervisor: goal registered; no background work started');
     }
     return true;
   }
@@ -123,8 +227,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const active = project
       ? supervisorSnapshot(project.project)
       : 'No git project detected in this session.';
+    const policy = project ? getProjectPolicy(project.project, project.repoPath) : undefined;
     console.log(
-      `MAJOR DEFAULT SUPERVISOR: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${active}\n\nBefore substantive work: preserve the user outcome as the durable goal. For broad/multi-step work, create or continue a Major goal and let Major own orchestration; do not start a separate untracked implementation. For small bounded work, execute directly under Major rules. Continue until end-to-end evidence or a genuine owner gate.`,
+      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers}\n` : ''}${active}\n\nMajor being present does not imply autonomous authority. Preserve the user outcome as the durable goal. Execute only within the project trust profile. Unknown/client projects default to observe until explicitly classified/promoted.`,
     );
     return true;
   }
@@ -132,6 +237,10 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'delegate') {
     const provider = validHost(requireFlag(args, '--provider'));
     const cwd = resolve(requireFlag(args, '--cwd'));
+    const project = resolveProjectForCwd(cwd);
+    if (!project) throw new Error(`cannot delegate outside a registered git project: ${cwd}`);
+    const policy = getProjectPolicy(project.project, project.repoPath);
+    assertExecutionAllowed(policy);
     const prompt = requireFlag(args, '--prompt');
     const worktree = flag(args, '--worktree');
     let runCwd = cwd;
@@ -148,6 +257,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         args: ['worktree', 'add', '-b', branch, runCwd],
         cwd,
         timeoutMs: 5 * 60 * 1000,
+        extraAllowedRoots: [root],
       });
       if (git.status !== 'succeeded') {
         throw new Error(
