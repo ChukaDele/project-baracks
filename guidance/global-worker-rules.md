@@ -8,19 +8,20 @@ Apply these defaults across projects unless a project/user instruction is more s
 - Major's canonical local CLI is `$HOME/.local/bin/major`.
 - At session start, attach to Major. Claude does this through a SessionStart hook. In Codex, Cursor and Antigravity, before substantive work run `$HOME/.local/bin/major session attach --cwd "$PWD" --host <codex|cursor|antigravity>` if the session has not already shown `MAJOR CONTROL PLANE: ACTIVE`.
 - Do not make the user remember or repeatedly invoke Major.
-- **Presence is not execution authority.** Read the project trust profile before delegating or starting background work.
-- Unknown projects default to `unknown/observe`. Client/candidate/PII projects remain `client/observe` until deliberately promoted through a separate client-safe validation path.
+- Read the project trust profile before delegating or starting background work.
+- The owner may explicitly fast-track a project into `build` with `--owner-approved`; this bypasses shadow/assist ceremony for foreground work but does not grant unattended authority.
+- Client/candidate/PII projects may run in owner-approved `client/build`, but their data must remain project-local and must never flow into global Major/GBrain/Ruflo memory.
 - If an active Major goal exists, preserve the durable outcome across the session rather than treating the latest message as an isolated micro-task.
 - Use `$HOME/.local/bin/major status <project>` before declaring a project complete or blocked.
 
 ## Trust levels
 
-- `observe`: no Major worker execution. Create a concise **MAJOR SHADOW PLAN** containing current P0, proposed workers/tools, expected evidence, owner gates and stop conditions. A human/gstack driver performs the real task. A different provider grades the shadow plan against the actual work. **Three consecutive passing shadow grades are required before assist.**
-- `assist`: visible foreground pilot only, maximum 3 useful workers and maximum 30 minutes per coordinator run. Paid spend, external writes and cross-project memory remain off unless explicitly granted.
-- `build`: independently validated foreground coordination, maximum 6 useful workers. Promotion requires a passing independent execution grade from assist.
-- `unattended`: maximum 8 useful workers with background continuation only after a further representative real-output pass and independent execution grade.
+- `observe`: no Major worker execution. Useful when explicitly requested for shadow evaluation or an unknown/untrusted project.
+- `assist`: visible foreground pilot, maximum 3 useful workers and maximum 30 minutes per coordinator run.
+- `build`: normal foreground working mode, maximum 6 useful workers and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
+- `unattended`: maximum 8 useful workers with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
 
-Do not promote trust because configuration exists, a branch builds, or self-authored tests are green.
+For owner-approved build projects, do not re-introduce shadow runs, repeated permission prompts, or ceremonial review loops that block ordinary reversible engineering.
 
 ## Communication
 
@@ -55,7 +56,7 @@ Good cases include retrieve/fan-out/filter/dedupe/rank, batch transformations, r
 - Prefer native connectors/APIs/CLIs as primitives.
 - Use generated code for mechanics; use the model for judgment/synthesis.
 - Keep provenance.
-- Do not use code to bypass Major trust, filesystem, credential or owner-gate boundaries.
+- Do not use code to bypass filesystem, credential, client-data, paid-spend or owner-gate boundaries.
 - If the temporary procedure becomes reusable, skillify it rather than growing the supervisor runtime.
 
 ## Use the right tool
@@ -77,12 +78,12 @@ Do not expect the current model to do every part of a task.
 
 ## Autonomy
 
-- Authority comes from project trust, not from Major merely being loaded.
-- In `observe`, do not call `major delegate`, do not start the daemon, and do not mutate external systems through Major.
-- In higher trust levels, continue safe reversible work until acceptance criteria are met or a genuine owner-only gate remains.
+- Authority comes from the current project policy plus explicit owner direction.
+- In owner-approved `build`, continue normal reversible engineering without repeatedly asking to proceed: inspect, edit, branch, worktree, test, run browser QA, fix CI, push feature branches, open/update PRs, create previews, and use already-authorized project integrations.
 - Concurrent writers require isolated worktrees and explicit ownership.
 - After two materially unchanged failed approaches, change strategy/tool/provider rather than repeat.
-- Respect the project trust-level worker and run-time ceilings; never treat the global maximum of 8 as the default.
+- Keep one integration owner and avoid duplicate workers.
+- `unattended` remains a separate trust level; do not start background/login execution merely because a project is owner-approved for build.
 
 ## Evidence and readiness language
 
@@ -94,14 +95,17 @@ Do not expect the current model to do every part of a task.
 - **READY** = a representative real-world outcome succeeded under the intended trust profile.
 - Never use built, validated and ready interchangeably.
 
-## Safety / blast radius
+## Minimum safety floor
+
+Keep only the hard boundaries that protect against large or hard-to-reverse mistakes:
 
 - Never expose or commit secrets.
-- Do not create paid API/credit spend without explicit authority.
-- Do not perform destructive/irreversible production-data, credential/ownership/DNS or production security-policy actions without the required authority.
+- Do not create new paid API/credit spend without explicit authority.
+- Do not make destructive/irreversible production-data, credential/ownership/DNS or production security-policy changes without explicit authority.
 - Client/candidate/PII data stays project-local and must not be promoted into global Major/GBrain/Ruflo memory.
-- Ruflo or other experimental swarm/memory machinery is not globally authorized merely because Major is present.
-- Ordinary reversible development may proceed only when the project trust profile permits execution.
+- Do not silently merge data or memory between projects.
+
+These boundaries must not be expanded into generic approval ceremony for ordinary reversible development.
 
 ## Emergency stop
 
