@@ -1,52 +1,63 @@
 # Security and permissions rules
 
-These rules bind Major itself and every agent it dispatches. They override all other
-guidance except explicit human decisions, and a human decision to weaken them must be
-recorded as a `security_exception` DecisionRequest.
+Major uses a **minimum viable security floor plus risk-proportional hardening**. Security protects the project from material harm; it must not become a reason to build enterprise controls before the core workflow has been proven.
 
-## Credentials
+These non-negotiable boundaries override delivery speed:
 
-- Never commit credentials, tokens, or key material. Credentials are referenced only by
-  environment-variable name (e.g. `GOOGLE_APPLICATION_CREDENTIALS`) or file path outside
-  the repository.
-- All logs, run events, and CLI output pass through the redaction layer
-  (`src/security/redact.ts`). Anything matching a secret pattern is replaced with
-  `[REDACTED]` before it is written anywhere.
-- `major doctor` reports the presence of credentials, never their contents.
+## Secrets and credentials
 
-## Subprocess containment
+- Never commit credentials, tokens, private keys or secret material.
+- Logs, memory and durable run records must redact secrets before persistence.
+- Report credential presence/availability without printing the credential itself.
+- Never silently enable paid API billing, consume purchased credits or create a new billable service when subscription-included/free capacity is available or the user has not authorised the spend.
 
-- Every external process passes through the execution gateway
-  (`src/security/gateway.ts`); provider adapters never spawn independently.
-- Allowed project roots are mandatory and non-empty; roots and working directories are
-  canonicalised with realpath before the containment check, so symlinks and `..`
-  traversal cannot escape a root.
-- The gateway accepts only structured executable + argv values — never shell command
-  strings — and provider CLIs are spawned without a shell, so prompts can never inject
-  shell syntax. Invoking a shell with `-c` is itself prohibited.
-- Child processes receive a sanitised environment allowlist. API keys, paid-credit
-  toggles and billing-related variables are stripped unless a valid, verified
-  DecisionRequest explicitly authorises named variables.
-- Every execution-policy decision — allowed or refused — is recorded (redacted) in the
-  append-only `execution_policy_decisions` table.
+## Production and irreversible risk
 
-## Prohibited operations
+Without explicit authority, do not:
 
-Enforced at spawn time by the gateway's argv policy (`src/security/commands.ts`)
-regardless of configuration:
+- destroy or irreversibly rewrite production data;
+- force-push protected production branches;
+- weaken authentication/authorisation or a security policy in production;
+- change DNS, account ownership, billing or credential ownership;
+- publish secrets or private/client data;
+- perform an irreversible production release when the project requires approval.
 
-- direct pushes to protected branches (default: `main`, `master`), in any argv
-  spelling including refspecs (`HEAD:main`) — bare `git push` is refused because
-  upstream tracking could target a protected branch;
-- force pushes (`--force`, `-f`, `--force-with-lease`, `--force-if-includes`);
-- destructive database commands (`DROP TABLE/DATABASE/SCHEMA`, `TRUNCATE`);
-- recursive force deletion (`rm -rf` and all flag arrangements);
-- access outside configured project roots.
+## Normal development is allowed
 
-The project's `allowedExecutables` allowlist is mandatory: anything not on it is
-refused. Projects add further prohibitions via `prohibitedCommands` (regex patterns).
+Security rules should **not** block ordinary reversible engineering work. Within the configured project/worktree and project authority, Major may use normal development tools and shell commands to:
 
-## No automatic promotion
+- inspect and edit files;
+- install approved project dependencies;
+- run package managers, compilers, tests, linters and development servers;
+- create/use worktrees and branches;
+- commit and push non-protected feature branches;
+- open/update pull requests;
+- run browser automation;
+- create/update preview deployments where the provider/project policy allows it;
+- call authenticated development integrations required by the task when they do not create new paid usage or irreversible production changes.
 
-- Major never merges, deploys, or marks roadmap items Done on its own authority. Those are
-  approval categories that require a resolved DecisionRequest (see `human-approval.md`).
+Contain worker writes to the intended project/worktree unless a task explicitly requires another approved path.
+
+## Risk-proportional hardening
+
+Apply deeper security work when the actual feature warrants it, especially for:
+
+- authentication/authorisation;
+- private or regulated data;
+- money/payments;
+- production writes;
+- destructive actions;
+- externally supplied executable content;
+- public upload/input surfaces;
+- privileged integrations;
+- multi-tenant boundaries.
+
+For low-risk local prototypes, static UI, reversible preview environments and proof-of-work slices, do **not** require exhaustive threat models, elaborate RBAC, compliance documentation, full security scanning, advanced audit infrastructure or speculative abuse controls before demonstrating the MVP.
+
+## Secure the boundary that exists
+
+Do not build security for hypothetical future architecture. Protect the real boundary used by the current slice and extend protection when the system gains a new risk-bearing capability.
+
+## Evidence
+
+Security claims must be tied to objective evidence appropriate to the risk. The absence of a large security checklist is not a defect when the checklist is irrelevant to the current MVP.
