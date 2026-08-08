@@ -1,12 +1,20 @@
-import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { executeMajorCommand } from '../security/major-gateway.js';
 import type { WorkerHost } from './state.js';
 
 export interface WorkerOutcome {
   host: WorkerHost;
+  status: 'succeeded' | 'failed' | 'timed_out';
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+}
+
+export interface GatewayCommandOutcome {
   status: 'succeeded' | 'failed' | 'timed_out';
   exitCode: number | null;
   stdout: string;
@@ -53,9 +61,14 @@ function commandFor(host: WorkerHost, prompt: string): { command: string; args: 
   }
 }
 
-function appendLimited(current: string, chunk: Buffer): string {
-  const next = `${current}${chunk.toString('utf8')}`;
+function appendLimited(current: string, chunk: string): string {
+  const next = `${current}${chunk}`;
   return next.length <= OUTPUT_LIMIT ? next : next.slice(next.length - OUTPUT_LIMIT);
+}
+
+function executableOnPath(name: string): boolean {
+  const path = process.env.PATH ?? '';
+  return path.split(':').some((part) => existsSync(join(part, name)));
 }
 
 export function hostAvailable(host: WorkerHost): boolean {
@@ -63,8 +76,59 @@ export function hostAvailable(host: WorkerHost): boolean {
     return existsSync(join(homedir(), '.major', 'antigravity-venv', 'bin', 'python'));
   }
   const executable = commandFor(host, '').command;
-  const path = process.env.PATH ?? '';
-  return path.split(':').some((part) => existsSync(join(part, executable)));
+  return executable.includes('/') ? existsSync(executable) : executableOnPath(executable);
+}
+
+export async function runGatewayCommand(input: {
+  executable: string;
+  args: readonly string[];
+  cwd: string;
+  timeoutMs?: number;
+  extraAllowedRoots?: readonly string[];
+}): Promise<GatewayCommandOutcome> {
+  const started = Date.now();
+  let stdout = '';
+  try {
+    const handle = executeMajorCommand({
+      executable: input.executable,
+      args: input.args,
+      cwd: resolve(input.cwd),
+      allowedRoots: [
+        resolve(input.cwd),
+        majorRepoRoot(),
+        join(homedir(), '.major'),
+        ...(input.extraAllowedRoots ?? []),
+      ],
+      ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+      parseLine: (line) => ({ type: 'stdout', data: line }),
+    });
+
+    for await (const event of handle.events) {
+      const text = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+      stdout = appendLimited(stdout, `${text}\n`);
+    }
+    const outcome = await handle.outcome;
+    return {
+      status:
+        outcome.status === 'succeeded'
+          ? 'succeeded'
+          : outcome.status === 'timed_out'
+            ? 'timed_out'
+            : 'failed',
+      exitCode: outcome.exitCode,
+      stdout,
+      stderr: outcome.stderrTail,
+      durationMs: Date.now() - started,
+    };
+  } catch (error) {
+    return {
+      status: 'failed',
+      exitCode: null,
+      stdout,
+      stderr: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - started,
+    };
+  }
 }
 
 export async function runWorker(input: {
@@ -73,57 +137,12 @@ export async function runWorker(input: {
   cwd: string;
   timeoutMs?: number;
 }): Promise<WorkerOutcome> {
-  const started = Date.now();
   const spec = commandFor(input.host, input.prompt);
-  if (spec.command.includes('/') && !existsSync(spec.command)) {
-    return {
-      host: input.host,
-      status: 'failed',
-      exitCode: null,
-      stdout: '',
-      stderr: `worker runtime not installed: ${spec.command}`,
-      durationMs: Date.now() - started,
-    };
-  }
-
-  return new Promise((resolveOutcome) => {
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    let settled = false;
-    const child = spawn(spec.command, spec.args, {
-      cwd: resolve(input.cwd),
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout = appendLimited(stdout, chunk);
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr = appendLimited(stderr, chunk);
-    });
-    child.on('error', (error) => {
-      stderr = appendLimited(stderr, Buffer.from(error.message));
-    });
-    const timeoutMs = input.timeoutMs ?? 45 * 60 * 1000;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGTERM');
-      setTimeout(() => child.kill('SIGKILL'), 5_000).unref();
-    }, timeoutMs);
-    timer.unref();
-    child.on('close', (exitCode) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolveOutcome({
-        host: input.host,
-        status: timedOut ? 'timed_out' : exitCode === 0 ? 'succeeded' : 'failed',
-        exitCode,
-        stdout,
-        stderr,
-        durationMs: Date.now() - started,
-      });
-    });
+  const outcome = await runGatewayCommand({
+    executable: spec.command,
+    args: spec.args,
+    cwd: input.cwd,
+    ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
   });
+  return { host: input.host, ...outcome };
 }
