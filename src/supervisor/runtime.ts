@@ -63,7 +63,9 @@ function trustContract(policy: ProjectPolicy): string {
 - class: ${policy.projectClass}
 - trust: ${policy.trust}
 - maximum concurrent workers: ${policy.maxWorkers}
+- maximum coordinator run: ${policy.maxRunMinutes} minutes
 - background/unattended execution: ${policy.allowBackground ? 'allowed' : 'not allowed'}
+- paid spend: ${policy.allowPaidSpend ? 'explicitly allowed' : 'not allowed'}
 - ${external}
 - ${memory}
 - Client data and PII stay inside the project boundary. Never use client/candidate data as global training/memory material.`;
@@ -140,7 +142,7 @@ export async function runGoalCycle(goalId: string): Promise<void> {
     host,
     prompt: coordinatorPrompt(goal),
     cwd: goal.repoPath,
-    timeoutMs: 60 * 60 * 1000,
+    timeoutMs: Math.max(1, policy.maxRunMinutes) * 60 * 1000,
   });
   const after = getGoal(goal.id);
   if (!after) return;
@@ -237,22 +239,19 @@ export async function runDaemon(): Promise<void> {
 export function supervisorSnapshot(project?: string): string {
   const state = readSupervisorState();
   const goals = state.goals.filter((goal) => project === undefined || goal.project === project);
-  const stop = globalStopRequested() ? 'GLOBAL STOP: ACTIVE\n\n' : '';
-  if (goals.length === 0) return `${stop}No Major goals found.`;
-  return (
-    stop +
-    goals
-      .map((goal) => {
-        const policy = getProjectPolicy(goal.project, goal.repoPath);
-        const lines = [
-          `${goal.project}: ${goal.status.toUpperCase()} — ${goal.goal}`,
-          `policy=${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} background=${policy.allowBackground ? 'yes' : 'no'}`,
-          `goal=${goal.id} cycle=${goal.cycle} failures=${goal.consecutiveFailures}`,
-        ];
-        if (goal.lastSummary) lines.push(`last: ${trim(goal.lastSummary, 1_500)}`);
-        if (goal.ownerGate) lines.push(`OWNER GATE: ${goal.ownerGate}`);
-        return lines.join('\n');
-      })
-      .join('\n\n')
-  );
+  if (goals.length === 0) return 'No Major goals found.';
+  return goals
+    .map((goal) => {
+      const policy = getProjectPolicy(goal.project, goal.repoPath);
+      const lines = [
+        `${goal.project}: ${goal.status.toUpperCase()} — ${goal.goal}`,
+        `policy=${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} maxRunMinutes=${policy.maxRunMinutes} background=${policy.allowBackground ? 'yes' : 'no'}`,
+        `shadow=${policy.shadowPasses}/3 consecutive passes (${policy.shadowRuns} total)`,
+        `goal=${goal.id} cycle=${goal.cycle} failures=${goal.consecutiveFailures}`,
+      ];
+      if (goal.lastSummary) lines.push(`last: ${trim(goal.lastSummary, 1_500)}`);
+      if (goal.ownerGate) lines.push(`OWNER GATE: ${goal.ownerGate}`);
+      return lines.join('\n');
+    })
+    .join('\n\n');
 }
