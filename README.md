@@ -20,7 +20,7 @@ For knowledge work: **minimum credible evidence for the next good decision**.
 
 ## Thin kernel, fat skills
 
-Permanent Major code should stay focused on deterministic control-plane concerns:
+Permanent Major code stays focused on deterministic control-plane concerns:
 
 - durable goal/project state;
 - project class and trust;
@@ -64,18 +64,18 @@ Project classes:
 
 Trust levels:
 
-- `observe` — no delegated execution;
-- `assist` — visible foreground pilot, max 3 useful workers;
-- `build` — validated build mode, max 6 useful workers;
+- `observe` — no Major worker execution; Major produces a shadow plan only;
+- `assist` — visible foreground pilot, max 3 useful workers, max 30 minutes per coordinator run;
+- `build` — independently validated foreground coordination, max 6 useful workers;
 - `unattended` — max 8 useful workers and background continuation.
 
 Unknown projects default to observe. Client/candidate/PII projects stay isolated until explicitly classified/promoted.
 
-Trust beyond assist requires a passing independent grade.
+**Three consecutive independently graded shadow passes are required before a project may enter assist.** Build and unattended require separate independent execution grades.
 
 ## Pilot deployment
 
-Install the v0.4 pilot runtime:
+Install the v0.4 pilot control plane:
 
 ```sh
 bash scripts/install-major-runtime.sh
@@ -91,14 +91,40 @@ This installs:
 
 It **does not** auto-start a Mac login daemon and **does not** attach Ruflo globally.
 
-Recommended first classification:
+First classification:
 
 ```sh
-major project configure jss-tool --class workshop --trust assist
+major project configure jss-tool --class workshop --trust observe
 major project configure surface-talent --class client --trust observe
 ```
 
-Run the first real JSS pilot visibly:
+Register the real JSS goal without letting Major execute it:
+
+```sh
+major run jss-tool \
+  --goal "Ship the smallest credible end-to-end JSS MVP"
+```
+
+The active agent session should then produce a **MAJOR SHADOW PLAN**. A human/gstack driver performs the real task. A different provider grades Major's proposed plan against the actual path and output.
+
+Record a shadow grade:
+
+```sh
+major project shadow-grade jss-tool \
+  --goal-id "<goal-id>" \
+  --planner codex \
+  --provider claude \
+  --result pass \
+  --evidence "<what matched reality and what evidence supports the pass>"
+```
+
+After **three consecutive passing shadow grades**, Major may be explicitly promoted to assist:
+
+```sh
+major project configure jss-tool --class workshop --trust assist
+```
+
+Only then may a visible foreground Major cycle run:
 
 ```sh
 major run jss-tool \
@@ -128,7 +154,9 @@ Major uses these terms deliberately:
 
 Builder-authored CI is useful but does not make Major ready.
 
-The first readiness gate is JSS in `workshop/assist`: Major must make correct real product progress in a visible foreground cycle, respect the 3-worker ceiling, persist state, respect owner gates, and leave objective evidence. A different provider then grades the exact result before Major is promoted to `build`.
+The first field gate is JSS in `workshop/observe`: Major must propose sensible P0/task/worker/tool/evidence plans while a human/gstack driver performs the work. A different provider grades the shadow plan. Three consecutive passes earn `assist`.
+
+The second gate is JSS in `workshop/assist`: Major must make correct real product progress in one visible bounded run, respect its worker/time limits, persist state, respect owner gates and leave objective evidence. A different provider grades the result before `build` can be earned.
 
 Surface Talent remains `client/observe` during this pilot.
 
@@ -170,22 +198,10 @@ Ruflo is optional subordinate infrastructure, not Major's source of truth and no
 - internal skills: `skills/internal/`;
 - human-reviewable reusable knowledge: Git/Markdown;
 - project/private knowledge: project-local namespaces;
-- client/candidate/PII data never enters global Major/Ruflo memory.
+- client/candidate/PII data never enters global Major/GBrain/Ruflo memory.
 
 ## Runtime migration boundary
 
-Major v0.4 is **built**, not yet **ready**. The v1 runtime remains temporarily as a migration reference until the JSS assist pilot and independent grade pass. Then obsolete v1 code/tests/docs are removed under the legacy-cleanup protocol.
+Major v0.4 is **built**, not yet **ready**. The v1 runtime remains temporarily as a migration reference until the JSS shadow gate, assist pilot and independent grades pass. Then obsolete v1 code/tests/docs are removed under the legacy-cleanup protocol.
 
 See `docs/migrations/major-v2-legacy-receipt.md`.
-
-## Development
-
-```sh
-corepack enable
-pnpm install
-pnpm validate:major
-pnpm test
-pnpm typecheck
-pnpm lint
-pnpm build
-```
