@@ -1,57 +1,43 @@
 # Model and provider routing rules
 
-Routing is model-level, not provider-level, and is decided by
-`src/routing/router.ts` using the configurable capability registry
-(`src/providers/registry.ts`, overridable at `~/.major/model-registry.json`).
-Marketing model names are configuration, never code.
+Major routes by task capability, available subscription capacity and current rate-limit state — not by provider brand loyalty.
 
-## Routing classes
+## Worker pools
 
-- **Fable-class** — ambitious long-running work, autonomous orchestration, complex
-  cross-cutting implementation, difficult system architecture.
-- **Opus-class** — architectural analysis, difficult root-cause debugging,
-  security-sensitive implementation, review adjudication, high-risk repository governance.
-- **Sonnet-class** — bounded implementation, clear repairs, ordinary tests, documentation,
-  routine engineering once the approach is settled.
-- **Codex** — independent adversarial review, alternative implementation, test
-  generation, cross-provider verification.
+- **Claude Code** — coordination, architecture, difficult diagnosis, high-risk adjudication, complex cross-cutting work, creative direction.
+- **Codex** — primary implementation swarm, refactors, tests, bulk coding, independent review and parallel work.
+- **Google / Antigravity** — bounded implementation, routine fixes, test/documentation work, research, browser tasks and overflow to preserve Claude/Codex headroom.
+- **Cursor Agent CLI** — overflow implementation, alternate-model execution, independent review and additional parallel capacity.
 
-## Model state dimensions
+These are defaults, not hard role monopolies. Route based on measured success, task fit and availability.
 
-Every model is tracked on orthogonal dimensions (see `agent_models` and `ModelState`):
-visible; authenticated; availability (available / rate-limited / exhausted / unknown);
-billing mode (subscription-included / usage-credits / API-billing / unknown); prohibited
-(with reason). A model is routable only when visible, authenticated, available, not
-prohibited, **and its billing mode is known** — unknown billing is unroutable.
+## State dimensions
 
-State is never merely asserted: every discovery persists an observation with source,
-confidence and time (`discovery_observations`). Observed exhaustion/rate limits carry a
-`nextProbeAt` backoff; nothing re-probes or retries a model before it, and an
-optimistic re-discover does not erase an observed exhaustion.
+Track independently for each worker/model:
 
-## Quality policy
+- visible/installed;
+- authenticated;
+- available / rate-limited / exhausted / unknown;
+- billing mode: subscription-included / credits / API-billed / unknown;
+- capability/quality class;
+- recent task outcomes;
+- prohibited/restricted reason.
 
-- Use the strongest permitted model for architecture, difficult diagnosis, and high-risk
-  work; use Sonnet-class for bounded execution once the contract is clear.
-- Never spend Fable-class capacity on formatting, mechanical edits, or straightforward
-  documentation.
-- Escalate one class after repeated failure (every two failed repair attempts),
-  contradictory review findings, or exhaustion of the repair budget.
-- Preserve Codex capacity for independent review: Codex is not selected for
-  non-review purposes while the reserve policy is on (default).
-- Same-provider review is not independent. When no cross-provider reviewer is available,
-  the run records `independence_loss` and the review is treated as advisory.
+Prefer **subscription-included** capacity. Never silently switch onto credits or API billing.
 
-## Billing safety
+## Routing policy
 
-- Never activate API billing automatically. Never consume usage credits automatically.
-  No environment variable may silently switch a run onto API billing: the execution
-  gateway strips billing-related variables from every child environment.
-- Any paid route requires an approved `paid_usage` DecisionRequest, referenced by id and
-  verified against the database; the run record stores the decision id (DB-enforced).
-- When included allowance for the target class is unavailable, fall down the class ladder;
-  when only paid options remain, checkpoint the task and pause rather than create an
-  unapproved charge. Checkpoints are persisted (`routing_checkpoints`) as explicit
-  records for a human to act on.
-- Every run records provider, model, billing mode, routing reason, and allowance state
-  (`agent_runs`), plus usage observations (`usage_observations`).
+- Use strong reasoning for architecture, difficult root cause, consequential security and adjudication.
+- Use cheaper/abundant workers for bounded execution once the contract is clear.
+- Use deterministic scripts/codemods/tests instead of a model where sufficient.
+- Scale normal substantive builds to useful parallel teams (typically 4–6, capacity up to 8) when work is genuinely independent.
+- Contract to 1–2 workers for small/local work.
+- Do not duplicate identical work across providers unless independent verification or exploration has clear value.
+- Preserve cross-provider review for high-consequence decisions where useful.
+- After two materially unchanged failed approaches, change strategy or escalate.
+
+## Cost/rate-limit objective
+
+Optimise for **time-to-verified-outcome and subscription headroom**, not minimum token count. Track duplicate work, context size, iteration count, latency, rate limits and any real paid spend.
+
+Paid credits/API routes require explicit authority; subscription-included use does not.

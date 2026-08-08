@@ -2,10 +2,13 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 /**
- * Machine-readable registries for instructions and skills. Entries are never
- * deleted: deprecated guidance stays listed with status 'deprecated' or
- * 'superseded' (plus a pointer to its successor) so agents can recognise and
- * refuse stale guidance.
+ * Machine-readable instruction registry.
+ *
+ * The committed active registry should contain only current binding guidance.
+ * Deprecated/superseded statuses remain supported for controlled migration or
+ * compatibility windows, but Git history is the long-term archive; completed
+ * migrations should remove obsolete active-tree entries once the successor is
+ * verified.
  */
 
 export const GUIDANCE_STATUSES = ['active', 'deprecated', 'superseded'] as const;

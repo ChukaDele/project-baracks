@@ -1,21 +1,15 @@
 # Task-scope rules
 
-- A task is the unit of dispatch: one task, one contract, one verifiable outcome. Agents
-  work only on the task they were dispatched for.
-- Every changed line must trace to the task's description. Adjacent refactoring,
-  drive-by fixes, and speculative flexibility are out of scope; propose them as task
-  suggestions (`major task suggest`) instead of doing them.
-- Suggested tasks are NOT tasks. They live in `task_suggestions` and enter the task table
-  only through explicit approval (`major task approve`).
-- One roadmap item may fan out into many engineering tasks; a task may reference at most
-  one roadmap item. Task-to-roadmap linkage is how evidence rolls up to roadmap updates.
-- Dependencies gate execution: a task cannot be queued while any dependency is not
-  completed. Model this with `TaskDependency` rows rather than prose.
-- A task is completed only through the canonical lifecycle
-  (`src/domain/lifecycle.ts`) by satisfying the completion proof set
-  (`src/domain/completion.ts`): passed verification runs, resolved P0/P1 review
-  findings, verified evidence relationships, and any task-specific criteria. A
-  free-text evidence assertion is never sufficient, and agents cannot fabricate
-  evidence references (DB-enforced). There is no other path to `completed`.
-- If a task's scope turns out to be wrong (too big, ambiguous, conflicts with guidance),
-  the agent stops and raises a DecisionRequest rather than improvising.
+Major scopes work around **verifiable end-to-end outcomes**, not artificially narrow implementation fragments.
+
+- A task is one bounded user-visible or operational outcome with a clear completion condition.
+- When a request contains many features, first apply the MVP prioritisation rules: identify the smallest feature set that proves the core value, then create tasks around that vertical slice.
+- One roadmap item may fan out into parallel engineering tasks when that shortens the critical path, but the tasks should recombine into a working end-to-end milestone rather than remain isolated layers.
+- Model real dependencies explicitly with `TaskDependency` rows rather than prose. Parallelise work that is genuinely independent.
+- Agents may make **safe adjacent changes required to make the assigned outcome work correctly**, including root-cause fixes, contract adjustments, small refactors, tests and recovery paths. Do not require a separate approval/task for every supporting edit.
+- Unrelated product features, speculative abstractions and broad opportunistic rewrites remain out of scope; propose them separately.
+- If a blocker affects one branch of work, continue independent productive work rather than stalling the whole goal.
+- After two materially unchanged failed approaches, change strategy, isolate the failing boundary or escalate to a stronger/specialist worker. Do not repeat the same repair loop indefinitely.
+- Completion requires objective evidence appropriate to the outcome: E2E/browser behaviour, deterministic tests, persisted state, provider response, generated artefact, deployment result or explicit human acceptance where needed. Agent self-report is never sufficient.
+- A local component or layer being complete does not prove the task complete when the requested outcome is end to end.
+- If the original scope is unnecessarily broad, Major should simplify it to the MVP and explain the cut briefly. If the outcome itself is genuinely ambiguous or conflicts with a human decision, request clarification rather than inventing the goal.

@@ -1,26 +1,35 @@
-# Roadmap-synchronisation rules
+# Project state and roadmap synchronisation
 
-The roadmap source (Google Sheets for Surface Talent) is the human-owned source of truth.
-Major proposes; humans (or approved automation) dispose.
+A project may use GitHub Issues/Projects, Linear, Notion, a document, a database table, another system or no external roadmap at all. Major must not assume one provider or workflow.
 
-- Roadmap rows are addressed only by their **stable ID** column, never by row position.
-- Every write is an `UpdateProposal`: idempotency key, atomic set of related changes,
-  rationale, and evidence refs. Partial application is forbidden — one invalid change
-  rejects the whole proposal.
-- Every proposal is bound to its canonical payload hash; the idempotency key embeds the
-  hash, so the same key can never carry different changes.
-- Every proposal is dry-run first; the dry-run diff, timestamp and the source revision
-  observed then are stored on the `roadmap_updates` record before any apply. Applying
-  requires that exact prior dry run; changed source state (revision or cell values)
-  invalidates the proposal instead of overwriting human edits.
-- Applying the same idempotency key twice is a no-op (`already_applied`).
-- Evidence backing a Done change must belong to tasks of that roadmap item — a
-  non-empty evidence string is not sufficient.
-- Roadmap permission grants no other authority: never merge, deploy, spend, or run
-  destructive commands on the strength of being allowed to propose roadmap updates.
-- Formula-backed cells are never overwritten.
-- A row is never set to Done (or any equivalent value) without at least one evidence
-  reference, and marking Done additionally requires an approved `roadmap_done`
-  DecisionRequest.
-- Tests and dry runs never perform live writes; the mock adapter
-  (`src/roadmap/mock-sheets.ts`) implements the identical contract.
+## Canonical project state
+
+- Each project declares its source(s) of truth and ownership rules in project configuration.
+- Use stable IDs/keys, not row positions, display order or fragile text matching.
+- Keep goal, P0/P1/P2 priority, current bottleneck, next action, status and evidence durable enough that a fresh worker can resume safely.
+- Do not duplicate canonical state across multiple tools unless a clear synchronization contract exists.
+
+## External writes
+
+When Major writes to an external project system:
+
+- use the provider's smallest reliable adapter/API;
+- make repeatable writes idempotent where duplicate execution could cause harm;
+- preserve existing human edits unless the active task explicitly replaces them;
+- confirm the external system reached the intended state rather than trusting only local response text;
+- attach or reference objective evidence when marking an outcome complete;
+- surface provider failures as a bottleneck and continue independent work when possible.
+
+## Authority
+
+Major may automatically update routine project/task state when the project grants that authority and objective evidence supports the change.
+
+Human approval is required only when the underlying action itself is a human-only gate under `human-approval.md` or project configuration. A generic roadmap status change is not automatically a human gate.
+
+## Provider neutrality
+
+Provider-specific details belong behind adapters or project configuration. Do not put Google Sheets, Linear, Notion, GitHub or any client-specific assumption into Major's global workflow rules.
+
+## No-roadmap projects
+
+Do not force a roadmap integration on a small or exploratory project. A concise project goal, priority backlog and durable status file/database are sufficient when they are the simplest useful source of truth.
