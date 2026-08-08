@@ -8,7 +8,7 @@ Apply these defaults across projects unless a project/user instruction is more s
 - Major's canonical local CLI is `$HOME/.local/bin/major`.
 - At session start, attach to Major. Claude does this through a SessionStart hook. In Codex, Cursor and Antigravity, before substantive work run `$HOME/.local/bin/major session attach --cwd "$PWD" --host <codex|cursor|antigravity>` if the session has not already shown `MAJOR CONTROL PLANE: ACTIVE`.
 - Do not make the user remember or repeatedly invoke Major.
-- Read the project trust profile before delegating or starting background work.
+- **Presence is not execution authority.** Read the project policy plus explicit owner direction before delegating or starting background work.
 - The owner may explicitly fast-track a project into `build` with `--owner-approved`; this bypasses shadow/assist ceremony for foreground work but does not grant unattended authority.
 - Client/candidate/PII projects may run in owner-approved `client/build`, but their data must remain project-local and must never flow into global Major/GBrain/Ruflo memory.
 - If an active Major goal exists, preserve the durable outcome across the session rather than treating the latest message as an isolated micro-task.
@@ -16,7 +16,7 @@ Apply these defaults across projects unless a project/user instruction is more s
 
 ## Trust levels
 
-- `observe`: no Major worker execution. Useful when explicitly requested for shadow evaluation or an unknown/untrusted project.
+- `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human/gstack driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
 - `assist`: visible foreground pilot, maximum 3 useful workers and maximum 30 minutes per coordinator run.
 - `build`: normal foreground working mode, maximum 6 useful workers and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
 - `unattended`: maximum 8 useful workers with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
