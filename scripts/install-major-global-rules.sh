@@ -3,9 +3,8 @@ set -euo pipefail
 
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GLOBAL_SRC="$MAJOR_ROOT/guidance/global-worker-rules.md"
-GLOBAL_TEXT="$(cat "$GLOBAL_SRC")"
 
-mkdir -p "$HOME/.major" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}" "$HOME/.gemini"
+mkdir -p "$HOME/.major" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}" "$HOME/.gemini" "$HOME/.cursor/rules/major-global"
 cp "$GLOBAL_SRC" "$HOME/.major/global-worker-rules.md"
 
 # Claude Code: global user memory imports one Major-managed file.
@@ -39,13 +38,10 @@ import sys
 path = Path(sys.argv[1])
 rules = Path(sys.argv[2]).read_text().strip()
 text = path.read_text() if path.exists() else ''
-
-# Clean the older communication-only managed block if present.
 old_start = '<!-- MAJOR-COMMUNICATION-START -->'
 old_end = '<!-- MAJOR-COMMUNICATION-END -->'
 if old_start in text and old_end in text:
     text = text.split(old_start, 1)[0].rstrip() + '\n\n' + text.split(old_end, 1)[1].lstrip()
-
 start = '<!-- MAJOR-GLOBAL-START -->'
 end = '<!-- MAJOR-GLOBAL-END -->'
 block = f'{start}\n{rules}\n{end}'
@@ -68,20 +64,20 @@ install_managed_block "$CODEX_RULE"
 GEMINI_RULE="$HOME/.gemini/GEMINI.md"
 install_managed_block "$GEMINI_RULE"
 
+# Cursor: local file-backed global rule. Cursor cloud User Rules are a separate
+# settings surface and are not mutated by this installer.
+CURSOR_RULE="$HOME/.cursor/rules/major-global/RULE.md"
+cp "$GLOBAL_SRC" "$CURSOR_RULE"
+
 cat <<EOF
 Major global worker rules installed for:
 - Claude Code: $CLAUDE_RULE imported by $CLAUDE_ROOT
 - Codex: $CODEX_RULE
 - Antigravity: $GEMINI_RULE
+- Cursor local global rule: $CURSOR_RULE
 
-Cursor:
-- Major-managed projects inherit the contract through AGENTS.md.
-- Cursor global User Rules are configured in Cursor Settings.
-- The canonical text is: $HOME/.major/global-worker-rules.md
+Cursor note:
+- This terminal-installed rule is local to this Mac.
+- Cursor's cloud-synced User Rules are a separate Settings surface and are not changed.
+- Major-managed projects also inherit the same contract through project AGENTS.md.
 EOF
-
-# macOS convenience: copy canonical rules for Cursor User Rules.
-if command -v pbcopy >/dev/null 2>&1; then
-  printf '%s' "$GLOBAL_TEXT" | pbcopy
-  echo "Copied Major global worker rules to the clipboard for Cursor User Rules."
-fi

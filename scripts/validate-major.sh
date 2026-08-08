@@ -6,7 +6,6 @@ cd "$ROOT"
 
 fail() { echo "MAJOR VALIDATION FAILED: $*" >&2; exit 1; }
 
-# 1. Basic syntax / machine-readable files.
 for script in scripts/*.sh; do bash -n "$script" || fail "shell syntax: $script"; done
 python3 - <<'PY'
 import json
@@ -18,7 +17,6 @@ for p in Path('.').rglob('*.json'):
         raise SystemExit(f"invalid JSON: {p}: {e}")
 PY
 
-# 2. Active guidance registry: valid schema version, every path exists, unique ids, critical rules active.
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -45,7 +43,6 @@ if missing:
     raise SystemExit(f"required Major guidance missing: {sorted(missing)}")
 PY
 
-# 3. Internal skill registry must exactly cover Major-owned skill directories.
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -78,7 +75,6 @@ for key in [
         raise SystemExit(f"required skill policy not enabled: {key}")
 PY
 
-# 4. Deleted v1 documents/project-specific core examples and superseded installers must not return.
 for path in \
   docs/deferred-security-milestones.md \
   docs/provider-routing.md \
@@ -90,7 +86,6 @@ for path in \
   [ ! -e "$path" ] || fail "obsolete file returned: $path"
 done
 
-# 5. Stale concepts must not appear in active rules/templates/README/PR template.
 for phrase in \
   "disabled architectural foundation" \
   "Codex is skipped entirely" \
@@ -103,7 +98,6 @@ for phrase in \
   fi
 done
 
-# 6. Explicit doctrine checks: small invariants, not wording-heavy snapshots.
 grep -Fq "MVP is the default delivery strategy" guidance/mvp-speed-and-prioritisation.md || fail "MVP default doctrine missing"
 grep -Fq "Git history is the audit archive" guidance/instruction-precedence.md || fail "clean supersession doctrine missing"
 grep -Fiq "continue until" guidance/autonomy-and-progress.md || fail "continue-until autonomy doctrine missing"
@@ -113,12 +107,10 @@ grep -Fq "Do not search for articles about the video" guidance/tool-routing-and-
 grep -Fq "complete current upstream bundle" docs/skills-catalog.md || fail "full Emil bundle policy missing"
 grep -Fq "Remove only skills previously installed by Major" scripts/install-major-skills.sh || fail "stale skill cleanup missing"
 
-# 7. Provider-specific contamination: canonical roadmap/state guidance must remain provider-neutral.
 if grep -E -n "Surface Talent|spreadsheetId|Google Sheets for" guidance/roadmap-sync.md; then
   fail "provider/client-specific roadmap assumption in global guidance"
 fi
 
-# 8. Bootstrap contract exists and uses provider-neutral AGENTS + profile skills.
 [ -f templates/project/major-core.md ] || fail "project core template missing"
 [ -f scripts/bootstrap-major-project.sh ] || fail "project bootstrap missing"
 grep -Fq "AGENTS.md" scripts/bootstrap-major-project.sh || fail "provider-neutral AGENTS bootstrap missing"
@@ -126,7 +118,6 @@ grep -Fq "install-major-skills.sh" scripts/bootstrap-major-project.sh || fail "s
 grep -Fq "core|knowledge|web-ui|exploratory|full" scripts/install-major-skills.sh || fail "knowledge profile missing from skill installer"
 grep -Fq "A failed first tool is not a failed task" templates/project/major-core.md || fail "project tool-routing rule missing"
 
-# 9. Cross-tool global rules must cover communication + tool/source routing.
 [ -f guidance/global-worker-rules.md ] || fail "compact global worker rules missing"
 [ -f scripts/install-major-global-rules.sh ] || fail "global worker rules installer missing"
 grep -Fq "Use the right tool" guidance/global-worker-rules.md || fail "global tool-routing rule missing"
@@ -134,9 +125,11 @@ grep -Fq "Primary-source integrity" guidance/global-worker-rules.md || fail "glo
 grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-rules.sh || fail "Claude global rules target missing"
 grep -Fq '.codex' scripts/install-major-global-rules.sh || fail "Codex global rules target missing"
 grep -Fq '.gemini/GEMINI.md' scripts/install-major-global-rules.sh || fail "Antigravity global rules target missing"
-grep -Fq "Cursor" scripts/install-major-global-rules.sh || fail "Cursor global rule handoff missing"
+grep -Fq '.cursor/rules/major-global/RULE.md' scripts/install-major-global-rules.sh || fail "Cursor terminal global rule target missing"
+if grep -Fq 'pbcopy' scripts/install-major-global-rules.sh; then
+  fail "Cursor clipboard handoff should not be primary installer path"
+fi
 
-# 10. Knowledge tool routing must have a real deterministic YouTube path and tool doctor.
 [ -f scripts/major-ingest-youtube.sh ] || fail "YouTube ingestion script missing"
 [ -f scripts/setup-major-knowledge-tools.sh ] || fail "knowledge tool setup/doctor missing"
 grep -Fq "yt-dlp" scripts/major-ingest-youtube.sh || fail "YouTube ingestion missing yt-dlp"
@@ -145,12 +138,10 @@ grep -Fq -- "--prefix" scripts/setup-major-knowledge-tools.sh || fail "GStack na
 grep -Fq "proactive false" scripts/setup-major-knowledge-tools.sh || fail "GStack proactive routing must be disabled under Major"
 grep -Fq "telemetry off" scripts/setup-major-knowledge-tools.sh || fail "GStack telemetry default must be off under Major setup"
 
-# 11. Architecture must preserve one kernel / profile separation and source-tool boundary.
 grep -Fq "Major Build" docs/architecture.md || fail "Major Build profile missing"
 grep -Fq "Major Knowledge" docs/architecture.md || fail "Major Knowledge profile missing"
 grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability router missing"
 
-# 12. Migration must stay explicitly incomplete until the old runtime is actually replaced.
 grep -Fiq "migration is incomplete" docs/architecture.md || fail "runtime migration caveat missing"
 grep -Fq "DELETE after successor verification" docs/migrations/major-v2-legacy-receipt.md || fail "legacy deletion gate missing"
 
