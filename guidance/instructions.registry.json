@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "entries": [
     {
       "id": "instruction-precedence",
@@ -17,6 +17,12 @@
       "id": "mvp-speed-and-prioritisation",
       "title": "Proof-first MVP speed and prioritisation rules",
       "path": "guidance/mvp-speed-and-prioritisation.md",
+      "status": "active"
+    },
+    {
+      "id": "autonomy-and-progress",
+      "title": "Autonomy, recovery and visible-progress rules",
+      "path": "guidance/autonomy-and-progress.md",
       "status": "active"
     },
     {
