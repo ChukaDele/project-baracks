@@ -64,10 +64,10 @@ function normalizedSummary(summary: string): string {
 export function captureLearning(input: {
   source: LearningSource;
   summary: string;
-  scope?: LearningScope;
-  evidence?: string;
-  project?: string;
-  repoPath?: string;
+  scope?: LearningScope | undefined;
+  evidence?: string | undefined;
+  project?: string | undefined;
+  repoPath?: string | undefined;
 }): LearningCandidate {
   const summary = input.summary.trim();
   if (!summary) throw new Error('learning summary must not be empty');
