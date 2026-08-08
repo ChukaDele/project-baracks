@@ -26,10 +26,8 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   export PATH="$BIN_DIR:$PATH"
 fi
 
-# Global rules make Major present across agent tools. Presence is not execution authority.
 bash "$ROOT/scripts/install-major-global-rules.sh"
 
-# Claude has a real per-session lifecycle hook, so attach deterministically on startup/resume.
 mkdir -p "$HOME/.claude"
 python3 - "$HOME/.claude/settings.json" "$BIN_DIR/major" <<'PY'
 import json
@@ -57,12 +55,10 @@ hooks["SessionStart"] = filtered
 path.write_text(json.dumps(data, indent=2) + "\n")
 PY
 
-# Pilot posture: do NOT auto-start a login daemon and do NOT attach Ruflo globally.
-# Remove the earlier experimental LaunchAgent if it exists.
+# Pilot posture: no auto-start daemon and no global Ruflo attachment.
 launchctl bootout "gui/$UID/com.chuka.major-supervisor" >/dev/null 2>&1 || true
 rm -f "$LEGACY_PLIST"
 
-# Antigravity worker installation is optional during pilot; avoid adding another runtime unless requested.
 if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
   if [ ! -x "$MAJOR_HOME/antigravity-venv/bin/python" ]; then
     python3 -m venv "$MAJOR_HOME/antigravity-venv"
@@ -72,30 +68,34 @@ if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 
 fi
 
 cat <<EOF
-Major v0.4 pilot runtime installed.
+Major v0.4 pilot control plane installed.
 
 CLI:        $BIN_DIR/major
 State:      $MAJOR_HOME/supervisor-state.json
 Policies:   $MAJOR_HOME/project-policies.json
 Kill switch:$MAJOR_HOME/STOP
 Claude:     deterministic SessionStart attach installed
-Codex:      global Major control-plane rules installed
-Cursor:     global Major control-plane rules installed
-Antigravity:global Major control-plane rules installed
+Codex:      global Major rules installed
+Cursor:     global Major rules installed
+Antigravity:global Major rules installed
 
-IMPORTANT:
+PILOT GUARANTEES:
 - Major is present by default, but no login daemon is started.
 - Unknown projects default to observe-only.
-- Ruflo is NOT attached globally during pilot.
-- Background/unattended execution requires an explicitly promoted project trust level.
+- Ruflo is NOT attached globally.
+- Observe mode cannot dispatch workers.
+- Three consecutive independent shadow-plan passes are required before assist mode.
+- Assist mode is foreground-only, max 3 workers, max 30 minutes per coordinator run, no paid spend or external writes by default.
 
 Open a new shell or run:
   export PATH="$BIN_DIR:\$PATH"
 
-Recommended first pilot:
-  major project configure jss-tool --class workshop --trust assist
+First JSS shadow pilot:
+  major project configure jss-tool --class workshop --trust observe
+  major run jss-tool --goal "Ship the smallest credible end-to-end JSS MVP"
+
+Surface Talent isolation:
   major project configure surface-talent --class client --trust observe
-  major run jss-tool --goal "Ship the smallest credible end-to-end JSS MVP" --foreground
 
 Emergency stop:
   major stop
