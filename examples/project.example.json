@@ -1,0 +1,25 @@
+{
+  "name": "example-project",
+  "repoPath": "~/Projects/example-project",
+  "githubRepo": "owner/example-project",
+  "goal": "Prove the core user workflow end to end with the smallest credible MVP.",
+  "verificationCommands": [
+    "pnpm typecheck",
+    "pnpm test"
+  ],
+  "protectedBranches": ["main"],
+  "humanOnlyActions": [
+    "paid_usage",
+    "destructive_production_data",
+    "credentials_or_ownership",
+    "security_exception"
+  ],
+  "previewDeployment": {
+    "provider": "vercel",
+    "autonomous": true
+  },
+  "projectState": {
+    "type": "local",
+    "path": "STATUS.md"
+  }
+}
