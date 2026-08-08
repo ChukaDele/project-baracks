@@ -4,6 +4,14 @@
 
 Use BLUF: answer/decision/status first, then only needed context and next action. Use short, direct, active sentences and simple technical English. Keep terminology consistent. Distinguish fact, assumption, risk and recommendation. Do not bury the conclusion in background.
 
+## Major presence vs authority
+
+Major is the default control plane for this project, but presence does **not** imply execution authority.
+
+Before substantive execution, read the current Major project policy (`major project show current`). Respect its class, trust level, worker ceiling, external-write boundary and memory boundary.
+
+Unknown projects default to observe-only. Client/candidate/PII projects remain isolated until explicitly classified/promoted.
+
 ## Tool and source routing
 
 Use the best available tool for the actual task. Prefer native connectors/APIs and deterministic CLIs/parsers over browser automation or model inference when they can obtain the requested source more reliably.
@@ -23,6 +31,15 @@ A prototype may be UI, code, script, provider call, local slice or another fast 
 
 For knowledge work, the equivalent is: define the decision, identify the biggest uncertainty, gather the minimum credible evidence, then recommend/act. Do not over-research reversible low-value choices.
 
+## Skill-first execution
+
+- Resolve the smallest relevant set of installed skills before inventing a new process.
+- Installed does not mean loaded.
+- Prefer markdown judgment plus minimal deterministic code over permanent hard-coded orchestration.
+- Use `tools-as-code` when repeated deterministic retrieval/filter/dedupe/rank/transform work would otherwise require many model turns.
+- If a successful novel procedure is likely to recur, use `skillify` after the real task succeeds.
+- Do not skillify trivial one-offs or pause P0 work to build infrastructure.
+
 ## Build behavior
 
 - Inspect current code/state before editing.
@@ -40,21 +57,35 @@ For knowledge work, the equivalent is: define the decision, identify the biggest
 - Continue safe reversible work until the acceptance condition is met or a genuine owner-only gate is reached.
 - Do not stop because one command failed or one subtask ended when a safe next action exists.
 - After two materially unchanged failed approaches, change strategy/tool/model or isolate the failing boundary.
-- Parallelise genuinely independent work. Normal substantive builds can use 4–6 useful workers; capacity may expand to 8 when it shortens the critical path.
+- Parallelise genuinely independent work only within the current project trust-level worker ceiling.
 - Concurrent writers use isolated worktrees and explicit ownership. Avoid duplicate writers on the same files.
 - Continue independent work around one blocked dependency.
 
 For knowledge work, parallelise materially different research angles rather than duplicating the same search. Use an independent skeptic/reviewer when consequence or uncertainty justifies it.
 
-## Verification
+## Verification and readiness
 
 Completion requires objective evidence appropriate to the outcome: browser/runtime behavior, tests, persisted state, provider response, faithful primary-source content/transcript, exact commit/PR state, preview/deploy result or explicit human acceptance when the result is subjective. Agent self-report is not evidence.
 
 Use risk-proportional QA. Optimize confidence per minute, not test count.
 
-## Safety floor
+- **BUILT** = implementation exists.
+- **VALIDATED** = relevant deterministic checks plus an independent grader support the claim.
+- **READY** = a representative real-world outcome succeeded under the intended trust profile.
 
-Never expose/commit secrets. Do not spend paid API/credits without authority. Do not make destructive/irreversible production-data, credential/ownership/DNS or production security-policy changes without the required authority. Ordinary reversible development is allowed.
+Never use built, validated and ready interchangeably.
+
+## Safety floor / blast radius
+
+Never expose/commit secrets. Do not spend paid API/credits without authority. Do not make destructive/irreversible production-data, credential/ownership/DNS or production security-policy changes without the required authority.
+
+Client/candidate/PII data must remain project-local. Do not promote it into global Major/Ruflo memory. Experimental swarm/memory machinery is not authorized merely because Major is attached.
+
+Ordinary reversible development is allowed only when the project trust policy permits execution.
+
+## Emergency stop
+
+`major stop` activates the global kill switch. New Major worker execution must stop and active Major gateway workers are cancelled on the next stop check. Resume with `major start` only after inspection.
 
 ## Legacy cleanup
 

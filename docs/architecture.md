@@ -1,20 +1,43 @@
-# Major 2.0 architecture
+# Major architecture
 
-Major is a **cross-project operating layer for building software and doing evidence-based knowledge work**. It is not a project-specific application and not a replacement for the models, coding agents or source tools underneath it.
+Major is a **thin cross-project control plane** for building software and doing evidence-based knowledge work. It owns durable goals, project trust, worker/tool routing, evidence, budgets/gates and learning. It should not become a large hard-coded workflow factory.
+
+## Core design principle
+
+**Thin deterministic kernel. Fat tested skills. Agents compose tools/code at runtime.**
+
+Keep permanent code only for state and boundaries that must be deterministic. Put judgment/procedure into skills. Let agents create short temporary code for repeated mechanics, and skillify procedures only after they work.
+
+```text
+user goal
+   ↓
+Major kernel
+(goal / state / trust / stop / evidence)
+   ↓
+skill resolver
+   ↓
+relevant tested skill packs
+   ↓
+agent
+   ↓
+reason directly | native tool | Tools-as-Code | dynamic worker graph
+   ↓
+evidence / independent grade
+   ↓
+reusable success? → skillify
+```
 
 ## One kernel, two internal profiles
-
-Major has one policy/memory/skill/routing kernel with two main internal operating profiles:
 
 ### Major Build
 
 Used to make and ship software.
 
 - proof-first P0 MVP delivery;
-- 4–6 useful workers normally, up to 8 when parallelism shortens the critical path;
-- isolated worktrees and explicit write ownership;
+- worktree isolation and explicit write ownership;
 - code, browser QA, preview deployments, repair loops and objective runtime evidence;
-- Ruflo swarm/workflow machinery where it earns its coordination cost.
+- worker count comes from the project's trust level rather than a global default;
+- multi-agent graphs are created only when independent parallel work earns their coordination cost.
 
 ### Major Knowledge
 
@@ -22,35 +45,90 @@ Used for research, strategy, synthesis, comparisons and decision work.
 
 - define the decision and minimum credible evidence first;
 - ingest named primary sources with the best connector/API/CLI/parser/browser/local tool;
-- use light, standard or high-stakes research depth rather than a fixed swarm size;
-- parallel researchers cover materially different angles;
+- use light, standard or high-stakes depth rather than a fixed swarm size;
+- use Tools-as-Code for repeated retrieve/filter/dedupe/rank/transform mechanics;
 - use an independent skeptic/reviewer when consequence or uncertainty warrants it;
-- preserve source provenance and separate evidence from inference;
-- stop when more research is unlikely to change the next decision.
+- preserve provenance and separate evidence from inference.
 
-These are profiles of the same Major kernel, not separate harnesses. They share policy, communication, skill format, model routing, memory governance, cost/capacity rules and learning.
+These are profiles of the same Major kernel, not separate harnesses.
 
-## Layers
+## 1. Always present, not always authorized
 
-### 1. Human-reviewable policy
+Major's communication/routing/project context is present across supported agent tools. Execution authority is project-scoped.
+
+Project classes:
+
+- `unknown`
+- `workshop`
+- `client`
+- `knowledge`
+
+Trust levels:
+
+- `observe` — no delegated execution;
+- `assist` — foreground pilot, maximum 3 useful workers;
+- `build` — validated build mode, maximum 6 useful workers;
+- `unattended` — maximum 8 useful workers and background continuation.
+
+Unknown projects default to observe. Client/candidate/PII projects remain isolated until explicitly classified/promoted. Trust promotion beyond assist requires a passing independent grade.
+
+The global kill switch (`major stop`) cancels active Major gateway work and blocks new work until `major start`.
+
+## 2. Human-reviewable policy
 
 Canonical rules live in `guidance/` and are selected by `guidance/instructions.registry.json`.
 
-They define the non-negotiable operating philosophy: proof-first MVP delivery, tool/source routing, autonomy, legacy cleanup, communication, proportional security, task scope, provider routing and project-state rules.
+They define:
 
-### 2. Reusable skills
+- proof-first MVP delivery;
+- built/validated/ready language;
+- independent grading;
+- project trust/blast radius;
+- tool/source routing;
+- autonomy/recovery;
+- legacy cleanup;
+- communication;
+- proportional security;
+- model/provider routing;
+- project-state rules.
 
-- Major internal skills: `skills/internal/`
-- external skills: installed through the canonical installer and locked to source commits
-- trigger-based loading: installed does not mean injected into every context
+## 3. Skill resolver and reusable skills
 
-Skills provide technique; Major guidance has higher authority.
+- Major internal skills: `skills/internal/`;
+- external skills: installed through the canonical installer and locked to source commits;
+- installed does not mean loaded;
+- the resolver selects the smallest useful skill set;
+- positive/negative trigger examples and reachability/overlap checks are part of the skill lifecycle.
 
-### 3. Tool/capability router
+Important recurring meta-skills:
 
-Major should route a task to the best capability rather than expecting the current model to do everything.
+- `skill-resolver`
+- `skillify`
+- `tools-as-code`
 
-Typical source/tool routes:
+Skills provide technique. Major guidance has higher authority.
+
+## 4. Tools as Code
+
+When repeated deterministic operations would otherwise require many model turns, an agent may compose approved primitives with a short temporary Python/TypeScript/shell program.
+
+Typical primitives:
+
+- search/retrieval adapters;
+- browser/GStack;
+- GitHub;
+- Google connectors;
+- Figma;
+- `yt-dlp`;
+- MacWhisper;
+- file/PDF parsers;
+- deterministic transforms/validators.
+
+Use code for mechanics, not judgment. Temporary code is discarded unless it has durable product value or is promoted through `skillify`.
+
+## 5. Tool/capability router
+
+Typical routes:
 
 - GitHub → GitHub connector/API;
 - Google files/mail/calendar → native Google connectors;
@@ -62,30 +140,9 @@ Typical source/tool routes:
 - PDF/document/spreadsheet → native parser/skill;
 - reasoning/synthesis → dynamically selected model(s).
 
-A failed first tool is not a failed task. `guidance/tool-routing-and-source-ingestion.md` defines fallback and primary-source integrity rules.
+A failed first tool is not a failed task.
 
-GStack is an optional subordinate browser capability pack, installed namespaced with its proactive routing disabled. It does not replace Major's router or policy.
-
-### 4. Project adapter
-
-Each managed project declares only the context Major needs: root/repo, goal, P0/P1/P2 backlog, verification commands, protected resources, preview/deployment configuration and optional external task/roadmap adapters.
-
-Major does not force every project into one external PM tool or infrastructure stack.
-
-### 5. Orchestration substrate
-
-Ruflo is the planned substrate for:
-
-- task/swarm coordination;
-- shared/semantic memory retrieval;
-- worktree-aware execution;
-- long-running loops;
-- browser/workflow support;
-- usage/observability signals.
-
-Major remains the policy/source-of-truth layer above Ruflo so Ruflo can be upgraded or replaced without rewriting project rules.
-
-### 6. Worker adapters
+## 6. Worker adapters
 
 Thin adapters invoke available coding/reasoning environments:
 
@@ -94,67 +151,79 @@ Thin adapters invoke available coding/reasoning environments:
 - Google Antigravity;
 - Cursor Agent CLI.
 
-Worker/model choice is dynamic. State includes authentication, availability, rate-limit/exhaustion, billing mode, capability and observed outcomes. Prefer subscription-included capacity; paid API/credit spend is an explicit authority boundary.
+Worker/model choice is dynamic. Prefer subscription-included capacity. Paid API/credit spend remains an explicit authority boundary.
 
-### 7. Execution and concurrency
+Major should not encode fixed permanent agent factories. The coordinator may create a small dynamic worker graph when the task contains genuinely independent work.
 
-For Build:
+## 7. Ruflo
 
-- normal substantive builds: typically 4–6 useful roles;
-- capacity: up to 8 normal development workers;
-- small/local tasks contract to 1–2;
-- every concurrent writer gets an isolated worktree and explicit ownership;
-- one integration owner resolves overlapping manifests/changes.
+Ruflo is **optional subordinate infrastructure**, not the default global control plane.
 
-For Knowledge:
+It may provide swarm/memory/workflow primitives for trusted workshop projects after pilot evidence shows the benefit outweighs coordination/blast-radius cost.
 
-- light work uses one direct source/research pass;
-- standard work uses 2–4 materially different research angles plus skeptic/synthesis where useful;
-- high-stakes work can expand further when more independent evidence materially improves the decision;
-- read-only research/review can share source state safely.
+During pilot:
 
-Parallelism is used to reduce uncertainty or shorten the critical path, not to duplicate the same reasoning blindly.
+- Ruflo is not attached globally;
+- client projects do not inherit Ruflo/global memory;
+- Major can operate directly through its worker adapters without Ruflo.
 
-### 8. Verification and recovery
+## 8. Execution and recovery
 
-Completion depends on external evidence appropriate to the task: tests, exact commit, browser/runtime behavior, persisted state, provider response, faithful primary-source content/transcript, preview/deploy result or explicit human acceptance.
+- execution runs through Major's gateway;
+- project policy decides whether delegation/background work is allowed;
+- concurrent writers use worktrees;
+- two materially unchanged failed strategies trigger a different strategy/tool/provider;
+- background daemon processing is restricted to explicitly promoted `unattended` projects;
+- pilot deployment does not auto-start a login daemon.
 
-Repair/fallback loops are bounded. Two materially unchanged failed strategies trigger a different strategy/tool/model rather than indefinite repetition.
+## 9. Verification and readiness
 
-### 9. Memory and learning
+**BUILT** = implementation exists.
+
+**VALIDATED** = relevant deterministic checks plus an independent grader support the claim.
+
+**READY** = a representative real-world outcome succeeded under the intended trust profile.
+
+Builder-authored CI is useful but cannot by itself promote trust.
+
+The first representative Major acceptance test is JSS in `workshop/assist`: Major must make useful product progress on the real JSS goal in a visible foreground cycle, respect the 3-worker ceiling, preserve state, avoid owner gates, and leave objective evidence. An independent provider then grades the exact result.
+
+## 10. Memory and learning
 
 Three distinct stores:
 
 1. **Git/Markdown** — human-reviewable rules, skills and verified reusable lessons.
 2. **Project/personal state** — project-specific decisions, architecture, research context, blockers and sensitive domain context.
-3. **Ruflo/AgentDB/runtime database** — derived searchable index, task/run state, outcomes and retrieval support.
+3. **Derived runtime/vector memory** — searchable index/task outcomes/retrieval support when enabled.
 
-Only sanitized transferable lessons cross from project/personal memory into Major global memory. Secrets and client-specific/confidential state do not.
+Learning priority:
+
+`deterministic rule/tool → tested skill → memory`
+
+Only sanitized transferable lessons cross into global Major learning. Client/candidate/PII material never does.
 
 ## Communication adapters
 
-Major maintains one canonical communication contract (`guidance/communication-style.md`) and installs it into the global/user-rule mechanisms of Claude Code, Codex and Antigravity. Cursor receives it through Major-managed project instructions and its global User Rules.
+Major maintains one canonical communication contract and installs it into supported global/project instruction surfaces. Claude has a deterministic SessionStart hook; other hosts rely on their supported persistent instruction surfaces and must be field-verified rather than assumed equivalent.
 
 ## Delivery architecture
 
-For software, the default sequence is:
+Software:
 
 **fastest credible proof → P0 vertical slice → real critical path → evidence → expand/harden**
 
-For knowledge work, the equivalent is:
+Knowledge work:
 
 **decision → biggest uncertainty → minimum credible evidence → primary-source ingestion → analysis/skeptic → recommendation → act/learn**
 
-Mocks/fixtures are allowed behind explicit replaceable boundaries when they create faster visible progress. They must never be represented as live.
-
 ## Product-runtime boundary
 
-Major may build product-specific AI systems, but those shipped runtimes are not Major itself. Client/product runtimes should receive only the permissions, skills, memory and data needed for that product; they do not inherit Major Build's broad machine access or global memory.
+Major may build product-specific AI systems, but those shipped runtimes are not Major. Client/product runtimes receive only the permissions, skills, memory and data needed for that product.
 
 ## Legacy rule
 
-Git history is the archive. After a successor path is proven, obsolete v1 code, docs, configuration, names and flags are deleted from the active tree unless a real current consumer requires a temporary compatibility shim.
+Git history is the archive. After a successor path is independently validated on real output, obsolete v1 code/docs/config/flags are deleted from the active tree unless a real current consumer requires a temporary shim.
 
 ## Migration status
 
-This document describes the target Major 2.0 architecture. The current branch still contains portions of the Major v1 runtime while Ruflo-backed execution/provider adapters are implemented. The migration is incomplete until the cleanup gate in `docs/migrations/major-v2-legacy-receipt.md` passes.
+The thin-kernel runtime is **built**, not yet **ready**. The migration is incomplete until the JSS assist pilot and independent grade pass, then the old v1 runtime can be removed under `docs/migrations/major-v2-legacy-receipt.md`.

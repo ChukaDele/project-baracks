@@ -34,6 +34,7 @@ export interface SupervisorGoal {
   ownerGate?: string | undefined;
   activePid?: number | undefined;
   nextRunAt?: string | undefined;
+  lastCoordinator?: WorkerHost | undefined;
 }
 
 export interface SessionAttachment {

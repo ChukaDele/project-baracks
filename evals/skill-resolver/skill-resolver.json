@@ -1,0 +1,16 @@
+{
+  "skill": "skill-resolver",
+  "should_trigger": [
+    "Start this substantial feature and use the existing Major capabilities instead of inventing a new process.",
+    "Before you work on this research task, select the relevant installed skills and avoid loading unrelated ones.",
+    "Audit our recurring skills for duplicates, unreachable triggers and one broad skill shadowing a more specific one."
+  ],
+  "should_not_trigger": [
+    "Continue the exact small edit already in progress.",
+    "Run the single test command I just gave you.",
+    "Answer this simple factual question from the source already open."
+  ],
+  "conflicts": [
+    "project-start handles repository bootstrap; skill-resolver handles task-time capability selection after project context exists."
+  ]
+}

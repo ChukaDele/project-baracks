@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { executeMajorCommand } from '../security/major-gateway.js';
+import { globalStopRequested } from './policy.js';
 import type { WorkerHost } from './state.js';
 
 export interface WorkerOutcome {
@@ -89,6 +90,7 @@ export async function runGatewayCommand(input: {
   const started = Date.now();
   let stdout = '';
   try {
+    if (globalStopRequested()) throw new Error('Major global kill switch is active');
     const handle = executeMajorCommand({
       executable: input.executable,
       args: input.args,
@@ -103,23 +105,34 @@ export async function runGatewayCommand(input: {
       parseLine: (line) => ({ type: 'stdout', data: line }),
     });
 
-    for await (const event of handle.events) {
-      const text = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
-      stdout = appendLimited(stdout, `${text}\n`);
+    const stopWatcher = setInterval(() => {
+      if (globalStopRequested()) handle.cancel();
+    }, 1_000);
+    stopWatcher.unref();
+
+    try {
+      for await (const event of handle.events) {
+        const text = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+        stdout = appendLimited(stdout, `${text}\n`);
+      }
+      const outcome = await handle.outcome;
+      return {
+        status:
+          outcome.status === 'succeeded'
+            ? 'succeeded'
+            : outcome.status === 'timed_out'
+              ? 'timed_out'
+              : 'failed',
+        exitCode: outcome.exitCode,
+        stdout,
+        stderr:
+          outcome.stderrTail ??
+          (globalStopRequested() ? 'Major global kill switch cancelled execution.' : ''),
+        durationMs: Date.now() - started,
+      };
+    } finally {
+      clearInterval(stopWatcher);
     }
-    const outcome = await handle.outcome;
-    return {
-      status:
-        outcome.status === 'succeeded'
-          ? 'succeeded'
-          : outcome.status === 'timed_out'
-            ? 'timed_out'
-            : 'failed',
-      exitCode: outcome.exitCode,
-      stdout,
-      stderr: outcome.stderrTail ?? '',
-      durationMs: Date.now() - started,
-    };
   } catch (error) {
     return {
       status: 'failed',

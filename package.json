@@ -1,7 +1,7 @@
 {
   "name": "major",
-  "version": "0.3.0",
-  "description": "Major — default cross-project supervisor for autonomous multi-agent MVP delivery, verification and learning",
+  "version": "0.4.0",
+  "description": "Major — thin cross-project control plane with project-scoped trust, skill-first execution, verification and learning",
   "type": "module",
   "private": true,
   "bin": {
