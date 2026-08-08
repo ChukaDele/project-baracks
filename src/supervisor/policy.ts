@@ -23,6 +23,7 @@ export interface IndependentGrade {
   at: string;
   goalId?: string | undefined;
   kind: 'shadow' | 'execution';
+  trustAtGrade: TrustLevel;
 }
 
 export interface ProjectPolicy {
@@ -79,13 +80,17 @@ function emptyStore(): PolicyStore {
 }
 
 function normalizePolicy(policy: ProjectPolicy): ProjectPolicy {
-  return {
+  const normalized = {
     ...policy,
     maxRunMinutes: policy.maxRunMinutes ?? limitsFor(policy.trust).maxRunMinutes,
     allowPaidSpend: policy.allowPaidSpend ?? false,
     shadowRuns: policy.shadowRuns ?? 0,
     shadowPasses: policy.shadowPasses ?? 0,
   };
+  if (normalized.lastGrade && normalized.lastGrade.trustAtGrade === undefined) {
+    normalized.lastGrade = { ...normalized.lastGrade, trustAtGrade: policy.trust };
+  }
+  return normalized;
 }
 
 function readStore(): PolicyStore {
@@ -152,7 +157,8 @@ export function configureProjectPolicy(input: {
     if (
       existing?.trust !== 'assist' ||
       existing.lastGrade?.kind !== 'execution' ||
-      existing.lastGrade.result !== 'pass'
+      existing.lastGrade.result !== 'pass' ||
+      existing.lastGrade.trustAtGrade !== 'assist'
     ) {
       throw new Error(
         `cannot promote ${input.project} to build: it must first run at assist and pass an independent execution grade`,
@@ -163,7 +169,8 @@ export function configureProjectPolicy(input: {
     if (
       existing?.trust !== 'build' ||
       existing.lastGrade?.kind !== 'execution' ||
-      existing.lastGrade.result !== 'pass'
+      existing.lastGrade.result !== 'pass' ||
+      existing.lastGrade.trustAtGrade !== 'build'
     ) {
       throw new Error(
         `cannot promote ${input.project} to unattended: it must first run at build and pass a fresh independent execution grade`,
@@ -213,6 +220,7 @@ function storeGrade(input: {
     evidence: input.evidence,
     at: new Date().toISOString(),
     kind: input.kind,
+    trustAtGrade: current.trust,
     ...(input.goalId ? { goalId: input.goalId } : {}),
   };
   const next: ProjectPolicy = {
