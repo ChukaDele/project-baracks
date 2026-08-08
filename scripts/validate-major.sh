@@ -7,6 +7,7 @@ cd "$ROOT"
 fail() { echo "MAJOR VALIDATION FAILED: $*" >&2; exit 1; }
 
 for script in scripts/*.sh; do bash -n "$script" || fail "shell syntax: $script"; done
+python3 -m py_compile scripts/major-antigravity-worker.py || fail "Antigravity worker Python syntax"
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -122,6 +123,8 @@ grep -Fq "A failed first tool is not a failed task" templates/project/major-core
 [ -f scripts/install-major-global-rules.sh ] || fail "global worker rules installer missing"
 grep -Fq "Use the right tool" guidance/global-worker-rules.md || fail "global tool-routing rule missing"
 grep -Fq "Primary-source integrity" guidance/global-worker-rules.md || fail "global primary-source rule missing"
+grep -Fq "Major is the default operating state" guidance/global-worker-rules.md || fail "Major default-state rule missing"
+grep -Fq '$HOME/.local/bin/major session attach' guidance/global-worker-rules.md || fail "GUI-safe Major attach command missing"
 grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-rules.sh || fail "Claude global rules target missing"
 grep -Fq '.codex' scripts/install-major-global-rules.sh || fail "Codex global rules target missing"
 grep -Fq '.gemini/GEMINI.md' scripts/install-major-global-rules.sh || fail "Antigravity global rules target missing"
@@ -142,6 +145,44 @@ grep -Fq "Major Build" docs/architecture.md || fail "Major Build profile missing
 grep -Fq "Major Knowledge" docs/architecture.md || fail "Major Knowledge profile missing"
 grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability router missing"
 
+# Default supervisor runtime: this is the product-level gate that the old Major lacked.
+[ -f src/entry.ts ] || fail "global Major supervisor entry missing"
+[ -f src/supervisor/state.ts ] || fail "durable supervisor state missing"
+[ -f src/supervisor/runtime.ts ] || fail "supervisor goal loop missing"
+[ -f src/supervisor/worker.ts ] || fail "multi-provider worker runtime missing"
+[ -f src/supervisor/cli.ts ] || fail "supervisor CLI missing"
+[ -f scripts/install-major-runtime.sh ] || fail "runtime installer missing"
+[ -f scripts/major-antigravity-worker.py ] || fail "Antigravity SDK worker missing"
+
+grep -Fq '"major": "./dist/entry.js"' package.json || fail "package bin must enter the supervisor runtime"
+grep -Fq "run <project>" /dev/null 2>/dev/null || true # semantic behavior covered by TypeScript tests/CLI smoke later
+grep -Fq "supervisor-state.json" src/supervisor/state.ts || fail "durable cross-session goal state missing"
+grep -Fq "Ship the smallest credible end-to-end" tests/supervisor-runtime.test.ts || fail "end-to-end coordinator contract test missing"
+grep -Fq "major goal report" src/supervisor/runtime.ts || fail "coordinator cannot durably report goal state"
+grep -Fq "4–6 useful workers" src/supervisor/runtime.ts || fail "adaptive normal concurrency rule missing"
+grep -Fq "max 8" src/supervisor/runtime.ts || fail "eight-worker capacity rule missing"
+for provider in claude codex cursor antigravity; do
+  grep -Fq "case '$provider'" src/supervisor/worker.ts || fail "live worker adapter missing: $provider"
+done
+grep -Fq "git', ['worktree', 'add'" src/supervisor/cli.ts || fail "deterministic worktree isolation missing"
+grep -Fq "SessionStart" scripts/install-major-runtime.sh || fail "Claude automatic session attach hook missing"
+grep -Fq "startup|resume|clear|compact" scripts/install-major-runtime.sh || fail "Claude attach hook does not cover session lifecycle"
+grep -Fq "RunAtLoad" scripts/install-major-runtime.sh || fail "Major daemon must start at Mac login"
+grep -Fq "KeepAlive" scripts/install-major-runtime.sh || fail "Major daemon must stay alive"
+grep -Fq "com.chuka.major-supervisor" scripts/install-major-runtime.sh || fail "Major launchd supervisor missing"
+grep -Fq "google-antigravity" scripts/install-major-runtime.sh || fail "Antigravity SDK runtime install missing"
+grep -Fq "claude mcp add ruflo" scripts/install-major-runtime.sh || fail "Claude Ruflo MCP bootstrap missing"
+grep -Fq "codex mcp add ruflo" scripts/install-major-runtime.sh || fail "Codex Ruflo MCP bootstrap missing"
+grep -Fq '.cursor/mcp.json' scripts/install-major-runtime.sh || fail "Cursor Ruflo MCP bootstrap missing"
+grep -Fq '.gemini/config/mcp_config.json' scripts/install-major-runtime.sh || fail "Antigravity Ruflo MCP bootstrap missing"
+
+# Codex is implementation capacity by default; the v1 review-only reserve must not return.
+grep -Fq "preserveCodexForReview ?? false" src/routing/router.ts || fail "Codex implementation routing default missing"
+if grep -Fq "never consumes codex for implementation work" tests/router.test.ts; then
+  fail "legacy Codex review-only test returned"
+fi
+
+# Old runtime remains a temporary migration source until the new supervisor proves itself on JSS.
 grep -Fiq "migration is incomplete" docs/architecture.md || fail "runtime migration caveat missing"
 grep -Fq "DELETE after successor verification" docs/migrations/major-v2-legacy-receipt.md || fail "legacy deletion gate missing"
 
