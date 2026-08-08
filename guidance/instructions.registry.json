@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "entries": [
     {
       "id": "instruction-precedence",
@@ -9,13 +9,25 @@
     },
     {
       "id": "security-and-permissions",
-      "title": "Security and permissions rules",
+      "title": "Risk-proportional security and permissions rules",
       "path": "guidance/security-and-permissions.md",
       "status": "active"
     },
     {
+      "id": "mvp-speed-and-prioritisation",
+      "title": "MVP speed, prototype-first and prioritisation rules",
+      "path": "guidance/mvp-speed-and-prioritisation.md",
+      "status": "active"
+    },
+    {
+      "id": "ui-patterns-and-reuse",
+      "title": "UI patterns, Figma prototyping, competitor learning and reuse rules",
+      "path": "guidance/ui-patterns-and-reuse.md",
+      "status": "active"
+    },
+    {
       "id": "task-scope",
-      "title": "Task-scope rules",
+      "title": "Outcome-oriented task-scope rules",
       "path": "guidance/task-scope.md",
       "status": "active"
     },
