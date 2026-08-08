@@ -31,7 +31,10 @@ describe('Major coordinator contract', () => {
     const repo = mkdtempSync(join(tmpdir(), 'major-runtime-'));
     roots.push(repo);
     mkdirSync(join(repo, '.git'));
-    writeFileSync(join(repo, 'GOAL_STATE.md'), '# Goal state\nCurrent P0: source → assess → tailor.\n');
+    writeFileSync(
+      join(repo, 'GOAL_STATE.md'),
+      '# Goal state\nCurrent P0: source → assess → tailor.\n',
+    );
     writeFileSync(join(repo, 'AGENTS.md'), '# Project contract\nContinue through safe blockers.\n');
 
     const prompt = coordinatorPrompt(goal(repo));
