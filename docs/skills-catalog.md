@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 21
+## Major internal skills — 23
 
 These are canonical Major-owned skills.
 
@@ -13,6 +13,8 @@ These are canonical Major-owned skills.
 | `project-start` | Start a new/existing repo from outcome, current state and fastest proof. |
 | `mvp-speed-prioritisation` | Reduce large briefs to P0 MVP / P1 / P2 and build P0 end to end. |
 | `legacy-cleanup` | Finish migrations with one canonical path and remove stale active artefacts. |
+| `source-ingestion` | Retrieve named primary sources with the right connector/CLI/browser/local tool before analysis. |
+| `knowledge-work` | Research/strategy/synthesis with minimum credible evidence, independent angles and skeptic review where justified. |
 | `competitive-product-audit` | Learn direct/adjacent product patterns before reinventing workflows. |
 | `open-source-leverage` | Reuse/adapt/wrap maintained systems before commodity rebuilds. |
 | `simple-modular-code` | Small replaceable modules; stable contracts; simple code. |
@@ -74,11 +76,26 @@ If Emil adds/removes skills later, the installer records the upstream commit and
 
 - `graph-engineering` from `codejunkie99/graph-engineering` — load only when Major's lean graph skill is insufficient and the workflow genuinely needs deeper graph modeling/orchestration.
 
-## Default project profiles
+## Major tool providers
+
+These are tools/capability packs, not policy authorities and not necessarily agent skills.
+
+| Tool | Use | Major rule |
+|---|---|---|
+| MacWhisper `mw` | Local audio/video transcription | Prefer local transcription; already installed on Chuka's Mac. |
+| `yt-dlp` | YouTube/media metadata, subtitles and audio extraction | Captions first; audio + MacWhisper fallback. |
+| GStack | Dynamic/authenticated browser work, scraping and codifying repeated browser procedures | Install namespaced; proactive routing and telemetry off; Major remains the router. |
+| Native connectors/APIs | GitHub, Google, Figma, mail/calendar etc. | Prefer over browser scraping when available. |
+
+## Default project / work profiles
 
 ### `core`
 
 All Major internal skills. Heavy bodies remain trigger-loaded.
+
+### `knowledge`
+
+`core` with knowledge-work semantics: `source-ingestion` + `knowledge-work` route named sources through native/deterministic tools, scale research by stakes and use a skeptic/reviewer where useful. GStack/yt-dlp/MacWhisper are machine capabilities installed separately, not copied into every project prompt.
 
 ### `web-ui`
 
@@ -90,6 +107,8 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### Specialist triggers
 
+- Named URL/video/file/source → `source-ingestion`.
+- Substantial research/strategy/comparison → `knowledge-work`.
 - Figma work → Figma skill set.
 - MCP work → `mcp-builder`.
 - Skill authoring → `skill-creator`.
@@ -117,3 +136,5 @@ The installer must:
 4. verify every installed directory contains `SKILL.md`;
 5. generate `MAJOR_SKILLS.lock`;
 6. never claim a profile is installed when validation fails.
+
+Tool setup must separately verify machine capabilities such as `mw`, `yt-dlp` and GStack rather than pretending that a skill file means the executable exists.

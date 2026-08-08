@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -7,12 +7,15 @@
     "externalSkillsAreSubordinateToMajorGuidance": true,
     "fullEmilBundle": true,
     "mvpIsDefault": true,
-    "legacyCleanupRequired": true
+    "legacyCleanupRequired": true,
+    "primarySourceBeforeReconstruction": true
   },
   "entries": [
     {"id":"project-start","source":"major-internal","availability":"all-projects","load":"project-start"},
     {"id":"mvp-speed-prioritisation","source":"major-internal","availability":"all-projects","load":"always-on-project-and-large-feature-planning"},
     {"id":"legacy-cleanup","source":"major-internal","availability":"all-projects","load":"rename-migration-provider-swap-architecture-replacement"},
+    {"id":"source-ingestion","source":"major-internal","availability":"all-projects","load":"named-url-file-video-audio-document-primary-source"},
+    {"id":"knowledge-work","source":"major-internal","availability":"all-projects","load":"research-strategy-synthesis-comparison-decision-work"},
     {"id":"competitive-product-audit","source":"major-internal","availability":"all-projects","load":"project-start-or-material-product-work"},
     {"id":"open-source-leverage","source":"major-internal","availability":"all-projects","load":"project-start-or-commodity-build"},
     {"id":"simple-modular-code","source":"major-internal","availability":"all-projects","load":"architecture-or-implementation"},

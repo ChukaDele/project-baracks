@@ -13,8 +13,8 @@ LOCK="$TARGET/MAJOR_SKILLS.lock"
 TMP="${TMPDIR:-/tmp}/major-skills-$$"
 
 case "$PROFILE" in
-  core|web-ui|exploratory|full) ;;
-  *) echo "ERROR: profile must be core, web-ui, exploratory, or full" >&2; exit 2 ;;
+  core|knowledge|web-ui|exploratory|full) ;;
+  *) echo "ERROR: profile must be core, knowledge, web-ui, exploratory, or full" >&2; exit 2 ;;
 esac
 
 mkdir -p "$AGENT_SKILLS" "$CLAUDE_SKILLS" "$CODEX_SKILLS" "$TMP"

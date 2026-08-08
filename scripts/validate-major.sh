@@ -35,7 +35,8 @@ for e in entries:
     if not Path(e['path']).is_file():
         raise SystemExit(f"missing guidance file: {e['path']}")
 required = {
-    'communication-style', 'mvp-speed-and-prioritisation', 'autonomy-and-progress',
+    'communication-style', 'tool-routing-and-source-ingestion',
+    'mvp-speed-and-prioritisation', 'autonomy-and-progress',
     'legacy-cleanup', 'security-and-permissions', 'ui-patterns-and-reuse',
     'task-scope', 'model-routing', 'human-approval', 'roadmap-sync'
 }
@@ -61,21 +62,32 @@ if registered_internal != actual_internal:
         f"missing from registry: {sorted(actual_internal-registered_internal)}\n"
         f"missing on disk: {sorted(registered_internal-actual_internal)}"
     )
+for required_skill in ['source-ingestion', 'knowledge-work']:
+    if required_skill not in registered_internal:
+        raise SystemExit(f"required Major Knowledge skill missing: {required_skill}")
 policy = reg.get('policy', {})
-for key in ['installedDoesNotMeanLoaded','externalSkillsAreSubordinateToMajorGuidance','fullEmilBundle','mvpIsDefault','legacyCleanupRequired']:
+for key in [
+    'installedDoesNotMeanLoaded',
+    'externalSkillsAreSubordinateToMajorGuidance',
+    'fullEmilBundle',
+    'mvpIsDefault',
+    'legacyCleanupRequired',
+    'primarySourceBeforeReconstruction',
+]:
     if policy.get(key) is not True:
         raise SystemExit(f"required skill policy not enabled: {key}")
 PY
 
-# 4. Deleted v1 documents/project-specific core examples must not return.
+# 4. Deleted v1 documents/project-specific core examples and superseded installers must not return.
 for path in \
   docs/deferred-security-milestones.md \
   docs/provider-routing.md \
   docs/security-model.md \
   docs/surface-talent-integration.md \
   docs/roadmap-sync.md \
-  examples/surface-talent.project.json; do
-  [ ! -e "$path" ] || fail "obsolete v1 file returned: $path"
+  examples/surface-talent.project.json \
+  scripts/install-major-global-style.sh; do
+  [ ! -e "$path" ] || fail "obsolete file returned: $path"
 done
 
 # 5. Stale concepts must not appear in active rules/templates/README/PR template.
@@ -96,6 +108,8 @@ grep -Fq "MVP is the default delivery strategy" guidance/mvp-speed-and-prioritis
 grep -Fq "Git history is the audit archive" guidance/instruction-precedence.md || fail "clean supersession doctrine missing"
 grep -Fiq "continue until" guidance/autonomy-and-progress.md || fail "continue-until autonomy doctrine missing"
 grep -Fq "ASD-STE100-inspired" guidance/communication-style.md || fail "communication standard missing"
+grep -Fq "A failed first tool is not a failed task" guidance/tool-routing-and-source-ingestion.md || fail "tool fallback doctrine missing"
+grep -Fq "Do not search for articles about the video" guidance/tool-routing-and-source-ingestion.md || fail "YouTube primary-source guard missing"
 grep -Fq "complete current upstream bundle" docs/skills-catalog.md || fail "full Emil bundle policy missing"
 grep -Fq "Remove only skills previously installed by Major" scripts/install-major-skills.sh || fail "stale skill cleanup missing"
 
@@ -109,14 +123,34 @@ fi
 [ -f scripts/bootstrap-major-project.sh ] || fail "project bootstrap missing"
 grep -Fq "AGENTS.md" scripts/bootstrap-major-project.sh || fail "provider-neutral AGENTS bootstrap missing"
 grep -Fq "install-major-skills.sh" scripts/bootstrap-major-project.sh || fail "skill-profile bootstrap missing"
+grep -Fq "core|knowledge|web-ui|exploratory|full" scripts/install-major-skills.sh || fail "knowledge profile missing from skill installer"
+grep -Fq "A failed first tool is not a failed task" templates/project/major-core.md || fail "project tool-routing rule missing"
 
-# 9. Cross-tool global style installer must cover the supported global-rule surfaces.
-[ -f scripts/install-major-global-style.sh ] || fail "global communication installer missing"
-grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-style.sh || fail "Claude global style target missing"
-grep -Fq '.codex' scripts/install-major-global-style.sh || fail "Codex global style target missing"
-grep -Fq '.gemini/GEMINI.md' scripts/install-major-global-style.sh || fail "Antigravity global style target missing"
+# 9. Cross-tool global rules must cover communication + tool/source routing.
+[ -f guidance/global-worker-rules.md ] || fail "compact global worker rules missing"
+[ -f scripts/install-major-global-rules.sh ] || fail "global worker rules installer missing"
+grep -Fq "Use the right tool" guidance/global-worker-rules.md || fail "global tool-routing rule missing"
+grep -Fq "Primary-source integrity" guidance/global-worker-rules.md || fail "global primary-source rule missing"
+grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-rules.sh || fail "Claude global rules target missing"
+grep -Fq '.codex' scripts/install-major-global-rules.sh || fail "Codex global rules target missing"
+grep -Fq '.gemini/GEMINI.md' scripts/install-major-global-rules.sh || fail "Antigravity global rules target missing"
+grep -Fq "Cursor" scripts/install-major-global-rules.sh || fail "Cursor global rule handoff missing"
 
-# 10. Migration must stay explicitly incomplete until the old runtime is actually replaced.
+# 10. Knowledge tool routing must have a real deterministic YouTube path and tool doctor.
+[ -f scripts/major-ingest-youtube.sh ] || fail "YouTube ingestion script missing"
+[ -f scripts/setup-major-knowledge-tools.sh ] || fail "knowledge tool setup/doctor missing"
+grep -Fq "yt-dlp" scripts/major-ingest-youtube.sh || fail "YouTube ingestion missing yt-dlp"
+grep -Fq "mw transcribe" scripts/major-ingest-youtube.sh || fail "YouTube ingestion missing MacWhisper fallback"
+grep -Fq -- "--prefix" scripts/setup-major-knowledge-tools.sh || fail "GStack namespacing missing"
+grep -Fq "proactive false" scripts/setup-major-knowledge-tools.sh || fail "GStack proactive routing must be disabled under Major"
+grep -Fq "telemetry off" scripts/setup-major-knowledge-tools.sh || fail "GStack telemetry default must be off under Major setup"
+
+# 11. Architecture must preserve one kernel / profile separation and source-tool boundary.
+grep -Fq "Major Build" docs/architecture.md || fail "Major Build profile missing"
+grep -Fq "Major Knowledge" docs/architecture.md || fail "Major Knowledge profile missing"
+grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability router missing"
+
+# 12. Migration must stay explicitly incomplete until the old runtime is actually replaced.
 grep -Fiq "migration is incomplete" docs/architecture.md || fail "runtime migration caveat missing"
 grep -Fq "DELETE after successor verification" docs/migrations/major-v2-legacy-receipt.md || fail "legacy deletion gate missing"
 
