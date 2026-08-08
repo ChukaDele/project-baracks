@@ -1,9 +1,9 @@
 {
-  "version": 2,
+  "version": 3,
   "entries": [
     {
       "id": "instruction-precedence",
-      "title": "Instruction precedence rules",
+      "title": "Instruction precedence and clean supersession rules",
       "path": "guidance/instruction-precedence.md",
       "status": "active"
     },
@@ -15,13 +15,19 @@
     },
     {
       "id": "mvp-speed-and-prioritisation",
-      "title": "MVP speed, prototype-first and prioritisation rules",
+      "title": "Proof-first MVP speed and prioritisation rules",
       "path": "guidance/mvp-speed-and-prioritisation.md",
       "status": "active"
     },
     {
+      "id": "legacy-cleanup",
+      "title": "Legacy cleanup and canonical-path rules",
+      "path": "guidance/legacy-cleanup.md",
+      "status": "active"
+    },
+    {
       "id": "ui-patterns-and-reuse",
-      "title": "UI patterns, Figma prototyping, competitor learning and reuse rules",
+      "title": "UI competitor learning, rapid proof and component reuse rules",
       "path": "guidance/ui-patterns-and-reuse.md",
       "status": "active"
     },
