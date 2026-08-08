@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -8,12 +8,17 @@
     "fullEmilBundle": true,
     "mvpIsDefault": true,
     "legacyCleanupRequired": true,
-    "primarySourceBeforeReconstruction": true
+    "primarySourceBeforeReconstruction": true,
+    "skillifyReusableProcedures": true,
+    "toolsAsCodeForRepeatedDeterministicWork": true
   },
   "entries": [
     {"id":"project-start","source":"major-internal","availability":"all-projects","load":"project-start"},
     {"id":"mvp-speed-prioritisation","source":"major-internal","availability":"all-projects","load":"always-on-project-and-large-feature-planning"},
     {"id":"legacy-cleanup","source":"major-internal","availability":"all-projects","load":"rename-migration-provider-swap-architecture-replacement"},
+    {"id":"skill-resolver","source":"major-internal","availability":"all-projects","load":"start-of-substantive-work-select-relevant-skills"},
+    {"id":"skillify","source":"major-internal","availability":"all-projects","load":"reusable-successful-procedure-or-recurring-solved-failure"},
+    {"id":"tools-as-code","source":"major-internal","availability":"all-projects","load":"repeated-retrieval-filter-dedupe-rank-transform-tool-composition"},
     {"id":"source-ingestion","source":"major-internal","availability":"all-projects","load":"named-url-file-video-audio-document-primary-source"},
     {"id":"knowledge-work","source":"major-internal","availability":"all-projects","load":"research-strategy-synthesis-comparison-decision-work"},
     {"id":"competitive-product-audit","source":"major-internal","availability":"all-projects","load":"project-start-or-material-product-work"},
