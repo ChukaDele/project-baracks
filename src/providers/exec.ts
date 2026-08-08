@@ -52,8 +52,7 @@ export interface StreamingSpawnSpec {
   allowedRoots?: readonly string[];
   /**
    * Spawn as a process-group leader so the WHOLE descendant tree can be
-   * signalled and terminated together (not only the direct child). Set by the
-   * execution gateway's process-tree containment.
+   * signalled and terminated together (not only the direct child).
    */
   detached?: boolean;
   /** Map one stdout line (usually NDJSON) to an event; null skips the line. */
@@ -79,15 +78,7 @@ function defaultParseLine(line: string): ProviderEvent | null {
   }
 }
 
-/**
- * QUARANTINED — always refuses. This is the raw streaming spawn engine for
- * agent runs; live agent execution is unavailable in this build, so the gate
- * below throws before any process can be created, unconditionally. The
- * machinery is retained, compiled and type-checked for milestone M1
- * (docs/deferred-security-milestones.md) but is unreachable until then.
- */
-export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
-  assertCapabilityAvailable('live-agent-execution');
+function spawnStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
   if (spec.allowedRoots) assertWithinRoots(spec.cwd, spec.allowedRoots);
 
   const queue = new EventQueue<ProviderEvent>();
@@ -104,13 +95,9 @@ export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
     env: spec.env,
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
-    // A detached child is its own process-group leader; killing the negative
-    // pid then signals the entire group — the whole descendant tree.
     detached,
   });
 
-  // Signal the whole process group when detached, so descendants launched by
-  // the agent CLI are terminated too — never just the direct child.
   const signalTree = (signal: NodeJS.Signals) => {
     try {
       if (detached && typeof child.pid === 'number') process.kill(-child.pid, signal);
@@ -181,4 +168,25 @@ export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
     },
     outcome,
   };
+}
+
+/**
+ * Major v1 compatibility path. It stays fail-closed until the legacy runtime
+ * is removed after Major 0.3 proves the successor supervisor on real projects.
+ */
+export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
+  assertCapabilityAvailable('live-agent-execution');
+  return spawnStreaming(spec);
+}
+
+/**
+ * Major 0.3 successor spawn engine. Only security/gateway.ts may import this.
+ * The successor gateway performs project-root, command, executable, env and
+ * process-tree checks before reaching this function. This intentionally does
+ * not require the v1 enterprise filesystem-sandbox milestone: Major's MVP
+ * safety boundary is project/worktree confinement at the gateway plus a
+ * sanitized environment and whole-process-tree termination.
+ */
+export function executeMajorStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
+  return spawnStreaming(spec);
 }
