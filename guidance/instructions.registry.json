@@ -14,6 +14,12 @@
       "status": "active"
     },
     {
+      "id": "readiness-and-independent-validation",
+      "title": "Built, validated, ready and independent-grader rules",
+      "path": "guidance/readiness-and-independent-validation.md",
+      "status": "active"
+    },
+    {
       "id": "tool-routing-and-source-ingestion",
       "title": "Tool routing, fallback and primary-source ingestion rules",
       "path": "guidance/tool-routing-and-source-ingestion.md",
