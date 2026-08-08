@@ -46,6 +46,7 @@ function kickGoal(goalId: string): void {
     stdio: 'ignore',
     env: process.env,
   });
+  if (child.pid) updateGoal(goalId, { activePid: child.pid, status: 'running' });
   child.unref();
 }
 
@@ -99,7 +100,6 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       status: statusRaw as GoalStatus,
       lastSummary: summary,
       lastFinishedAt: new Date().toISOString(),
-      activePid: undefined,
       ownerGate,
     };
     updateGoal(id, patch);
