@@ -100,6 +100,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       trust,
       ...(hasFlag(args, '--allow-external-writes') ? { allowExternalWrites: true } : {}),
       ...(hasFlag(args, '--allow-paid-spend') ? { allowPaidSpend: true } : {}),
+      ...(hasFlag(args, '--owner-approved') ? { ownerApprovedBuild: true } : {}),
     });
     console.log(JSON.stringify(policy, null, 2));
     return true;
@@ -194,7 +195,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     console.log(`project: ${goal.project}`);
     console.log(`repo: ${goal.repoPath}`);
     console.log(
-      `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} maxRunMinutes=${policy.maxRunMinutes}`,
+      `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} maxRunMinutes=${policy.maxRunMinutes} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}`,
     );
     console.log(`autonomous: ${goal.autonomous ? 'yes' : 'no'}`);
 
@@ -206,7 +207,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       }
       console.log('mode: SHADOW / OBSERVE');
       console.log(
-        `Major will not dispatch workers. In the active agent session, produce a "MAJOR SHADOW PLAN" for this goal, then have a different provider grade that plan against the work actually performed. Three consecutive passing shadow grades are required before assist mode can be enabled.`,
+        `Major will not dispatch workers. In the active agent session, produce a "MAJOR SHADOW PLAN" for this goal, then have a different provider grade that plan against the work actually performed. Three consecutive passing shadow grades are required before assist mode can be enabled unless the owner explicitly fast-tracks the project to build with --owner-approved.`,
       );
       return true;
     }
@@ -275,7 +276,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       : 'No git project detected in this session.';
     const policy = project ? getProjectPolicy(project.project, project.repoPath) : undefined;
     console.log(
-      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers}\n` : ''}${active}\n\nMajor being present does not imply autonomous authority. In observe mode, do not dispatch workers: create a MAJOR SHADOW PLAN and let the human/gstack driver perform the work. Preserve the user outcome as the durable goal.`,
+      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}\n` : ''}${active}\n\nMajor is the default control plane. Execute within the current project policy. Owner-approved build projects may coordinate normal reversible engineering work immediately; client data remains project-local and destructive/irreversible owner gates still apply.`,
     );
     return true;
   }
