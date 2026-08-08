@@ -1,10 +1,16 @@
 {
-  "version": 4,
+  "version": 5,
   "entries": [
     {
       "id": "instruction-precedence",
       "title": "Instruction precedence and clean supersession rules",
       "path": "guidance/instruction-precedence.md",
+      "status": "active"
+    },
+    {
+      "id": "communication-style",
+      "title": "BLUF and simplified technical communication style",
+      "path": "guidance/communication-style.md",
       "status": "active"
     },
     {
