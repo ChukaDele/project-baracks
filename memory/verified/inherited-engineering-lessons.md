@@ -36,3 +36,17 @@ These are reusable cross-project lessons promoted into Major. Project-specific b
 32. Reuse maintained UI primitives such as shadcn for commodity product components; spend custom effort on differentiated workflow/value.
 33. After two materially unchanged failed approaches, change strategy rather than repeat.
 34. Optimise subscription/rate-limit capacity and time-to-verified-outcome, not token count in isolation.
+35. Agent loops should preserve durable goal/task state while allowing fresh execution contexts so long conversations do not become the only source of truth.
+36. A loop continues until explicit acceptance criteria are met, a genuine owner gate is reached, or no productive alternative remains — not merely until one subtask completes.
+37. Each meaningful loop iteration should produce evidence and update durable progress/state rather than relying on conversational memory.
+38. Provider/model assignments are hypotheses until measured; preserve a working route while trialling alternatives on bounded tasks.
+39. Keep Major provider-neutral: canonical project instructions and contracts should not depend on one coding vendor; provider-specific logic belongs in thin adapters.
+40. Independent review is valuable but does not replace tests, runtime evidence or exact-state verification.
+41. Consequential review should bind to the exact immutable head/artefact being approved; material changes invalidate stale review.
+42. Do not claim an external system changed because a local file/JSON says so; require observable provider/runtime confirmation.
+43. Canonical external systems need explicit ownership/single-writer discipline when competing writes could corrupt truth.
+44. Permission policy and execution mode must not contradict each other; avoid a nominally restricted harness that silently bypasses its own controls.
+45. Strong preparation, explicit task contracts, isolated worktrees and visible Git/diff/PR state materially improve autonomous agent performance.
+46. Challenge misleading benchmarks with first-principles estimates and measured project outcomes; do not optimise to vanity benchmark claims.
+47. Map the real workflow, handoffs, tools and exception paths before automating a process deeply, while still proving the critical path with the smallest MVP.
+48. Reusable skills, templates and automation compound speed and should be promoted into Major when they repeatedly save effort.
