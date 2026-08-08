@@ -2,10 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  configureProjectPolicy,
-  recordShadowGrade,
-} from '../src/supervisor/policy.js';
+import { configureProjectPolicy, recordShadowGrade } from '../src/supervisor/policy.js';
 import { coordinatorPrompt } from '../src/supervisor/runtime.js';
 import type { SupervisorGoal } from '../src/supervisor/state.js';
 
