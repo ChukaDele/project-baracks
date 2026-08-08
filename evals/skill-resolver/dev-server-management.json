@@ -1,0 +1,17 @@
+{
+  "skill": "dev-server-management",
+  "should_trigger": [
+    "Start the Bredge app locally and open the browser preview without colliding with JSS.",
+    "Use another localhost port because 3001 is already used by another project.",
+    "Run Playwright against this project's local dev server while Surface Talent is also running."
+  ],
+  "should_not_trigger": [
+    "What is the default PostgreSQL port?",
+    "Explain the difference between localhost and 127.0.0.1.",
+    "Deploy the existing preview to Vercel production."
+  ],
+  "conflicts": [
+    "webapp-testing/playwright own browser test technique; dev-server-management owns stable local server/port coordination.",
+    "root-cause-qa owns diagnosis of a broken app; dev-server-management owns the shared local runtime resource."
+  ]
+}
