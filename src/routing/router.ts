@@ -12,19 +12,12 @@ export interface RoutingRequest {
   implementedByProvider?: string;
   /** Prior failed repair attempts on this task; drives escalation. */
   repairAttempts?: number;
-  /**
-   * Explicit human approval to spend usage credits or API billing: the id of
-   * an APPROVED 'paid_usage' DecisionRequest, verified by the caller against
-   * the database (see domain/decision-service.ts#isApprovedDecision). A bare
-   * boolean is deliberately not accepted. In this build the reference can
-   * never produce a paid route: paid provider execution is an unavailable
-   * capability, so the router checkpoints instead (milestone M2).
-   */
+  /** Explicit approval for paid capacity. Subscription-included capacity needs none. */
   approvedPaidUsage?: { decisionId: string };
 }
 
 export interface RoutingOptions {
-  /** Keep Codex capacity for independent review (default true). */
+  /** Optional escape hatch for a project that explicitly wants to reserve Codex. Default false. */
   preserveCodexForReview?: boolean;
 }
 
@@ -41,27 +34,27 @@ export type RoutingDecision =
       routingClass: RoutingClass;
       billingMode: BillingMode;
       reason: string;
-      /** The approving DecisionRequest, present iff the route is paid. */
       paidUsageDecisionId?: string;
-      /** Set when review independence was lost (same-provider review). */
       independenceLoss?: string;
     }
   | {
       kind: 'checkpoint';
       reason: string;
-      /** Paid options that exist but were not authorised. */
       paidOptionsAvailable: Candidate[];
     };
 
 const FREE_BILLING: BillingMode = 'subscription_included';
 
-/** Preference ladder per target class. Never silently climbs INTO fable for
- * routine work, and never falls below sonnet-class quality floors. */
+/**
+ * Preference ladders. Codex is normal implementation capacity, not a review-only reserve.
+ * The router still prefers the requested Claude quality class first where available and
+ * uses Codex as a strong subscription-backed fallback before dropping below the intended class.
+ */
 const LADDERS: Record<Exclude<RoutingClass, 'unknown'>, RoutingClass[]> = {
-  fable: ['fable', 'opus', 'sonnet'],
-  opus: ['opus', 'fable', 'sonnet'],
-  sonnet: ['sonnet', 'opus'],
-  codex: ['codex'],
+  fable: ['fable', 'opus', 'codex', 'sonnet'],
+  opus: ['opus', 'fable', 'codex', 'sonnet'],
+  sonnet: ['sonnet', 'codex', 'opus'],
+  codex: ['codex', 'opus', 'sonnet', 'fable'],
 };
 
 function escalate(target: Exclude<RoutingClass, 'unknown' | 'codex'>): typeof target {
@@ -70,7 +63,6 @@ function escalate(target: Exclude<RoutingClass, 'unknown' | 'codex'>): typeof ta
   return 'fable';
 }
 
-/** Map task shape to the routing class the quality policy asks for. */
 export function targetClass(request: RoutingRequest): Exclude<RoutingClass, 'unknown' | 'codex'> {
   let target: Exclude<RoutingClass, 'unknown' | 'codex'>;
   if (request.riskLevel === 'security_sensitive' || request.riskLevel === 'high') {
@@ -83,7 +75,6 @@ export function targetClass(request: RoutingRequest): Exclude<RoutingClass, 'unk
   } else {
     target = 'sonnet';
   }
-  // Repeated failure escalates one class per two failed repair attempts.
   const escalations = Math.min(2, Math.floor((request.repairAttempts ?? 0) / 2));
   for (let i = 0; i < escalations; i++) target = escalate(target);
   return target;
@@ -96,7 +87,6 @@ function usable(candidate: Candidate): boolean {
     m.authenticated &&
     !m.prohibited &&
     m.availability === 'available' &&
-    // Unknown billing is unroutable: we cannot prove the run would be free.
     m.billingMode !== 'unknown'
   );
 }
@@ -111,12 +101,11 @@ function pickFromLadder(
   request: RoutingRequest,
   options: RoutingOptions,
 ): { free?: Candidate; paid: Candidate[] } {
-  const preserveCodex = options.preserveCodexForReview ?? true;
+  const preserveCodex = options.preserveCodexForReview ?? false;
   const paid: Candidate[] = [];
   for (const cls of ladder) {
     for (const candidate of candidates) {
       if (candidate.model.routingClass !== cls || !usable(candidate)) continue;
-      // Codex reserve: outside review, do not consume Codex capacity.
       if (
         preserveCodex &&
         candidate.model.routingClass === 'codex' &&
@@ -124,9 +113,7 @@ function pickFromLadder(
       ) {
         continue;
       }
-      if (candidate.model.billingMode === FREE_BILLING) {
-        return { free: candidate, paid };
-      }
+      if (candidate.model.billingMode === FREE_BILLING) return { free: candidate, paid };
       paid.push(candidate);
     }
   }
@@ -142,8 +129,6 @@ export function route(
   const isReview = request.purpose === 'review';
   const target = isReview ? 'codex' : targetClass(request);
 
-  // Reviews prefer Codex for cross-provider independence, then any other
-  // provider that did not produce the work, then (recorded) same-provider.
   const ladder: RoutingClass[] = isReview ? ['codex', 'opus', 'fable', 'sonnet'] : LADDERS[target];
 
   let pool = candidates;
@@ -177,11 +162,6 @@ export function route(
     return decision;
   }
 
-  // Only paid options remain. Paid provider execution is unavailable in this
-  // build: even an approved DecisionRequest reference cannot route to paid
-  // capacity (capability gate, milestone M2) — the router checkpoints instead
-  // of ever creating a charge. The branch below is retained for M2 but is
-  // unreachable until then.
   if (
     paid.length > 0 &&
     request.approvedPaidUsage &&
