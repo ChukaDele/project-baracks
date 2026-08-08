@@ -146,8 +146,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const worktree = flag(args, '--worktree');
     let runCwd = cwd;
     if (worktree) {
-      const safe =
-        worktree.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'task';
+      const safe = worktree.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'task';
       const projectName = basename(cwd);
       const root = join(homedir(), '.major', 'worktrees', projectName);
       mkdirSync(root, { recursive: true });
@@ -159,7 +158,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         encoding: 'utf8',
       });
       if (git.status !== 0) {
-        throw new Error(`worktree setup failed: ${git.stderr || git.stdout || 'unknown git error'}`);
+        throw new Error(
+          `worktree setup failed: ${git.stderr || git.stdout || 'unknown git error'}`,
+        );
       }
       console.error(`Major worktree: ${runCwd} (${branch})`);
     }
