@@ -22,15 +22,26 @@ function majorRepoRoot(): string {
 
 function commandFor(host: WorkerHost, prompt: string): { command: string; args: string[] } {
   switch (host) {
-    case 'claude':
+    case 'claude': {
+      const permissionMode = process.env.MAJOR_CLAUDE_PERMISSION_MODE ?? 'auto';
       return {
         command: 'claude',
-        args: ['-p', prompt, '--output-format', 'json', '--max-turns', '80', '--permission-mode', 'dontAsk'],
+        args: [
+          '-p',
+          prompt,
+          '--output-format',
+          'json',
+          '--max-turns',
+          '80',
+          '--permission-mode',
+          permissionMode,
+        ],
       };
+    }
     case 'codex':
       return { command: 'codex', args: ['exec', '--json', prompt] };
     case 'cursor':
-      return { command: 'cursor-agent', args: ['-p', '--output-format', 'json', '-f', prompt] };
+      return { command: 'cursor-agent', args: ['-p', '--force', '--output-format', 'json', prompt] };
     case 'antigravity': {
       const python = join(homedir(), '.major', 'antigravity-venv', 'bin', 'python');
       const helper = join(majorRepoRoot(), 'scripts', 'major-antigravity-worker.py');
@@ -76,6 +87,7 @@ export async function runWorker(input: {
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let settled = false;
     const child = spawn(spec.command, spec.args, {
       cwd: resolve(input.cwd),
       env: process.env,
@@ -98,6 +110,8 @@ export async function runWorker(input: {
     }, timeoutMs);
     timer.unref();
     child.on('close', (exitCode) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       resolveOutcome({
         host: input.host,
