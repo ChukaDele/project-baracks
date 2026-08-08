@@ -1,7 +1,7 @@
 {
   "name": "major",
-  "version": "0.4.0",
-  "description": "Major — thin cross-project control plane with project-scoped trust, skill-first execution, verification and learning",
+  "version": "0.4.1",
+  "description": "Major — thin cross-project control plane with owner-approved build mode, project-scoped trust, skill-first execution, verification and learning",
   "type": "module",
   "private": true,
   "bin": {
