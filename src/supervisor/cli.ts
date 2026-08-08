@@ -1,8 +1,18 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import { attachSession, getGoal, resolveProject, resolveProjectForCwd, startGoal, updateGoal, WORKER_HOSTS, type GoalStatus, type WorkerHost } from './state.js';
+import {
+  attachSession,
+  getGoal,
+  resolveProject,
+  resolveProjectForCwd,
+  startGoal,
+  updateGoal,
+  WORKER_HOSTS,
+  type GoalStatus,
+  type WorkerHost,
+} from './state.js';
 import { runDaemon, runGoalCycle, supervisorSnapshot } from './runtime.js';
 import { runWorker } from './worker.js';
 
@@ -22,7 +32,9 @@ function requireFlag(args: string[], name: string): string {
 }
 
 function validHost(value: string): WorkerHost {
-  if (!WORKER_HOSTS.includes(value as WorkerHost)) throw new Error(`unsupported provider: ${value}`);
+  if (!WORKER_HOSTS.includes(value as WorkerHost)) {
+    throw new Error(`unsupported provider: ${value}`);
+  }
   return value as WorkerHost;
 }
 
@@ -78,7 +90,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const id = requireFlag(args, '--id');
     const statusRaw = requireFlag(args, '--status');
     const allowed: GoalStatus[] = ['active', 'blocked', 'done', 'failed', 'paused', 'running'];
-    if (!allowed.includes(statusRaw as GoalStatus)) throw new Error(`invalid goal status: ${statusRaw}`);
+    if (!allowed.includes(statusRaw as GoalStatus)) {
+      throw new Error(`invalid goal status: ${statusRaw}`);
+    }
     const summary = requireFlag(args, '--summary');
     const ownerGate = flag(args, '--owner-gate');
     const patch: Parameters<typeof updateGoal>[1] = {
@@ -86,7 +100,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       lastSummary: summary,
       lastFinishedAt: new Date().toISOString(),
       activePid: undefined,
-      ...(ownerGate ? { ownerGate } : { ownerGate: undefined }),
+      ownerGate,
     };
     updateGoal(id, patch);
     console.log(`goal ${id}: ${statusRaw}`);
@@ -119,7 +133,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const active = project
       ? supervisorSnapshot(project.project)
       : 'No git project detected in this session.';
-    console.log(`MAJOR DEFAULT SUPERVISOR: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${active}\n\nBefore substantive work: preserve the user outcome as the durable goal. For broad/multi-step work, create or continue a Major goal; use Major delegation for independent work; continue until end-to-end evidence or a genuine owner gate.`);
+    console.log(
+      `MAJOR DEFAULT SUPERVISOR: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${active}\n\nBefore substantive work: preserve the user outcome as the durable goal. For broad/multi-step work, create or continue a Major goal and let Major own orchestration; do not start a separate untracked implementation. For small bounded work, execute directly under Major rules. Continue until end-to-end evidence or a genuine owner gate.`,
+    );
     return true;
   }
 
@@ -130,20 +146,22 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const worktree = flag(args, '--worktree');
     let runCwd = cwd;
     if (worktree) {
-      const safe = worktree.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'task';
+      const safe =
+        worktree.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'task';
       const projectName = basename(cwd);
-      runCwd = join(homedir(), '.major', 'worktrees', projectName, `${Date.now()}-${safe}`);
-      mkdirSync(join(homedir(), '.major', 'worktrees', projectName), { recursive: true });
-      const branch = `major/${Date.now()}-${safe}`;
-      const git = await runWorker({
-        host: 'cursor',
+      const root = join(homedir(), '.major', 'worktrees', projectName);
+      mkdirSync(root, { recursive: true });
+      const stamp = Date.now();
+      runCwd = join(root, `${stamp}-${safe}`);
+      const branch = `major/${stamp}-${safe}`;
+      const git = spawnSync('git', ['worktree', 'add', '-b', branch, runCwd], {
         cwd,
-        timeoutMs: 5 * 60 * 1000,
-        prompt: `Create an isolated git worktree at ${runCwd} on new branch ${branch} from current HEAD using git worktree add. Do only that setup and verify the worktree exists.`,
+        encoding: 'utf8',
       });
-      if (git.status !== 'succeeded') {
-        throw new Error(`worktree setup failed: ${git.stderr || git.stdout}`);
+      if (git.status !== 0) {
+        throw new Error(`worktree setup failed: ${git.stderr || git.stdout || 'unknown git error'}`);
       }
+      console.error(`Major worktree: ${runCwd} (${branch})`);
     }
     const outcome = await runWorker({ host: provider, cwd: runCwd, prompt });
     process.stdout.write(outcome.stdout);
