@@ -150,7 +150,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         timeoutMs: 5 * 60 * 1000,
       });
       if (git.status !== 'succeeded') {
-        throw new Error(`worktree setup failed: ${git.stderr || git.stdout || 'unknown git error'}`);
+        throw new Error(
+          `worktree setup failed: ${git.stderr || git.stdout || 'unknown git error'}`,
+        );
       }
       console.error(`Major worktree: ${runCwd} (${branch})`);
     }
