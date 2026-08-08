@@ -1,7 +1,23 @@
-import { existsSync, mkdirSync, openSync, closeSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  openSync,
+  closeSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { activeGoals, getGoal, majorHome, readSupervisorState, updateGoal, type SupervisorGoal, type WorkerHost } from './state.js';
+import {
+  activeGoals,
+  getGoal,
+  majorHome,
+  readSupervisorState,
+  updateGoal,
+  type SupervisorGoal,
+  type WorkerHost,
+} from './state.js';
 import { hostAvailable, runWorker } from './worker.js';
 
 const COORDINATOR_ORDER: WorkerHost[] = ['claude', 'codex', 'cursor', 'antigravity'];
@@ -100,7 +116,9 @@ export async function runGoalCycle(goalId: string): Promise<void> {
       consecutiveFailures: 0,
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
-      lastSummary: trim(outcome.stdout || 'Coordinator cycle completed without an explicit Major report.'),
+      lastSummary: trim(
+        outcome.stdout || 'Coordinator cycle completed without an explicit Major report.',
+      ),
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
     });
   } else {
@@ -144,7 +162,8 @@ export async function runDaemon(): Promise<void> {
   const lockPath = join(majorHome(), 'supervisor-daemon.pid');
   const cleanup = () => {
     try {
-      if (existsSync(lockPath) && readFileSync(lockPath, 'utf8').trim() === String(process.pid)) unlinkSync(lockPath);
+      if (existsSync(lockPath) && readFileSync(lockPath, 'utf8').trim() === String(process.pid))
+        unlinkSync(lockPath);
     } catch {
       // best effort
     }
