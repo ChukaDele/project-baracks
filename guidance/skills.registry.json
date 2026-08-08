@@ -1,9 +1,10 @@
 {
-  "version": 4,
+  "version": 5,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
     "externalSourcesRequireLock": true,
+    "externalSkillsAreSubordinateToMajorGuidance": true,
     "fullEmilBundle": true,
     "mvpIsDefault": true,
     "legacyCleanupRequired": true
@@ -20,6 +21,9 @@
     {"id":"lean-graph-engineering","source":"major-internal","availability":"all-projects","load":"complex-autonomous-or-parallel-work"},
     {"id":"behavior-reward-system","source":"major-internal","availability":"all-projects","load":"autonomous-or-long-running-work"},
     {"id":"root-cause-qa","source":"major-internal","availability":"all-projects","load":"bug-failure-regression"},
+    {"id":"ci-recovery","source":"major-internal","availability":"all-projects","load":"ci-github-actions-pr-check-failure"},
+    {"id":"lean-quality","source":"major-internal","availability":"all-projects","load":"test-strategy-verification-release-confidence"},
+    {"id":"performance-caching","source":"major-internal","availability":"all-projects","load":"measured-slow-workflow-page-query-build-integration"},
     {"id":"exact-head-pr-review","source":"major-internal","availability":"all-projects","load":"pr-review-or-release"},
     {"id":"rapid-ui-prototype","source":"major-internal","availability":"ui-projects","load":"multiple-credible-ui-options"},
     {"id":"data-learning-loop","source":"major-internal","availability":"all-projects","load":"outcome-data-scoring-learning"},
@@ -29,10 +33,21 @@
     {"id":"exploratory-creative-dev","source":"major-internal","availability":"ui-projects","load":"exploratory-awwwards-fwa-heavy-motion-immersive-illustrative"},
 
     {"id":"emil-kowalski-complete","source":"github:emilkowalski/skills","availability":"all-ui-projects","load":"task-relevant","install":"entire-current-bundle"},
+
     {"id":"frontend-design","source":"github:anthropics/skills","availability":"all-ui-projects","load":"frontend-design-work"},
     {"id":"webapp-testing","source":"github:anthropics/skills","availability":"web-projects","load":"browser-or-webapp-qa"},
-    {"id":"graph-engineering","source":"github:codejunkie99/graph-engineering","availability":"all-projects","load":"deep-graph-orchestration"},
+    {"id":"mcp-builder","source":"github:anthropics/skills","availability":"all-projects","load":"build-or-improve-mcp-server"},
+    {"id":"skill-creator","source":"github:anthropics/skills","availability":"all-projects","load":"create-evaluate-or-improve-persistent-skill"},
+    {"id":"algorithmic-art","source":"github:anthropics/skills","availability":"exploratory-ui-projects","load":"generative-art-particles-flow-fields-p5"},
+
+    {"id":"playwright","source":"github:openai/skills","availability":"web-projects","load":"real-browser-automation-debugging-qa"},
+    {"id":"vercel-deploy","source":"github:openai/skills","availability":"vercel-projects","load":"preview-or-production-vercel-deployment"},
+    {"id":"figma-use","source":"github:openai/skills","availability":"figma-enabled-projects","load":"programmatic-figma-read-write"},
+    {"id":"figma-implement-design","source":"github:openai/skills","availability":"figma-enabled-projects","load":"implement-code-from-figma"},
+    {"id":"figma-generate-design","source":"github:openai/skills","availability":"figma-enabled-projects","load":"create-or-update-figma-screen"},
     {"id":"security-threat-model","source":"github:openai/skills","availability":"all-projects","load":"material-security-risk"},
-    {"id":"pdf","source":"github:openai/skills","availability":"all-projects","load":"pdf-task"}
+    {"id":"pdf","source":"github:openai/skills","availability":"all-projects","load":"pdf-task"},
+
+    {"id":"graph-engineering","source":"github:codejunkie99/graph-engineering","availability":"all-projects","load":"deep-graph-orchestration"}
   ]
 }
