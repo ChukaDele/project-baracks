@@ -150,7 +150,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
     }
     if (!goal.lastCoordinator) {
-      throw new Error(`goal ${goalId} has no recorded builder/coordinator yet; it cannot be independently graded`);
+      throw new Error(
+        `goal ${goalId} has no recorded builder/coordinator yet; it cannot be independently graded`,
+      );
     }
     if (goal.lastCoordinator === provider) {
       throw new Error(
