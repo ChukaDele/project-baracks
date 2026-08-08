@@ -14,6 +14,12 @@
       "status": "active"
     },
     {
+      "id": "tool-routing-and-source-ingestion",
+      "title": "Tool routing, fallback and primary-source ingestion rules",
+      "path": "guidance/tool-routing-and-source-ingestion.md",
+      "status": "active"
+    },
+    {
       "id": "security-and-permissions",
       "title": "Risk-proportional security and permissions rules",
       "path": "guidance/security-and-permissions.md",
