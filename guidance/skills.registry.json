@@ -1,4 +1,34 @@
 {
-  "version": 1,
-  "entries": []
+  "version": 2,
+  "policy": {
+    "installedDoesNotMeanLoaded": true,
+    "loadMode": "triggered",
+    "externalSourcesRequireLock": true,
+    "fullEmilBundle": true
+  },
+  "entries": [
+    {"id":"project-start","source":"major-internal","availability":"all-projects","load":"project-start"},
+    {"id":"competitive-product-audit","source":"major-internal","availability":"all-projects","load":"project-start-or-material-product-work"},
+    {"id":"open-source-leverage","source":"major-internal","availability":"all-projects","load":"project-start-or-commodity-build"},
+    {"id":"simple-modular-code","source":"major-internal","availability":"all-projects","load":"architecture-or-implementation"},
+    {"id":"vertical-slice-delivery","source":"major-internal","availability":"all-projects","load":"planning-or-implementation"},
+    {"id":"nontechnical-ux","source":"major-internal","availability":"all-product-projects","load":"operator-or-user-workflow"},
+    {"id":"lean-graph-engineering","source":"major-internal","availability":"all-projects","load":"complex-autonomous-or-parallel-work"},
+    {"id":"behavior-reward-system","source":"major-internal","availability":"all-projects","load":"autonomous-or-long-running-work"},
+    {"id":"root-cause-qa","source":"major-internal","availability":"all-projects","load":"bug-failure-regression"},
+    {"id":"exact-head-pr-review","source":"major-internal","availability":"all-projects","load":"pr-review-or-release"},
+    {"id":"rapid-ui-prototype","source":"major-internal","availability":"ui-projects","load":"multiple-credible-ui-options"},
+    {"id":"data-learning-loop","source":"major-internal","availability":"all-projects","load":"outcome-data-scoring-learning"},
+    {"id":"source-adapter-engineering","source":"major-internal","availability":"all-projects","load":"api-scraping-feed-external-data"},
+    {"id":"pdf-reporting-qa","source":"major-internal","availability":"all-projects","load":"generated-pdf-reporting"},
+    {"id":"cost-control","source":"major-internal","availability":"all-projects","load":"provider-model-browser-infrastructure-cost"},
+    {"id":"exploratory-creative-dev","source":"major-internal","availability":"ui-projects","load":"exploratory-awwwards-fwa-heavy-motion-immersive-illustrative"},
+
+    {"id":"emil-kowalski-complete","source":"github:emilkowalski/skills","availability":"all-ui-projects","load":"task-relevant","install":"entire-current-bundle"},
+    {"id":"frontend-design","source":"github:anthropics/skills","availability":"all-ui-projects","load":"frontend-design-work"},
+    {"id":"webapp-testing","source":"github:anthropics/skills","availability":"web-projects","load":"browser-or-webapp-qa"},
+    {"id":"graph-engineering","source":"github:codejunkie99/graph-engineering","availability":"all-projects","load":"deep-graph-orchestration"},
+    {"id":"security-threat-model","source":"github:openai/skills","availability":"all-projects","load":"material-security-risk"},
+    {"id":"pdf","source":"github:openai/skills","availability":"all-projects","load":"pdf-task"}
+  ]
 }
