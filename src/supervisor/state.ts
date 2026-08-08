@@ -1,5 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 
@@ -20,21 +28,21 @@ export interface SupervisorGoal {
   consecutiveFailures: number;
   createdAt: string;
   updatedAt: string;
-  lastStartedAt?: string;
-  lastFinishedAt?: string;
-  lastSummary?: string;
-  ownerGate?: string;
-  activePid?: number;
-  nextRunAt?: string;
+  lastStartedAt?: string | undefined;
+  lastFinishedAt?: string | undefined;
+  lastSummary?: string | undefined;
+  ownerGate?: string | undefined;
+  activePid?: number | undefined;
+  nextRunAt?: string | undefined;
 }
 
 export interface SessionAttachment {
   id: string;
   host: string;
   cwd: string;
-  project?: string;
-  repoPath?: string;
-  sessionId?: string;
+  project?: string | undefined;
+  repoPath?: string | undefined;
+  sessionId?: string | undefined;
   attachedAt: string;
 }
 
@@ -68,7 +76,9 @@ export function readSupervisorState(): SupervisorState {
     }
     return parsed;
   } catch (error) {
-    throw new Error(`cannot read Major supervisor state at ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `cannot read Major supervisor state at ${path}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -218,7 +228,10 @@ function scanRepos(root: string, depth: number): string[] {
   return results;
 }
 
-export function resolveProject(project: string, cwd = process.cwd()): { project: string; repoPath: string } {
+export function resolveProject(
+  project: string,
+  cwd = process.cwd(),
+): { project: string; repoPath: string } {
   const cwdRoot = gitRootFrom(cwd);
   if (cwdRoot) {
     const cwdName = basename(cwdRoot);
@@ -246,7 +259,9 @@ export function resolveProject(project: string, cwd = process.cwd()): { project:
   );
 }
 
-export function resolveProjectForCwd(cwd: string): { project: string; repoPath: string } | undefined {
+export function resolveProjectForCwd(
+  cwd: string,
+): { project: string; repoPath: string } | undefined {
   const root = gitRootFrom(cwd);
   if (!root) return undefined;
   return { project: readRemoteName(root) ?? basename(root), repoPath: root };
