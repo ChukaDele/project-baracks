@@ -1,7 +1,7 @@
 {
   "name": "major",
-  "version": "0.1.0",
-  "description": "Major — autonomous engineering supervisor that dispatches and monitors Claude Code and Codex",
+  "version": "0.2.0",
+  "description": "Major — cross-project engineering harness for autonomous multi-agent MVP delivery, verification and learning",
   "type": "module",
   "private": true,
   "bin": {
@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "validate:major": "bash scripts/validate-major.sh",
     "major": "tsx src/cli/index.ts",
     "db:generate": "drizzle-kit generate"
   },
