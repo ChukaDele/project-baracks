@@ -46,6 +46,15 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Prefer markdown judgment + minimal deterministic code over permanent hard-coded orchestration.
 - If a successful novel procedure is likely to recur, use `skillify` after the real task succeeds.
 - Do not skillify trivial one-offs or pause an active P0 to build tooling.
+- **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it with `major learn capture` and classify it as project-local or global. Do not rely on chat memory alone.
+
+## Local dev servers
+
+- Starting/restarting a local web server, browser preview or browser QA must load `dev-server-management`.
+- Before starting a server, run `major dev port current` and use the returned stable per-project port.
+- Do not silently default to shared `localhost:3000` or `localhost:3001` when Major is available.
+- Reuse a healthy existing server for the same project. Never kill another project's listener simply to reclaim a convenient port.
+- Browser QA must use the same Major-assigned port that started the intended project.
 
 ## Tools as Code
 
@@ -111,9 +120,14 @@ These boundaries must not be expanded into generic approval ceremony for ordinar
 
 `$HOME/.local/bin/major stop` activates the global kill switch. New Major worker execution is blocked until `$HOME/.local/bin/major start` is deliberately run after inspection.
 
-## Learning
+## Self-learning loop
 
-- Solve the real problem first. Prove the solution. Skillify only when the procedure is likely reusable.
+- Solve the real problem first and verify the fix.
+- Explicit corrections, repeated mistakes and recurring failures must be captured with `major learn capture`; do not merely apologize or say "remembered".
+- Classify each candidate: project-local business/context fact, global policy, tested reusable skill, or memory-only context.
+- Repeated candidates increment one durable occurrence count rather than creating duplicate notes.
+- When a correction is cross-project, stable, sanitized and procedural, run `skillify` with deterministic tests, resolver positive/negative cases and an integration smoke test.
+- Verify the new/updated skill on a later representative real task. A skill file existing is not proof that the resolver actually uses it.
 - Prefer a tested skill or deterministic tool over adding another permanent supervisor workflow.
 - Rules prevent; tested skills institutionalize; memory reminds.
 - Retire duplicate/obsolete custom skills when an upstream capability proves better.

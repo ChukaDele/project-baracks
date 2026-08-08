@@ -60,7 +60,10 @@ if registered_internal != actual_internal:
         f"missing from registry: {sorted(actual_internal-registered_internal)}\n"
         f"missing on disk: {sorted(registered_internal-actual_internal)}"
     )
-for required_skill in ['source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code']:
+for required_skill in [
+    'source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code',
+    'learning-capture', 'dev-server-management'
+]:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
 policy = reg.get('policy', {})
@@ -71,9 +74,21 @@ for key in [
     'mvpIsDefault',
     'legacyCleanupRequired',
     'primarySourceBeforeReconstruction',
+    'skillifyReusableProcedures',
+    'toolsAsCodeForRepeatedDeterministicWork',
+    'captureExplicitCorrections',
 ]:
     if policy.get(key) is not True:
         raise SystemExit(f"required skill policy not enabled: {key}")
+for fixture in [
+    'evals/skill-resolver/skill-resolver.json',
+    'evals/skill-resolver/skillify.json',
+    'evals/skill-resolver/tools-as-code.json',
+    'evals/skill-resolver/learning-capture.json',
+    'evals/skill-resolver/dev-server-management.json',
+]:
+    if not Path(fixture).is_file():
+        raise SystemExit(f"resolver eval missing: {fixture}")
 PY
 
 for path in \
@@ -131,6 +146,9 @@ grep -Fq "MAJOR SHADOW PLAN" guidance/global-worker-rules.md || fail "observe-fi
 grep -Fq "Three consecutive passing shadow grades" guidance/global-worker-rules.md || fail "shadow promotion threshold missing"
 grep -Fq "Tools as Code" guidance/global-worker-rules.md || fail "Tools-as-Code rule missing"
 grep -Fq "skillify" guidance/global-worker-rules.md || fail "skillify rule missing"
+grep -Fq "major learn capture" guidance/global-worker-rules.md || fail "explicit correction capture rule missing"
+grep -Fq "major dev port current" guidance/global-worker-rules.md || fail "deterministic dev-port rule missing"
+grep -Fq "localhost:3000" guidance/global-worker-rules.md || fail "shared localhost default guard missing"
 grep -Fq '$HOME/.local/bin/major session attach' guidance/global-worker-rules.md || fail "GUI-safe Major attach command missing"
 grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-rules.sh || fail "Claude global rules target missing"
 grep -Fq '.codex' scripts/install-major-global-rules.sh || fail "Codex global rules target missing"
@@ -152,7 +170,7 @@ grep -Fq "Major Build" docs/architecture.md || fail "Major Build profile missing
 grep -Fq "Major Knowledge" docs/architecture.md || fail "Major Knowledge profile missing"
 grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability router missing"
 
-# Thin-kernel supervisor runtime.
+# Thin-kernel supervisor runtime and machine-global coordination state.
 [ -f src/entry.ts ] || fail "global Major supervisor entry missing"
 [ -f src/supervisor/state.ts ] || fail "durable supervisor state missing"
 [ -f src/supervisor/policy.ts ] || fail "project trust policy missing"
@@ -160,11 +178,17 @@ grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability 
 [ -f src/supervisor/worker.ts ] || fail "multi-provider worker runtime missing"
 [ -f src/supervisor/cli.ts ] || fail "supervisor CLI missing"
 [ -f src/security/major-gateway.ts ] || fail "Major successor execution gateway missing"
+[ -f src/dev/ports.ts ] || fail "dev-port allocator missing"
+[ -f src/learning/candidates.ts ] || fail "learning candidate queue missing"
 [ -f scripts/install-major-runtime.sh ] || fail "runtime installer missing"
 
 grep -Fq '"major": "./dist/entry.js"' package.json || fail "package bin must enter the supervisor runtime"
 grep -Fq "supervisor-state.json" src/supervisor/state.ts || fail "durable cross-session goal state missing"
 grep -Fq "project-policies.json" src/supervisor/policy.ts || fail "durable project policy store missing"
+grep -Fq "dev-ports.json" src/dev/ports.ts || fail "durable dev-port registry missing"
+grep -Fq "learning-candidates.json" src/learning/candidates.ts || fail "durable learning candidate registry missing"
+grep -Fq "command === 'dev'" src/supervisor/cli.ts || fail "dev-port CLI path missing"
+grep -Fq "command === 'learn'" src/supervisor/cli.ts || fail "learning-capture CLI path missing"
 grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts || fail "project classes missing"
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
 grep -Fq "maxWorkers: 3" src/supervisor/policy.ts || fail "assist worker ceiling missing"
@@ -193,7 +217,7 @@ grep -Fq "SessionStart" scripts/install-major-runtime.sh || fail "Claude automat
 grep -Fq "startup|resume|clear|compact" scripts/install-major-runtime.sh || fail "Claude attach hook does not cover session lifecycle"
 grep -Fq "no auto-start daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
 grep -Fq "Ruflo is NOT attached globally" scripts/install-major-runtime.sh || fail "pilot installer must avoid global Ruflo blast radius"
-grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "first JSS pilot must be observe-only"
+grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "optional observe pilot path must remain available"
 if grep -Fq "launchctl bootstrap" scripts/install-major-runtime.sh; then
   fail "pilot installer must not start a login daemon"
 fi

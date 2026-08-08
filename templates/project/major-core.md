@@ -10,7 +10,7 @@ Major is the default control plane for this project, but presence does **not** i
 
 Before substantive execution, read the current Major project policy (`major project show current`). Respect its class, trust level, worker ceiling, external-write boundary and memory boundary.
 
-Unknown projects default to observe-only. Client/candidate/PII projects remain isolated until explicitly classified/promoted.
+Unknown projects default to observe-only. The owner may explicitly fast-track a trusted project into foreground `build` with `--owner-approved`. Client/candidate/PII projects may be owner-approved for build but their data remains project-local.
 
 ## Tool and source routing
 
@@ -39,6 +39,19 @@ For knowledge work, the equivalent is: define the decision, identify the biggest
 - Use `tools-as-code` when repeated deterministic retrieval/filter/dedupe/rank/transform work would otherwise require many model turns.
 - If a successful novel procedure is likely to recur, use `skillify` after the real task succeeds.
 - Do not skillify trivial one-offs or pause P0 work to build infrastructure.
+- An explicit user correction or “we already fixed this” statement is a learning event. Fix the real task first, then capture the lesson with `major learn capture`; do not rely on chat memory alone.
+
+## Local development servers
+
+When starting/restarting a local web app, browser preview or browser QA:
+
+- load `dev-server-management`;
+- run `major dev port current` before starting the server;
+- use the returned stable per-project port explicitly;
+- never silently default to shared localhost ports 3000/3001 when Major is available;
+- reuse a healthy server for the same project instead of starting duplicates;
+- do not kill another project’s listener just to reclaim a convenient port;
+- point browser QA at the same Major-assigned port.
 
 ## Build behavior
 
@@ -79,13 +92,26 @@ Never use built, validated and ready interchangeably.
 
 Never expose/commit secrets. Do not spend paid API/credits without authority. Do not make destructive/irreversible production-data, credential/ownership/DNS or production security-policy changes without the required authority.
 
-Client/candidate/PII data must remain project-local. Do not promote it into global Major/Ruflo memory. Experimental swarm/memory machinery is not authorized merely because Major is attached.
+Client/candidate/PII data must remain project-local. Do not promote it into global Major/GBrain/Ruflo memory. Experimental swarm/memory machinery is not authorized merely because Major is attached.
 
-Ordinary reversible development is allowed only when the project trust policy permits execution.
+Ordinary reversible development is allowed when the project trust policy permits execution.
+
+## Self-learning
+
+After fixing and verifying an explicit correction, recurring mistake or reusable procedure:
+
+1. capture it with `major learn capture`;
+2. classify it as project-local or sanitized/global;
+3. choose policy vs tested skill vs memory;
+4. use `skillify` for a stable reusable procedure;
+5. add positive/negative resolver evals;
+6. verify on a later representative real task that the resolver actually loads and follows it.
+
+Repeated identical corrections should increment one durable candidate rather than create duplicate notes.
 
 ## Emergency stop
 
-`major stop` activates the global kill switch. New Major worker execution must stop and active Major gateway workers are cancelled on the next stop check. Resume with `major start` only after inspection.
+`major stop` activates the global kill switch. New Major worker execution stops. Resume with `major start` only after inspection.
 
 ## Legacy cleanup
 
