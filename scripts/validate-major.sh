@@ -78,15 +78,16 @@ for key in [
         raise SystemExit(f"required skill policy not enabled: {key}")
 PY
 
-# 4. Deleted v1 documents/project-specific core examples must not return.
+# 4. Deleted v1 documents/project-specific core examples and superseded installers must not return.
 for path in \
   docs/deferred-security-milestones.md \
   docs/provider-routing.md \
   docs/security-model.md \
   docs/surface-talent-integration.md \
   docs/roadmap-sync.md \
-  examples/surface-talent.project.json; do
-  [ ! -e "$path" ] || fail "obsolete v1 file returned: $path"
+  examples/surface-talent.project.json \
+  scripts/install-major-global-style.sh; do
+  [ ! -e "$path" ] || fail "obsolete file returned: $path"
 done
 
 # 5. Stale concepts must not appear in active rules/templates/README/PR template.
@@ -123,12 +124,17 @@ fi
 grep -Fq "AGENTS.md" scripts/bootstrap-major-project.sh || fail "provider-neutral AGENTS bootstrap missing"
 grep -Fq "install-major-skills.sh" scripts/bootstrap-major-project.sh || fail "skill-profile bootstrap missing"
 grep -Fq "core|knowledge|web-ui|exploratory|full" scripts/install-major-skills.sh || fail "knowledge profile missing from skill installer"
+grep -Fq "A failed first tool is not a failed task" templates/project/major-core.md || fail "project tool-routing rule missing"
 
-# 9. Cross-tool global style installer must cover the supported global-rule surfaces.
-[ -f scripts/install-major-global-style.sh ] || fail "global communication installer missing"
-grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-style.sh || fail "Claude global style target missing"
-grep -Fq '.codex' scripts/install-major-global-style.sh || fail "Codex global style target missing"
-grep -Fq '.gemini/GEMINI.md' scripts/install-major-global-style.sh || fail "Antigravity global style target missing"
+# 9. Cross-tool global rules must cover communication + tool/source routing.
+[ -f guidance/global-worker-rules.md ] || fail "compact global worker rules missing"
+[ -f scripts/install-major-global-rules.sh ] || fail "global worker rules installer missing"
+grep -Fq "Use the right tool" guidance/global-worker-rules.md || fail "global tool-routing rule missing"
+grep -Fq "Primary-source integrity" guidance/global-worker-rules.md || fail "global primary-source rule missing"
+grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-rules.sh || fail "Claude global rules target missing"
+grep -Fq '.codex' scripts/install-major-global-rules.sh || fail "Codex global rules target missing"
+grep -Fq '.gemini/GEMINI.md' scripts/install-major-global-rules.sh || fail "Antigravity global rules target missing"
+grep -Fq "Cursor" scripts/install-major-global-rules.sh || fail "Cursor global rule handoff missing"
 
 # 10. Knowledge tool routing must have a real deterministic YouTube path and tool doctor.
 [ -f scripts/major-ingest-youtube.sh ] || fail "YouTube ingestion script missing"
