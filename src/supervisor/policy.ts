@@ -149,14 +149,22 @@ export function configureProjectPolicy(input: {
     }
   }
   if (input.trust === 'build') {
-    if (existing?.trust !== 'assist' || existing.lastGrade?.kind !== 'execution' || existing.lastGrade.result !== 'pass') {
+    if (
+      existing?.trust !== 'assist' ||
+      existing.lastGrade?.kind !== 'execution' ||
+      existing.lastGrade.result !== 'pass'
+    ) {
       throw new Error(
         `cannot promote ${input.project} to build: it must first run at assist and pass an independent execution grade`,
       );
     }
   }
   if (input.trust === 'unattended') {
-    if (existing?.trust !== 'build' || existing.lastGrade?.kind !== 'execution' || existing.lastGrade.result !== 'pass') {
+    if (
+      existing?.trust !== 'build' ||
+      existing.lastGrade?.kind !== 'execution' ||
+      existing.lastGrade.result !== 'pass'
+    ) {
       throw new Error(
         `cannot promote ${input.project} to unattended: it must first run at build and pass a fresh independent execution grade`,
       );
@@ -233,7 +241,9 @@ export function recordShadowGrade(input: {
   goalId?: string;
 }): ProjectPolicy {
   if (input.planner === input.provider) {
-    throw new Error(`shadow grade must be independent: planner and grader are both ${input.provider}`);
+    throw new Error(
+      `shadow grade must be independent: planner and grader are both ${input.provider}`,
+    );
   }
   return storeGrade({ ...input, kind: 'shadow' });
 }
