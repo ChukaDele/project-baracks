@@ -117,7 +117,7 @@ export async function runGatewayCommand(input: {
             : 'failed',
       exitCode: outcome.exitCode,
       stdout,
-      stderr: outcome.stderrTail,
+      stderr: outcome.stderrTail ?? '',
       durationMs: Date.now() - started,
     };
   } catch (error) {
