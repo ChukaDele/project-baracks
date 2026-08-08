@@ -32,14 +32,6 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Print exact final runtime formatting patch
-        run: |
-          pnpm exec prettier --write src/security/major-gateway.ts src/supervisor/cli.ts
-          echo '--- PRETTIER PATCH START ---'
-          git diff -- src/security/major-gateway.ts src/supervisor/cli.ts
-          echo '--- PRETTIER PATCH END ---'
-          git diff --quiet -- src/security/major-gateway.ts src/supervisor/cli.ts
-
       - name: Format check
         run: pnpm format:check
 
