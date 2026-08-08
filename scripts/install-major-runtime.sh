@@ -55,7 +55,8 @@ hooks["SessionStart"] = filtered
 path.write_text(json.dumps(data, indent=2) + "\n")
 PY
 
-# Pilot posture: no auto-start daemon and no global Ruflo attachment.
+# No login daemon by default. Foreground build mode is the normal active-work posture;
+# unattended/background execution remains a separate explicit trust level.
 launchctl bootout "gui/$UID/com.chuka.major-supervisor" >/dev/null 2>&1 || true
 rm -f "$LEGACY_PLIST"
 
@@ -68,7 +69,7 @@ if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 
 fi
 
 cat <<EOF
-Major v0.4 pilot control plane installed.
+Major v0.4.1 control plane installed.
 
 CLI:        $BIN_DIR/major
 State:      $MAJOR_HOME/supervisor-state.json
@@ -79,23 +80,23 @@ Codex:      global Major rules installed
 Cursor:     global Major rules installed
 Antigravity:global Major rules installed
 
-PILOT GUARANTEES:
-- Major is present by default, but no login daemon is started.
-- Unknown projects default to observe-only.
-- Ruflo is NOT attached globally.
-- Observe mode cannot dispatch workers.
-- Three consecutive independent shadow-plan passes are required before assist mode.
-- Assist mode is foreground-only, max 3 workers, max 30 minutes per coordinator run, no paid spend or external writes by default.
+NORMAL WORK MODE:
+- Major is present by default across supported agent tools.
+- The owner can explicitly fast-track trusted projects to foreground build mode.
+- build = up to 6 useful workers, 120-minute coordinator ceiling, no repeated shadow/assist ceremony.
+- --allow-external-writes authorizes normal project writes such as branches, PRs, previews and already-authorized integrations.
+- client projects remain isolated from cross-project/global memory even in build mode.
+- no new paid spend, destructive production-data changes, credential/ownership/DNS changes, or production security-policy changes without explicit authority.
+- unattended/background mode is still separate from foreground build mode.
 
-Open a new shell or run:
-  export PATH="$BIN_DIR:\$PATH"
+Owner-approved JSS working mode:
+  major project configure jss-tool --class workshop --trust build --owner-approved --allow-external-writes
 
-First JSS shadow pilot:
-  major project configure jss-tool --class workshop --trust observe
-  major run jss-tool --goal "Ship the smallest credible end-to-end JSS MVP"
+Owner-approved Surface Talent working mode:
+  major project configure surface-talent --class client --trust build --owner-approved --allow-external-writes
 
-Surface Talent isolation:
-  major project configure surface-talent --class client --trust observe
+Then work normally in a fresh Claude/Codex/Cursor session opened inside each repo.
+No "start Major" prompt is required.
 
 Emergency stop:
   major stop
