@@ -41,7 +41,10 @@ function commandFor(host: WorkerHost, prompt: string): { command: string; args: 
     case 'codex':
       return { command: 'codex', args: ['exec', '--json', prompt] };
     case 'cursor':
-      return { command: 'cursor-agent', args: ['-p', '--force', '--output-format', 'json', prompt] };
+      return {
+        command: 'cursor-agent',
+        args: ['-p', '--force', '--output-format', 'json', prompt],
+      };
     case 'antigravity': {
       const python = join(homedir(), '.major', 'antigravity-venv', 'bin', 'python');
       const helper = join(majorRepoRoot(), 'scripts', 'major-antigravity-worker.py');
