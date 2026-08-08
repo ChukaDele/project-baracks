@@ -37,6 +37,7 @@ export interface ProjectPolicy {
   allowExternalWrites: boolean;
   allowCrossProjectMemory: boolean;
   allowPaidSpend: boolean;
+  ownerApprovedBuild: boolean;
   shadowRuns: number;
   shadowPasses: number;
   updatedAt: string;
@@ -84,6 +85,7 @@ function normalizePolicy(policy: ProjectPolicy): ProjectPolicy {
     ...policy,
     maxRunMinutes: policy.maxRunMinutes ?? limitsFor(policy.trust).maxRunMinutes,
     allowPaidSpend: policy.allowPaidSpend ?? false,
+    ownerApprovedBuild: policy.ownerApprovedBuild ?? false,
     shadowRuns: policy.shadowRuns ?? 0,
     shadowPasses: policy.shadowPasses ?? 0,
   };
@@ -122,6 +124,7 @@ export function defaultProjectPolicy(project: string, repoPath: string): Project
     allowExternalWrites: false,
     allowCrossProjectMemory: false,
     allowPaidSpend: false,
+    ownerApprovedBuild: false,
     shadowRuns: 0,
     shadowPasses: 0,
     updatedAt: new Date().toISOString(),
@@ -142,9 +145,11 @@ export function configureProjectPolicy(input: {
   trust: TrustLevel;
   allowExternalWrites?: boolean;
   allowPaidSpend?: boolean;
+  ownerApprovedBuild?: boolean;
 }): ProjectPolicy {
   const store = readStore();
   const existing = store.projects.find((candidate) => candidate.project === input.project);
+  const ownerApprovedBuild = input.ownerApprovedBuild ?? existing?.ownerApprovedBuild ?? false;
 
   if (input.trust === 'assist') {
     if (!existing || existing.shadowPasses < 3 || existing.lastGrade?.result !== 'pass') {
@@ -153,7 +158,7 @@ export function configureProjectPolicy(input: {
       );
     }
   }
-  if (input.trust === 'build') {
+  if (input.trust === 'build' && !input.ownerApprovedBuild) {
     if (
       existing?.trust !== 'assist' ||
       existing.lastGrade?.kind !== 'execution' ||
@@ -161,7 +166,7 @@ export function configureProjectPolicy(input: {
       existing.lastGrade.trustAtGrade !== 'assist'
     ) {
       throw new Error(
-        `cannot promote ${input.project} to build: it must first run at assist and pass an independent execution grade`,
+        `cannot promote ${input.project} to build: it must first run at assist and pass an independent execution grade, or the owner must explicitly use --owner-approved`,
       );
     }
   }
@@ -184,10 +189,11 @@ export function configureProjectPolicy(input: {
     projectClass: input.projectClass,
     trust: input.trust,
     ...limitsFor(input.trust),
-    allowExternalWrites: input.allowExternalWrites ?? false,
+    allowExternalWrites: input.allowExternalWrites ?? existing?.allowExternalWrites ?? false,
     allowCrossProjectMemory:
       input.projectClass !== 'client' && (input.trust === 'build' || input.trust === 'unattended'),
-    allowPaidSpend: input.allowPaidSpend ?? false,
+    allowPaidSpend: input.allowPaidSpend ?? existing?.allowPaidSpend ?? false,
+    ownerApprovedBuild,
     shadowRuns: existing?.shadowRuns ?? 0,
     shadowPasses: existing?.shadowPasses ?? 0,
     updatedAt: new Date().toISOString(),
