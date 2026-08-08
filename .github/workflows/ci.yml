@@ -32,13 +32,6 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Print exact dev-port formatting
-        run: |
-          echo '--- PRETTIER FILE START ---'
-          pnpm exec prettier src/dev/ports.ts
-          echo '--- PRETTIER FILE END ---'
-          exit 1
-
       - name: Format check
         run: pnpm format:check
 
