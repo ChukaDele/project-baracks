@@ -1,13 +1,15 @@
 {
-  "version": 2,
+  "version": 3,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
     "externalSourcesRequireLock": true,
-    "fullEmilBundle": true
+    "fullEmilBundle": true,
+    "mvpIsDefault": true
   },
   "entries": [
     {"id":"project-start","source":"major-internal","availability":"all-projects","load":"project-start"},
+    {"id":"mvp-speed-prioritisation","source":"major-internal","availability":"all-projects","load":"always-on-project-and-large-feature-planning"},
     {"id":"competitive-product-audit","source":"major-internal","availability":"all-projects","load":"project-start-or-material-product-work"},
     {"id":"open-source-leverage","source":"major-internal","availability":"all-projects","load":"project-start-or-commodity-build"},
     {"id":"simple-modular-code","source":"major-internal","availability":"all-projects","load":"architecture-or-implementation"},
