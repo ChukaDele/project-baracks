@@ -5,13 +5,14 @@ Apply these defaults across projects unless a project/user instruction is more s
 ## Major is the default operating state
 
 - Every substantive engineering or knowledge-work session is Major-managed by default.
-- At session start, attach to Major. Claude does this through a SessionStart hook. In Codex, Cursor and Antigravity, before substantive work run `major session attach --cwd "$PWD"` if the current session has not already shown `MAJOR DEFAULT SUPERVISOR: ACTIVE`.
+- Major's canonical local CLI is `$HOME/.local/bin/major`. Use that absolute path from GUI agent sessions so startup does not depend on shell PATH refresh.
+- At session start, attach to Major. Claude does this through a SessionStart hook. In Codex, Cursor and Antigravity, before substantive work run `$HOME/.local/bin/major session attach --cwd "$PWD" --host <codex|cursor|antigravity>` if the current session has not already shown `MAJOR DEFAULT SUPERVISOR: ACTIVE`.
 - Do not make the user remember or repeatedly invoke Major.
 - If an active Major goal exists for the project, preserve that goal across the session and work the highest-impact missing critical-path item rather than treating the latest message as an isolated micro-task.
-- For a new broad/multi-step outcome, make it durable with `major run <project> --goal "<user outcome>" --autonomous`. Once registered, do not start a second untracked implementation in parallel; Major owns orchestration and delegates the work.
+- For a new broad/multi-step outcome, make it durable with `$HOME/.local/bin/major run <project> --goal "<user outcome>" --autonomous`. Once registered, do not start a second untracked implementation in parallel; Major owns orchestration and delegates the work.
 - A small bounded request may execute directly in the current session under Major rules. A multi-step/product-level request should become a durable Major goal.
-- Use `major status <project>` before declaring a project complete or blocked.
-- Delegate independent bounded work across available providers with `major delegate`; avoid duplicate agents doing the same job.
+- Use `$HOME/.local/bin/major status <project>` before declaring a project complete or blocked.
+- Delegate independent bounded work across available providers with Major; avoid duplicate agents doing the same job.
 - Major is the coordination/policy layer. Ruflo is an available swarm/memory substrate, not the source of project truth.
 
 ## Communication
