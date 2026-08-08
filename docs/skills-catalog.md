@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 23
+## Major internal skills — 26
 
 These are canonical Major-owned skills.
 
@@ -13,6 +13,9 @@ These are canonical Major-owned skills.
 | `project-start` | Start a new/existing repo from outcome, current state and fastest proof. |
 | `mvp-speed-prioritisation` | Reduce large briefs to P0 MVP / P1 / P2 and build P0 end to end. |
 | `legacy-cleanup` | Finish migrations with one canonical path and remove stale active artefacts. |
+| `skill-resolver` | Select only the small set of task-relevant skills; audit overlap/reachability. |
+| `skillify` | Turn a successful reusable procedure into a tested skill pack after the real task works. |
+| `tools-as-code` | Compose repeated deterministic retrieval/filter/dedupe/rank/transform mechanics with short temporary code. |
 | `source-ingestion` | Retrieve named primary sources with the right connector/CLI/browser/local tool before analysis. |
 | `knowledge-work` | Research/strategy/synthesis with minimum credible evidence, independent angles and skeptic review where justified. |
 | `competitive-product-audit` | Learn direct/adjacent product patterns before reinventing workflows. |
@@ -33,6 +36,24 @@ These are canonical Major-owned skills.
 | `pdf-reporting-qa` | Reliable generated PDF reports with visual QA. |
 | `cost-control` | Subscription/rate-limit/paid-spend routing and usage discipline. |
 | `exploratory-creative-dev` | Awwwards/FWA/heavy-motion/immersive creative-development workflow. |
+
+## Skill-pack standard
+
+A procedure becomes durable only after the real task works. `skillify` then prefers this bundle when justified:
+
+1. `SKILL.md` — intent, judgment, trigger conditions, procedure and stop conditions;
+2. minimal deterministic code only where I/O/transformation/validation benefits from certainty;
+3. unit tests for deterministic code when present;
+4. representative skill eval;
+5. resolver positive/negative/near-neighbour cases;
+6. integration/E2E smoke test when code and markdown interact;
+7. filing/memory rules separating reusable knowledge from project-sensitive context.
+
+Learning priority:
+
+`deterministic rule/tool → tested skill → memory`
+
+Rules prevent. Skills institutionalize. Memory reminds.
 
 ## Emil Kowalski complete bundle — 9
 
@@ -82,7 +103,7 @@ These are tools/capability packs, not policy authorities and not necessarily age
 
 | Tool | Use | Major rule |
 |---|---|---|
-| MacWhisper `mw` | Local audio/video transcription | Prefer local transcription; already installed on Chuka's Mac. |
+| MacWhisper `mw` | Local audio/video transcription | Prefer local transcription; never duplicate it with another Whisper stack unless needed. |
 | `yt-dlp` | YouTube/media metadata, subtitles and audio extraction | Captions first; audio + MacWhisper fallback. |
 | GStack | Dynamic/authenticated browser work, scraping and codifying repeated browser procedures | Install namespaced; proactive routing and telemetry off; Major remains the router. |
 | Native connectors/APIs | GitHub, Google, Figma, mail/calendar etc. | Prefer over browser scraping when available. |
@@ -95,7 +116,7 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### `knowledge`
 
-`core` with knowledge-work semantics: `source-ingestion` + `knowledge-work` route named sources through native/deterministic tools, scale research by stakes and use a skeptic/reviewer where useful. GStack/yt-dlp/MacWhisper are machine capabilities installed separately, not copied into every project prompt.
+`core` with knowledge-work semantics: `source-ingestion` + `knowledge-work` route named sources through native/deterministic tools. `tools-as-code` handles repeated retrieval mechanics. GStack/yt-dlp/MacWhisper remain machine capabilities rather than prompt baggage.
 
 ### `web-ui`
 
@@ -107,14 +128,17 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### Specialist triggers
 
+- Start substantive work → `skill-resolver`.
+- Reusable successful procedure / recurring solved failure → `skillify` after the real task succeeds.
+- Repeated deterministic tool/retrieval mechanics → `tools-as-code`.
 - Named URL/video/file/source → `source-ingestion`.
 - Substantial research/strategy/comparison → `knowledge-work`.
 - Figma work → Figma skill set.
 - MCP work → `mcp-builder`.
-- Skill authoring → `skill-creator`.
+- Skill authoring/evaluation → `skill-creator` plus `skillify` where appropriate.
 - Material security work → `security-threat-model`.
 - PDFs → `pdf` + `pdf-reporting-qa` as appropriate.
-- Deep orchestration → `graph-engineering`.
+- Deep orchestration → `graph-engineering` only when lean graph engineering is insufficient.
 
 ## Explicit recurring exclusions
 
