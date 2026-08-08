@@ -1,0 +1,17 @@
+{
+  "skill": "learning-capture",
+  "should_trigger": [
+    "We already fixed this localhost collision. Why is the agent doing it again?",
+    "Stop doing this across my projects and make sure Major learns the correction.",
+    "This is a recurring workflow mistake; capture the lesson after you fix it."
+  ],
+  "should_not_trigger": [
+    "Fix this TypeScript compile error.",
+    "Make this card a little smaller.",
+    "Explain why this unit test failed."
+  ],
+  "conflicts": [
+    "skillify owns packaging a proven reusable procedure; learning-capture owns harvesting/classifying the correction first.",
+    "data-learning-loop is about product/outcome feedback data, not agent-process corrections."
+  ]
+}
