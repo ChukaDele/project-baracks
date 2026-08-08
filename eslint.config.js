@@ -17,11 +17,11 @@ export default tseslint.config(
     },
   },
   {
-    // Every child process must pass through the execution gateway: only the
-    // gateway (and the streaming spawner it owns) may touch child_process,
-    // and only the gateway may reach the spawner.
+    // Every child process must pass through an execution gateway: only the
+    // legacy gateway, the Major successor gateway and the streaming spawner
+    // they own may reach providers/exec or child_process.
     files: ['src/**/*.ts'],
-    ignores: ['src/security/gateway.ts', 'src/providers/exec.ts'],
+    ignores: ['src/security/gateway.ts', 'src/security/major-gateway.ts', 'src/providers/exec.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -33,7 +33,7 @@ export default tseslint.config(
           patterns: [
             {
               group: ['**/providers/exec.js'],
-              message: 'executeStreaming is gateway-internal; use ExecutionGateway.execute()',
+              message: 'streaming spawn is gateway-internal; use an execution gateway',
             },
           ],
         },

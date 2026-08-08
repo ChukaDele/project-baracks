@@ -93,14 +93,23 @@ describe('provider and model fallback', () => {
   });
 });
 
-describe('codex review reserve', () => {
-  it('never consumes codex for implementation work', () => {
+describe('Codex routing', () => {
+  it('uses subscription-backed Codex for implementation when it is the useful available capacity', () => {
     const providers = [codex()];
     const decision = route({ purpose: 'implementation', complexity: 'bounded' }, providers);
+    expect(decision.kind).toBe('route');
+    if (decision.kind === 'route') expect(decision.provider).toBe('codex');
+  });
+
+  it('can explicitly preserve Codex for review for a project that requests it', () => {
+    const providers = [codex()];
+    const decision = route({ purpose: 'implementation', complexity: 'bounded' }, providers, {
+      preserveCodexForReview: true,
+    });
     expect(decision.kind).toBe('checkpoint');
   });
 
-  it('prefers codex for review', () => {
+  it('prefers codex for independent review', () => {
     const decision = route(
       { purpose: 'review', complexity: 'bounded', implementedByProvider: 'claude-code' },
       FULL_FLEET,
@@ -144,8 +153,6 @@ describe('billing safety', () => {
   });
 
   it('never routes to paid capacity, even with an approving DecisionRequest reference', () => {
-    // Paid provider execution is an unavailable capability in this build: an
-    // approved paid_usage reference still checkpoints instead of routing.
     const decision = route(
       {
         purpose: 'implementation',
