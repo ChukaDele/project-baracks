@@ -9,6 +9,7 @@ import {
   getProjectPolicy,
   globalStopRequested,
   recordIndependentGrade,
+  recordShadowGrade,
   requestGlobalStop,
 } from '../src/supervisor/policy.js';
 
@@ -32,6 +33,32 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
+function earnAssist(project = 'jss-tool', repoPath = '/tmp/jss-tool') {
+  configureProjectPolicy({
+    project,
+    repoPath,
+    projectClass: 'workshop',
+    trust: 'observe',
+  });
+  for (let i = 0; i < 3; i++) {
+    recordShadowGrade({
+      project,
+      repoPath,
+      planner: 'codex',
+      provider: 'claude',
+      result: 'pass',
+      evidence: `shadow ${i + 1} matched the real task path`,
+      goalId: 'goal-1',
+    });
+  }
+  return configureProjectPolicy({
+    project,
+    repoPath,
+    projectClass: 'workshop',
+    trust: 'assist',
+  });
+}
+
 describe('Major project trust policy', () => {
   it('defaults unknown projects to observe-only with zero delegated workers', () => {
     const policy = defaultProjectPolicy('surface-talent', '/tmp/surface-talent');
@@ -40,38 +67,35 @@ describe('Major project trust policy', () => {
     expect(policy.maxWorkers).toBe(0);
     expect(policy.allowBackground).toBe(false);
     expect(policy.allowCrossProjectMemory).toBe(false);
+    expect(policy.allowPaidSpend).toBe(false);
   });
 
-  it('supports a foreground assist pilot with a three-worker ceiling', () => {
-    const policy = configureProjectPolicy({
-      project: 'jss-tool',
-      repoPath: '/tmp/jss-tool',
-      projectClass: 'workshop',
-      trust: 'assist',
-    });
+  it('supports a foreground assist pilot only after the three-shadow gate', () => {
+    const policy = earnAssist();
     expect(policy.maxWorkers).toBe(3);
+    expect(policy.maxRunMinutes).toBe(30);
     expect(policy.allowBackground).toBe(false);
+    expect(policy.allowExternalWrites).toBe(false);
+    expect(policy.allowPaidSpend).toBe(false);
     expect(getProjectPolicy('jss-tool', '/tmp/jss-tool').trust).toBe('assist');
   });
 
-  it('keeps client projects isolated from cross-project memory by default', () => {
+  it('keeps client projects observe-only and isolated during the pilot', () => {
     const policy = configureProjectPolicy({
       project: 'surface-talent',
       repoPath: '/tmp/surface-talent',
       projectClass: 'client',
-      trust: 'assist',
+      trust: 'observe',
     });
+    expect(policy.trust).toBe('observe');
+    expect(policy.maxWorkers).toBe(0);
     expect(policy.allowCrossProjectMemory).toBe(false);
     expect(policy.allowExternalWrites).toBe(false);
+    expect(policy.allowPaidSpend).toBe(false);
   });
 
-  it('requires a passing independent grade before build/unattended promotion', () => {
-    configureProjectPolicy({
-      project: 'jss-tool',
-      repoPath: '/tmp/jss-tool',
-      projectClass: 'workshop',
-      trust: 'assist',
-    });
+  it('requires a fresh independent execution grade at each higher trust promotion', () => {
+    earnAssist();
 
     expect(() =>
       configureProjectPolicy({
@@ -80,25 +104,52 @@ describe('Major project trust policy', () => {
         projectClass: 'workshop',
         trust: 'build',
       }),
-    ).toThrow(/passing independent grade/);
+    ).toThrow(/independent execution grade/);
 
     recordIndependentGrade({
       project: 'jss-tool',
       repoPath: '/tmp/jss-tool',
       provider: 'claude',
       result: 'pass',
-      evidence: 'Independent read-only review of exact head and real JSS output passed.',
+      evidence: 'Independent review of the representative assist run passed.',
       goalId: 'goal-1',
     });
 
-    const promoted = configureProjectPolicy({
+    const built = configureProjectPolicy({
       project: 'jss-tool',
       repoPath: '/tmp/jss-tool',
       projectClass: 'workshop',
       trust: 'build',
     });
-    expect(promoted.maxWorkers).toBe(6);
-    expect(promoted.allowBackground).toBe(false);
+    expect(built.maxWorkers).toBe(6);
+    expect(built.allowBackground).toBe(false);
+
+    expect(() =>
+      configureProjectPolicy({
+        project: 'jss-tool',
+        repoPath: '/tmp/jss-tool',
+        projectClass: 'workshop',
+        trust: 'unattended',
+      }),
+    ).toThrow(/fresh independent execution grade/);
+
+    recordIndependentGrade({
+      project: 'jss-tool',
+      repoPath: '/tmp/jss-tool',
+      provider: 'codex',
+      result: 'pass',
+      evidence: 'Independent review of a representative build-mode run passed.',
+      goalId: 'goal-1',
+    });
+
+    const unattended = configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath: '/tmp/jss-tool',
+      projectClass: 'workshop',
+      trust: 'unattended',
+    });
+    expect(unattended.maxWorkers).toBe(8);
+    expect(unattended.allowBackground).toBe(true);
   });
 
   it('provides a global kill switch that can be cleared explicitly', () => {
