@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { configureProjectPolicy } from '../src/supervisor/policy.js';
+import {
+  configureProjectPolicy,
+  recordShadowGrade,
+} from '../src/supervisor/policy.js';
 import { coordinatorPrompt } from '../src/supervisor/runtime.js';
 import type { SupervisorGoal } from '../src/supervisor/state.js';
 
@@ -36,7 +39,7 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
-  it('keeps the product goal while respecting pilot trust and thin-kernel skill-first execution', () => {
+  it('keeps the product goal while respecting earned assist trust and thin-kernel skill-first execution', () => {
     const repo = mkdtempSync(join(tmpdir(), 'major-runtime-'));
     roots.push(repo);
     process.env.MAJOR_POLICY_PATH = join(repo, 'policies.json');
@@ -46,6 +49,24 @@ describe('Major coordinator contract', () => {
       '# Goal state\nCurrent P0: source → assess → tailor.\n',
     );
     writeFileSync(join(repo, 'AGENTS.md'), '# Project contract\nContinue through safe blockers.\n');
+
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath: repo,
+      projectClass: 'workshop',
+      trust: 'observe',
+    });
+    for (let i = 0; i < 3; i++) {
+      recordShadowGrade({
+        project: 'jss-tool',
+        repoPath: repo,
+        planner: 'codex',
+        provider: 'claude',
+        result: 'pass',
+        evidence: `shadow ${i + 1} matched actual task path`,
+        goalId: 'goal-1',
+      });
+    }
     configureProjectPolicy({
       project: 'jss-tool',
       repoPath: repo,
@@ -59,6 +80,7 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('class: workshop');
     expect(prompt).toContain('trust: assist');
     expect(prompt).toContain('maximum concurrent workers: 3');
+    expect(prompt).toContain('maximum coordinator run: 30 minutes');
     expect(prompt).toContain('Tools-as-Code');
     expect(prompt).toContain('Skillify');
     expect(prompt).toContain('BUILT = implementation exists');
