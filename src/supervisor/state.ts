@@ -100,7 +100,10 @@ export function startGoal(input: {
   const state = readSupervisorState();
   const now = new Date().toISOString();
   for (const existing of state.goals) {
-    if (existing.project === input.project && ['active', 'running', 'blocked'].includes(existing.status)) {
+    if (
+      existing.project === input.project &&
+      ['active', 'running', 'blocked'].includes(existing.status)
+    ) {
       existing.goal = input.goal;
       existing.repoPath = resolve(input.repoPath);
       existing.autonomous = input.autonomous;
@@ -210,7 +213,8 @@ function scanRepos(root: string, depth: number): string[] {
     return results;
   }
   for (const entry of entries) {
-    if (entry.startsWith('.') || ['node_modules', 'Library', 'Applications'].includes(entry)) continue;
+    if (entry.startsWith('.') || ['node_modules', 'Library', 'Applications'].includes(entry))
+      continue;
     const full = join(root, entry);
     let isDirectory = false;
     try {
