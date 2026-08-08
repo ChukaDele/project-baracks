@@ -33,27 +33,9 @@ Permanent Major code stays focused on deterministic control-plane concerns:
 
 Reusable procedure belongs in tested skills. Repeated deterministic mechanics can be composed at runtime with `tools-as-code`. A successful novel procedure becomes a reusable skill only after it works, via `skillify`.
 
-```text
-user goal
-  ↓
-Major kernel
-  ↓
-skill resolver
-  ↓
-relevant skill packs
-  ↓
-agent
-  ↓
-reason | native tool | Tools-as-Code | dynamic worker graph
-  ↓
-evidence / independent grade
-  ↓
-reusable success? → skillify
-```
+## Always present, owner-controlled authority
 
-## Always present ≠ always autonomous
-
-Major's communication/routing/project context should be present across supported agent tools, but execution authority is **project-scoped**.
+Major's communication/routing/project context should be present across supported agent tools. The owner decides how much execution authority each project receives.
 
 Project classes:
 
@@ -64,18 +46,16 @@ Project classes:
 
 Trust levels:
 
-- `observe` — no Major worker execution; Major produces a shadow plan only;
+- `observe` — no Major worker execution; useful for new/untrusted projects or deliberate shadow evaluation;
 - `assist` — visible foreground pilot, max 3 useful workers, max 30 minutes per coordinator run;
-- `build` — independently validated foreground coordination, max 6 useful workers;
+- `build` — normal foreground coordination, max 6 useful workers, max 120 minutes per coordinator run;
 - `unattended` — max 8 useful workers and background continuation.
 
-Unknown projects default to observe. Client/candidate/PII projects stay isolated until explicitly classified/promoted.
+The owner may explicitly fast-track a trusted project directly into `build` with `--owner-approved`. This bypasses shadow/assist ceremony for normal foreground work. It does **not** silently grant unattended/background authority.
 
-**Three consecutive independently graded shadow passes are required before a project may enter assist.** Build and unattended require separate independent execution grades.
+Client/candidate/PII projects may run in `client/build`, but their data stays project-local and cannot enter global Major/GBrain/Ruflo memory.
 
-## Pilot deployment
-
-Install the v0.4 pilot control plane:
+## Install
 
 ```sh
 bash scripts/install-major-runtime.sh
@@ -89,50 +69,45 @@ This installs:
 - durable goal/policy state;
 - scoped worker adapters and execution gateway.
 
-It **does not** auto-start a Mac login daemon and **does not** attach Ruflo globally.
+It does **not** auto-start a Mac login daemon and does **not** attach Ruflo globally.
 
-First classification:
+## Recommended working mode for trusted projects
 
-```sh
-major project configure jss-tool --class workshop --trust observe
-major project configure surface-talent --class client --trust observe
-```
-
-Register the real JSS goal without letting Major execute it:
+JSS:
 
 ```sh
-major run jss-tool \
-  --goal "Ship the smallest credible end-to-end JSS MVP"
+major project configure jss-tool \
+  --class workshop \
+  --trust build \
+  --owner-approved \
+  --allow-external-writes
 ```
 
-The active agent session should then produce a **MAJOR SHADOW PLAN**. A human/gstack driver performs the real task. A different provider grades Major's proposed plan against the actual path and output.
-
-Record a shadow grade:
+Surface Talent:
 
 ```sh
-major project shadow-grade jss-tool \
-  --goal-id "<goal-id>" \
-  --planner codex \
-  --provider claude \
-  --result pass \
-  --evidence "<what matched reality and what evidence supports the pass>"
+major project configure surface-talent \
+  --class client \
+  --trust build \
+  --owner-approved \
+  --allow-external-writes
 ```
 
-After **three consecutive passing shadow grades**, Major may be explicitly promoted to assist:
+`--allow-external-writes` authorizes normal project writes such as branches, PRs, preview deployments and already-authorized integrations. It does not authorize new paid spend, destructive production-data changes, credential/ownership/DNS changes or production security-policy changes.
 
-```sh
-major project configure jss-tool --class workshop --trust assist
+Then open a fresh Claude/Codex/Cursor session inside the relevant repo and work normally. No `start Major` prompt is required.
+
+## Optional evidence-first path
+
+For a new or untrusted project, keep the stricter ramp:
+
+```text
+observe → assist → build → unattended
 ```
 
-Only then may a visible foreground Major cycle run:
+The shadow/grade machinery remains available when you deliberately want it. It is not required for an owner-approved trusted project to enter foreground build mode.
 
-```sh
-major run jss-tool \
-  --goal "Ship the smallest credible end-to-end JSS MVP" \
-  --foreground
-```
-
-Emergency stop:
+## Emergency stop
 
 ```sh
 major stop
@@ -144,21 +119,27 @@ Resume after inspection:
 major start
 ```
 
+## Minimum safety floor
+
+Major should not turn ordinary reversible development into approval ceremony. The hard boundaries are:
+
+- never expose or commit secrets;
+- no new paid API/credit spend without explicit authority;
+- no destructive/irreversible production-data changes without explicit authority;
+- no credential/ownership/DNS or production security-policy changes without explicit authority;
+- client/candidate/PII data stays inside its project boundary and never enters global memory.
+
+Everything else that is normal reversible engineering may proceed in owner-approved `build`: inspect, edit, branch, worktree, test, browser QA, CI repair, feature-branch pushes, PRs, previews and already-authorized project integrations.
+
 ## Built, validated, ready
 
 Major uses these terms deliberately:
 
 - **BUILT** — implementation exists.
-- **VALIDATED** — relevant deterministic checks plus an independent grader support the claim.
+- **VALIDATED** — relevant deterministic checks plus independent evidence support the claim.
 - **READY** — a representative real-world outcome succeeded under the intended trust profile.
 
-Builder-authored CI is useful but does not make Major ready.
-
-The first field gate is JSS in `workshop/observe`: Major must propose sensible P0/task/worker/tool/evidence plans while a human/gstack driver performs the work. A different provider grades the shadow plan. Three consecutive passes earn `assist`.
-
-The second gate is JSS in `workshop/assist`: Major must make correct real product progress in one visible bounded run, respect its worker/time limits, persist state, respect owner gates and leave objective evidence. A different provider grades the result before `build` can be earned.
-
-Surface Talent remains `client/observe` during this pilot.
+Owner approval grants authority; it does not convert an unproven result into evidence.
 
 ## One kernel, two profiles
 
@@ -188,7 +169,7 @@ reasoning/synthesis → routed model(s)
 
 ## Ruflo
 
-Ruflo is optional subordinate infrastructure, not Major's source of truth and not a global pilot dependency. It can be enabled later for trusted workshop projects if real runs show that its swarm/memory primitives improve outcomes enough to justify coordination and blast-radius cost.
+Ruflo is optional subordinate infrastructure, not Major's source of truth and not a global dependency. Enable it only where real project results show that it improves outcomes enough to justify the extra orchestration.
 
 ## Rules, skills and memory
 
@@ -202,6 +183,4 @@ Ruflo is optional subordinate infrastructure, not Major's source of truth and no
 
 ## Runtime migration boundary
 
-Major v0.4 is **built**, not yet **ready**. The v1 runtime remains temporarily as a migration reference until the JSS shadow gate, assist pilot and independent grades pass. Then obsolete v1 code/tests/docs are removed under the legacy-cleanup protocol.
-
-See `docs/migrations/major-v2-legacy-receipt.md`.
+Major v0.4.1 keeps the evidence-based trust ramp available while adding an explicit owner-approved foreground build fast path. Unattended authority remains separately earned.

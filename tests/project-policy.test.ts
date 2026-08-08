@@ -68,9 +68,10 @@ describe('Major project trust policy', () => {
     expect(policy.allowBackground).toBe(false);
     expect(policy.allowCrossProjectMemory).toBe(false);
     expect(policy.allowPaidSpend).toBe(false);
+    expect(policy.ownerApprovedBuild).toBe(false);
   });
 
-  it('supports a foreground assist pilot only after the three-shadow gate', () => {
+  it('supports the evidence-earned assist path', () => {
     const policy = earnAssist();
     expect(policy.maxWorkers).toBe(3);
     expect(policy.maxRunMinutes).toBe(30);
@@ -80,21 +81,79 @@ describe('Major project trust policy', () => {
     expect(getProjectPolicy('jss-tool', '/tmp/jss-tool').trust).toBe('assist');
   });
 
-  it('keeps client projects observe-only and isolated during the pilot', () => {
+  it('allows the owner to fast-track a project directly to foreground build mode', () => {
+    const policy = configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath: '/tmp/jss-tool',
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+      allowExternalWrites: true,
+    });
+    expect(policy.trust).toBe('build');
+    expect(policy.ownerApprovedBuild).toBe(true);
+    expect(policy.maxWorkers).toBe(6);
+    expect(policy.maxRunMinutes).toBe(120);
+    expect(policy.allowBackground).toBe(false);
+    expect(policy.allowExternalWrites).toBe(true);
+    expect(policy.allowPaidSpend).toBe(false);
+    expect(policy.allowCrossProjectMemory).toBe(true);
+  });
+
+  it('keeps client knowledge isolated even when owner-approved for build work', () => {
     const policy = configureProjectPolicy({
       project: 'surface-talent',
       repoPath: '/tmp/surface-talent',
       projectClass: 'client',
-      trust: 'observe',
+      trust: 'build',
+      ownerApprovedBuild: true,
+      allowExternalWrites: true,
     });
-    expect(policy.trust).toBe('observe');
-    expect(policy.maxWorkers).toBe(0);
+    expect(policy.trust).toBe('build');
+    expect(policy.maxWorkers).toBe(6);
+    expect(policy.allowExternalWrites).toBe(true);
     expect(policy.allowCrossProjectMemory).toBe(false);
-    expect(policy.allowExternalWrites).toBe(false);
     expect(policy.allowPaidSpend).toBe(false);
   });
 
-  it('requires a fresh independent execution grade at each higher trust promotion', () => {
+  it('still requires a fresh independent build-mode grade before unattended promotion', () => {
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath: '/tmp/jss-tool',
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+
+    expect(() =>
+      configureProjectPolicy({
+        project: 'jss-tool',
+        repoPath: '/tmp/jss-tool',
+        projectClass: 'workshop',
+        trust: 'unattended',
+      }),
+    ).toThrow(/fresh independent execution grade/);
+
+    recordIndependentGrade({
+      project: 'jss-tool',
+      repoPath: '/tmp/jss-tool',
+      provider: 'codex',
+      result: 'pass',
+      evidence: 'Independent review of a representative build-mode run passed.',
+      goalId: 'goal-1',
+    });
+
+    const unattended = configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath: '/tmp/jss-tool',
+      projectClass: 'workshop',
+      trust: 'unattended',
+    });
+    expect(unattended.maxWorkers).toBe(8);
+    expect(unattended.allowBackground).toBe(true);
+  });
+
+  it('retains the evidence-based promotion path when owner approval is not used', () => {
     earnAssist();
 
     expect(() =>
@@ -123,33 +182,6 @@ describe('Major project trust policy', () => {
     });
     expect(built.maxWorkers).toBe(6);
     expect(built.allowBackground).toBe(false);
-
-    expect(() =>
-      configureProjectPolicy({
-        project: 'jss-tool',
-        repoPath: '/tmp/jss-tool',
-        projectClass: 'workshop',
-        trust: 'unattended',
-      }),
-    ).toThrow(/fresh independent execution grade/);
-
-    recordIndependentGrade({
-      project: 'jss-tool',
-      repoPath: '/tmp/jss-tool',
-      provider: 'codex',
-      result: 'pass',
-      evidence: 'Independent review of a representative build-mode run passed.',
-      goalId: 'goal-1',
-    });
-
-    const unattended = configureProjectPolicy({
-      project: 'jss-tool',
-      repoPath: '/tmp/jss-tool',
-      projectClass: 'workshop',
-      trust: 'unattended',
-    });
-    expect(unattended.maxWorkers).toBe(8);
-    expect(unattended.allowBackground).toBe(true);
   });
 
   it('provides a global kill switch that can be cleared explicitly', () => {
