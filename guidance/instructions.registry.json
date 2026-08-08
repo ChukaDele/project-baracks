@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 1,
   "entries": [
     {
       "id": "instruction-precedence",
@@ -63,7 +63,7 @@
     },
     {
       "id": "roadmap-sync",
-      "title": "Roadmap-synchronisation rules",
+      "title": "Project state and roadmap synchronisation rules",
       "path": "guidance/roadmap-sync.md",
       "status": "active"
     }
