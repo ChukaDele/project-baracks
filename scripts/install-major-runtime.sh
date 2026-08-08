@@ -55,10 +55,12 @@ hooks["SessionStart"] = filtered
 path.write_text(json.dumps(data, indent=2) + "\n")
 PY
 
-# No login daemon by default. Foreground build mode is the normal active-work posture;
+# Pilot posture: no auto-start daemon. Foreground build mode is the normal active-work posture;
 # unattended/background execution remains a separate explicit trust level.
 launchctl bootout "gui/$UID/com.chuka.major-supervisor" >/dev/null 2>&1 || true
 rm -f "$LEGACY_PLIST"
+
+# Ruflo is NOT attached globally. It remains optional and project-scoped.
 
 if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
   if [ ! -x "$MAJOR_HOME/antigravity-venv/bin/python" ]; then
@@ -94,6 +96,9 @@ Owner-approved JSS working mode:
 
 Owner-approved Surface Talent working mode:
   major project configure surface-talent --class client --trust build --owner-approved --allow-external-writes
+
+Optional evidence-first mode for any new/untrusted project:
+  major project configure <project> --class unknown --trust observe
 
 Then work normally in a fresh Claude/Codex/Cursor session opened inside each repo.
 No "start Major" prompt is required.
