@@ -62,7 +62,7 @@ if registered_internal != actual_internal:
     )
 for required_skill in [
     'source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code',
-    'learning-capture', 'remote-first-web-development', 'dev-server-management'
+    'learning-capture', 'remote-first-web-development', 'human-blocker-orchestration', 'dev-server-management'
 ]:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
@@ -150,6 +150,8 @@ grep -Fq "skillify" guidance/global-worker-rules.md || fail "skillify rule missi
 grep -Fq "major learn capture" guidance/global-worker-rules.md || fail "explicit correction capture rule missing"
 grep -Fq "remote-first-web-development" guidance/global-worker-rules.md || fail "remote-first web rule missing"
 grep -Fq "major web preflight" guidance/global-worker-rules.md || fail "remote browser-target guard missing"
+grep -Fq "human-blocker-orchestration" guidance/global-worker-rules.md || fail "human blocker rule missing"
+grep -Fq "notify-human-blocker.sh" skills/internal/human-blocker-orchestration/SKILL.md || fail "human notification command missing"
 grep -Fq '$HOME/.local/bin/major session attach' guidance/global-worker-rules.md || fail "GUI-safe Major attach command missing"
 grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-rules.sh || fail "Claude global rules target missing"
 grep -Fq '.codex' scripts/install-major-global-rules.sh || fail "Codex global rules target missing"

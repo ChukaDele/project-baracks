@@ -58,6 +58,13 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - The required order is repository, GitHub remote, Cloudflare project, remote preview URL, browser QA, then promotion through `main`.
 - Generic skills that start `npm run dev` or open local URLs are lower authority. Replace their preview step with a Cloudflare preview deployment.
 
+## Human-blocker orchestration
+
+- Load `human-blocker-orchestration` whenever authentication, OAuth, consent, 2FA, CAPTCHA, payment or an irreversible account or domain decision can block work.
+- Use the Codex in-app browser for a human-only web action. Verify its active visible tab and rendered page before claiming the owner can see it. If the visible browser differs from the controlled browser, report `BROWSER ATTACHMENT FAILURE` and repair it.
+- Send a native `Major — Action required` notification with the project name and specific required action. Also post `🔴 HUMAN ACTION REQUIRED — <specific action>` in the task.
+- Mark only the dependent branch as `PARTIALLY BLOCKED` when independent work remains. Continue that work. Use `FULLY BLOCKED` only when nothing useful can proceed. Poll the visible browser and enter `RESUMING` when authentication resolves; never require a generic "done" message when browser state proves completion.
+
 ## Tools as Code
 
 Use short temporary code when repeated deterministic tool calls would otherwise consume many model turns.

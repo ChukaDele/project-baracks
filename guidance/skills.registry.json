@@ -22,6 +22,7 @@
     {"id":"skillify","source":"major-internal","availability":"all-projects","load":"reusable-successful-procedure-or-recurring-solved-failure"},
     {"id":"tools-as-code","source":"major-internal","availability":"all-projects","load":"repeated-retrieval-filter-dedupe-rank-transform-tool-composition"},
     {"id":"remote-first-web-development","source":"major-internal","availability":"web-projects","load":"all-web-project-ui-work-browser-preview-visual-qa-acceptance"},
+    {"id":"human-blocker-orchestration","source":"major-internal","availability":"all-projects","load":"authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"},
     {"id":"dev-server-management","source":"major-internal","availability":"web-projects","load":"explicit-owner-approved-localhost-exception-only"},
     {"id":"source-ingestion","source":"major-internal","availability":"all-projects","load":"named-url-file-video-audio-document-primary-source"},
     {"id":"knowledge-work","source":"major-internal","availability":"all-projects","load":"research-strategy-synthesis-comparison-decision-work"},
