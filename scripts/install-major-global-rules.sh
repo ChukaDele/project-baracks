@@ -3,9 +3,13 @@ set -euo pipefail
 
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GLOBAL_SRC="$MAJOR_ROOT/guidance/global-worker-rules.md"
+REMOTE_FIRST_SKILL_SRC="$MAJOR_ROOT/skills/internal/remote-first-web-development/SKILL.md"
+REMOTE_FIRST_SKILL_DEST="$HOME/.major/skills/internal/remote-first-web-development/SKILL.md"
 
 mkdir -p "$HOME/.major" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}" "$HOME/.gemini" "$HOME/.cursor/rules/major-global"
 cp "$GLOBAL_SRC" "$HOME/.major/global-worker-rules.md"
+mkdir -p "$(dirname "$REMOTE_FIRST_SKILL_DEST")"
+cp "$REMOTE_FIRST_SKILL_SRC" "$REMOTE_FIRST_SKILL_DEST"
 
 # Claude Code: global user memory imports one Major-managed file.
 CLAUDE_RULE="$HOME/.claude/major-global.md"
@@ -75,6 +79,7 @@ Major global worker rules installed for:
 - Codex: $CODEX_RULE
 - Antigravity: $GEMINI_RULE
 - Cursor local global rule: $CURSOR_RULE
+- Major remote-first web skill: $REMOTE_FIRST_SKILL_DEST
 
 Cursor note:
 - This terminal-installed rule is local to this Mac.
