@@ -21,6 +21,8 @@ Only open the URL when the preflight passes.
 
 The preflight rejects `localhost`, loopback IPs, `.local`, non-HTTPS URLs and hosts outside `workers.dev` or `pages.dev`. Do not replace a rejected local target with another port.
 
+A trusted CLI may temporarily receive an OAuth callback on loopback during provider authentication. That narrow exception never applies to an application preview, development URL, visual QA target, E2E target or user-facing link. The preflight continues to reject every local application target.
+
 ## Iteration
 
 Build locally without serving. Then use `code → build → commit → push branch → Cloudflare preview → browser QA → fix`. Promote accepted work through `main`.

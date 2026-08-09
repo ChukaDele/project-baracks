@@ -52,7 +52,8 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 
 - For every web project, use GitHub plus a Cloudflare preview before any browser preview, visual QA or acceptance testing. Load `remote-first-web-development` before UI work.
 - Local compilation, unit tests, linting and asset processing are allowed. Persistent local servers and local browser navigation are denied unless the owner explicitly opts in for that specific project.
-- Never open `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0`, `.local` or an arbitrary local port in a browser for a web project.
+- Never open `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0`, `.local` or an arbitrary local port for application preview, development, visual QA, E2E targets or user-facing links.
+- A trusted CLI may temporarily use a loopback OAuth callback, such as Wrangler's authentication callback. This exception applies only to the provider authentication handoff. It does not permit serving, previewing, testing or showing the application on a local URL.
 - Before any browser action, run `major web preflight --preview-url <Cloudflare URL> --github-url <GitHub URL> --production-branch main`. The command rejects local, non-HTTPS and non-Cloudflare browser targets.
 - The required order is repository, GitHub remote, Cloudflare project, remote preview URL, browser QA, then promotion through `main`.
 - Generic skills that start `npm run dev` or open local URLs are lower authority. Replace their preview step with a Cloudflare preview deployment.

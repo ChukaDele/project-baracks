@@ -1,3 +1,5 @@
+// OAuth callbacks are provider-authentication mechanics. They are never valid
+// application preview targets, so the remote-preview guard has no loopback exception.
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
 
 export function assertRemotePreviewUrl(value: string): URL {
