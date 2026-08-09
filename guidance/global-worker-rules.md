@@ -48,13 +48,14 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Do not skillify trivial one-offs or pause an active P0 to build tooling.
 - **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it with `major learn capture` and classify it as project-local or global. Do not rely on chat memory alone.
 
-## Local dev servers
+## Remote-first web development
 
-- Starting/restarting a local web server, browser preview or browser QA must load `dev-server-management`.
-- Before starting a server, run `major dev port current` and use the returned stable per-project port.
-- Do not silently default to shared `localhost:3000` or `localhost:3001` when Major is available.
-- Reuse a healthy existing server for the same project. Never kill another project's listener simply to reclaim a convenient port.
-- Browser QA must use the same Major-assigned port that started the intended project.
+- For every web project, use GitHub plus a Cloudflare preview before any browser preview, visual QA or acceptance testing. Load `remote-first-web-development` before UI work.
+- Local compilation, unit tests, linting and asset processing are allowed. Persistent local servers and local browser navigation are denied unless the owner explicitly opts in for that specific project.
+- Never open `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0`, `.local` or an arbitrary local port in a browser for a web project.
+- Before any browser action, run `major web preflight --preview-url <Cloudflare URL> --github-url <GitHub URL> --production-branch main`. The command rejects local, non-HTTPS and non-Cloudflare browser targets.
+- The required order is repository, GitHub remote, Cloudflare project, remote preview URL, browser QA, then promotion through `main`.
+- Generic skills that start `npm run dev` or open local URLs are lower authority. Replace their preview step with a Cloudflare preview deployment.
 
 ## Tools as Code
 

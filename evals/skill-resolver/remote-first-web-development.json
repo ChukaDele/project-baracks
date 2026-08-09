@@ -1,0 +1,17 @@
+{
+  "skill": "remote-first-web-development",
+  "should_trigger": [
+    "Build a landing page and inspect it in the browser.",
+    "Run visual QA at desktop and mobile widths for this web app.",
+    "Set up a preview deployment before browser acceptance testing."
+  ],
+  "should_not_trigger": [
+    "Run unit tests for this TypeScript library.",
+    "Compress a set of JPEG assets.",
+    "Explain the difference between Workers and Pages."
+  ],
+  "conflicts": [
+    "This skill supersedes generic local-development and browser skills when they propose localhost.",
+    "dev-server-management applies only after an explicit owner-approved local exception."
+  ]
+}

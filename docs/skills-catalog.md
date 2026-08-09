@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 28
+## Major internal skills — 29
 
 These are canonical Major-owned skills.
 
@@ -17,7 +17,8 @@ These are canonical Major-owned skills.
 | `learning-capture` | Harvest explicit corrections/repeated mistakes after fixing the real task; classify project/global/policy/skill/memory. |
 | `skillify` | Turn a successful reusable procedure into a tested skill pack after the real task works. |
 | `tools-as-code` | Compose repeated deterministic retrieval/filter/dedupe/rank/transform mechanics with short temporary code. |
-| `dev-server-management` | Allocate/reuse stable per-project local dev ports and prevent 3000/3001 collisions across simultaneous projects. |
+| `remote-first-web-development` | Require GitHub plus a Cloudflare preview for browser work and block local browser targets. |
+| `dev-server-management` | Coordinate an explicitly approved local exception only. |
 | `source-ingestion` | Retrieve named primary sources with the right connector/CLI/browser/local tool before analysis. |
 | `knowledge-work` | Research/strategy/synthesis with minimum credible evidence, independent angles and skeptic review where justified. |
 | `competitive-product-audit` | Learn direct/adjacent product patterns before reinventing workflows. |
@@ -109,7 +110,7 @@ These are tools/capability packs, not policy authorities and not necessarily age
 | `yt-dlp` | YouTube/media metadata, subtitles and audio extraction | Captions first; audio + MacWhisper fallback. |
 | GStack | Dynamic/authenticated browser work, scraping and codifying repeated browser procedures | Install namespaced; proactive routing and telemetry off; Major remains the router. |
 | Native connectors/APIs | GitHub, Google, Figma, mail/calendar etc. | Prefer over browser scraping when available. |
-| Major dev-port allocator | Stable local web-server ports across concurrent projects | `major dev port current`; avoid shared 3000/3001 defaults. |
+| Major remote-preview preflight | Block local or non-Cloudflare browser targets | `major web preflight` before browser work. |
 | Major learning candidate queue | Durable process-learning inbox | `major learn capture` after explicit corrections/repeated mistakes once the real task is fixed. |
 
 ## Default project / work profiles
@@ -124,7 +125,7 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### `web-ui`
 
-`core` + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. Add `vercel-deploy` when the project uses Vercel. Starting a local web preview also triggers `dev-server-management`.
+`core` + `remote-first-web-development` + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work.
 
 ### `exploratory`
 
@@ -134,7 +135,8 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 - Start substantive work → `skill-resolver`.
 - Explicit correction / repeated mistake / "we fixed this before" → `learning-capture` after the real task is fixed.
-- Start/restart/local preview/browser QA/dev server → `dev-server-management`.
+- Web UI implementation, browser preview or browser QA → `remote-first-web-development`.
+- Explicit owner-approved local exception → `dev-server-management`.
 - Reusable successful procedure / recurring solved failure → `skillify` after the real task succeeds.
 - Repeated deterministic tool/retrieval mechanics → `tools-as-code`.
 - Named URL/video/file/source → `source-ingestion`.

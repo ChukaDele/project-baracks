@@ -1,17 +1,17 @@
 {
   "skill": "dev-server-management",
   "should_trigger": [
-    "Start the Bredge app locally and open the browser preview without colliding with JSS.",
-    "Use another localhost port because 3001 is already used by another project.",
-    "Run Playwright against this project's local dev server while Surface Talent is also running."
+    "Chuka explicitly approved a local browser exception for this project; allocate a safe port.",
+    "The documented local-preview exception has expired; renew its single-project port assignment.",
+    "Use the owner-approved local runtime for a hardware-only debugging session."
   ],
   "should_not_trigger": [
     "What is the default PostgreSQL port?",
     "Explain the difference between localhost and 127.0.0.1.",
-    "Deploy the existing preview to Vercel production."
+    "Open the Cloudflare branch preview and run responsive QA."
   ],
   "conflicts": [
-    "webapp-testing/playwright own browser test technique; dev-server-management owns stable local server/port coordination.",
-    "root-cause-qa owns diagnosis of a broken app; dev-server-management owns the shared local runtime resource."
+    "remote-first-web-development owns normal browser preview and QA; dev-server-management applies only after an explicit owner exception.",
+    "root-cause-qa owns diagnosis; dev-server-management only coordinates the approved local runtime."
   ]
 }

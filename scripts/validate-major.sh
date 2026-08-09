@@ -62,7 +62,7 @@ if registered_internal != actual_internal:
     )
 for required_skill in [
     'source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code',
-    'learning-capture', 'dev-server-management'
+    'learning-capture', 'remote-first-web-development', 'dev-server-management'
 ]:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
@@ -85,6 +85,7 @@ for fixture in [
     'evals/skill-resolver/skillify.json',
     'evals/skill-resolver/tools-as-code.json',
     'evals/skill-resolver/learning-capture.json',
+    'evals/skill-resolver/remote-first-web-development.json',
     'evals/skill-resolver/dev-server-management.json',
 ]:
     if not Path(fixture).is_file():
@@ -147,8 +148,8 @@ grep -Fq "Three consecutive passing shadow grades" guidance/global-worker-rules.
 grep -Fq "Tools as Code" guidance/global-worker-rules.md || fail "Tools-as-Code rule missing"
 grep -Fq "skillify" guidance/global-worker-rules.md || fail "skillify rule missing"
 grep -Fq "major learn capture" guidance/global-worker-rules.md || fail "explicit correction capture rule missing"
-grep -Fq "major dev port current" guidance/global-worker-rules.md || fail "deterministic dev-port rule missing"
-grep -Fq "localhost:3000" guidance/global-worker-rules.md || fail "shared localhost default guard missing"
+grep -Fq "remote-first-web-development" guidance/global-worker-rules.md || fail "remote-first web rule missing"
+grep -Fq "major web preflight" guidance/global-worker-rules.md || fail "remote browser-target guard missing"
 grep -Fq '$HOME/.local/bin/major session attach' guidance/global-worker-rules.md || fail "GUI-safe Major attach command missing"
 grep -Fq '.claude/CLAUDE.md' scripts/install-major-global-rules.sh || fail "Claude global rules target missing"
 grep -Fq '.codex' scripts/install-major-global-rules.sh || fail "Codex global rules target missing"

@@ -36,6 +36,7 @@ import {
 } from './state.js';
 import { runDaemon, runGoalCycle, supervisorSnapshot } from './runtime.js';
 import { runGatewayCommand, runWorker } from './worker.js';
+import { assertRemotePreviewUrl } from '../web/remote-preview.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -109,6 +110,18 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'start') {
     clearGlobalStop();
     console.log('Major global kill switch: CLEARED');
+    return true;
+  }
+
+  if (command === 'web' && args[1] === 'preflight') {
+    const preview = assertRemotePreviewUrl(requireFlag(args, '--preview-url'));
+    const githubUrl = requireFlag(args, '--github-url');
+    if (!/^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(githubUrl)) {
+      throw new Error(`remote web preflight requires a GitHub repository URL, received ${githubUrl}`);
+    }
+    const productionBranch = flag(args, '--production-branch') ?? 'main';
+    if (productionBranch !== 'main') throw new Error(`remote web preflight requires main as the production branch, received ${productionBranch}`);
+    console.log(`REMOTE WEB PREFLIGHT: PASS\npreview: ${preview.href}\ngithub: ${githubUrl}\nproduction branch: main`);
     return true;
   }
 

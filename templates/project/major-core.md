@@ -41,17 +41,9 @@ For knowledge work, the equivalent is: define the decision, identify the biggest
 - Do not skillify trivial one-offs or pause P0 work to build infrastructure.
 - An explicit user correction or “we already fixed this” statement is a learning event. Fix the real task first, then capture the lesson with `major learn capture`; do not rely on chat memory alone.
 
-## Local development servers
+## Remote-first web development
 
-When starting/restarting a local web app, browser preview or browser QA:
-
-- load `dev-server-management`;
-- run `major dev port current` before starting the server;
-- use the returned stable per-project port explicitly;
-- never silently default to shared localhost ports 3000/3001 when Major is available;
-- reuse a healthy server for the same project instead of starting duplicates;
-- do not kill another project’s listener just to reclaim a convenient port;
-- point browser QA at the same Major-assigned port.
+For web UI work, load `remote-first-web-development` before implementation. Build locally without serving, then use GitHub plus a Cloudflare preview for all browser work. Before opening a browser target, run `major web preflight` against the Cloudflare preview URL and GitHub repository URL. Local browser targets are denied unless the owner explicitly grants a project-specific exception.
 
 ## Build behavior
 
