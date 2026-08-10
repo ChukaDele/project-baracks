@@ -5,14 +5,38 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="$HOME/.local/bin"
 MAJOR_HOME="$HOME/.major"
 LEGACY_PLIST="$HOME/Library/LaunchAgents/com.chuka.major-supervisor.plist"
+RELEASE_RECORD="$MAJOR_HOME/installed-release.json"
 
 mkdir -p "$BIN_DIR" "$MAJOR_HOME/logs"
 
 cd "$ROOT"
+
+if [ "${MAJOR_ALLOW_DIRTY_INSTALL:-0}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+  echo "ERROR: refusing to install Major from a dirty checkout." >&2
+  echo "Commit/stash/remove local changes first, or set MAJOR_ALLOW_DIRTY_INSTALL=1 only for an intentional local pilot." >&2
+  exit 1
+fi
+
+INSTALL_SHA="$(git rev-parse HEAD)"
+INSTALL_BRANCH="$(git branch --show-current 2>/dev/null || true)"
+INSTALL_BRANCH="${INSTALL_BRANCH:-detached}"
+INSTALL_VERSION="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('package.json','utf8')).version)")"
+
 corepack enable >/dev/null 2>&1 || true
 pnpm install --frozen-lockfile
+
+echo "Running Major release gate before installation..."
+bash scripts/validate-major.sh
+if [ -f scripts/validate-major-stability.sh ]; then
+  bash scripts/validate-major-stability.sh
+fi
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
 pnpm build
 
+# Only replace the active runtime after every release check passes.
 cat > "$BIN_DIR/major" <<EOF
 #!/bin/sh
 exec node "$ROOT/dist/entry.js" "\$@"
@@ -70,10 +94,29 @@ if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 
     echo "WARN: Antigravity SDK install failed; Major will route around this worker until fixed."
 fi
 
+python3 - "$RELEASE_RECORD" "$INSTALL_VERSION" "$INSTALL_SHA" "$INSTALL_BRANCH" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path(sys.argv[1])
+record = {
+    "version": sys.argv[2],
+    "sha": sys.argv[3],
+    "branch": sys.argv[4],
+    "installedAt": datetime.now(timezone.utc).isoformat(),
+    "releaseGate": "passed",
+}
+path.write_text(json.dumps(record, indent=2) + "\n")
+PY
+
 cat <<EOF
-Major v0.4.3 control plane installed.
+Major v${INSTALL_VERSION} control plane installed from validated source.
 
 CLI:        $BIN_DIR/major
+Release:    $INSTALL_SHA ($INSTALL_BRANCH)
+Record:     $RELEASE_RECORD
 State:      $MAJOR_HOME/supervisor-state.json
 Policies:   $MAJOR_HOME/project-policies.json
 Kill switch:$MAJOR_HOME/STOP
