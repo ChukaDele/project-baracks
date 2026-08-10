@@ -4,11 +4,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="$HOME/.local/bin"
 MAJOR_HOME="$HOME/.major"
+RELEASES_DIR="$MAJOR_HOME/releases"
 LEGACY_PLIST="$HOME/Library/LaunchAgents/com.chuka.major-supervisor.plist"
 RELEASE_RECORD="$MAJOR_HOME/installed-release.json"
 
-mkdir -p "$BIN_DIR" "$MAJOR_HOME/logs"
-
+mkdir -p "$BIN_DIR" "$MAJOR_HOME/logs" "$RELEASES_DIR"
 cd "$ROOT"
 
 if [ "${MAJOR_ALLOW_DIRTY_INSTALL:-0}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=all)" ]; then
@@ -21,11 +21,32 @@ INSTALL_SHA="$(git rev-parse HEAD)"
 INSTALL_BRANCH="$(git branch --show-current 2>/dev/null || true)"
 INSTALL_BRANCH="${INSTALL_BRANCH:-detached}"
 INSTALL_VERSION="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('package.json','utf8')).version)")"
+RELEASE_DIR="$RELEASES_DIR/$INSTALL_SHA"
+STAGE_DIR="$RELEASES_DIR/.staging-$INSTALL_SHA-$$"
+WRAPPER_TMP="$BIN_DIR/.major-$$.tmp"
+RECORD_TMP="$MAJOR_HOME/.installed-release-$$.tmp"
+
+cleanup() {
+  rm -rf "$STAGE_DIR" "$WRAPPER_TMP" "$RECORD_TMP"
+}
+trap cleanup EXIT
 
 if [ "${MAJOR_ALLOW_NON_MAIN_INSTALL:-0}" != "1" ] && [ "$INSTALL_BRANCH" != "main" ]; then
   echo "ERROR: refusing to install Major from branch '$INSTALL_BRANCH'." >&2
   echo "Install releases from main after green CI. Set MAJOR_ALLOW_NON_MAIN_INSTALL=1 only for an intentional field pilot." >&2
   exit 1
+fi
+
+if [ "${MAJOR_ALLOW_UNPUSHED_INSTALL:-0}" != "1" ]; then
+  git fetch --quiet origin main
+  REMOTE_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+  if [ "$INSTALL_SHA" != "$REMOTE_MAIN_SHA" ]; then
+    echo "ERROR: refusing to install Major because local HEAD is not the current origin/main." >&2
+    echo "local:  $INSTALL_SHA" >&2
+    echo "remote: $REMOTE_MAIN_SHA" >&2
+    echo "Pull the green main release first. Use MAJOR_ALLOW_UNPUSHED_INSTALL=1 only for an intentional local pilot." >&2
+    exit 1
+  fi
 fi
 
 corepack enable >/dev/null 2>&1 || true
@@ -42,31 +63,27 @@ pnpm typecheck
 pnpm test
 pnpm build
 
-# Only replace the active runtime after every release check passes. The wrapper
-# is pinned to the exact validated commit so a later checkout/build cannot
-# silently change the globally active Major implementation.
-cat > "$BIN_DIR/major" <<EOF
-#!/bin/sh
-set -eu
-ROOT="$ROOT"
-EXPECTED_SHA="$INSTALL_SHA"
-CURRENT_SHA="\$(git -C "\$ROOT" rev-parse HEAD 2>/dev/null || true)"
-if [ "\$CURRENT_SHA" != "\$EXPECTED_SHA" ]; then
-  echo "MAJOR RUNTIME REFUSAL: installed release is \$EXPECTED_SHA but source checkout is \${CURRENT_SHA:-unavailable}." >&2
-  echo "Return project-baracks to the installed commit or install a new fully validated main release." >&2
-  exit 78
-fi
-exec node "\$ROOT/dist/entry.js" "\$@"
+# Build an immutable runtime snapshot. The globally active Major command must
+# never execute dist/node_modules from the mutable development checkout.
+rm -rf "$STAGE_DIR"
+mkdir -p "$STAGE_DIR"
+cp package.json pnpm-lock.yaml "$STAGE_DIR/"
+cp -R dist "$STAGE_DIR/dist"
+pnpm install --prod --frozen-lockfile --dir "$STAGE_DIR"
+
+cat > "$STAGE_DIR/release.json" <<EOF
+{
+  "version": "$INSTALL_VERSION",
+  "sha": "$INSTALL_SHA",
+  "branch": "$INSTALL_BRANCH"
+}
 EOF
-chmod +x "$BIN_DIR/major"
 
-if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-  if ! grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then
-    printf '\n# Major global CLI\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.zshrc"
-  fi
-  export PATH="$BIN_DIR:$PATH"
-fi
+rm -rf "$RELEASE_DIR"
+mv "$STAGE_DIR" "$RELEASE_DIR"
 
+# Install global rules/skills from the validated source before swapping the
+# active CLI. A failure here leaves the previous executable in place.
 bash "$ROOT/scripts/install-major-global-rules.sh"
 
 mkdir -p "$HOME/.claude"
@@ -102,7 +119,6 @@ launchctl bootout "gui/$UID/com.chuka.major-supervisor" >/dev/null 2>&1 || true
 rm -f "$LEGACY_PLIST"
 
 # Ruflo is NOT attached globally. It remains optional and project-scoped.
-
 if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
   if [ ! -x "$MAJOR_HOME/antigravity-venv/bin/python" ]; then
     python3 -m venv "$MAJOR_HOME/antigravity-venv"
@@ -111,7 +127,16 @@ if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 
     echo "WARN: Antigravity SDK install failed; Major will route around this worker until fixed."
 fi
 
-python3 - "$RELEASE_RECORD" "$INSTALL_VERSION" "$INSTALL_SHA" "$INSTALL_BRANCH" <<'PY'
+# Stage the wrapper and release record, then swap the wrapper only after every
+# required installation step above has succeeded.
+cat > "$WRAPPER_TMP" <<EOF
+#!/bin/sh
+set -eu
+exec node "$RELEASE_DIR/dist/entry.js" "\$@"
+EOF
+chmod +x "$WRAPPER_TMP"
+
+python3 - "$RECORD_TMP" "$INSTALL_VERSION" "$INSTALL_SHA" "$INSTALL_BRANCH" "$RELEASE_DIR" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
@@ -122,18 +147,31 @@ record = {
     "version": sys.argv[2],
     "sha": sys.argv[3],
     "branch": sys.argv[4],
+    "releaseDir": sys.argv[5],
     "installedAt": datetime.now(timezone.utc).isoformat(),
     "releaseGate": "passed",
-    "runtimePinnedToSha": True,
+    "runtimeImmutableSnapshot": True,
 }
 path.write_text(json.dumps(record, indent=2) + "\n")
 PY
 
+mv "$RECORD_TMP" "$RELEASE_RECORD"
+mv "$WRAPPER_TMP" "$BIN_DIR/major"
+chmod +x "$BIN_DIR/major"
+
+if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+  if ! grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then
+    printf '\n# Major global CLI\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.zshrc"
+  fi
+  export PATH="$BIN_DIR:$PATH"
+fi
+
 cat <<EOF
-Major v${INSTALL_VERSION} control plane installed from validated source.
+Major v${INSTALL_VERSION} control plane installed from validated main.
 
 CLI:        $BIN_DIR/major
 Release:    $INSTALL_SHA ($INSTALL_BRANCH)
+Runtime:    $RELEASE_DIR
 Record:     $RELEASE_RECORD
 State:      $MAJOR_HOME/supervisor-state.json
 Policies:   $MAJOR_HOME/project-policies.json
@@ -144,9 +182,9 @@ Cursor:     global Major rules installed
 Antigravity:global Major rules installed
 
 RUNTIME INTEGRITY:
-- The active command is pinned to the exact validated SHA above.
-- If project-baracks later moves to another commit, Major fails loudly instead of silently running an unvalidated checkout.
-- Install normal releases from green main only; non-main installation is an explicit pilot override.
+- The active CLI runs from an immutable release snapshot under ~/.major/releases.
+- Editing, rebuilding, pulling or switching branches in project-baracks cannot silently change the installed runtime.
+- Normal installs require clean main equal to current origin/main plus the complete local release gate.
 
 NORMAL WORK MODE:
 - Major is present by default across supported agent tools.
