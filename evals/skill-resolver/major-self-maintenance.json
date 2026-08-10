@@ -1,0 +1,17 @@
+{
+  "skill": "major-self-maintenance",
+  "should_trigger": [
+    "Add this new reusable skill to Major.",
+    "Change Major's self-learning loop and merge it safely.",
+    "Major main is red after a direct skill commit; repair the system before more changes.",
+    "Update Major's routing or project boundary rules."
+  ],
+  "should_not_trigger": [
+    "Fix a JSS application workflow bug.",
+    "QA the Surface Talent candidate page.",
+    "Change the Bredge hero animation."
+  ],
+  "conflicts": [
+    "This skill governs how Major changes itself; the specialist skill still governs the substance of the change."
+  ]
+}
