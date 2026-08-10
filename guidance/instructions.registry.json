@@ -20,6 +20,12 @@
       "status": "active"
     },
     {
+      "id": "stability-invariants",
+      "title": "Cross-project context, learning, integration and self-maintenance invariants",
+      "path": "guidance/stability-invariants.md",
+      "status": "active"
+    },
+    {
       "id": "tool-routing-and-source-ingestion",
       "title": "Tool routing, fallback and primary-source ingestion rules",
       "path": "guidance/tool-routing-and-source-ingestion.md",

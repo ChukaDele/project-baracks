@@ -5,17 +5,58 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="$HOME/.local/bin"
 MAJOR_HOME="$HOME/.major"
 LEGACY_PLIST="$HOME/Library/LaunchAgents/com.chuka.major-supervisor.plist"
+RELEASE_RECORD="$MAJOR_HOME/installed-release.json"
 
 mkdir -p "$BIN_DIR" "$MAJOR_HOME/logs"
 
 cd "$ROOT"
+
+if [ "${MAJOR_ALLOW_DIRTY_INSTALL:-0}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+  echo "ERROR: refusing to install Major from a dirty checkout." >&2
+  echo "Commit/stash/remove local changes first, or set MAJOR_ALLOW_DIRTY_INSTALL=1 only for an intentional local pilot." >&2
+  exit 1
+fi
+
+INSTALL_SHA="$(git rev-parse HEAD)"
+INSTALL_BRANCH="$(git branch --show-current 2>/dev/null || true)"
+INSTALL_BRANCH="${INSTALL_BRANCH:-detached}"
+INSTALL_VERSION="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('package.json','utf8')).version)")"
+
+if [ "${MAJOR_ALLOW_NON_MAIN_INSTALL:-0}" != "1" ] && [ "$INSTALL_BRANCH" != "main" ]; then
+  echo "ERROR: refusing to install Major from branch '$INSTALL_BRANCH'." >&2
+  echo "Install releases from main after green CI. Set MAJOR_ALLOW_NON_MAIN_INSTALL=1 only for an intentional field pilot." >&2
+  exit 1
+fi
+
 corepack enable >/dev/null 2>&1 || true
 pnpm install --frozen-lockfile
+
+echo "Running Major release gate before installation..."
+bash scripts/validate-major.sh
+if [ -f scripts/validate-major-stability.sh ]; then
+  bash scripts/validate-major-stability.sh
+fi
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
 pnpm build
 
+# Only replace the active runtime after every release check passes. The wrapper
+# is pinned to the exact validated commit so a later checkout/build cannot
+# silently change the globally active Major implementation.
 cat > "$BIN_DIR/major" <<EOF
 #!/bin/sh
-exec node "$ROOT/dist/entry.js" "\$@"
+set -eu
+ROOT="$ROOT"
+EXPECTED_SHA="$INSTALL_SHA"
+CURRENT_SHA="\$(git -C "\$ROOT" rev-parse HEAD 2>/dev/null || true)"
+if [ "\$CURRENT_SHA" != "\$EXPECTED_SHA" ]; then
+  echo "MAJOR RUNTIME REFUSAL: installed release is \$EXPECTED_SHA but source checkout is \${CURRENT_SHA:-unavailable}." >&2
+  echo "Return project-baracks to the installed commit or install a new fully validated main release." >&2
+  exit 78
+fi
+exec node "\$ROOT/dist/entry.js" "\$@"
 EOF
 chmod +x "$BIN_DIR/major"
 
@@ -70,10 +111,30 @@ if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 
     echo "WARN: Antigravity SDK install failed; Major will route around this worker until fixed."
 fi
 
+python3 - "$RELEASE_RECORD" "$INSTALL_VERSION" "$INSTALL_SHA" "$INSTALL_BRANCH" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path(sys.argv[1])
+record = {
+    "version": sys.argv[2],
+    "sha": sys.argv[3],
+    "branch": sys.argv[4],
+    "installedAt": datetime.now(timezone.utc).isoformat(),
+    "releaseGate": "passed",
+    "runtimePinnedToSha": True,
+}
+path.write_text(json.dumps(record, indent=2) + "\n")
+PY
+
 cat <<EOF
-Major v0.4.3 control plane installed.
+Major v${INSTALL_VERSION} control plane installed from validated source.
 
 CLI:        $BIN_DIR/major
+Release:    $INSTALL_SHA ($INSTALL_BRANCH)
+Record:     $RELEASE_RECORD
 State:      $MAJOR_HOME/supervisor-state.json
 Policies:   $MAJOR_HOME/project-policies.json
 Kill switch:$MAJOR_HOME/STOP
@@ -81,6 +142,11 @@ Claude:     deterministic SessionStart attach installed
 Codex:      global Major rules installed
 Cursor:     global Major rules installed
 Antigravity:global Major rules installed
+
+RUNTIME INTEGRITY:
+- The active command is pinned to the exact validated SHA above.
+- If project-baracks later moves to another commit, Major fails loudly instead of silently running an unvalidated checkout.
+- Install normal releases from green main only; non-main installation is an explicit pilot override.
 
 NORMAL WORK MODE:
 - Major is present by default across supported agent tools.

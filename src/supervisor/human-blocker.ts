@@ -1,4 +1,9 @@
-export const BLOCKER_STATES = ['RUNNING', 'PARTIALLY_BLOCKED', 'FULLY_BLOCKED', 'RESUMING'] as const;
+export const BLOCKER_STATES = [
+  'RUNNING',
+  'PARTIALLY_BLOCKED',
+  'FULLY_BLOCKED',
+  'RESUMING',
+] as const;
 export type BlockerState = (typeof BLOCKER_STATES)[number];
 
 export interface VisibleBrowserState {
@@ -45,7 +50,11 @@ export function assertVisibleBrowserState(
     };
   }
 
-  if (!visible.rendered || active.hostname !== expected.hostname || active.hostname === 'localhost') {
+  if (
+    !visible.rendered ||
+    active.hostname !== expected.hostname ||
+    active.hostname === 'localhost'
+  ) {
     return {
       status: 'BROWSER_ATTACHMENT_FAILURE',
       message: `BROWSER ATTACHMENT FAILURE: expected rendered ${expected.hostname}, found ${active.hostname || 'no active host'}.`,

@@ -23,6 +23,9 @@ jobs:
       - name: Major doctrine / skill / legacy validation
         run: bash scripts/validate-major.sh
 
+      - name: Major stability / learning validation
+        run: bash scripts/validate-major-stability.sh
+
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

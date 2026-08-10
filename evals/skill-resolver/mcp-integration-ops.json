@@ -1,0 +1,17 @@
+{
+  "skill": "mcp-integration-ops",
+  "should_trigger": [
+    "The MCP server is installed but Codex cannot see its tools.",
+    "Google Calendar says connected but the actual call still fails.",
+    "Reconnect this provider and prove the integration works with a real read.",
+    "The agent keeps opening the browser even though we already have a native connector."
+  ],
+  "should_not_trigger": [
+    "Build a normal internal API endpoint.",
+    "Fix a CSS spacing issue.",
+    "Research public competitor pricing."
+  ],
+  "conflicts": [
+    "Tool-routing chooses the preferred capability; mcp-integration-ops repairs and proves the integration; mcp-builder is only for authoring an MCP server."
+  ]
+}

@@ -4,21 +4,29 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 29
+## Major internal skills — 37
 
 These are canonical Major-owned skills.
 
 | Skill | Use |
 |---|---|
 | `project-start` | Start a new/existing repo from outcome, current state and fastest proof. |
+| `project-context-integrity` | Confirm the requested project/repo before edits; reroute an unambiguous wrong-workspace task instead of patching the wrong repo. |
+| `workspace-lifecycle-management` | Manage HOT/WARM/COLD local project lifecycle, safe clone parking/deletion, storage pressure, large assets and local-vs-cloud development without losing project truth. |
 | `mvp-speed-prioritisation` | Reduce large briefs to P0 MVP / P1 / P2 and build P0 end to end. |
 | `legacy-cleanup` | Finish migrations with one canonical path and remove stale active artefacts. |
+| `major-self-maintenance` | Keep Major main green; make self-changes atomically through branch/PR/full gate/independent review where consequential. |
 | `skill-resolver` | Select only the small set of task-relevant skills; audit overlap/reachability. |
 | `learning-capture` | Harvest explicit corrections/repeated mistakes after fixing the real task; classify project/global/policy/skill/memory. |
 | `skillify` | Turn a successful reusable procedure into a tested skill pack after the real task works. |
 | `tools-as-code` | Compose repeated deterministic retrieval/filter/dedupe/rank/transform mechanics with short temporary code. |
+| `design-direction-and-taste` | Canonical art-direction layer: design read, surface mode, preserve-vs-redesign, variance/motion/density, anti-default discipline and bounded critique. |
 | `remote-first-web-development` | Require GitHub plus a Cloudflare preview for browser work and block local browser targets. |
+| `website-design-qa` | Canonical website/landing-page visual, responsive, browser, launch, SEO, accessibility and production QA doctrine. |
+| `responsive-motion-systems` | Responsive GSAP/ScrollTrigger/sticky/pinned/Three.js geometry, lifecycle, handoff and zoom-robustness doctrine. |
+| `human-blocker-orchestration` | Surface auth/OAuth/2FA/CAPTCHA/payment/irreversible human-only actions and keep independent work moving. |
 | `dev-server-management` | Coordinate an explicitly approved local exception only. |
+| `mcp-integration-ops` | Diagnose and prove MCP/connector/plugin integrations across installed→configured→exposed→authenticated→permissioned→operational→integrated states. |
 | `source-ingestion` | Retrieve named primary sources with the right connector/CLI/browser/local tool before analysis. |
 | `knowledge-work` | Research/strategy/synthesis with minimum credible evidence, independent angles and skeptic review where justified. |
 | `competitive-product-audit` | Learn direct/adjacent product patterns before reinventing workflows. |
@@ -38,7 +46,7 @@ These are canonical Major-owned skills.
 | `source-adapter-engineering` | Modular APIs/scrapers/feeds with provenance, retries and dedupe. |
 | `pdf-reporting-qa` | Reliable generated PDF reports with visual QA. |
 | `cost-control` | Subscription/rate-limit/paid-spend routing and usage discipline. |
-| `exploratory-creative-dev` | Awwwards/FWA/heavy-motion/immersive creative-development workflow. |
+| `exploratory-creative-dev` | Awwwards/FWA/heavy-motion/immersive execution after art direction is settled. |
 
 ## Skill-pack standard
 
@@ -57,6 +65,35 @@ Learning priority:
 `explicit correction → fix/verify → candidate capture → deterministic rule/tool → tested skill → memory`
 
 Rules prevent. Skills institutionalize. Memory reminds.
+
+## Workspace lifecycle policy
+
+Major keeps a verified machine-specific workspace memory in `memory/verified/developer-workspace-lifecycle.md` and retrieves it only for project lifecycle/storage decisions.
+
+Key model:
+
+- Mac = active workspace;
+- GitHub = canonical source **after** local commit/push/non-Git state verification;
+- deployment providers = runtime;
+- cloud/external storage = large assets/archives/backups;
+- HOT/WARM/COLD project states keep only genuinely active repos fully hydrated locally;
+- do not create duplicate project clones when the expected path is missing;
+- do not delete a clone merely because a GitHub repo exists; verify local-only commits, untracked/ignored files and non-Git state first;
+- prefer pnpm for new compatible Node projects, but do not churn healthy active projects just to migrate package managers;
+- disk-headroom thresholds are machine-specific operational guidance, not universal developer policy.
+
+## Design-direction source policy
+
+Major reviewed two external design systems and **did not install either wholesale**:
+
+- `pbakaus/impeccable` — useful surface modes, preserve-vs-redesign discipline, design-specificity critique, deterministic detector philosophy and bounded finish passes.
+- `Leonxlnx/taste-skill` — useful brief inference, Design Read, variance/motion/density calibration and anti-default discipline; current v2 is explicitly experimental upstream.
+
+The non-duplicative judgment is distilled into `design-direction-and-taste`, with exact source commits and accepted/rejected ideas recorded in `memory/verified/design-direction-taste-synthesis.md`.
+
+Reason: loading Impeccable, Taste Skill, Anthropic frontend-design, Emil, Major website QA and Major motion doctrine as simultaneous generic taste authorities would create contradictory defaults and context bloat. One canonical Major art-direction layer owns taste; specialist skills keep separate responsibilities.
+
+The Impeccable deterministic detector remains a **candidate subordinate tool**, not a global hook. Its local live-server/browser flow conflicts with Major's remote-first web policy; source-file detector use can be evaluated separately before adoption.
 
 ## Emil Kowalski complete bundle — 9
 
@@ -78,7 +115,7 @@ If Emil adds/removes skills later, the installer records the upstream commit and
 
 | Skill | Profile | Why |
 |---|---|---|
-| `frontend-design` | UI/Web | Strong frontend design guidance. |
+| `frontend-design` | UI/Web | Strong frontend implementation/design guidance beneath Major's canonical art-direction layer. |
 | `webapp-testing` | UI/Web | Browser/app testing workflows. |
 | `mcp-builder` | MCP/integration task | Build/evaluate MCP servers and tool contracts. |
 | `skill-creator` | Major/skill-authoring task | Create/evaluate/improve reusable skills. |
@@ -111,6 +148,7 @@ These are tools/capability packs, not policy authorities and not necessarily age
 | GStack | Dynamic/authenticated browser work, scraping and codifying repeated browser procedures | Install namespaced; proactive routing and telemetry off; Major remains the router. |
 | Native connectors/APIs | GitHub, Google, Figma, mail/calendar etc. | Prefer over browser scraping when available. |
 | Major remote-preview preflight | Block local or non-Cloudflare browser targets | `major web preflight` before browser work. |
+| Major project context guard | Prevent edits in the wrong repo and provide the canonical target path | `major project guard <target>` / `major project locate <target>`. |
 | Major learning candidate queue | Durable process-learning inbox | `major learn capture` after explicit corrections/repeated mistakes once the real task is fixed. |
 
 ## Default project / work profiles
@@ -125,24 +163,30 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### `web-ui`
 
-`core` + `remote-first-web-development` + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work.
+`core` + `design-direction-and-taste` when art direction is material + `remote-first-web-development` + `website-design-qa` + `responsive-motion-systems` when motion applies + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work unless the owner explicitly grants a local exception.
 
 ### `exploratory`
 
-`web-ui` + `algorithmic-art` + `exploratory-creative-dev`. Add Rive/Three/R3F/Spline/Remotion as runtime dependencies only if the chosen concept needs them; they are not agent skills by default.
+`web-ui` + `algorithmic-art` + `exploratory-creative-dev`. Art direction remains owned by `design-direction-and-taste`; `exploratory-creative-dev` executes the chosen world. Add Rive/Three/R3F/Spline/Remotion as runtime dependencies only if the concept needs them.
 
 ### Specialist triggers
 
-- Start substantive work → `skill-resolver`.
+- Start substantive work → `skill-resolver` plus relevant project learnings.
+- Named/clearly implied project differs from current workspace → `project-context-integrity` before edits.
+- Project create/clone/locate/move/park/delete/archive/storage-pressure/large-asset/local-vs-cloud decision → `workspace-lifecycle-management`.
+- Major/project-baracks self-change → `major-self-maintenance`.
 - Explicit correction / repeated mistake / "we fixed this before" → `learning-capture` after the real task is fixed.
-- Web UI implementation, browser preview or browser QA → `remote-first-web-development`.
+- Substantial UI/website creation, redesign, new visual identity, "generic AI", "too safe", "too loud" → `design-direction-and-taste`.
+- Web UI implementation/browser/launch QA → `remote-first-web-development` + `website-design-qa`.
+- GSAP/ScrollTrigger/sticky/pinned/Three.js/viewport motion → add `responsive-motion-systems`.
 - Explicit owner-approved local exception → `dev-server-management`.
+- MCP/connector/plugin setup/reconnect/tool exposure/auth/permission failure → `mcp-integration-ops`.
 - Reusable successful procedure / recurring solved failure → `skillify` after the real task succeeds.
 - Repeated deterministic tool/retrieval mechanics → `tools-as-code`.
 - Named URL/video/file/source → `source-ingestion`.
 - Substantial research/strategy/comparison → `knowledge-work`.
 - Figma work → Figma skill set.
-- MCP work → `mcp-builder`.
+- MCP server authoring → `mcp-builder`.
 - Skill authoring/evaluation → `skill-creator` plus `skillify` where appropriate.
 - Material security work → `security-threat-model`.
 - PDFs → `pdf` + `pdf-reporting-qa` as appropriate.
@@ -152,10 +196,12 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 These may be installed per project when needed, but they are **not** Major recurring defaults:
 
-- `gh-fix-ci` — conflicts with Major's autonomous safe-fix policy; use `ci-recovery`.
-- Anthropic `web-artifacts-builder` — optimized for claude.ai artifacts rather than normal deployed product development.
-- Anthropic brand-specific skill — Anthropic branding is not a cross-project design standard.
-- generic document/spreadsheet/internal-comms skills — outside the engineering harness unless a project requires them.
+- raw `impeccable` as a second generic design authority — useful source/tool candidate, but overlaps with Major design/QA/motion and its live-server hook conflicts with remote-first policy;
+- raw `design-taste-frontend` / `gpt-taste` as a second generic taste authority — v2 is experimental and several blanket defaults conflict with brief-first/project-first design;
+- `gh-fix-ci` — conflicts with Major's autonomous safe-fix policy; use `ci-recovery`;
+- Anthropic `web-artifacts-builder` — optimized for claude.ai artifacts rather than normal deployed product development;
+- Anthropic brand-specific skill — Anthropic branding is not a cross-project design standard;
+- generic document/spreadsheet/internal-comms skills — outside the engineering harness unless a project requires them;
 - duplicate browser/deployment/security skills without a distinct capability.
 
 ## Validation contract
@@ -167,6 +213,7 @@ The installer must:
 3. fail on a selected skill that cannot be found/copied;
 4. verify every installed directory contains `SKILL.md`;
 5. generate `MAJOR_SKILLS.lock`;
-6. never claim a profile is installed when validation fails.
+6. sync canonical internal skills globally so a newly promoted cross-project skill is reachable by fresh sessions without re-bootstrapping every existing repo;
+7. never claim a profile is installed when validation fails.
 
 Tool setup must separately verify machine capabilities such as `mw`, `yt-dlp` and GStack rather than pretending that a skill file means the executable exists.

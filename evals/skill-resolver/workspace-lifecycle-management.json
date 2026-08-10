@@ -1,0 +1,20 @@
+{
+  "skill": "workspace-lifecycle-management",
+  "should_trigger": [
+    "Can I delete these finished projects from my Mac now that they are on GitHub?",
+    "My project folders are taking 75 GB; clean them up safely without losing anything.",
+    "Move my active repos out of Documents without breaking Major's project paths.",
+    "The expected JSS folder is missing; should I clone another copy?",
+    "Should these large Flow/Veo source videos live in the application repository?",
+    "Should I use Codespaces for this rarely touched project instead of keeping it fully installed locally?"
+  ],
+  "should_not_trigger": [
+    "Fix the broken React import.",
+    "Redesign this landing page.",
+    "Debug the failing OAuth request.",
+    "Run the website launch QA."
+  ],
+  "conflicts": [
+    "project-context-integrity determines the canonical repo before clone/move/delete actions; workspace-lifecycle-management owns HOT/WARM/COLD local lifecycle and storage hygiene; legacy-cleanup owns obsolete code/config inside a repo; cost-control owns paid infrastructure economics."
+  ]
+}

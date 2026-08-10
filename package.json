@@ -1,7 +1,7 @@
 {
   "name": "major",
-  "version": "0.4.3",
-  "description": "Major — thin cross-project control plane with owner-approved build mode, durable correction learning, deterministic dev-server coordination, verification and skill-first execution",
+  "version": "0.5.0",
+  "description": "Major — thin cross-project control plane with project-context integrity, closed-loop learning, reusable skills, integration truth states and evidence-driven delivery",
   "type": "module",
   "private": true,
   "bin": {
@@ -19,7 +19,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "validate:major": "bash scripts/validate-major.sh",
+    "validate:major": "bash scripts/validate-major.sh && bash scripts/validate-major-stability.sh",
     "major": "tsx src/entry.ts",
     "install:runtime": "bash scripts/install-major-runtime.sh",
     "db:generate": "drizzle-kit generate"

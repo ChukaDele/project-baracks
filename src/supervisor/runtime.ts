@@ -8,6 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { listLearningCandidates } from '../learning/candidates.js';
 import {
   assertExecutionAllowed,
   getProjectPolicy,
@@ -32,7 +33,18 @@ function trim(text: string, max = 12_000): string {
 }
 
 function readProjectContext(repoPath: string): string {
-  const candidates = ['GOAL_STATE.md', 'STATUS.md', 'PROJECT.md', 'BUILD_PLAN.md', 'AGENTS.md'];
+  const candidates = [
+    'GOAL_STATE.md',
+    'STATUS.md',
+    'PROJECT.md',
+    'BUILD_PLAN.md',
+    'LEARNINGS.md',
+    'SKILLS.md',
+    'QUALITY.md',
+    'DESIGN.md',
+    'ARCHITECTURE.md',
+    'AGENTS.md',
+  ];
   const sections: string[] = [];
   for (const name of candidates) {
     const path = join(repoPath, name);
@@ -41,6 +53,23 @@ function readProjectContext(repoPath: string): string {
     sections.push(`\n===== ${name} =====\n${content.slice(0, 12_000)}`);
   }
   return sections.join('\n');
+}
+
+function readLearningContext(project: string): string {
+  const candidates = listLearningCandidates(project)
+    .filter((candidate) => candidate.status === 'candidate')
+    .sort((left, right) => {
+      if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
+      return right.updatedAt.localeCompare(left.updatedAt);
+    })
+    .slice(0, 20);
+  if (candidates.length === 0) return '(No active Major learning candidates for this project.)';
+  return candidates
+    .map(
+      (candidate) =>
+        `- ${candidate.occurrences}x [${candidate.scope}/${candidate.source}] ${candidate.summary}`,
+    )
+    .join('\n');
 }
 
 function coordinatorFor(goal: SupervisorGoal): WorkerHost {
@@ -77,6 +106,7 @@ function trustContract(policy: ProjectPolicy): string {
 
 export function coordinatorPrompt(goal: SupervisorGoal): string {
   const context = readProjectContext(goal.repoPath);
+  const learningContext = readLearningContext(goal.project);
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const workerLanguage =
     policy.maxWorkers <= 1
@@ -90,14 +120,26 @@ BOTTOM LINE: own this goal until the smallest credible end-to-end outcome is dem
 GOAL:
 ${goal.goal}
 
+CANONICAL TARGET:
+- project: ${goal.project}
+- repository path: ${goal.repoPath}
+
+Before any substantive mutation, verify that the current Git root/remote and the task's named or implied target agree with this canonical target. If the task clearly belongs to another known project, do not patch this repository. Use project-context-integrity and reroute to the correct repository when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong repository is a failed task.
+
 ${trustContract(policy)}
 
 MAJOR OPERATING CONTRACT:
 - Speed and MVP are the default. Reduce broad scope to the smallest end-to-end P0 that proves value, then keep expanding only while P0 gaps remain.
 - Do not stop after one PR, migration, fix, test, or subtask. After each result ask: what is now the highest-impact missing piece blocking the goal?
 - ${workerLanguage}
+- Before inventing a process, resolve the smallest relevant Major skill set and load the actual skill bodies from project skills or $HOME/.major/skills/internal.
+- Read project LEARNINGS.md and the Major learning candidates below before acting. Do not repeat a captured correction merely because a fresh worker lacks chat history.
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
-- Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, propose Skillify rather than growing the permanent supervisor workflow.
+- For substantial UI/website creation, redesign, art-direction changes, or "generic/AI-looking/too safe/too loud" feedback, use design-direction-and-taste first. It is the single Major art-direction/taste authority; do not stack competing generic taste systems.
+- For MCP/connectors/plugins, distinguish installed → configured → exposed → authenticated → permissioned → operational → integrated. Use mcp-integration-ops and prove the needed state with a representative real operation.
+- For customer-facing website QA, use website-design-qa. Pair responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js or viewport-motion work. Respect remote-first-web-development for browser preview/acceptance unless the owner explicitly permits a local exception.
+- Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, Skillify rather than growing the permanent supervisor workflow.
+- An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then capture it with major learn capture. A candidate recurring twice must be promoted or explicitly classified as unstable/project-specific.
 - Reserve Major capacity before every worker, browser, or build. Queue when capacity or memory pressure blocks admission.
 - Delegate independent work across providers with the Major CLI only within the project trust limit. Delegated workers must not create descendants beyond depth 1.
 - Prefer lower-cost/abundant subscription capacity for bounded tasks. Use stronger reasoning for architecture, hard bugs, integration, and adjudication.
@@ -107,6 +149,7 @@ MAJOR OPERATING CONTRACT:
 - Continue independent work around a blocked dependency.
 - Never fabricate external success, submissions, provider state, or user data just to satisfy a test.
 - Stop only for a genuine owner gate: MFA/CAPTCHA, unavailable credentials, new paid spend, destructive production data, DNS/ownership, or irreversible security-policy changes.
+- Push back briefly when a requested path is contradicted by stronger known project truth. Prefer correct reversible rerouting over blind obedience.
 - Keep communication BLUF and concise.
 
 READINESS LANGUAGE:
@@ -121,6 +164,9 @@ Before ending this coordinator turn, report the goal back to Major with exactly 
   major goal report --id "${goal.id}" --status done --summary "<objective completion evidence>"
   major goal report --id "${goal.id}" --status blocked --summary "<what is complete>" --owner-gate "<exact owner action>"
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
+
+ACTIVE MAJOR LEARNING CANDIDATES:
+${learningContext}
 
 CURRENT PROJECT CONTEXT:
 ${context || '(No canonical project context files found. Inspect the repository directly.)'}
