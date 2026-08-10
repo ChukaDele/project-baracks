@@ -109,10 +109,12 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
   }
 
   if (args[1] === 'promote') {
+    const scope = promotionScope(required(args, '--scope'));
     const candidate = promoteLearning({
       id: required(args, '--id'),
-      scope: promotionScope(required(args, '--scope')),
-      ...(flag(args, '--evidence') ? { evidence: flag(args, '--evidence') } : {}),
+      scope,
+      evidence: required(args, '--evidence'),
+      ...(scope === 'global' ? { summary: required(args, '--summary') } : {}),
     });
     console.log(JSON.stringify(candidate, null, 2));
     return true;
