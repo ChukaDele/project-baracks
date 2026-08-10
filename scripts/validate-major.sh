@@ -183,6 +183,7 @@ grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability 
 [ -f src/security/major-gateway.ts ] || fail "Major successor execution gateway missing"
 [ -f src/dev/ports.ts ] || fail "dev-port allocator missing"
 [ -f src/learning/candidates.ts ] || fail "learning candidate queue missing"
+[ -f src/learning/lifecycle-cli.ts ] || fail "canonical learning lifecycle CLI missing"
 [ -f scripts/install-major-runtime.sh ] || fail "runtime installer missing"
 
 grep -Fq '"major": "./dist/entry.js"' package.json || fail "package bin must enter the supervisor runtime"
@@ -191,7 +192,7 @@ grep -Fq "project-policies.json" src/supervisor/policy.ts || fail "durable proje
 grep -Fq "dev-ports.json" src/dev/ports.ts || fail "durable dev-port registry missing"
 grep -Fq "learning-candidates.json" src/learning/candidates.ts || fail "durable learning candidate registry missing"
 grep -Fq "command === 'dev'" src/supervisor/cli.ts || fail "dev-port CLI path missing"
-grep -Fq "command === 'learn'" src/supervisor/cli.ts || fail "learning-capture CLI path missing"
+grep -Fq "args[1] === 'capture'" src/learning/lifecycle-cli.ts || fail "learning-capture CLI path missing"
 grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts || fail "project classes missing"
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
 grep -Fq "maxWorkers: 3" src/supervisor/policy.ts || fail "assist worker ceiling missing"
