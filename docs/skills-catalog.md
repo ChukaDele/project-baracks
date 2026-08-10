@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 35
+## Major internal skills — 36
 
 These are canonical Major-owned skills.
 
@@ -19,6 +19,7 @@ These are canonical Major-owned skills.
 | `learning-capture` | Harvest explicit corrections/repeated mistakes after fixing the real task; classify project/global/policy/skill/memory. |
 | `skillify` | Turn a successful reusable procedure into a tested skill pack after the real task works. |
 | `tools-as-code` | Compose repeated deterministic retrieval/filter/dedupe/rank/transform mechanics with short temporary code. |
+| `design-direction-and-taste` | Canonical art-direction layer: design read, surface mode, preserve-vs-redesign, variance/motion/density, anti-default discipline and bounded critique. |
 | `remote-first-web-development` | Require GitHub plus a Cloudflare preview for browser work and block local browser targets. |
 | `website-design-qa` | Canonical website/landing-page visual, responsive, browser, launch, SEO, accessibility and production QA doctrine. |
 | `responsive-motion-systems` | Responsive GSAP/ScrollTrigger/sticky/pinned/Three.js geometry, lifecycle, handoff and zoom-robustness doctrine. |
@@ -44,7 +45,7 @@ These are canonical Major-owned skills.
 | `source-adapter-engineering` | Modular APIs/scrapers/feeds with provenance, retries and dedupe. |
 | `pdf-reporting-qa` | Reliable generated PDF reports with visual QA. |
 | `cost-control` | Subscription/rate-limit/paid-spend routing and usage discipline. |
-| `exploratory-creative-dev` | Awwwards/FWA/heavy-motion/immersive creative-development workflow. |
+| `exploratory-creative-dev` | Awwwards/FWA/heavy-motion/immersive execution after art direction is settled. |
 
 ## Skill-pack standard
 
@@ -63,6 +64,19 @@ Learning priority:
 `explicit correction → fix/verify → candidate capture → deterministic rule/tool → tested skill → memory`
 
 Rules prevent. Skills institutionalize. Memory reminds.
+
+## Design-direction source policy
+
+Major reviewed two external design systems and **did not install either wholesale**:
+
+- `pbakaus/impeccable` — useful surface modes, preserve-vs-redesign discipline, design-specificity critique, deterministic detector philosophy and bounded finish passes.
+- `Leonxlnx/taste-skill` — useful brief inference, Design Read, variance/motion/density calibration and anti-default discipline; current v2 is explicitly experimental upstream.
+
+The non-duplicative judgment is distilled into `design-direction-and-taste`, with exact source commits and accepted/rejected ideas recorded in `memory/verified/design-direction-taste-synthesis.md`.
+
+Reason: loading Impeccable, Taste Skill, Anthropic frontend-design, Emil, Major website QA and Major motion doctrine as simultaneous generic taste authorities would create contradictory defaults and context bloat. One canonical Major art-direction layer owns taste; specialist skills keep separate responsibilities.
+
+The Impeccable deterministic detector remains a **candidate subordinate tool**, not a global hook. Its local live-server/browser flow conflicts with Major's remote-first web policy; source-file detector use can be evaluated separately before adoption.
 
 ## Emil Kowalski complete bundle — 9
 
@@ -84,7 +98,7 @@ If Emil adds/removes skills later, the installer records the upstream commit and
 
 | Skill | Profile | Why |
 |---|---|---|
-| `frontend-design` | UI/Web | Strong frontend design guidance. |
+| `frontend-design` | UI/Web | Strong frontend implementation/design guidance beneath Major's canonical art-direction layer. |
 | `webapp-testing` | UI/Web | Browser/app testing workflows. |
 | `mcp-builder` | MCP/integration task | Build/evaluate MCP servers and tool contracts. |
 | `skill-creator` | Major/skill-authoring task | Create/evaluate/improve reusable skills. |
@@ -132,11 +146,11 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### `web-ui`
 
-`core` + `remote-first-web-development` + `website-design-qa` + `responsive-motion-systems` when motion applies + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work unless the owner explicitly grants a local exception.
+`core` + `design-direction-and-taste` when art direction is material + `remote-first-web-development` + `website-design-qa` + `responsive-motion-systems` when motion applies + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work unless the owner explicitly grants a local exception.
 
 ### `exploratory`
 
-`web-ui` + `algorithmic-art` + `exploratory-creative-dev`. Add Rive/Three/R3F/Spline/Remotion as runtime dependencies only if the chosen concept needs them; they are not agent skills by default.
+`web-ui` + `algorithmic-art` + `exploratory-creative-dev`. Art direction remains owned by `design-direction-and-taste`; `exploratory-creative-dev` executes the chosen world. Add Rive/Three/R3F/Spline/Remotion as runtime dependencies only if the concept needs them.
 
 ### Specialist triggers
 
@@ -144,6 +158,7 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 - Named/clearly implied project differs from current workspace → `project-context-integrity` before edits.
 - Major/project-baracks self-change → `major-self-maintenance`.
 - Explicit correction / repeated mistake / "we fixed this before" → `learning-capture` after the real task is fixed.
+- Substantial UI/website creation, redesign, new visual identity, "generic AI", "too safe", "too loud" → `design-direction-and-taste`.
 - Web UI implementation/browser/launch QA → `remote-first-web-development` + `website-design-qa`.
 - GSAP/ScrollTrigger/sticky/pinned/Three.js/viewport motion → add `responsive-motion-systems`.
 - Explicit owner-approved local exception → `dev-server-management`.
@@ -163,10 +178,12 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 These may be installed per project when needed, but they are **not** Major recurring defaults:
 
-- `gh-fix-ci` — conflicts with Major's autonomous safe-fix policy; use `ci-recovery`.
-- Anthropic `web-artifacts-builder` — optimized for claude.ai artifacts rather than normal deployed product development.
-- Anthropic brand-specific skill — Anthropic branding is not a cross-project design standard.
-- generic document/spreadsheet/internal-comms skills — outside the engineering harness unless a project requires them.
+- raw `impeccable` as a second generic design authority — useful source/tool candidate, but overlaps with Major design/QA/motion and its live-server hook conflicts with remote-first policy;
+- raw `design-taste-frontend` / `gpt-taste` as a second generic taste authority — v2 is experimental and several blanket defaults conflict with brief-first/project-first design;
+- `gh-fix-ci` — conflicts with Major's autonomous safe-fix policy; use `ci-recovery`;
+- Anthropic `web-artifacts-builder` — optimized for claude.ai artifacts rather than normal deployed product development;
+- Anthropic brand-specific skill — Anthropic branding is not a cross-project design standard;
+- generic document/spreadsheet/internal-comms skills — outside the engineering harness unless a project requires them;
 - duplicate browser/deployment/security skills without a distinct capability.
 
 ## Validation contract
