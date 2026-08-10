@@ -2,12 +2,19 @@
 set -euo pipefail
 
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GLOBAL_SRC="$MAJOR_ROOT/guidance/global-worker-rules.md"
+GLOBAL_BASE="$MAJOR_ROOT/guidance/global-worker-rules.md"
+STABILITY_SRC="$MAJOR_ROOT/guidance/stability-invariants.md"
 INTERNAL_SKILLS_SRC="$MAJOR_ROOT/skills/internal"
 GLOBAL_SKILLS_DEST="$HOME/.major/skills/internal"
 
 mkdir -p "$HOME/.major" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}" "$HOME/.gemini" "$HOME/.cursor/rules/major-global"
-cp "$GLOBAL_SRC" "$HOME/.major/global-worker-rules.md"
+COMBINED_SRC="$HOME/.major/global-worker-rules.md"
+{
+  cat "$GLOBAL_BASE"
+  printf '\n\n'
+  cat "$STABILITY_SRC"
+} > "$COMBINED_SRC"
+GLOBAL_SRC="$COMBINED_SRC"
 
 # Canonical cross-project Major skills. This path is Major-owned, so converge it
 # to the current repository rather than leaving stale copies behind.
@@ -88,6 +95,7 @@ Major global worker rules installed for:
 - Antigravity: $GEMINI_RULE
 - Cursor local global rule: $CURSOR_RULE
 - Canonical Major internal skills: $GLOBAL_SKILLS_DEST ($SKILL_COUNT skills)
+- Stability invariants: $STABILITY_SRC
 
 Cursor note:
 - This terminal-installed rule is local to this Mac.
