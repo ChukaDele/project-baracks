@@ -95,7 +95,9 @@ export function captureLearning(input: {
       : !candidate.key && normalizedSummary(candidate.summary) === fingerprint;
     if (!sameLesson) return false;
     return (
-      candidate.scope === 'global' || input.scope === 'global' || candidate.project === input.project
+      candidate.scope === 'global' ||
+      input.scope === 'global' ||
+      candidate.project === input.project
     );
   });
   const now = new Date().toISOString();
@@ -143,7 +145,9 @@ export function listLearningCandidates(
 }
 
 export function learningReviewDue(project?: string): LearningCandidate[] {
-  return listLearningCandidates(project, 'candidate').filter((candidate) => candidate.occurrences >= 2);
+  return listLearningCandidates(project, 'candidate').filter(
+    (candidate) => candidate.occurrences >= 2,
+  );
 }
 
 export function promoteLearning(input: {

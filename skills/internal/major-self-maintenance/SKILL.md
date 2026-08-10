@@ -29,7 +29,7 @@ For every material Major change:
    - validator requirements when the capability is a hard invariant.
 6. Run Major validator, format, lint, typecheck, full tests and production build locally when an execution environment is available.
 7. Fix all locally detectable failures **before** opening the PR. GitHub Actions is a release verifier, not the iterative formatter/test runner.
-8. Open the PR only when the batch is coherent. Once the PR exists, avoid one-commit/one-CI loops; consolidate fixes before the next push.
+8. Open the PR only when the batch is coherent. If a deterministic CI defect appears, close the PR before making a repair batch when the workflow triggers on `pull_request` synchronization; reopen only after the complete repair batch is ready.
 9. For changes to authority, routing, learning, project boundaries, installation or external writes, use a different provider for adversarial review.
 10. Merge only the exact green head.
 11. Verify the resulting `main` CI after merge.
@@ -39,9 +39,35 @@ For every material Major change:
 
 - Prefer read-only GitHub inspection while auditing.
 - Branch commits do not need a PR immediately. Keep the branch unopened while batching when the workflow only runs on PRs/main.
+- Before saying `one push`, `no CI`, or `one Actions run`, inspect the workflow trigger **and** live PR state. A plan is not evidence.
+- With `pull_request` CI, assume each push to a branch with an open PR can trigger a new run. Close the PR before further repair commits if the goal is to stop CI consumption.
 - Do not create temporary CI-failing workflow commits just to print formatter output when local tooling can provide it.
 - Re-run failed jobs only when the failure is plausibly transient. Deterministic code/format/type/test failures require a real fix before another run.
 - One final PR validation plus one post-merge `main` validation is the normal target for a coherent release batch.
+
+## Operational truth
+
+Do not describe intended state as observed state.
+
+Before claiming that something is installed, green, merged, attached, deployed, blocked, not triggering CI, or limited to a specific number of writes/runs:
+
+1. identify the observable system state that proves the claim;
+2. read that state after the relevant action;
+3. report what actually happened, including deviations from the plan;
+4. correct the process before repeating the action when the observed state contradicts the plan.
+
+Never hide a process deviation behind wording like `batched`, `done`, or `one push` when the repository/activity history shows otherwise.
+
+## Code simplicity
+
+Major self-changes must follow `simple-modular-code`:
+
+- one clear responsibility per module/function;
+- one canonical code path for a behavior;
+- minimal side effects at explicit boundaries;
+- no abstraction for hypothetical future needs;
+- remove duplicate/shadowed implementations when introducing a replacement;
+- before merge, simplify anything that can lose moving parts without losing correctness, clarity, testability or replaceability.
 
 ## Skill promotion is atomic
 
@@ -67,6 +93,7 @@ Builder-authored tests are necessary but not sufficient for consequential Major 
 - "Update Major's learning loop."
 - "Fix Major itself after its CI went red."
 - "Stop burning GitHub Actions on every tiny Major fix."
+- "You said one push but the PR shows multiple failing runs."
 
 ### Should not trigger
 

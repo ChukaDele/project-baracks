@@ -27,6 +27,11 @@ grep -Fq 'majorMainMustStayGreen' guidance/skills.registry.json || fail "Major m
 grep -Fq 'singleCanonicalDesignDirectionLayer' guidance/skills.registry.json || fail "single canonical design direction policy missing"
 grep -Fq 'workspaceLifecyclePolicy' guidance/skills.registry.json || fail "workspace lifecycle policy flag missing"
 
+grep -Fq 'smallest correct modular implementation' guidance/global-worker-rules.md || fail "global code-simplicity invariant missing"
+grep -Fq 'simple-modular-code' guidance/global-worker-rules.md || fail "global rules do not route modular-code guidance"
+grep -Fq 'Do not describe intended state as observed state' skills/internal/major-self-maintenance/SKILL.md || fail "self-maintenance lacks operational-truth rule"
+grep -Fq 'live PR state' skills/internal/major-self-maintenance/SKILL.md || fail "self-maintenance does not verify CI-triggering state before claims"
+
 [ -f memory/verified/design-direction-taste-synthesis.md ] || fail "Impeccable/Taste synthesis memory missing"
 grep -Fq '2ab054d1f400c5ec085133352232ffc2617f0d54' memory/verified/design-direction-taste-synthesis.md || fail "Impeccable source commit not pinned in synthesis"
 grep -Fq 'e988add20dab0fa97d7a76781c48961c8184288e' memory/verified/design-direction-taste-synthesis.md || fail "Taste source commit not pinned in synthesis"
@@ -56,6 +61,14 @@ grep -Fq 'design-direction-and-taste' src/context/session-context.ts || fail "se
 grep -Fq 'website-design-qa' src/context/session-context.ts || fail "session attach lacks website QA routing reminder"
 grep -Fq 'mcp-integration-ops' src/context/session-context.ts || fail "session attach lacks MCP integration routing reminder"
 
+if grep -Fq "command === 'learn'" src/supervisor/cli.ts; then
+  fail "duplicate learning CLI path remains in supervisor CLI"
+fi
+grep -Fq "args[1] === 'capture'" src/learning/lifecycle-cli.ts || fail "learning capture is not exposed through canonical learning CLI"
+grep -Fq "args[1] === 'list'" src/learning/lifecycle-cli.ts || fail "learning list is not exposed through canonical learning CLI"
+grep -Fq "args[1] === 'promote'" src/learning/lifecycle-cli.ts || fail "learning promotion is not exposed through canonical learning CLI"
+grep -Fq "args[1] === 'dismiss'" src/learning/lifecycle-cli.ts || fail "learning dismissal is not exposed through canonical learning CLI"
+
 grep -Fq 'runProjectContextCli' src/entry.ts || fail "project context CLI is not wired into Major entrypoint"
 grep -Fq 'PROJECT CONTEXT: REROUTE' src/context/project-integrity.ts || fail "wrong-repo reroute signal missing"
 grep -Fq 'major project guard' skills/internal/project-context-integrity/SKILL.md || fail "project guard command missing from skill"
@@ -76,8 +89,6 @@ grep -Fq -- '--key' skills/internal/learning-capture/SKILL.md || fail "learning 
 grep -Fq 'promoteLearning' src/learning/candidates.ts || fail "learning store has no promotion lifecycle"
 grep -Fq 'dismissLearning' src/learning/candidates.ts || fail "learning store has no dismissal lifecycle"
 grep -Fq 'learningReviewDue' src/learning/candidates.ts || fail "learning store cannot surface review-due candidates"
-grep -Fq "args[1] === 'promote'" src/learning/lifecycle-cli.ts || fail "learning promotion is not exposed through Major CLI"
-grep -Fq "args[1] === 'dismiss'" src/learning/lifecycle-cli.ts || fail "learning dismissal is not exposed through Major CLI"
 grep -Fq 'Major `main` must stay green' skills/internal/major-self-maintenance/SKILL.md || fail "Major self-maintenance green-main rule missing"
 grep -Fq 'unopened branch' skills/internal/major-self-maintenance/SKILL.md || fail "Major self-maintenance does not conserve GitHub Actions"
 

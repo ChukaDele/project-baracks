@@ -96,7 +96,8 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
     const project = projectArg ? resolveProject(projectArg).project : undefined;
     const due = learningReviewDue(project);
     if (args.includes('--json')) console.log(JSON.stringify(due, null, 2));
-    else if (due.length === 0) console.log('No Major learning candidates require promotion review.');
+    else if (due.length === 0)
+      console.log('No Major learning candidates require promotion review.');
     else {
       for (const candidate of due) {
         console.log(
