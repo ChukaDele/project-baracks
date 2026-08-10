@@ -35,6 +35,15 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
+      - name: Print exact Prettier output
+        run: |
+          for f in src/context/project-integrity.ts src/supervisor/human-blocker.ts src/web/remote-preview.ts tests/remote-preview.test.ts tests/supervisor-runtime.test.ts; do
+            echo "--- FILE:$f START ---"
+            pnpm exec prettier "$f"
+            echo "--- FILE:$f END ---"
+          done
+          exit 1
+
       - name: Format check
         run: pnpm format:check
 
