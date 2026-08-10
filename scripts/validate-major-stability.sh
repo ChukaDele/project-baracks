@@ -50,6 +50,7 @@ grep -Fq 'website-design-qa' src/supervisor/runtime.ts || fail "coordinator lack
 grep -Fq 'runSessionContextCli' src/entry.ts || fail "session context loader is not wired into Major entrypoint"
 grep -Fq 'DURABLE PROJECT LEARNINGS' src/context/session-context.ts || fail "session attach does not preload project learnings"
 grep -Fq 'ACTIVE MAJOR LEARNING CANDIDATES' src/context/session-context.ts || fail "session attach does not preload learning candidates"
+grep -Fq 'REVIEW-DUE' src/context/session-context.ts || fail "session attach does not flag recurring learning for promotion review"
 grep -Fq 'design-direction-and-taste' src/context/session-context.ts || fail "session attach lacks canonical design direction routing reminder"
 grep -Fq 'website-design-qa' src/context/session-context.ts || fail "session attach lacks website QA routing reminder"
 grep -Fq 'mcp-integration-ops' src/context/session-context.ts || fail "session attach lacks MCP integration routing reminder"
@@ -58,6 +59,8 @@ grep -Fq 'runProjectContextCli' src/entry.ts || fail "project context CLI is not
 grep -Fq 'PROJECT CONTEXT: REROUTE' src/context/project-integrity.ts || fail "wrong-repo reroute signal missing"
 grep -Fq 'major project guard' skills/internal/project-context-integrity/SKILL.md || fail "project guard command missing from skill"
 grep -Fq 'safe parking protocol' -i skills/internal/workspace-lifecycle-management/SKILL.md || fail "workspace lifecycle safe parking protocol missing"
+grep -Fq 'commondir' src/supervisor/state.ts || fail "project resolution is not Git-worktree aware"
+grep -Fq 'priorSession' src/supervisor/state.ts || fail "project resolution ignores prior attached sessions"
 
 grep -Fq 'GLOBAL_SKILLS_DEST' scripts/install-major-global-rules.sh || fail "global internal skill sync missing"
 grep -Fq 'STABILITY_SRC' scripts/install-major-global-rules.sh || fail "stability invariants not installed globally"
@@ -68,13 +71,19 @@ grep -Fq 'website-design-qa' templates/project/major-core.md || fail "project te
 grep -Fq 'workspace-lifecycle-management' skills/internal/project-start/SKILL.md || fail "project-start does not route lifecycle decisions"
 
 grep -Fq 'At two occurrences' skills/internal/learning-capture/SKILL.md || fail "learning recurrence promotion threshold missing"
+grep -Fq -- '--key' skills/internal/learning-capture/SKILL.md || fail "learning capture does not teach stable recurrence keys"
+grep -Fq 'promoteLearning' src/learning/candidates.ts || fail "learning store has no promotion lifecycle"
+grep -Fq 'dismissLearning' src/learning/candidates.ts || fail "learning store has no dismissal lifecycle"
+grep -Fq 'learningReviewDue' src/learning/candidates.ts || fail "learning store cannot surface review-due candidates"
 grep -Fq 'Major `main` must stay green' skills/internal/major-self-maintenance/SKILL.md || fail "Major self-maintenance green-main rule missing"
+grep -Fq 'unopened branch' skills/internal/major-self-maintenance/SKILL.md || fail "Major self-maintenance does not conserve GitHub Actions"
 
 # Runtime installation is a release boundary. A red/partial or mutable checkout
 # must never silently replace/change the active global Major runtime.
 grep -Fq 'refusing to install Major from a dirty checkout' scripts/install-major-runtime.sh || fail "runtime installer does not reject dirty source"
 grep -Fq 'MAJOR_ALLOW_NON_MAIN_INSTALL' scripts/install-major-runtime.sh || fail "runtime installer does not gate non-main installs"
-grep -Fq 'Install releases from main after green CI' scripts/install-major-runtime.sh || fail "runtime installer lacks main-release contract"
+grep -Fq 'MAJOR_ALLOW_UNPUSHED_INSTALL' scripts/install-major-runtime.sh || fail "runtime installer does not verify origin/main"
+grep -Fq 'refs/remotes/origin/main' scripts/install-major-runtime.sh || fail "runtime installer does not compare local and remote main"
 grep -Fq 'bash scripts/validate-major.sh' scripts/install-major-runtime.sh || fail "runtime installer skips Major doctrine validation"
 grep -Fq 'bash scripts/validate-major-stability.sh' scripts/install-major-runtime.sh || fail "runtime installer skips stability validation"
 grep -Fq 'pnpm format:check' scripts/install-major-runtime.sh || fail "runtime installer skips format gate"
@@ -82,8 +91,9 @@ grep -Fq 'pnpm lint' scripts/install-major-runtime.sh || fail "runtime installer
 grep -Fq 'pnpm typecheck' scripts/install-major-runtime.sh || fail "runtime installer skips typecheck gate"
 grep -Fq 'pnpm test' scripts/install-major-runtime.sh || fail "runtime installer skips tests"
 grep -Fq 'installed-release.json' scripts/install-major-runtime.sh || fail "runtime installer does not record exact installed release"
-grep -Fq 'EXPECTED_SHA=' scripts/install-major-runtime.sh || fail "runtime wrapper is not pinned to exact installed SHA"
-grep -Fq 'MAJOR RUNTIME REFUSAL' scripts/install-major-runtime.sh || fail "runtime wrapper does not fail loudly on source drift"
-grep -Fq 'runtimePinnedToSha' scripts/install-major-runtime.sh || fail "release record does not state SHA pinning"
+grep -Fq 'RELEASES_DIR=' scripts/install-major-runtime.sh || fail "runtime installer has no immutable release store"
+grep -Fq 'pnpm install --prod --frozen-lockfile --dir' scripts/install-major-runtime.sh || fail "runtime snapshot does not install production dependencies"
+grep -Fq 'exec node "$RELEASE_DIR/dist/entry.js"' scripts/install-major-runtime.sh || fail "active wrapper does not execute immutable release snapshot"
+grep -Fq 'runtimeImmutableSnapshot' scripts/install-major-runtime.sh || fail "release record does not state immutable runtime snapshot"
 
-echo "Major stability validation passed."
+ echo "Major stability validation passed."
