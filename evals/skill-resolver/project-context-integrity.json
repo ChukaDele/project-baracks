@@ -1,0 +1,17 @@
+{
+  "skill": "project-context-integrity",
+  "should_trigger": [
+    "Fix Surface Talent but I currently have JSS open.",
+    "Use the Bredge code as reference, but make the change in my personal website repo.",
+    "This work is in the wrong project; move to the existing repo instead of patching this one.",
+    "The task names another repository than the current workspace."
+  ],
+  "should_not_trigger": [
+    "Rename this component inside the current repo.",
+    "Compare two project architectures without editing either.",
+    "Search GitHub for a public implementation example."
+  ],
+  "conflicts": [
+    "Project-context-integrity resolves the target before implementation, deployment, QA or migration skills run."
+  ]
+}
