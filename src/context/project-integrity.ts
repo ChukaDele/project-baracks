@@ -9,7 +9,10 @@ export interface ProjectContextResult {
   currentRepoPath?: string | undefined;
 }
 
-export function checkProjectContext(targetProject: string, cwd = process.cwd()): ProjectContextResult {
+export function checkProjectContext(
+  targetProject: string,
+  cwd = process.cwd(),
+): ProjectContextResult {
   const current = resolveProjectForCwd(cwd);
   const target = resolveProject(targetProject, cwd);
   const currentPath = current ? resolve(current.repoPath) : undefined;
@@ -48,7 +51,9 @@ export async function runProjectContextCli(args: string[]): Promise<boolean> {
     if (args.includes('--json')) {
       console.log(JSON.stringify(result, null, 2));
     } else if (result.status === 'pass') {
-      console.log(`PROJECT CONTEXT: PASS\nproject: ${result.targetProject}\nrepo: ${result.targetRepoPath}`);
+      console.log(
+        `PROJECT CONTEXT: PASS\nproject: ${result.targetProject}\nrepo: ${result.targetRepoPath}`,
+      );
     } else {
       console.log(
         `PROJECT CONTEXT: REROUTE\ncurrent: ${result.currentProject ?? 'no-git-project'} ${result.currentRepoPath ?? ''}\ntarget: ${result.targetProject} ${result.targetRepoPath}\nDo not edit the current repo. Continue the task from the target repo.`,
