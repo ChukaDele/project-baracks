@@ -40,6 +40,7 @@ Do **not** archive a live GitHub repository merely because it has no current loc
 Store large non-source artifacts outside normal Git unless they are intentionally versioned with a suitable mechanism such as Git LFS.
 
 Examples:
+
 - raw/source videos;
 - Veo/Flow generations;
 - large screenshots/QA captures;
@@ -68,6 +69,7 @@ Before parking/deleting a clone:
 8. only then delete reconstructible dependencies/build caches or the clone itself.
 
 Important non-Git state includes:
+
 - `.env` / `.env.local` and other local config;
 - local databases/dumps;
 - uploaded files;
@@ -81,9 +83,10 @@ Never commit secrets merely to make a repo deletable.
 ## Reconstructible data
 
 Treat these as disposable when the project manifests/lockfiles are correct and there is no project-specific reason to retain them:
+
 - `node_modules`;
 - `.next`;
-- `dist`/`build` outputs;
+- `dist` / `build` outputs;
 - `.turbo`;
 - coverage/build caches;
 - downloaded package cache where safe to rebuild.
@@ -115,6 +118,7 @@ Storage pressure and RAM pressure are separate signals. Do not infer RAM trouble
 Default to a **hybrid** model rather than moving all development to cloud compute solely for storage reasons.
 
 Local is usually best for:
+
 - rapid UI iteration;
 - GSAP/Three.js/motion work;
 - visual QA/browser work;
@@ -122,6 +126,7 @@ Local is usually best for:
 - fast interactive Claude/Codex work.
 
 Cloud/isolated environments can be better for:
+
 - heavy builds;
 - reproducible throwaway environments;
 - long-running jobs;
@@ -146,6 +151,7 @@ Do not make an iCloud-synced Documents directory the canonical home of active Gi
 ## Source provenance
 
 Distilled from the user's 2026-08-10 workspace/storage operating note. The source established:
+
 - Mac as active workspace;
 - GitHub as canonical code;
 - deployment providers as runtime;
