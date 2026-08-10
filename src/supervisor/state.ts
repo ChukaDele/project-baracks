@@ -227,6 +227,13 @@ function gitRootFrom(path: string): string | undefined {
   }
 }
 
+function validRememberedRepoPath(path: string | undefined): string | undefined {
+  if (!path) return undefined;
+  const remembered = resolve(path);
+  const root = gitRootFrom(remembered);
+  return root === remembered ? remembered : undefined;
+}
+
 function scanRepos(root: string, depth: number): string[] {
   if (depth < 0 || !existsSync(root)) return [];
   const results: string[] = [];
@@ -270,18 +277,13 @@ export function resolveProject(
   }
 
   const state = readSupervisorState();
-  const priorGoal = [...state.goals]
-    .reverse()
-    .find((goal) => goal.project === project && existsSync(goal.repoPath));
-  if (priorGoal) return { project, repoPath: priorGoal.repoPath };
+  const priorGoal = [...state.goals].reverse().find((goal) => goal.project === project);
+  const priorGoalPath = validRememberedRepoPath(priorGoal?.repoPath);
+  if (priorGoalPath) return { project, repoPath: priorGoalPath };
 
-  const priorSession = [...state.sessions]
-    .reverse()
-    .find(
-      (session) =>
-        session.project === project && session.repoPath !== undefined && existsSync(session.repoPath),
-    );
-  if (priorSession?.repoPath) return { project, repoPath: priorSession.repoPath };
+  const priorSession = [...state.sessions].reverse().find((session) => session.project === project);
+  const priorSessionPath = validRememberedRepoPath(priorSession?.repoPath);
+  if (priorSessionPath) return { project, repoPath: priorSessionPath };
 
   const roots = [join(homedir(), 'Projects'), join(homedir(), 'Documents')];
   for (const root of roots) {
