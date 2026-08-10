@@ -28,8 +28,7 @@ function projectLearningFile(repoPath: string): string {
 }
 
 function durableCandidates(project: string): string {
-  const candidates = listLearningCandidates(project)
-    .filter((candidate) => candidate.status === 'candidate')
+  const candidates = listLearningCandidates(project, 'candidate')
     .sort((left, right) => {
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
       return right.updatedAt.localeCompare(left.updatedAt);
@@ -37,10 +36,11 @@ function durableCandidates(project: string): string {
     .slice(0, 15);
   if (candidates.length === 0) return '(No active Major learning candidates.)';
   return candidates
-    .map(
-      (candidate) =>
-        `- ${candidate.occurrences}x [${candidate.scope}/${candidate.source}] ${candidate.summary}`,
-    )
+    .map((candidate) => {
+      const review = candidate.occurrences >= 2 ? ' REVIEW-DUE' : '';
+      const key = candidate.key ? ` key=${candidate.key}` : '';
+      return `- ${candidate.occurrences}x${review} [${candidate.scope}/${candidate.source}]${key} ${candidate.summary}`;
+    })
     .join('\n');
 }
 
@@ -108,7 +108,8 @@ SESSION CONTRACT
 - Before substantive edits, confirm any named/implied project matches this repo. If not, load project-context-integrity and reroute before mutation.
 - Resolve and load the smallest relevant skill bodies from project skills or $HOME/.major/skills/internal before inventing a workflow.
 - Treat the durable learnings above as active constraints. A fresh session is not permission to repeat a prior correction.
-- If the user explicitly corrects behavior or says a mistake happened before: fix and verify the real task, then capture the correction with major learn capture without making the user ask.
+- A REVIEW-DUE learning has recurred at least twice. Before closing the task, either promote the proven lesson into guidance/skill or record why it remains unstable/project-specific.
+- If the user explicitly corrects behavior or says a mistake happened before: fix and verify the real task, then capture the correction with major learn capture without making the user ask. Use one stable learning key for the same failure class across runs.
 - For MCP/connectors/plugins, load mcp-integration-ops and prove the actual integration state.
 - For substantial UI/website creation, redesign, or "generic/AI-looking/too safe" feedback, load design-direction-and-taste first. It is the single Major taste authority; do not stack competing generic taste skills.
 - For customer-facing website QA, load website-design-qa; add responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js work.
