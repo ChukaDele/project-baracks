@@ -24,9 +24,11 @@ If session context marks a candidate `REVIEW-DUE`, it has already recurred at le
 7. Verify the resolver can reach the new/updated skill on the next representative task.
 8. Mark the candidate promoted only after the durable replacement exists and is evidenced.
 
-Example:
+Default to project scope when the evidence comes from a concrete project. Use `--scope global` at capture time only when **both** the summary and evidence are already sanitized cross-project statements.
 
-`major learn capture --source user-correction --key wrong-project-edit --summary "Confirm the target repo before edits and reroute when the named project differs" --scope global --evidence "Corrected and verified in the real task"`
+Example project capture:
+
+`major learn capture --source user-correction --key wrong-project-edit --summary "Confirm the target repo before edits and reroute when the named project differs" --scope project --evidence "Corrected and verified in the real task"`
 
 ## Stable learning keys
 
@@ -70,6 +72,8 @@ Promote only sanitized lessons that are:
 
 Examples: project/repo context integrity, primary-source fallback, exact-head review, MCP truth-state verification, remote-first previews, or a repeatable CI recovery pattern.
 
+Project-scoped captures do **not** merge into an existing global candidate merely because they share a key. This prevents project-local evidence from leaking into global learning.
+
 ### Policy vs skill vs memory
 
 - **Policy/guidance** when the lesson is a durable behavioral constraint.
@@ -78,7 +82,7 @@ Examples: project/repo context integrity, primary-source fallback, exact-head re
 
 ## Recurrence rule
 
-A repeated explicit correction should increase the candidate's occurrence count rather than creating duplicate notes.
+A repeated explicit correction should increase the candidate's occurrence count rather than creating duplicate notes within the same scope.
 
 **At two occurrences, the candidate may no longer be silently ignored.** Before the task closes, either:
 
@@ -88,8 +92,11 @@ A repeated explicit correction should increase the candidate's occurrence count 
 Use:
 
 - `major learn review --project current` to list recurring candidates requiring a decision;
-- `major learn promote --id <id> --scope <project|global> --evidence "<durable replacement/evidence>"` after the replacement exists;
+- project promotion: `major learn promote --id <id> --scope project --evidence "<durable replacement/evidence>"`;
+- global promotion: `major learn promote --id <id> --scope global --summary "<sanitized reusable lesson>" --evidence "<sanitized durable replacement/evidence>"`;
 - `major learn dismiss --id <id> --evidence "<why this candidate should not be promoted>"` when the non-promotion decision is deliberate and evidenced.
+
+Global promotion requires a sanitized summary and evidence. Major removes project/repo metadata and prior project-local evidence from the promoted global receipt.
 
 A single correction may be skillified immediately when the procedure is deterministic, cross-project, already proven in prior work, and cheap to validate.
 
@@ -106,15 +113,15 @@ Never promote candidate names, CVs, interview transcripts, client credentials or
 
 ## Evidence
 
-Useful evidence includes:
+Useful project-local evidence includes:
 
 - the user's explicit correction;
 - failing/successful runtime behavior;
 - a screenshot/log that demonstrates the failure;
 - the exact fix and post-fix verification;
-- prior project occurrences without sensitive data.
+- prior project occurrences.
 
-Do not store secrets, candidate/client PII or raw private content in global learning evidence.
+Global evidence must be a sanitized statement that proves the durable replacement without including secrets, candidate/client PII, raw private content or private paths.
 
 ## Resolver examples
 
