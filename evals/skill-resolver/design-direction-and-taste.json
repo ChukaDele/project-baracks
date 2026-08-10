@@ -1,0 +1,19 @@
+{
+  "skill": "design-direction-and-taste",
+  "should_trigger": [
+    "Redesign this landing page; it still looks like generic AI SaaS.",
+    "Make this website Awwwards-level without losing conversion clarity.",
+    "The design is too safe and category-generic; give it a stronger visual identity.",
+    "Use these references to define the design language before rebuilding the page.",
+    "I want a real redesign, not another mild polish pass."
+  ],
+  "should_not_trigger": [
+    "Fix the missing React import.",
+    "Run browser QA on this already-approved layout.",
+    "Debug this ScrollTrigger overlap without changing the art direction.",
+    "Fix this database migration."
+  ],
+  "conflicts": [
+    "design-direction-and-taste owns art direction; website-design-qa owns browser/launch QA; responsive-motion-systems owns motion geometry/lifecycle; Emil skills own motion craft; nontechnical-ux owns task-workflow usability."
+  ]
+}
