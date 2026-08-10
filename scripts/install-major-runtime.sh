@@ -66,10 +66,18 @@ pnpm build
 # Build an immutable runtime snapshot. The globally active Major command must
 # never execute dist/node_modules from the mutable development checkout.
 rm -rf "$STAGE_DIR"
-mkdir -p "$STAGE_DIR"
+mkdir -p "$STAGE_DIR/scripts"
 cp package.json pnpm-lock.yaml "$STAGE_DIR/"
 cp -R dist "$STAGE_DIR/dist"
+cp -R drizzle "$STAGE_DIR/drizzle"
+cp scripts/major-antigravity-worker.py "$STAGE_DIR/scripts/major-antigravity-worker.py"
 pnpm install --prod --frozen-lockfile --dir "$STAGE_DIR"
+
+# Fail before activation if runtime-relative assets are incomplete.
+test -f "$STAGE_DIR/dist/entry.js"
+test -d "$STAGE_DIR/drizzle"
+test -f "$STAGE_DIR/scripts/major-antigravity-worker.py"
+test -d "$STAGE_DIR/node_modules"
 
 cat > "$STAGE_DIR/release.json" <<EOF
 {
@@ -183,6 +191,7 @@ Antigravity:global Major rules installed
 
 RUNTIME INTEGRITY:
 - The active CLI runs from an immutable release snapshot under ~/.major/releases.
+- The snapshot includes production dependencies, DB migrations and required runtime helpers.
 - Editing, rebuilding, pulling or switching branches in project-baracks cannot silently change the installed runtime.
 - Normal installs require clean main equal to current origin/main plus the complete local release gate.
 
