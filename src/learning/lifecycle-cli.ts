@@ -1,4 +1,13 @@
-import { learningReviewDue, promoteLearning, type LearningScope } from './candidates.js';
+import {
+  LEARNING_SCOPES,
+  LEARNING_SOURCES,
+  captureLearning,
+  dismissLearning,
+  learningReviewDue,
+  promoteLearning,
+  type LearningScope,
+  type LearningSource,
+} from './candidates.js';
 import { resolveProject } from '../supervisor/state.js';
 
 function flag(args: string[], name: string): string | undefined {
@@ -12,6 +21,20 @@ function required(args: string[], name: string): string {
   return value;
 }
 
+function learningSource(value: string): LearningSource {
+  if (!LEARNING_SOURCES.includes(value as LearningSource)) {
+    throw new Error(`unsupported learning source: ${value}`);
+  }
+  return value as LearningSource;
+}
+
+function learningScope(value: string): LearningScope {
+  if (!LEARNING_SCOPES.includes(value as LearningScope)) {
+    throw new Error(`unsupported learning scope: ${value}`);
+  }
+  return value as LearningScope;
+}
+
 function promotionScope(value: string): Exclude<LearningScope, 'undecided'> {
   if (value !== 'project' && value !== 'global') {
     throw new Error('promotion scope must be project or global');
@@ -21,6 +44,21 @@ function promotionScope(value: string): Exclude<LearningScope, 'undecided'> {
 
 export async function runLearningLifecycleCli(args: string[]): Promise<boolean> {
   if (args[0] !== 'learn') return false;
+
+  if (args[1] === 'capture' && flag(args, '--key')) {
+    const project = resolveProject(flag(args, '--project') ?? 'current');
+    const candidate = captureLearning({
+      source: learningSource(required(args, '--source')),
+      summary: required(args, '--summary'),
+      key: required(args, '--key'),
+      scope: learningScope(flag(args, '--scope') ?? 'undecided'),
+      project: project.project,
+      repoPath: project.repoPath,
+      ...(flag(args, '--evidence') ? { evidence: flag(args, '--evidence') } : {}),
+    });
+    console.log(JSON.stringify(candidate, null, 2));
+    return true;
+  }
 
   if (args[1] === 'review') {
     const projectArg = flag(args, '--project');
@@ -43,6 +81,15 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
       id: required(args, '--id'),
       scope: promotionScope(required(args, '--scope')),
       ...(flag(args, '--evidence') ? { evidence: flag(args, '--evidence') } : {}),
+    });
+    console.log(JSON.stringify(candidate, null, 2));
+    return true;
+  }
+
+  if (args[1] === 'dismiss') {
+    const candidate = dismissLearning({
+      id: required(args, '--id'),
+      evidence: required(args, '--evidence'),
     });
     console.log(JSON.stringify(candidate, null, 2));
     return true;
