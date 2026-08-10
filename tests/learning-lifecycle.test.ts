@@ -33,6 +33,7 @@ describe('Major learning lifecycle', () => {
       summary: 'Confirm the target repository before editing.',
       scope: 'global',
       project: 'jss-tool',
+      repoPath: root,
       evidence: 'Sanitized first correction',
     });
     const second = captureLearning({
@@ -41,11 +42,14 @@ describe('Major learning lifecycle', () => {
       summary: 'Do not patch whichever repo happens to be open.',
       scope: 'global',
       project: 'surface-talent',
+      repoPath: root,
       evidence: 'Sanitized second correction',
     });
 
     expect(second.id).toBe(first.id);
     expect(second.occurrences).toBe(2);
+    expect(second.project).toBeUndefined();
+    expect(second.repoPath).toBeUndefined();
     expect(second.evidence).toEqual(['Sanitized first correction', 'Sanitized second correction']);
     expect(learningReviewDue()).toHaveLength(1);
   });
@@ -57,6 +61,7 @@ describe('Major learning lifecycle', () => {
       summary: 'Use browser evidence for visual claims.',
       scope: 'global',
       project: 'jss-tool',
+      repoPath: root,
       evidence: 'Sanitized global evidence',
     });
     const projectCandidate = captureLearning({
@@ -71,6 +76,8 @@ describe('Major learning lifecycle', () => {
 
     expect(projectCandidate.id).not.toBe(globalCandidate.id);
     expect(globalCandidate.occurrences).toBe(1);
+    expect(globalCandidate.project).toBeUndefined();
+    expect(globalCandidate.repoPath).toBeUndefined();
     expect(globalCandidate.evidence).toEqual(['Sanitized global evidence']);
     expect(projectCandidate.scope).toBe('project');
   });
