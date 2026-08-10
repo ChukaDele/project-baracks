@@ -13,6 +13,7 @@ for skill in \
   project-context-integrity \
   mcp-integration-ops \
   major-self-maintenance \
+  design-direction-and-taste \
   website-design-qa \
   responsive-motion-systems; do
   [ -f "skills/internal/$skill/SKILL.md" ] || fail "required stability skill missing: $skill"
@@ -22,17 +23,25 @@ done
 
 grep -Fq 'projectContextIntegrityRequired' guidance/skills.registry.json || fail "project context policy flag missing"
 grep -Fq 'majorMainMustStayGreen' guidance/skills.registry.json || fail "Major main-green policy flag missing"
+grep -Fq 'singleCanonicalDesignDirectionLayer' guidance/skills.registry.json || fail "single canonical design direction policy missing"
+
+[ -f memory/verified/design-direction-taste-synthesis.md ] || fail "Impeccable/Taste synthesis memory missing"
+grep -Fq '2ab054d1f400c5ec085133352232ffc2617f0d54' memory/verified/design-direction-taste-synthesis.md || fail "Impeccable source commit not pinned in synthesis"
+grep -Fq 'e988add20dab0fa97d7a76781c48961c8184288e' memory/verified/design-direction-taste-synthesis.md || fail "Taste source commit not pinned in synthesis"
+grep -Fq 'not installed wholesale' memory/verified/design-direction-taste-synthesis.md || fail "duplicate design-system rejection missing"
 
 grep -Fq 'LEARNINGS.md' src/supervisor/runtime.ts || fail "coordinator does not preload project learnings"
 grep -Fq 'listLearningCandidates' src/supervisor/runtime.ts || fail "coordinator does not preload Major learning candidates"
 grep -Fq 'project-context-integrity' src/supervisor/runtime.ts || fail "coordinator lacks project context integrity contract"
 grep -Fq 'mcp-integration-ops' src/supervisor/runtime.ts || fail "coordinator lacks MCP integration truth-state contract"
+grep -Fq 'design-direction-and-taste' src/supervisor/runtime.ts || fail "coordinator lacks canonical design direction routing"
 grep -Fq 'website-design-qa' src/supervisor/runtime.ts || fail "coordinator lacks website QA routing"
 
 [ -f src/context/session-context.ts ] || fail "enriched session context loader missing"
 grep -Fq 'runSessionContextCli' src/entry.ts || fail "session context loader is not wired into Major entrypoint"
 grep -Fq 'DURABLE PROJECT LEARNINGS' src/context/session-context.ts || fail "session attach does not preload project learnings"
 grep -Fq 'ACTIVE MAJOR LEARNING CANDIDATES' src/context/session-context.ts || fail "session attach does not preload learning candidates"
+grep -Fq 'design-direction-and-taste' src/context/session-context.ts || fail "session attach lacks canonical design direction routing reminder"
 grep -Fq 'website-design-qa' src/context/session-context.ts || fail "session attach lacks website QA routing reminder"
 grep -Fq 'mcp-integration-ops' src/context/session-context.ts || fail "session attach lacks MCP integration routing reminder"
 
