@@ -29,6 +29,13 @@ grep -Fq 'project-context-integrity' src/supervisor/runtime.ts || fail "coordina
 grep -Fq 'mcp-integration-ops' src/supervisor/runtime.ts || fail "coordinator lacks MCP integration truth-state contract"
 grep -Fq 'website-design-qa' src/supervisor/runtime.ts || fail "coordinator lacks website QA routing"
 
+[ -f src/context/session-context.ts ] || fail "enriched session context loader missing"
+grep -Fq 'runSessionContextCli' src/entry.ts || fail "session context loader is not wired into Major entrypoint"
+grep -Fq 'DURABLE PROJECT LEARNINGS' src/context/session-context.ts || fail "session attach does not preload project learnings"
+grep -Fq 'ACTIVE MAJOR LEARNING CANDIDATES' src/context/session-context.ts || fail "session attach does not preload learning candidates"
+grep -Fq 'website-design-qa' src/context/session-context.ts || fail "session attach lacks website QA routing reminder"
+grep -Fq 'mcp-integration-ops' src/context/session-context.ts || fail "session attach lacks MCP integration routing reminder"
+
 grep -Fq 'runProjectContextCli' src/entry.ts || fail "project context CLI is not wired into Major entrypoint"
 grep -Fq 'PROJECT CONTEXT: REROUTE' src/context/project-integrity.ts || fail "wrong-repo reroute signal missing"
 grep -Fq 'major project guard' skills/internal/project-context-integrity/SKILL.md || fail "project guard command missing from skill"
