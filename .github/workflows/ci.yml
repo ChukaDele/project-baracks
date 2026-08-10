@@ -49,3 +49,9 @@ jobs:
 
       - name: Production build
         run: pnpm build
+
+      - name: Immutable runtime snapshot smoke
+        run: |
+          RUNTIME_TMP="$(mktemp -d)"
+          trap 'rm -rf "$RUNTIME_TMP"' EXIT
+          bash scripts/build-major-runtime-snapshot.sh "$RUNTIME_TMP/runtime"
