@@ -3,17 +3,20 @@ set -euo pipefail
 
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GLOBAL_SRC="$MAJOR_ROOT/guidance/global-worker-rules.md"
-REMOTE_FIRST_SKILL_SRC="$MAJOR_ROOT/skills/internal/remote-first-web-development/SKILL.md"
-REMOTE_FIRST_SKILL_DEST="$HOME/.major/skills/internal/remote-first-web-development/SKILL.md"
-HUMAN_BLOCKER_SKILL_SRC="$MAJOR_ROOT/skills/internal/human-blocker-orchestration/SKILL.md"
-HUMAN_BLOCKER_SKILL_DEST="$HOME/.major/skills/internal/human-blocker-orchestration/SKILL.md"
+INTERNAL_SKILLS_SRC="$MAJOR_ROOT/skills/internal"
+GLOBAL_SKILLS_DEST="$HOME/.major/skills/internal"
 
 mkdir -p "$HOME/.major" "$HOME/.claude" "${CODEX_HOME:-$HOME/.codex}" "$HOME/.gemini" "$HOME/.cursor/rules/major-global"
 cp "$GLOBAL_SRC" "$HOME/.major/global-worker-rules.md"
-mkdir -p "$(dirname "$REMOTE_FIRST_SKILL_DEST")"
-cp "$REMOTE_FIRST_SKILL_SRC" "$REMOTE_FIRST_SKILL_DEST"
-mkdir -p "$(dirname "$HUMAN_BLOCKER_SKILL_DEST")"
-cp "$HUMAN_BLOCKER_SKILL_SRC" "$HUMAN_BLOCKER_SKILL_DEST"
+
+# Canonical cross-project Major skills. This path is Major-owned, so converge it
+# to the current repository rather than leaving stale copies behind.
+rm -rf "$GLOBAL_SKILLS_DEST"
+mkdir -p "$GLOBAL_SKILLS_DEST"
+for skill_dir in "$INTERNAL_SKILLS_SRC"/*; do
+  [ -d "$skill_dir" ] || continue
+  cp -R "$skill_dir" "$GLOBAL_SKILLS_DEST/$(basename "$skill_dir")"
+done
 
 # Claude Code: global user memory imports one Major-managed file.
 CLAUDE_RULE="$HOME/.claude/major-global.md"
@@ -77,14 +80,14 @@ install_managed_block "$GEMINI_RULE"
 CURSOR_RULE="$HOME/.cursor/rules/major-global/RULE.md"
 cp "$GLOBAL_SRC" "$CURSOR_RULE"
 
+SKILL_COUNT="$(find "$GLOBAL_SKILLS_DEST" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 cat <<EOF
 Major global worker rules installed for:
 - Claude Code: $CLAUDE_RULE imported by $CLAUDE_ROOT
 - Codex: $CODEX_RULE
 - Antigravity: $GEMINI_RULE
 - Cursor local global rule: $CURSOR_RULE
-- Major remote-first web skill: $REMOTE_FIRST_SKILL_DEST
-- Major human-blocker skill: $HUMAN_BLOCKER_SKILL_DEST
+- Canonical Major internal skills: $GLOBAL_SKILLS_DEST ($SKILL_COUNT skills)
 
 Cursor note:
 - This terminal-installed rule is local to this Mac.
