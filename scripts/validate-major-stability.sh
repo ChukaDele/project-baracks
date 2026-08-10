@@ -95,10 +95,18 @@ grep -Fq 'pnpm typecheck' scripts/install-major-runtime.sh || fail "runtime inst
 grep -Fq 'pnpm test' scripts/install-major-runtime.sh || fail "runtime installer skips tests"
 grep -Fq 'installed-release.json' scripts/install-major-runtime.sh || fail "runtime installer does not record exact installed release"
 grep -Fq 'RELEASES_DIR=' scripts/install-major-runtime.sh || fail "runtime installer has no immutable release store"
-grep -Fq 'pnpm install --prod --frozen-lockfile --dir' scripts/install-major-runtime.sh || fail "runtime snapshot does not install production dependencies"
-grep -Fq 'cp -R drizzle' scripts/install-major-runtime.sh || fail "runtime snapshot omits DB migrations"
-grep -Fq 'major-antigravity-worker.py' scripts/install-major-runtime.sh || fail "runtime snapshot omits Antigravity helper"
+grep -Fq 'build-major-runtime-snapshot.sh' scripts/install-major-runtime.sh || fail "runtime installer does not use canonical snapshot builder"
 grep -Fq 'exec node "$RELEASE_DIR/dist/entry.js"' scripts/install-major-runtime.sh || fail "active wrapper does not execute immutable release snapshot"
 grep -Fq 'runtimeImmutableSnapshot' scripts/install-major-runtime.sh || fail "release record does not state immutable runtime snapshot"
+
+# The builder is the single executable packaging contract and must prove the
+# runtime shape rather than relying on grep-only claims.
+[ -f scripts/build-major-runtime-snapshot.sh ] || fail "runtime snapshot builder missing"
+grep -Fq 'pnpm install --prod --frozen-lockfile --dir' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot does not install production dependencies"
+grep -Fq 'cp -R "$ROOT/drizzle"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits DB migrations"
+grep -Fq 'major-antigravity-worker.py' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits Antigravity helper"
+grep -Fq 'node "$DEST/dist/entry.js" status' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks executable CLI smoke"
+grep -Fq 'MAJOR_DB_PATH=' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks migration smoke"
+grep -Fq 'Immutable runtime snapshot smoke' .github/workflows/ci.yml || fail "CI does not execute the immutable runtime snapshot smoke"
 
 echo "Major stability validation passed."
