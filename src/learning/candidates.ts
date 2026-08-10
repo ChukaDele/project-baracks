@@ -119,6 +119,16 @@ function visibleToProject(candidate: LearningCandidate, project?: string): boole
   return candidate.project === project;
 }
 
+function projectMetadata(
+  input: LearningCaptureInput,
+): Pick<LearningCandidate, 'project' | 'repoPath'> {
+  if (input.scope === 'global') return {};
+  return {
+    ...(input.project ? { project: input.project } : {}),
+    ...(input.repoPath ? { repoPath: resolve(input.repoPath) } : {}),
+  };
+}
+
 export function captureLearning(input: LearningCaptureInput): LearningCandidate {
   const summary = input.summary.trim();
   if (!summary) throw new Error('learning summary must not be empty');
@@ -154,8 +164,7 @@ export function captureLearning(input: LearningCaptureInput): LearningCandidate 
     createdAt: now,
     updatedAt: now,
     ...(key ? { key } : {}),
-    ...(input.project ? { project: input.project } : {}),
-    ...(input.repoPath ? { repoPath: resolve(input.repoPath) } : {}),
+    ...projectMetadata(input),
   };
 
   store.candidates.push(candidate);
