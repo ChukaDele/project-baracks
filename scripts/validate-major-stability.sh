@@ -48,6 +48,7 @@ grep -Fq 'website-design-qa' src/supervisor/runtime.ts || fail "coordinator lack
 
 [ -f src/context/session-context.ts ] || fail "enriched session context loader missing"
 grep -Fq 'runSessionContextCli' src/entry.ts || fail "session context loader is not wired into Major entrypoint"
+grep -Fq 'runLearningLifecycleCli' src/entry.ts || fail "learning lifecycle CLI is not wired into Major entrypoint"
 grep -Fq 'DURABLE PROJECT LEARNINGS' src/context/session-context.ts || fail "session attach does not preload project learnings"
 grep -Fq 'ACTIVE MAJOR LEARNING CANDIDATES' src/context/session-context.ts || fail "session attach does not preload learning candidates"
 grep -Fq 'REVIEW-DUE' src/context/session-context.ts || fail "session attach does not flag recurring learning for promotion review"
@@ -75,6 +76,8 @@ grep -Fq -- '--key' skills/internal/learning-capture/SKILL.md || fail "learning 
 grep -Fq 'promoteLearning' src/learning/candidates.ts || fail "learning store has no promotion lifecycle"
 grep -Fq 'dismissLearning' src/learning/candidates.ts || fail "learning store has no dismissal lifecycle"
 grep -Fq 'learningReviewDue' src/learning/candidates.ts || fail "learning store cannot surface review-due candidates"
+grep -Fq "args[1] === 'promote'" src/learning/lifecycle-cli.ts || fail "learning promotion is not exposed through Major CLI"
+grep -Fq "args[1] === 'dismiss'" src/learning/lifecycle-cli.ts || fail "learning dismissal is not exposed through Major CLI"
 grep -Fq 'Major `main` must stay green' skills/internal/major-self-maintenance/SKILL.md || fail "Major self-maintenance green-main rule missing"
 grep -Fq 'unopened branch' skills/internal/major-self-maintenance/SKILL.md || fail "Major self-maintenance does not conserve GitHub Actions"
 
@@ -93,7 +96,9 @@ grep -Fq 'pnpm test' scripts/install-major-runtime.sh || fail "runtime installer
 grep -Fq 'installed-release.json' scripts/install-major-runtime.sh || fail "runtime installer does not record exact installed release"
 grep -Fq 'RELEASES_DIR=' scripts/install-major-runtime.sh || fail "runtime installer has no immutable release store"
 grep -Fq 'pnpm install --prod --frozen-lockfile --dir' scripts/install-major-runtime.sh || fail "runtime snapshot does not install production dependencies"
+grep -Fq 'cp -R drizzle' scripts/install-major-runtime.sh || fail "runtime snapshot omits DB migrations"
+grep -Fq 'major-antigravity-worker.py' scripts/install-major-runtime.sh || fail "runtime snapshot omits Antigravity helper"
 grep -Fq 'exec node "$RELEASE_DIR/dist/entry.js"' scripts/install-major-runtime.sh || fail "active wrapper does not execute immutable release snapshot"
 grep -Fq 'runtimeImmutableSnapshot' scripts/install-major-runtime.sh || fail "release record does not state immutable runtime snapshot"
 
- echo "Major stability validation passed."
+echo "Major stability validation passed."
