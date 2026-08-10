@@ -26,14 +26,14 @@ afterEach(() => {
 });
 
 describe('Major learning lifecycle', () => {
-  it('coalesces paraphrased corrections when they share a stable learning key', () => {
+  it('coalesces sanitized global corrections when they share a stable learning key', () => {
     const first = captureLearning({
       source: 'user-correction',
       key: 'wrong-project-edit',
       summary: 'Confirm the target repository before editing.',
       scope: 'global',
       project: 'jss-tool',
-      evidence: 'First correction',
+      evidence: 'Sanitized first correction',
     });
     const second = captureLearning({
       source: 'recurring-failure',
@@ -41,13 +41,82 @@ describe('Major learning lifecycle', () => {
       summary: 'Do not patch whichever repo happens to be open.',
       scope: 'global',
       project: 'surface-talent',
-      evidence: 'Second correction',
+      evidence: 'Sanitized second correction',
     });
 
     expect(second.id).toBe(first.id);
     expect(second.occurrences).toBe(2);
-    expect(second.evidence).toEqual(['First correction', 'Second correction']);
+    expect(second.evidence).toEqual(['Sanitized first correction', 'Sanitized second correction']);
     expect(learningReviewDue()).toHaveLength(1);
+  });
+
+  it('does not merge project-scoped evidence into an existing global candidate', () => {
+    const globalCandidate = captureLearning({
+      source: 'manual',
+      key: 'browser-evidence-required',
+      summary: 'Use browser evidence for visual claims.',
+      scope: 'global',
+      project: 'jss-tool',
+      evidence: 'Sanitized global evidence',
+    });
+    const projectCandidate = captureLearning({
+      source: 'user-correction',
+      key: 'browser-evidence-required',
+      summary: 'This project had a private visual QA correction.',
+      scope: 'project',
+      project: 'surface-talent',
+      repoPath: root,
+      evidence: 'Project-local evidence that must not enter global learning',
+    });
+
+    expect(projectCandidate.id).not.toBe(globalCandidate.id);
+    expect(globalCandidate.occurrences).toBe(1);
+    expect(globalCandidate.evidence).toEqual(['Sanitized global evidence']);
+    expect(projectCandidate.scope).toBe('project');
+  });
+
+  it('requires evidence and a sanitized summary before global promotion', () => {
+    const candidate = captureLearning({
+      source: 'user-correction',
+      key: 'remote-preview-not-localhost',
+      summary: 'Private project wording that should not become global.',
+      scope: 'project',
+      project: 'bredge',
+      repoPath: root,
+      evidence: 'Private project evidence',
+    });
+
+    expect(() =>
+      promoteLearning({
+        id: candidate.id,
+        scope: 'global',
+        evidence: '   ',
+        summary: 'Use the approved remote preview path.',
+      }),
+    ).toThrow(/promotion evidence is required/);
+
+    expect(() =>
+      promoteLearning({
+        id: candidate.id,
+        scope: 'global',
+        evidence: 'Promoted into tested remote-first guidance.',
+        summary: '   ',
+      }),
+    ).toThrow(/sanitized summary/);
+
+    const promoted = promoteLearning({
+      id: candidate.id,
+      scope: 'global',
+      evidence: 'Promoted into tested remote-first guidance.',
+      summary: 'Use the approved remote preview path.',
+    });
+
+    expect(promoted.status).toBe('promoted');
+    expect(promoted.scope).toBe('global');
+    expect(promoted.summary).toBe('Use the approved remote preview path.');
+    expect(promoted.project).toBeUndefined();
+    expect(promoted.repoPath).toBeUndefined();
+    expect(promoted.evidence).toEqual(['Promoted into tested remote-first guidance.']);
   });
 
   it('removes a candidate from review due after its durable replacement is promoted', () => {
@@ -71,6 +140,7 @@ describe('Major learning lifecycle', () => {
       id: candidate.id,
       scope: 'global',
       evidence: 'Promoted into tested remote-first guidance.',
+      summary: 'Use the approved remote preview path.',
     });
 
     expect(promoted.status).toBe('promoted');
