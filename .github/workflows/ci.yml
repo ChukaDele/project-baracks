@@ -35,6 +35,11 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
+      - name: Print exact workspace memory format
+        run: |
+          pnpm exec prettier memory/verified/developer-workspace-lifecycle.md
+          exit 1
+
       - name: Format check
         run: pnpm format:check
 
