@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -14,11 +14,13 @@
     "captureExplicitCorrections": true,
     "projectContextIntegrityRequired": true,
     "majorMainMustStayGreen": true,
-    "singleCanonicalDesignDirectionLayer": true
+    "singleCanonicalDesignDirectionLayer": true,
+    "workspaceLifecyclePolicy": true
   },
   "entries": [
     {"id":"project-start","source":"major-internal","availability":"all-projects","load":"project-start"},
     {"id":"project-context-integrity","source":"major-internal","availability":"all-projects","load":"named-project-repository-path-cross-project-edit-handoff-migration-wrong-project"},
+    {"id":"workspace-lifecycle-management","source":"major-internal","availability":"all-projects","load":"project-create-clone-locate-move-park-delete-archive-storage-disk-pressure-duplicate-repo-large-assets-local-cloud"},
     {"id":"mvp-speed-prioritisation","source":"major-internal","availability":"all-projects","load":"always-on-project-and-large-feature-planning"},
     {"id":"legacy-cleanup","source":"major-internal","availability":"all-projects","load":"rename-migration-provider-swap-architecture-replacement"},
     {"id":"major-self-maintenance","source":"major-internal","availability":"major-repo","load":"major-self-change-skill-routing-learning-policy-runtime-installer"},
