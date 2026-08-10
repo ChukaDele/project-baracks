@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 36
+## Major internal skills — 37
 
 These are canonical Major-owned skills.
 
@@ -12,6 +12,7 @@ These are canonical Major-owned skills.
 |---|---|
 | `project-start` | Start a new/existing repo from outcome, current state and fastest proof. |
 | `project-context-integrity` | Confirm the requested project/repo before edits; reroute an unambiguous wrong-workspace task instead of patching the wrong repo. |
+| `workspace-lifecycle-management` | Manage HOT/WARM/COLD local project lifecycle, safe clone parking/deletion, storage pressure, large assets and local-vs-cloud development without losing project truth. |
 | `mvp-speed-prioritisation` | Reduce large briefs to P0 MVP / P1 / P2 and build P0 end to end. |
 | `legacy-cleanup` | Finish migrations with one canonical path and remove stale active artefacts. |
 | `major-self-maintenance` | Keep Major main green; make self-changes atomically through branch/PR/full gate/independent review where consequential. |
@@ -64,6 +65,22 @@ Learning priority:
 `explicit correction → fix/verify → candidate capture → deterministic rule/tool → tested skill → memory`
 
 Rules prevent. Skills institutionalize. Memory reminds.
+
+## Workspace lifecycle policy
+
+Major keeps a verified machine-specific workspace memory in `memory/verified/developer-workspace-lifecycle.md` and retrieves it only for project lifecycle/storage decisions.
+
+Key model:
+
+- Mac = active workspace;
+- GitHub = canonical source **after** local commit/push/non-Git state verification;
+- deployment providers = runtime;
+- cloud/external storage = large assets/archives/backups;
+- HOT/WARM/COLD project states keep only genuinely active repos fully hydrated locally;
+- do not create duplicate project clones when the expected path is missing;
+- do not delete a clone merely because a GitHub repo exists; verify local-only commits, untracked/ignored files and non-Git state first;
+- prefer pnpm for new compatible Node projects, but do not churn healthy active projects just to migrate package managers;
+- disk-headroom thresholds are machine-specific operational guidance, not universal developer policy.
 
 ## Design-direction source policy
 
@@ -156,6 +173,7 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 - Start substantive work → `skill-resolver` plus relevant project learnings.
 - Named/clearly implied project differs from current workspace → `project-context-integrity` before edits.
+- Project create/clone/locate/move/park/delete/archive/storage-pressure/large-asset/local-vs-cloud decision → `workspace-lifecycle-management`.
 - Major/project-baracks self-change → `major-self-maintenance`.
 - Explicit correction / repeated mistake / "we fixed this before" → `learning-capture` after the real task is fixed.
 - Substantial UI/website creation, redesign, new visual identity, "generic AI", "too safe", "too loud" → `design-direction-and-taste`.
