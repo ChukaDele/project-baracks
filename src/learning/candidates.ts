@@ -195,10 +195,7 @@ export function promoteLearning(input: {
   return candidate;
 }
 
-export function dismissLearning(input: {
-  id: string;
-  evidence: string;
-}): LearningCandidate {
+export function dismissLearning(input: { id: string; evidence: string }): LearningCandidate {
   const evidence = input.evidence.trim();
   if (!evidence) throw new Error('dismissal evidence/reason is required');
 
