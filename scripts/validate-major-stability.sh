@@ -70,9 +70,11 @@ grep -Fq 'workspace-lifecycle-management' skills/internal/project-start/SKILL.md
 grep -Fq 'At two occurrences' skills/internal/learning-capture/SKILL.md || fail "learning recurrence promotion threshold missing"
 grep -Fq 'Major `main` must stay green' skills/internal/major-self-maintenance/SKILL.md || fail "Major self-maintenance green-main rule missing"
 
-# Runtime installation is a release boundary. A red/partial checkout must never
-# silently replace the active global Major runtime.
+# Runtime installation is a release boundary. A red/partial or mutable checkout
+# must never silently replace/change the active global Major runtime.
 grep -Fq 'refusing to install Major from a dirty checkout' scripts/install-major-runtime.sh || fail "runtime installer does not reject dirty source"
+grep -Fq 'MAJOR_ALLOW_NON_MAIN_INSTALL' scripts/install-major-runtime.sh || fail "runtime installer does not gate non-main installs"
+grep -Fq 'Install releases from main after green CI' scripts/install-major-runtime.sh || fail "runtime installer lacks main-release contract"
 grep -Fq 'bash scripts/validate-major.sh' scripts/install-major-runtime.sh || fail "runtime installer skips Major doctrine validation"
 grep -Fq 'bash scripts/validate-major-stability.sh' scripts/install-major-runtime.sh || fail "runtime installer skips stability validation"
 grep -Fq 'pnpm format:check' scripts/install-major-runtime.sh || fail "runtime installer skips format gate"
@@ -80,5 +82,8 @@ grep -Fq 'pnpm lint' scripts/install-major-runtime.sh || fail "runtime installer
 grep -Fq 'pnpm typecheck' scripts/install-major-runtime.sh || fail "runtime installer skips typecheck gate"
 grep -Fq 'pnpm test' scripts/install-major-runtime.sh || fail "runtime installer skips tests"
 grep -Fq 'installed-release.json' scripts/install-major-runtime.sh || fail "runtime installer does not record exact installed release"
+grep -Fq 'EXPECTED_SHA=' scripts/install-major-runtime.sh || fail "runtime wrapper is not pinned to exact installed SHA"
+grep -Fq 'MAJOR RUNTIME REFUSAL' scripts/install-major-runtime.sh || fail "runtime wrapper does not fail loudly on source drift"
+grep -Fq 'runtimePinnedToSha' scripts/install-major-runtime.sh || fail "release record does not state SHA pinning"
 
 echo "Major stability validation passed."
