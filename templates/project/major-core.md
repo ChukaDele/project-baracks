@@ -67,6 +67,22 @@ An explicit user correction, `we already fixed this`, or credible evidence contr
 
 A recurring candidate must not sit indefinitely as an ignored note. Promote it to project guidance/global guidance/tested skill, or record why it is still unstable/project-specific.
 
+## Design direction
+
+For substantial UI/website creation, redesign, art-direction changes, or feedback such as `generic AI`, `too safe`, `too loud`, `make it Awwwards-level`, load `design-direction-and-taste` **before** implementation.
+
+It is the single Major art-direction/taste authority. Do not stack raw Impeccable/Taste/frontend taste systems and let conflicting defaults compete.
+
+Use it to settle:
+
+- surface mode: PERSUADE / OPERATE / READ / EXPERIENCE;
+- REFINE / EXTEND / REDESIGN / NEW WORLD;
+- the Design Read;
+- relative VARIANCE / MOTION / DENSITY;
+- the visual grammar and anti-default checks.
+
+Then hand implementation/QA to the specialist layers below. The user's explicit brief and existing project truth outrank generic taste opinions.
+
 ## Remote-first web development
 
 For web UI work, load `remote-first-web-development` before implementation. Build locally without serving, then use GitHub plus a Cloudflare preview for browser work. Before opening a browser target, run `major web preflight` against the Cloudflare preview URL and GitHub repository URL. Local browser targets are denied unless the owner explicitly grants a project-specific exception.
@@ -83,7 +99,7 @@ For web UI work, load `remote-first-web-development` before implementation. Buil
 - Keep code simple, modular and replaceable: explicit inputs/outputs, stable boundaries, business rules independent of providers/frameworks where practical.
 - Do not add abstraction, infrastructure, tests or documentation without a current reason.
 
-For customer-facing web work, load `website-design-qa`; pair `responsive-motion-systems` for GSAP/ScrollTrigger/sticky/pinned/Three.js or other viewport-motion systems.
+For customer-facing web work, load `website-design-qa`; pair `responsive-motion-systems` for GSAP/ScrollTrigger/sticky/pinned/Three.js or other viewport-motion systems. `exploratory-creative-dev` executes an approved high-craft direction; it does not choose a second competing art direction.
 
 ## Autonomy and concurrency
 
