@@ -63,22 +63,8 @@ pnpm typecheck
 pnpm test
 pnpm build
 
-# Build an immutable runtime snapshot. The globally active Major command must
-# never execute dist/node_modules from the mutable development checkout.
-rm -rf "$STAGE_DIR"
-mkdir -p "$STAGE_DIR/scripts"
-cp package.json pnpm-lock.yaml "$STAGE_DIR/"
-cp -R dist "$STAGE_DIR/dist"
-cp -R drizzle "$STAGE_DIR/drizzle"
-cp scripts/major-antigravity-worker.py "$STAGE_DIR/scripts/major-antigravity-worker.py"
-pnpm install --prod --frozen-lockfile --dir "$STAGE_DIR"
-
-# Fail before activation if runtime-relative assets are incomplete.
-test -f "$STAGE_DIR/dist/entry.js"
-test -d "$STAGE_DIR/drizzle"
-test -f "$STAGE_DIR/scripts/major-antigravity-worker.py"
-test -d "$STAGE_DIR/node_modules"
-
+# Build and execute-smoke the same immutable runtime shape used in production.
+bash "$ROOT/scripts/build-major-runtime-snapshot.sh" "$STAGE_DIR"
 cat > "$STAGE_DIR/release.json" <<EOF
 {
   "version": "$INSTALL_VERSION",
@@ -87,11 +73,31 @@ cat > "$STAGE_DIR/release.json" <<EOF
 }
 EOF
 
-rm -rf "$RELEASE_DIR"
-mv "$STAGE_DIR" "$RELEASE_DIR"
+# Never delete a release directory that an already-installed wrapper may still
+# be using. A same-SHA reinstall reuses a complete existing snapshot; an
+# incomplete same-SHA directory is treated as corruption and must be inspected.
+if [ -d "$RELEASE_DIR" ]; then
+  if [ ! -f "$RELEASE_DIR/release.json" ] || \
+     [ ! -f "$RELEASE_DIR/dist/entry.js" ] || \
+     [ ! -d "$RELEASE_DIR/drizzle" ] || \
+     [ ! -d "$RELEASE_DIR/node_modules" ]; then
+    echo "ERROR: existing Major release snapshot is incomplete: $RELEASE_DIR" >&2
+    echo "Do not overwrite it automatically; inspect/remove the corrupt inactive snapshot and reinstall." >&2
+    exit 1
+  fi
+  EXISTING_SHA="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).sha || '')" "$RELEASE_DIR/release.json")"
+  if [ "$EXISTING_SHA" != "$INSTALL_SHA" ]; then
+    echo "ERROR: existing release directory SHA mismatch at $RELEASE_DIR" >&2
+    exit 1
+  fi
+  rm -rf "$STAGE_DIR"
+else
+  mv "$STAGE_DIR" "$RELEASE_DIR"
+fi
 
-# Install global rules/skills from the validated source before swapping the
-# active CLI. A failure here leaves the previous executable in place.
+# Update global rules/skills from the validated source before swapping the
+# active CLI. The old executable remains untouched until all required setup
+# below has succeeded.
 bash "$ROOT/scripts/install-major-global-rules.sh"
 
 mkdir -p "$HOME/.claude"
@@ -135,8 +141,8 @@ if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 
     echo "WARN: Antigravity SDK install failed; Major will route around this worker until fixed."
 fi
 
-# Stage the wrapper and release record, then swap the wrapper only after every
-# required installation step above has succeeded.
+# Stage the wrapper and release record, then atomically replace those small files
+# only after every required installation step above has succeeded.
 cat > "$WRAPPER_TMP" <<EOF
 #!/bin/sh
 set -eu
@@ -191,7 +197,7 @@ Antigravity:global Major rules installed
 
 RUNTIME INTEGRITY:
 - The active CLI runs from an immutable release snapshot under ~/.major/releases.
-- The snapshot includes production dependencies, DB migrations and required runtime helpers.
+- The exact snapshot builder is smoke-tested, including production dependencies, DB migrations and required runtime helpers.
 - Editing, rebuilding, pulling or switching branches in project-baracks cannot silently change the installed runtime.
 - Normal installs require clean main equal to current origin/main plus the complete local release gate.
 
