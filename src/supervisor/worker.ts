@@ -1,9 +1,16 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { executeMajorCommand } from '../security/major-gateway.js';
 import { globalStopRequested } from './policy.js';
+import {
+  releaseResource,
+  requestResource,
+  waitForResource,
+  type ResourceLease,
+} from './resources.js';
 import type { WorkerHost } from './state.js';
 
 export interface WorkerOutcome {
@@ -86,6 +93,7 @@ export async function runGatewayCommand(input: {
   cwd: string;
   timeoutMs?: number;
   extraAllowedRoots?: readonly string[];
+  resourceLeaseId?: string;
 }): Promise<GatewayCommandOutcome> {
   const started = Date.now();
   let stdout = '';
@@ -102,6 +110,7 @@ export async function runGatewayCommand(input: {
         ...(input.extraAllowedRoots ?? []),
       ],
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+      ...(input.resourceLeaseId ? { resourceLeaseId: input.resourceLeaseId } : {}),
       parseLine: (line) => ({ type: 'stdout', data: line }),
     });
 
@@ -150,12 +159,48 @@ export async function runWorker(input: {
   cwd: string;
   timeoutMs?: number;
 }): Promise<WorkerOutcome> {
-  const spec = commandFor(input.host, input.prompt);
-  const outcome = await runGatewayCommand({
-    executable: spec.command,
-    args: spec.args,
-    cwd: input.cwd,
-    ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+  const started = Date.now();
+  const request = requestResource({
+    kind: 'worker',
+    owner: `major:${input.host}:${process.pid}:${randomUUID()}`,
+    project: basename(resolve(input.cwd)),
   });
-  return { host: input.host, ...outcome };
+  if (request.status === 'rejected') {
+    return {
+      host: input.host,
+      status: 'failed',
+      exitCode: null,
+      stdout: '',
+      stderr: `Major resource guard refused worker: ${request.reason}`,
+      durationMs: Date.now() - started,
+    };
+  }
+
+  let lease: ResourceLease | undefined;
+  try {
+    lease =
+      request.status === 'active'
+        ? request.lease
+        : await waitForResource(request.request, input.timeoutMs);
+    const spec = commandFor(input.host, input.prompt);
+    const outcome = await runGatewayCommand({
+      executable: spec.command,
+      args: spec.args,
+      cwd: input.cwd,
+      resourceLeaseId: lease.id,
+      ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+    });
+    return { host: input.host, ...outcome };
+  } catch (error) {
+    return {
+      host: input.host,
+      status: 'failed',
+      exitCode: null,
+      stdout: '',
+      stderr: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - started,
+    };
+  } finally {
+    if (lease) releaseResource(lease.id);
+  }
 }

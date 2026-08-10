@@ -1,4 +1,5 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { executeMajorStreaming } from '../providers/exec.js';
@@ -16,6 +17,24 @@ export interface MajorGatewayRequest {
   allowedRoots: readonly string[];
   timeoutMs?: number;
   parseLine?: (line: string) => ProviderEvent | null;
+  resourceLeaseId?: string;
+}
+
+/** Fixed, read-only host probe used by the global admission guard on macOS. */
+export function readSystemMemoryAvailablePercent(): number | undefined {
+  if (process.platform !== 'darwin') return undefined;
+  try {
+    const output = execFileSync('/usr/bin/memory_pressure', ['-Q'], {
+      encoding: 'utf8',
+      timeout: 2_000,
+      env: {},
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const match = output.match(/System-wide memory free percentage:\s*(\d+)%/);
+    return match?.[1] ? Number.parseInt(match[1], 10) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function executableName(executable: string): string {
@@ -138,7 +157,10 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
     executable: spawnPath,
     args: [...request.args],
     cwd,
-    env: sanitized.env,
+    env: {
+      ...sanitized.env,
+      ...(request.resourceLeaseId ? { MAJOR_RESOURCE_LEASE_ID: request.resourceLeaseId } : {}),
+    },
     allowedRoots: request.allowedRoots,
     detached: true,
     ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),

@@ -149,7 +149,7 @@ describe('Major project trust policy', () => {
       projectClass: 'workshop',
       trust: 'unattended',
     });
-    expect(unattended.maxWorkers).toBe(8);
+    expect(unattended.maxWorkers).toBe(6);
     expect(unattended.allowBackground).toBe(true);
   });
 

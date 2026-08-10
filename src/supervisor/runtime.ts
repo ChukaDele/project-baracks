@@ -63,6 +63,10 @@ function trustContract(policy: ProjectPolicy): string {
 - class: ${policy.projectClass}
 - trust: ${policy.trust}
 - maximum concurrent workers: ${policy.maxWorkers}
+- hard global active-resource ceiling: 6 across the full task tree
+- subagent depth: maximum 1; delegated reviewers are leaf workers
+- browser budget: maximum 2 contexts total (one visible and one headless)
+- build budget: maximum 1 production build at a time
 - maximum coordinator run: ${policy.maxRunMinutes} minutes
 - background/unattended execution: ${policy.allowBackground ? 'allowed' : 'not allowed'}
 - paid spend: ${policy.allowPaidSpend ? 'explicitly allowed' : 'not allowed'}
@@ -94,7 +98,8 @@ MAJOR OPERATING CONTRACT:
 - ${workerLanguage}
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
 - Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, propose Skillify rather than growing the permanent supervisor workflow.
-- Delegate independent work across providers with the Major CLI only within the project trust limit.
+- Reserve Major capacity before every worker, browser, or build. Queue when capacity or memory pressure blocks admission.
+- Delegate independent work across providers with the Major CLI only within the project trust limit. Delegated workers must not create descendants beyond depth 1.
 - Prefer lower-cost/abundant subscription capacity for bounded tasks. Use stronger reasoning for architecture, hard bugs, integration, and adjudication.
 - Concurrent writers must use isolated worktrees. Keep one integration owner.
 - Validate with objective evidence: browser/runtime behavior, tests, persisted state, exact SHA/PR, provider response, or deployed result.

@@ -36,6 +36,16 @@ import {
 } from './state.js';
 import { runDaemon, runGoalCycle, supervisorSnapshot } from './runtime.js';
 import { runGatewayCommand, runWorker } from './worker.js';
+import {
+  RESOURCE_KINDS,
+  cancelResourceRequest,
+  formatResourceTelemetry,
+  heartbeatResource,
+  releaseResource,
+  requestResource,
+  resourceSnapshot,
+  type ResourceKind,
+} from './resources.js';
 import { assertRemotePreviewUrl } from '../web/remote-preview.js';
 
 function flag(args: string[], name: string): string | undefined {
@@ -88,6 +98,13 @@ function validLearningScope(value: string): LearningScope {
   return value as LearningScope;
 }
 
+function validResourceKind(value: string): ResourceKind {
+  if (!RESOURCE_KINDS.includes(value as ResourceKind)) {
+    throw new Error(`unsupported resource kind: ${value}`);
+  }
+  return value as ResourceKind;
+}
+
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
   process.stdin.setEncoding('utf8');
@@ -113,15 +130,73 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     return true;
   }
 
+  if (command === 'resource' && args[1] === 'status') {
+    const snapshot = resourceSnapshot();
+    if (hasFlag(args, '--json')) console.log(JSON.stringify(snapshot, null, 2));
+    else console.log(formatResourceTelemetry(snapshot.telemetry));
+    return true;
+  }
+
+  if (command === 'resource' && args[1] === 'acquire') {
+    const ttlMinutes = Number.parseFloat(flag(args, '--ttl-minutes') ?? '');
+    const resourceProject = flag(args, '--project');
+    const parentLeaseId = flag(args, '--parent');
+    const pidRaw = flag(args, '--pid');
+    const resourcePid = pidRaw ? Number.parseInt(pidRaw, 10) : undefined;
+    if (Number.isFinite(ttlMinutes) && ttlMinutes <= 0) {
+      throw new Error('--ttl-minutes must be greater than zero');
+    }
+    if (resourcePid !== undefined && (!Number.isFinite(resourcePid) || resourcePid <= 0)) {
+      throw new Error('--pid must be a positive process id');
+    }
+    const result = requestResource({
+      kind: validResourceKind(requireFlag(args, '--kind')),
+      owner: requireFlag(args, '--owner'),
+      ...(resourceProject ? { project: resourceProject } : {}),
+      ...(parentLeaseId ? { parentLeaseId } : {}),
+      ...(resourcePid !== undefined ? { pid: resourcePid } : {}),
+      ...(Number.isFinite(ttlMinutes) ? { ttlMs: ttlMinutes * 60 * 1000 } : {}),
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return true;
+  }
+
+  if (command === 'resource' && args[1] === 'heartbeat') {
+    const lease = heartbeatResource(requireFlag(args, '--lease'));
+    console.log(JSON.stringify(lease, null, 2));
+    return true;
+  }
+
+  if (command === 'resource' && args[1] === 'release') {
+    const telemetry = releaseResource(requireFlag(args, '--lease'));
+    if (hasFlag(args, '--json')) console.log(JSON.stringify(telemetry, null, 2));
+    else console.log(formatResourceTelemetry(telemetry));
+    return true;
+  }
+
+  if (command === 'resource' && args[1] === 'cancel') {
+    const telemetry = cancelResourceRequest(requireFlag(args, '--request'));
+    if (hasFlag(args, '--json')) console.log(JSON.stringify(telemetry, null, 2));
+    else console.log(formatResourceTelemetry(telemetry));
+    return true;
+  }
+
   if (command === 'web' && args[1] === 'preflight') {
     const preview = assertRemotePreviewUrl(requireFlag(args, '--preview-url'));
     const githubUrl = requireFlag(args, '--github-url');
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(githubUrl)) {
-      throw new Error(`remote web preflight requires a GitHub repository URL, received ${githubUrl}`);
+      throw new Error(
+        `remote web preflight requires a GitHub repository URL, received ${githubUrl}`,
+      );
     }
     const productionBranch = flag(args, '--production-branch') ?? 'main';
-    if (productionBranch !== 'main') throw new Error(`remote web preflight requires main as the production branch, received ${productionBranch}`);
-    console.log(`REMOTE WEB PREFLIGHT: PASS\npreview: ${preview.href}\ngithub: ${githubUrl}\nproduction branch: main`);
+    if (productionBranch !== 'main')
+      throw new Error(
+        `remote web preflight requires main as the production branch, received ${productionBranch}`,
+      );
+    console.log(
+      `REMOTE WEB PREFLIGHT: PASS\npreview: ${preview.href}\ngithub: ${githubUrl}\nproduction branch: main`,
+    );
     return true;
   }
 
@@ -315,6 +390,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
 
   if (command === 'status') {
     console.log(supervisorSnapshot(args[1]));
+    console.log(formatResourceTelemetry(resourceSnapshot().telemetry));
     return true;
   }
 
@@ -365,8 +441,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       ? supervisorSnapshot(project.project)
       : 'No git project detected in this session.';
     const policy = project ? getProjectPolicy(project.project, project.repoPath) : undefined;
+    const resources = formatResourceTelemetry(resourceSnapshot().telemetry);
     console.log(
-      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}\n` : ''}${active}\n\nMajor is the default control plane. Execute within the current project policy. Owner-approved build projects may coordinate normal reversible engineering work immediately; client data remains project-local and destructive/irreversible owner gates still apply.`,
+      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}\n` : ''}${active}\n\nRESOURCE GUARD\n${resources}\nsubagent depth: 1\nbrowser hard cap: 2\nconcurrent build cap: 1\n\nMajor is the default control plane. Reserve shared capacity before workers, browsers, or builds; queued work must wait. Owner-approved build projects may coordinate normal reversible engineering work immediately; client data remains project-local and destructive/irreversible owner gates still apply.`,
     );
     return true;
   }

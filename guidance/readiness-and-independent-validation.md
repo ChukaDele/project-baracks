@@ -38,7 +38,7 @@ Trust/autonomy is earned from real evidence:
 - `observe`: context, planning, inspection; no delegated execution.
 - `assist`: visible/foreground pilot, maximum 3 useful workers, no unattended background loop.
 - `build`: validated autonomous build work, maximum 6 useful workers; still no unattended/login execution by default.
-- `unattended`: maximum 8 useful workers, background continuation allowed only after representative real-output validation and an independent grade.
+- `unattended`: maximum 6 useful workers, background continuation allowed only after representative real-output validation and an independent grade.
 
 Do not increase trust merely because configuration exists or self-authored tests are green.
 

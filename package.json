@@ -1,6 +1,6 @@
 {
   "name": "major",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Major — thin cross-project control plane with owner-approved build mode, durable correction learning, deterministic dev-server coordination, verification and skill-first execution",
   "type": "module",
   "private": true,

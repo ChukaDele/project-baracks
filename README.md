@@ -49,7 +49,7 @@ Trust levels:
 - `observe` — no Major worker execution; useful for new/untrusted projects or deliberate shadow evaluation;
 - `assist` — visible foreground pilot, max 3 useful workers, max 30 minutes per coordinator run;
 - `build` — normal foreground coordination, max 6 useful workers, max 120 minutes per coordinator run;
-- `unattended` — max 8 useful workers and background continuation.
+- `unattended` — max 6 useful workers and background continuation.
 
 The owner may explicitly fast-track a trusted project directly into `build` with `--owner-approved`. This bypasses shadow/assist ceremony for normal foreground work. It does **not** silently grant unattended/background authority.
 

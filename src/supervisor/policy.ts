@@ -72,7 +72,7 @@ function limitsFor(
     case 'build':
       return { maxWorkers: 6, maxRunMinutes: 120, allowBackground: false };
     case 'unattended':
-      return { maxWorkers: 8, maxRunMinutes: 480, allowBackground: true };
+      return { maxWorkers: 6, maxRunMinutes: 480, allowBackground: true };
   }
 }
 

@@ -36,7 +36,7 @@ Used to make and ship software.
 - proof-first P0 MVP delivery;
 - worktree isolation and explicit write ownership;
 - code, browser QA, preview deployments, repair loops and objective runtime evidence;
-- worker count comes from the project's trust level rather than a global default;
+- project trust may lower concurrency, while one hard global resource guard caps the full task tree at 6;
 - multi-agent graphs are created only when independent parallel work earns their coordination cost.
 
 ### Major Knowledge
@@ -68,7 +68,9 @@ Trust levels:
 - `observe` — no delegated execution;
 - `assist` — foreground pilot, maximum 3 useful workers;
 - `build` — validated build mode, maximum 6 useful workers;
-- `unattended` — maximum 8 useful workers and background continuation.
+- `unattended` — maximum 6 useful workers and background continuation.
+
+The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. Browser leases also have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
 
 Unknown projects default to observe. Client/candidate/PII projects remain isolated until explicitly classified/promoted. Trust promotion beyond assist requires a passing independent grade.
 

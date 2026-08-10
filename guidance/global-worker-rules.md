@@ -19,9 +19,21 @@ Apply these defaults across projects unless a project/user instruction is more s
 - `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human/gstack driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
 - `assist`: visible foreground pilot, maximum 3 useful workers and maximum 30 minutes per coordinator run.
 - `build`: normal foreground working mode, maximum 6 useful workers and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
-- `unattended`: maximum 8 useful workers with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
+- `unattended`: maximum 6 useful workers with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
 
 For owner-approved build projects, do not re-introduce shadow runs, repeated permission prompts, or ceremonial review loops that block ordinary reversible engineering.
+
+## Global resource guard
+
+- The hard ceiling is 6 active resources across the full task tree. Parent agents, child agents, nested subagents, QA workers, browser workers and build workers share this one budget. The preferred operating range is 3–4 active resources.
+- Subagent depth is 1 by default. Review and QA workers are leaves. They do not delegate unless Major has granted a parent-linked worker lease and the request remains within depth 1.
+- Before starting a worker, browser or build, acquire a Major lease with `major resource acquire --kind <worker|browser|build> --owner <stable-owner> --project <project>`. Pass `--parent <lease-id>` for child workers. Release it immediately after the work with `major resource release --lease <lease-id>`.
+- A queued result is not permission to start. Wait until Major promotes the request. Six occupied slots means further work queues.
+- Browser budget: at most one shared visible browser plus one headless browser context. Reuse contexts and close each viewport/page set promptly.
+- Build budget: one production build at a time. Build once per relevant commit. Reviewers inspect the same immutable remote preview.
+- Major admission checks the shared resource ledger and memory availability. Below the memory soft floor, new work queues instead of increasing pressure.
+- Use `major resource status` for lightweight telemetry: workers, browsers, builds, total active, queued and memory availability.
+- QA runs use bounded waves, not swarms: up to 3 reviewers, consolidate and repair, up to 3 second-wave reviewers, then one final verifier.
 
 ## Communication
 

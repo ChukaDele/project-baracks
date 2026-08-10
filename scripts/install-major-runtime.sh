@@ -71,7 +71,7 @@ if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 
 fi
 
 cat <<EOF
-Major v0.4.1 control plane installed.
+Major v0.4.3 control plane installed.
 
 CLI:        $BIN_DIR/major
 State:      $MAJOR_HOME/supervisor-state.json
