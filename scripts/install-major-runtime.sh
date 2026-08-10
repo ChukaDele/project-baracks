@@ -22,6 +22,12 @@ INSTALL_BRANCH="$(git branch --show-current 2>/dev/null || true)"
 INSTALL_BRANCH="${INSTALL_BRANCH:-detached}"
 INSTALL_VERSION="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('package.json','utf8')).version)")"
 
+if [ "${MAJOR_ALLOW_NON_MAIN_INSTALL:-0}" != "1" ] && [ "$INSTALL_BRANCH" != "main" ]; then
+  echo "ERROR: refusing to install Major from branch '$INSTALL_BRANCH'." >&2
+  echo "Install releases from main after green CI. Set MAJOR_ALLOW_NON_MAIN_INSTALL=1 only for an intentional field pilot." >&2
+  exit 1
+fi
+
 corepack enable >/dev/null 2>&1 || true
 pnpm install --frozen-lockfile
 
@@ -36,10 +42,21 @@ pnpm typecheck
 pnpm test
 pnpm build
 
-# Only replace the active runtime after every release check passes.
+# Only replace the active runtime after every release check passes. The wrapper
+# is pinned to the exact validated commit so a later checkout/build cannot
+# silently change the globally active Major implementation.
 cat > "$BIN_DIR/major" <<EOF
 #!/bin/sh
-exec node "$ROOT/dist/entry.js" "\$@"
+set -eu
+ROOT="$ROOT"
+EXPECTED_SHA="$INSTALL_SHA"
+CURRENT_SHA="\$(git -C "\$ROOT" rev-parse HEAD 2>/dev/null || true)"
+if [ "\$CURRENT_SHA" != "\$EXPECTED_SHA" ]; then
+  echo "MAJOR RUNTIME REFUSAL: installed release is \$EXPECTED_SHA but source checkout is \${CURRENT_SHA:-unavailable}." >&2
+  echo "Return project-baracks to the installed commit or install a new fully validated main release." >&2
+  exit 78
+fi
+exec node "\$ROOT/dist/entry.js" "\$@"
 EOF
 chmod +x "$BIN_DIR/major"
 
@@ -107,6 +124,7 @@ record = {
     "branch": sys.argv[4],
     "installedAt": datetime.now(timezone.utc).isoformat(),
     "releaseGate": "passed",
+    "runtimePinnedToSha": True,
 }
 path.write_text(json.dumps(record, indent=2) + "\n")
 PY
@@ -124,6 +142,11 @@ Claude:     deterministic SessionStart attach installed
 Codex:      global Major rules installed
 Cursor:     global Major rules installed
 Antigravity:global Major rules installed
+
+RUNTIME INTEGRITY:
+- The active command is pinned to the exact validated SHA above.
+- If project-baracks later moves to another commit, Major fails loudly instead of silently running an unvalidated checkout.
+- Install normal releases from green main only; non-main installation is an explicit pilot override.
 
 NORMAL WORK MODE:
 - Major is present by default across supported agent tools.
