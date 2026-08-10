@@ -110,7 +110,8 @@ SESSION CONTRACT
 - Treat the durable learnings above as active constraints. A fresh session is not permission to repeat a prior correction.
 - If the user explicitly corrects behavior or says a mistake happened before: fix and verify the real task, then capture the correction with major learn capture without making the user ask.
 - For MCP/connectors/plugins, load mcp-integration-ops and prove the actual integration state.
-- For customer-facing website work, load website-design-qa; add responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js work.
+- For substantial UI/website creation, redesign, or "generic/AI-looking/too safe" feedback, load design-direction-and-taste first. It is the single Major taste authority; do not stack competing generic taste skills.
+- For customer-facing website QA, load website-design-qa; add responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js work.
 - Owner-approved build projects may continue ordinary reversible engineering without permission ceremony. Client/PII data remains project-local.`);
   return true;
 }
