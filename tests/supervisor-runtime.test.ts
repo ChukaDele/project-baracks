@@ -107,6 +107,8 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('Do not mark done unless the end-to-end goal is demonstrably true');
     expect(prompt).toContain('source → assess → tailor');
     expect(prompt).toContain('Do not fabricate an employer submission');
-    expect(prompt).toContain('Use the existing project instead of creating a duplicate implementation');
+    expect(prompt).toContain(
+      'Use the existing project instead of creating a duplicate implementation',
+    );
   });
 });
