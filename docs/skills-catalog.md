@@ -4,21 +4,27 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 29
+## Major internal skills — 35
 
 These are canonical Major-owned skills.
 
 | Skill | Use |
 |---|---|
 | `project-start` | Start a new/existing repo from outcome, current state and fastest proof. |
+| `project-context-integrity` | Confirm the requested project/repo before edits; reroute an unambiguous wrong-workspace task instead of patching the wrong repo. |
 | `mvp-speed-prioritisation` | Reduce large briefs to P0 MVP / P1 / P2 and build P0 end to end. |
 | `legacy-cleanup` | Finish migrations with one canonical path and remove stale active artefacts. |
+| `major-self-maintenance` | Keep Major main green; make self-changes atomically through branch/PR/full gate/independent review where consequential. |
 | `skill-resolver` | Select only the small set of task-relevant skills; audit overlap/reachability. |
 | `learning-capture` | Harvest explicit corrections/repeated mistakes after fixing the real task; classify project/global/policy/skill/memory. |
 | `skillify` | Turn a successful reusable procedure into a tested skill pack after the real task works. |
 | `tools-as-code` | Compose repeated deterministic retrieval/filter/dedupe/rank/transform mechanics with short temporary code. |
 | `remote-first-web-development` | Require GitHub plus a Cloudflare preview for browser work and block local browser targets. |
+| `website-design-qa` | Canonical website/landing-page visual, responsive, browser, launch, SEO, accessibility and production QA doctrine. |
+| `responsive-motion-systems` | Responsive GSAP/ScrollTrigger/sticky/pinned/Three.js geometry, lifecycle, handoff and zoom-robustness doctrine. |
+| `human-blocker-orchestration` | Surface auth/OAuth/2FA/CAPTCHA/payment/irreversible human-only actions and keep independent work moving. |
 | `dev-server-management` | Coordinate an explicitly approved local exception only. |
+| `mcp-integration-ops` | Diagnose and prove MCP/connector/plugin integrations across installed→configured→exposed→authenticated→permissioned→operational→integrated states. |
 | `source-ingestion` | Retrieve named primary sources with the right connector/CLI/browser/local tool before analysis. |
 | `knowledge-work` | Research/strategy/synthesis with minimum credible evidence, independent angles and skeptic review where justified. |
 | `competitive-product-audit` | Learn direct/adjacent product patterns before reinventing workflows. |
@@ -111,6 +117,7 @@ These are tools/capability packs, not policy authorities and not necessarily age
 | GStack | Dynamic/authenticated browser work, scraping and codifying repeated browser procedures | Install namespaced; proactive routing and telemetry off; Major remains the router. |
 | Native connectors/APIs | GitHub, Google, Figma, mail/calendar etc. | Prefer over browser scraping when available. |
 | Major remote-preview preflight | Block local or non-Cloudflare browser targets | `major web preflight` before browser work. |
+| Major project context guard | Prevent edits in the wrong repo and provide the canonical target path | `major project guard <target>` / `major project locate <target>`. |
 | Major learning candidate queue | Durable process-learning inbox | `major learn capture` after explicit corrections/repeated mistakes once the real task is fixed. |
 
 ## Default project / work profiles
@@ -125,7 +132,7 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### `web-ui`
 
-`core` + `remote-first-web-development` + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work.
+`core` + `remote-first-web-development` + `website-design-qa` + `responsive-motion-systems` when motion applies + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work unless the owner explicitly grants a local exception.
 
 ### `exploratory`
 
@@ -133,16 +140,20 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### Specialist triggers
 
-- Start substantive work → `skill-resolver`.
+- Start substantive work → `skill-resolver` plus relevant project learnings.
+- Named/clearly implied project differs from current workspace → `project-context-integrity` before edits.
+- Major/project-baracks self-change → `major-self-maintenance`.
 - Explicit correction / repeated mistake / "we fixed this before" → `learning-capture` after the real task is fixed.
-- Web UI implementation, browser preview or browser QA → `remote-first-web-development`.
+- Web UI implementation/browser/launch QA → `remote-first-web-development` + `website-design-qa`.
+- GSAP/ScrollTrigger/sticky/pinned/Three.js/viewport motion → add `responsive-motion-systems`.
 - Explicit owner-approved local exception → `dev-server-management`.
+- MCP/connector/plugin setup/reconnect/tool exposure/auth/permission failure → `mcp-integration-ops`.
 - Reusable successful procedure / recurring solved failure → `skillify` after the real task succeeds.
 - Repeated deterministic tool/retrieval mechanics → `tools-as-code`.
 - Named URL/video/file/source → `source-ingestion`.
 - Substantial research/strategy/comparison → `knowledge-work`.
 - Figma work → Figma skill set.
-- MCP work → `mcp-builder`.
+- MCP server authoring → `mcp-builder`.
 - Skill authoring/evaluation → `skill-creator` plus `skillify` where appropriate.
 - Material security work → `security-threat-model`.
 - PDFs → `pdf` + `pdf-reporting-qa` as appropriate.
@@ -167,6 +178,7 @@ The installer must:
 3. fail on a selected skill that cannot be found/copied;
 4. verify every installed directory contains `SKILL.md`;
 5. generate `MAJOR_SKILLS.lock`;
-6. never claim a profile is installed when validation fails.
+6. sync canonical internal skills globally so a newly promoted cross-project skill is reachable by fresh sessions without re-bootstrapping every existing repo;
+7. never claim a profile is installed when validation fails.
 
 Tool setup must separately verify machine capabilities such as `mw`, `yt-dlp` and GStack rather than pretending that a skill file means the executable exists.
