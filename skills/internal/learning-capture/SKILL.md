@@ -11,15 +11,42 @@ An explicit user correction is a **high-value learning event**. Do not merely ac
 
 Before substantive work, inspect the project's `LEARNINGS.md` and relevant `major learn list --project current` candidates. A fresh worker lacking chat history is not an excuse to repeat a durable correction.
 
+If session context marks a candidate `REVIEW-DUE`, it has already recurred at least twice and may not be silently ignored.
+
 ## Order of operations
 
 1. **Fix the real task first.** Do not pause the user's P0 to build learning infrastructure.
 2. Verify the fix with evidence appropriate to the task.
-3. Capture the correction/procedure before ending the task without waiting for the user to request it:
-   `major learn capture --source user-correction --summary "..." --scope <project|global> --evidence "..."`
-4. Classify the lesson.
-5. If it is a stable reusable procedure, run `skillify` after the working fix is proven.
-6. Verify the resolver can reach the new/updated skill on the next representative task.
+3. Capture the correction/procedure before ending the task without waiting for the user to request it.
+4. Use one stable `--key` for the same failure/procedure class across runs so paraphrases coalesce into one candidate.
+5. Classify the lesson.
+6. If it is a stable reusable procedure, run `skillify` after the working fix is proven.
+7. Verify the resolver can reach the new/updated skill on the next representative task.
+8. Mark the candidate promoted only after the durable replacement exists and is evidenced.
+
+Example:
+
+`major learn capture --source user-correction --key wrong-project-edit --summary "Confirm the target repo before edits and reroute when the named project differs" --scope global --evidence "Corrected and verified in the real task"`
+
+## Stable learning keys
+
+A stable key is a short kebab-case identifier for the underlying behavior, not the wording of one complaint.
+
+Good:
+
+- `wrong-project-edit`
+- `remote-preview-not-localhost`
+- `mcp-installed-is-not-operational`
+- `qa-browser-evidence-required`
+
+Bad:
+
+- a sentence copied from the user's message;
+- a candidate/client/person name;
+- a timestamp;
+- a key containing private project data.
+
+When the same behavior happens again, reuse the key even if the summary wording changes.
 
 ## Scope classification
 
@@ -56,7 +83,13 @@ A repeated explicit correction should increase the candidate's occurrence count 
 **At two occurrences, the candidate may no longer be silently ignored.** Before the task closes, either:
 
 - promote it to project guidance, global guidance or a tested skill; or
-- record why it is still unstable, unsafe to globalize, or project-specific.
+- dismiss it with explicit evidence explaining why it is unstable, unsafe to globalize, obsolete or intentionally project-specific.
+
+Use:
+
+- `major learn review --project current` to list recurring candidates requiring a decision;
+- `major learn promote --id <id> --scope <project|global> --evidence "<durable replacement/evidence>"` after the replacement exists;
+- `major learn dismiss --id <id> --evidence "<why this candidate should not be promoted>"` when the non-promotion decision is deliberate and evidenced.
 
 A single correction may be skillified immediately when the procedure is deterministic, cross-project, already proven in prior work, and cheap to validate.
 
