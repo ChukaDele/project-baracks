@@ -70,4 +70,15 @@ grep -Fq 'workspace-lifecycle-management' skills/internal/project-start/SKILL.md
 grep -Fq 'At two occurrences' skills/internal/learning-capture/SKILL.md || fail "learning recurrence promotion threshold missing"
 grep -Fq 'Major `main` must stay green' skills/internal/major-self-maintenance/SKILL.md || fail "Major self-maintenance green-main rule missing"
 
+# Runtime installation is a release boundary. A red/partial checkout must never
+# silently replace the active global Major runtime.
+grep -Fq 'refusing to install Major from a dirty checkout' scripts/install-major-runtime.sh || fail "runtime installer does not reject dirty source"
+grep -Fq 'bash scripts/validate-major.sh' scripts/install-major-runtime.sh || fail "runtime installer skips Major doctrine validation"
+grep -Fq 'bash scripts/validate-major-stability.sh' scripts/install-major-runtime.sh || fail "runtime installer skips stability validation"
+grep -Fq 'pnpm format:check' scripts/install-major-runtime.sh || fail "runtime installer skips format gate"
+grep -Fq 'pnpm lint' scripts/install-major-runtime.sh || fail "runtime installer skips lint gate"
+grep -Fq 'pnpm typecheck' scripts/install-major-runtime.sh || fail "runtime installer skips typecheck gate"
+grep -Fq 'pnpm test' scripts/install-major-runtime.sh || fail "runtime installer skips tests"
+grep -Fq 'installed-release.json' scripts/install-major-runtime.sh || fail "runtime installer does not record exact installed release"
+
 echo "Major stability validation passed."
