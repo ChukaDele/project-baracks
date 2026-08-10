@@ -93,4 +93,17 @@ describe('project context integrity', () => {
       repoPath: repo,
     });
   });
+
+  it('does not trust a remembered path after it stops being a Git repository', () => {
+    const repo = makeRepo('moved-app');
+    attachSession({
+      host: 'codex',
+      cwd: repo,
+      project: 'moved-app',
+      repoPath: repo,
+    });
+    rmSync(join(repo, '.git'), { recursive: true, force: true });
+
+    expect(() => resolveProject('moved-app', root)).toThrow(/cannot resolve project/);
+  });
 });
