@@ -169,7 +169,8 @@ export function listLearningCandidates(
 }
 
 export function learningReviewDue(project?: string): LearningCandidate[] {
-  return listLearningCandidates(project, 'candidate').filter(({ occurrences }) => occurrences >= 2);
+  const candidates = listLearningCandidates(project, 'candidate');
+  return candidates.filter(({ occurrences }) => occurrences >= 2);
 }
 
 export function promoteLearning(input: {
