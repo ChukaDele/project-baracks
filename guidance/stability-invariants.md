@@ -37,7 +37,20 @@ For MCP/connectors/plugins, do not use `connected` as a vague status. Distinguis
 
 Load `mcp-integration-ops` for integration setup/recovery. Do not claim success until a representative real provider operation proves the required state.
 
-## 4. Website design and QA
+## 4. Workspace lifecycle and local project truth
+
+When creating, cloning, locating, moving, parking, deleting or archiving a project, or when storage pressure is part of the task, load `workspace-lifecycle-management`.
+
+- Mac is an active workspace, not the only durable source of truth.
+- GitHub may be treated as canonical source only after local commit/push divergence and important non-Git state are checked.
+- Never create a duplicate clone merely because the expected local path is missing; resolve the existing project/remote first.
+- Never delete/park a local clone without checking local-only commits, untracked/ignored files and non-Git state such as `.env`, local DBs, uploads and source assets.
+- Large source media and archives should not accumulate in normal application repos unless intentionally required/versioned.
+- Existing healthy repos should not be mass-moved merely to satisfy a folder convention; path migrations must update Major/project integrations atomically.
+
+Machine-specific workspace targets and disk thresholds live in `memory/verified/developer-workspace-lifecycle.md`; do not generalize them to unrelated machines/users.
+
+## 5. Website design and QA
 
 For customer-facing websites:
 
@@ -48,7 +61,7 @@ For customer-facing websites:
 - 100% browser zoom is the canonical visual baseline; other zoom levels are robustness QA;
 - preserve approved interactions and repair architecture rather than deleting motion to make tests pass.
 
-## 5. Major must keep itself green
+## 6. Major must keep itself green
 
 When the current repo is Major/project-baracks, load `major-self-maintenance`.
 
@@ -58,7 +71,7 @@ When the current repo is Major/project-baracks, load `major-self-maintenance`.
 - consequential routing/learning/authority changes receive independent review;
 - never begin a new Major self-change while `main` is red; repair the active tree first.
 
-## 6. Push back intelligently
+## 7. Push back intelligently
 
 Major is not an obedient patch generator. When an instruction conflicts with stronger known project truth or would create an obviously wrong outcome:
 
