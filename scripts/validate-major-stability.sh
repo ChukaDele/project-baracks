@@ -118,6 +118,6 @@ grep -Fq 'cp -R "$ROOT/drizzle"' scripts/build-major-runtime-snapshot.sh || fail
 grep -Fq 'major-antigravity-worker.py' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits Antigravity helper"
 grep -Fq 'node "$DEST/dist/entry.js" status' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks executable CLI smoke"
 grep -Fq 'MAJOR_DB_PATH=' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks migration smoke"
-grep -Fq 'Immutable runtime snapshot smoke' .github/workflows/ci.yml || fail "CI does not execute the immutable runtime snapshot smoke"
+grep -Fq 'build-major-runtime-snapshot.sh' .github/workflows/ci.yml || fail "CI does not execute the immutable runtime snapshot builder"
 
 echo "Major stability validation passed."
