@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -11,19 +11,26 @@
     "primarySourceBeforeReconstruction": true,
     "skillifyReusableProcedures": true,
     "toolsAsCodeForRepeatedDeterministicWork": true,
-    "captureExplicitCorrections": true
+    "captureExplicitCorrections": true,
+    "projectContextIntegrityRequired": true,
+    "majorMainMustStayGreen": true
   },
   "entries": [
     {"id":"project-start","source":"major-internal","availability":"all-projects","load":"project-start"},
+    {"id":"project-context-integrity","source":"major-internal","availability":"all-projects","load":"named-project-repository-path-cross-project-edit-handoff-migration-wrong-project"},
     {"id":"mvp-speed-prioritisation","source":"major-internal","availability":"all-projects","load":"always-on-project-and-large-feature-planning"},
     {"id":"legacy-cleanup","source":"major-internal","availability":"all-projects","load":"rename-migration-provider-swap-architecture-replacement"},
+    {"id":"major-self-maintenance","source":"major-internal","availability":"major-repo","load":"major-self-change-skill-routing-learning-policy-runtime-installer"},
     {"id":"skill-resolver","source":"major-internal","availability":"all-projects","load":"start-of-substantive-work-select-relevant-skills"},
     {"id":"learning-capture","source":"major-internal","availability":"all-projects","load":"explicit-user-correction-repeated-mistake-recurring-failure-reusable-success"},
     {"id":"skillify","source":"major-internal","availability":"all-projects","load":"reusable-successful-procedure-or-recurring-solved-failure"},
     {"id":"tools-as-code","source":"major-internal","availability":"all-projects","load":"repeated-retrieval-filter-dedupe-rank-transform-tool-composition"},
     {"id":"remote-first-web-development","source":"major-internal","availability":"web-projects","load":"all-web-project-ui-work-browser-preview-visual-qa-acceptance"},
+    {"id":"website-design-qa","source":"major-internal","availability":"web-projects","load":"website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"},
+    {"id":"responsive-motion-systems","source":"major-internal","availability":"web-projects","load":"gsap-scrolltrigger-sticky-pinned-scrollytelling-card-stacking-hero-video-parallax-threejs-zoom-motion"},
     {"id":"human-blocker-orchestration","source":"major-internal","availability":"all-projects","load":"authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"},
     {"id":"dev-server-management","source":"major-internal","availability":"web-projects","load":"explicit-owner-approved-localhost-exception-only"},
+    {"id":"mcp-integration-ops","source":"major-internal","availability":"all-projects","load":"mcp-connector-plugin-integration-authentication-tool-exposure-reconnect-permission-provider-operation"},
     {"id":"source-ingestion","source":"major-internal","availability":"all-projects","load":"named-url-file-video-audio-document-primary-source"},
     {"id":"knowledge-work","source":"major-internal","availability":"all-projects","load":"research-strategy-synthesis-comparison-decision-work"},
     {"id":"competitive-product-audit","source":"major-internal","availability":"all-projects","load":"project-start-or-material-product-work"},
