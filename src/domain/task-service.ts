@@ -222,14 +222,12 @@ export function applyTransition(
   // against a stateful accessor.
   const fence = opts.fence;
   // Worker-owned downstream mutations are unavailable in this build: a
-  // fence-carrying (worker-attributed) transition is refused outright,
-  // regardless of the fence's validity (milestone M4 — fencing coverage is
-  // incomplete). The live-claim check below is retained for M4.
+  // fence-carrying (worker-attributed) transition is refused outright until
+  // the combined M4 fencing boundary is independently reviewed and activated.
   if (fence) assertCapabilityAvailable('worker-owned-downstream-mutations');
   // Automated task completion is unavailable in this build: NO service-layer
-  // path reaches 'completed' (milestone M3 — completion criteria are mutable,
-  // so the proof set cannot yet be trusted as task-specific and immutable).
-  // The proof evaluation below is retained for M3.
+  // path reaches 'completed' until the combined M3 immutable proof boundary is
+  // independently reviewed and activated.
   if (to === 'completed') assertCapabilityAvailable('automated-task-completion');
   if (fence) assertLiveClaim(db, fence, taskId);
   const task = getTask(db, taskId);

@@ -12,13 +12,12 @@ import { applyTransition, ConcurrencyError } from './task-service.js';
  * mutations are an unavailable capability (src/security/capabilities.ts):
  * claimNextTask, heartbeatClaim, completeClaim and releaseClaim refuse
  * unconditionally, so nothing can acquire or exercise a work claim until
- * milestone M4 delivers complete fencing (independent review found the
- * current fencing does not cover every owner mutation and downstream write).
+ * the combined M4 fencing boundary passes independent review and activation.
  * Only reads (getClaim) and the supervisor-side crash-recovery sweep
  * (recoverExpiredClaims) remain runnable. The lease/fencing machinery below
  * the gates — BEGIN IMMEDIATE claim transactions, the task_claims_one_active
  * unique index, the ownerFence predicate — is retained, compiled and
- * DB-backed as the M4 starting point.
+ * DB-backed as the quarantined M4 implementation.
  */
 
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;

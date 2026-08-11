@@ -22,10 +22,8 @@ import { ensureObservedModel, seedProject, testDb } from './helpers.js';
 /**
  * Worker-owned downstream mutations are an unavailable capability in this
  * build: every fence-carrying or claim-bound write refuses unconditionally,
- * BEFORE any fencing logic runs — comprehensive fencing is deferred to
- * milestone M4 (independent review found the current fencing incomplete).
- * The DB-level fencing triggers on run-linked writes are retained as a
- * backstop and verified here with directly seeded rows.
+ * BEFORE any fencing logic runs while combined M4 review is pending. The
+ * DB-level fencing triggers are verified here with directly seeded rows.
  */
 
 function runningTask(db: ReturnType<typeof testDb>) {

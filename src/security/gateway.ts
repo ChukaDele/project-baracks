@@ -35,16 +35,13 @@ import {
  * --version probe, no `which` subprocess, no execFile/spawn anywhere in this
  * file. A resolvable path is reported but confers no execution trust and is
  * never evidence a binary is genuine or runnable; verifying that requires the
- * trusted, OS-isolated execution boundary of milestone M1
- * (docs/deferred-security-milestones.md).
+ * trusted, OS-isolated execution boundary of milestone M1.
  *
  * The validation pipeline below the gate (path canonicalisation, trusted
  * executable binding, argv policy, path-argument confinement, environment
- * sanitisation, process-group containment) is retained as the starting point
- * for milestone M1 (docs/deferred-security-milestones.md). The implementation
- * now rehashes executable content at every spawn and applies an OS sandbox,
- * but the build gate remains closed until that boundary receives the required
- * fresh independent review.
+ * sanitisation and OS containment) is implemented and compiled. The build
+ * gate remains closed until the combined boundary receives fresh independent
+ * review and representative provider validation.
  */
 
 export interface ExecutionPolicyDecision {

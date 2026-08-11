@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { executeMajorCommand } from '../security/major-gateway.js';
 import { globalStopRequested } from './policy.js';
@@ -35,10 +34,6 @@ export interface GatewayCommandOutcome {
 }
 
 const OUTPUT_LIMIT = 200_000;
-
-function majorRepoRoot(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-}
 
 export function workerCommand(
   host: WorkerHost,
@@ -90,14 +85,13 @@ function appendLimited(current: string, chunk: string): string {
   return next.length <= OUTPUT_LIMIT ? next : next.slice(next.length - OUTPUT_LIMIT);
 }
 
-function executableOnPath(name: string): boolean {
-  const path = process.env.PATH ?? '';
-  return path.split(':').some((part) => existsSync(join(part, name)));
+function trustedExecutableInstalled(name: string): boolean {
+  return existsSync(join(homedir(), '.local', 'bin', name));
 }
 
 export function hostAvailable(host: WorkerHost): boolean {
   const executable = workerCommand(host, '').command;
-  return executable.includes('/') ? existsSync(executable) : executableOnPath(executable);
+  return executable.includes('/') ? existsSync(executable) : trustedExecutableInstalled(executable);
 }
 
 export async function runGatewayCommand(input: {
@@ -207,7 +201,6 @@ export async function runWorker(input: {
       args: spec.args,
       cwd: input.cwd,
       resourceLeaseId: lease.id,
-      ...(input.host === 'antigravity' ? { extraAllowedRoots: [majorRepoRoot()] } : {}),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
     });
     return { host: input.host, ...outcome };

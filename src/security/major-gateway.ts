@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
+import { isCapabilityAvailable } from './capabilities.js';
 import { darwinSeatbeltContainment } from './containment.js';
 import { ExecutionGateway, type ExecutionPolicyDecision } from './gateway.js';
 import { TrustedExecutableRegistry } from './trusted-executables.js';
@@ -49,16 +50,14 @@ function recordExecution(decision: ExecutionPolicyDecision): void {
   });
 }
 
-function resolveTrustedExecutable(executable: string): TrustedExecutableRegistry {
+export function trustedExecutableRegistry(executable: string): TrustedExecutableRegistry {
   const registry = new TrustedExecutableRegistry();
   const name = basename(executable);
-  if (executable.includes('/')) {
-    registry.trust(name, executable, 'pinned');
-    return registry;
+  const pinnedPath = name === 'git' ? '/usr/bin/git' : join(homedir(), '.local', 'bin', name);
+  if (executable.includes('/') && resolve(executable) !== resolve(pinnedPath)) {
+    throw new Error(`Major refuses unpinned executable path ${executable}; expected ${pinnedPath}`);
   }
-  const resolved = registry.resolveForReport(name, process.env.PATH);
-  if (!resolved) throw new Error(`Major worker executable not found on PATH: ${name}`);
-  registry.trust(name, resolved, 'pinned');
+  registry.pin(pinnedPath);
   return registry;
 }
 
@@ -84,7 +83,9 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       allowedExecutables: [executable],
       protectedBranches: ['main', 'master'],
     },
-    trustedExecutables: resolveTrustedExecutable(request.executable),
+    trustedExecutables: isCapabilityAvailable('live-agent-execution')
+      ? trustedExecutableRegistry(request.executable)
+      : new TrustedExecutableRegistry(),
     containment: darwinSeatbeltContainment(),
     baseEnv,
     envAllowlist: [

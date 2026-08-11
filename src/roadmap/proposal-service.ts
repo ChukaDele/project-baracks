@@ -29,10 +29,9 @@ import type { DiffEntry, RoadmapAdapter, RowChange, UpdateProposal } from './typ
  * available — proposing stores local records and uses only the adapter's
  * read-side (revision/dryRun).
  *
- * The apply/reconcile protocol below the gates is retained as the milestone
- * M5 starting point; independent review found it incomplete (reconciliation
- * does not compare-and-swap against the exact observed attempt), so it must
- * not be presented as a crash-safe boundary until M5 closes that gap.
+ * The apply/reconcile protocol below the gates carries exact persisted attempt
+ * identity. It remains quarantined until combined independent review and a
+ * representative live-adapter test authorize activation.
  *
  * Roadmap permission grants NOTHING else: no merge, deploy, paid-usage or
  * destructive authority is inferred from the ability to propose updates.

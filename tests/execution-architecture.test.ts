@@ -30,4 +30,13 @@ describe('single execution boundary', () => {
     });
     expect(importers).toEqual(['src/security/gateway.ts']);
   });
+
+  it('does not convert PATH discovery into trust or expose the immutable runtime as writable', () => {
+    const root = resolve(import.meta.dirname, '..');
+    const gateway = readFileSync(join(root, 'src', 'security', 'major-gateway.ts'), 'utf8');
+    const worker = readFileSync(join(root, 'src', 'supervisor', 'worker.ts'), 'utf8');
+    expect(gateway).not.toContain('resolveForReport');
+    expect(worker).not.toContain('majorRepoRoot');
+    expect(worker).not.toContain("input.host === 'antigravity'");
+  });
 });

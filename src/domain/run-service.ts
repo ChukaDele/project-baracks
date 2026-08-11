@@ -60,10 +60,8 @@ export interface NewRunInput {
  * QUARANTINED paths: a PAID billing mode is refused unconditionally (paid
  * provider execution is unavailable — M2), and a claim-bound run is refused
  * unconditionally (worker-owned downstream mutations are unavailable — M4).
- * The validation code for those paths below the gates is retained as the
- * milestone starting point but is unreachable until then; independent review
- * found it incomplete (approval scoping/consumption, fencing coverage), so it
- * must not be presented as an enforced boundary.
+ * The validation code below those gates is the combined M2/M4 implementation,
+ * but remains unreachable until fresh independent review authorizes activation.
  */
 export function createRun(db: Db, rawInput: NewRunInput) {
   // Single-read snapshot of the caller-owned input (see task-service.ts

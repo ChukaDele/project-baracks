@@ -28,8 +28,8 @@ export interface DoctorReport {
   configuredProjects: { name: string; repoPath: string }[];
   missingPrerequisites: string[];
   /** Status of overnight/autonomous LIVE execution. ALWAYS 'unavailable' in
-   * this foundation: live-agent-execution is a hard-disabled capability and no
-   * OS isolation is enforced, so it is never reported as safe. */
+   * this release candidate: live-agent-execution remains hard-disabled until
+   * combined review and field validation, so it is never reported as safe. */
   overnightExecution: OvernightExecutionStatus;
   overnightExecutionReasons: string[];
   /** Separate, truthful signal: is the environment healthy enough for the
@@ -38,7 +38,7 @@ export interface DoctorReport {
   inspectionEnvironmentOk: boolean;
   inspectionEnvironmentIssues: string[];
   /** True only when the OS containment required for live agent execution is
-   * actually enforced. False in this foundation (no filesystem sandbox).
+   * actually enforced. Diagnostic only while the capability gate is closed.
    * DIAGNOSTIC ONLY: enforcement is the hard-coded capability gate
    * (src/security/capabilities.ts), never this report or any flag. */
   liveExecutionReady: boolean;
@@ -146,8 +146,8 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
   });
 
   // Descendant/process containment for live agent execution. Reported honestly:
-  // process-tree termination is available on POSIX, but no OS filesystem
-  // sandbox is wired, so live execution readiness is false.
+  // process-tree termination and platform isolation are reported separately
+  // from the hard capability activation gate.
   const containment = detectContainment();
   checks.push({
     name: 'descendant-containment',

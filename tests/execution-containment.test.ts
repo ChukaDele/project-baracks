@@ -23,6 +23,7 @@ import {
   TrustedExecutableRegistry,
 } from '../src/security/trusted-executables.js';
 import { ExecutionGateway, type ExecutionPolicyDecision } from '../src/security/gateway.js';
+import { trustedExecutableRegistry } from '../src/security/major-gateway.js';
 
 const NODE = process.execPath;
 
@@ -107,6 +108,23 @@ describe('executable identity revalidation', () => {
     expect(after.size).toBe(before.size);
     expect(after.mtimeMs).toBe(before.mtimeMs);
     expect(() => registry.verify('tool')).toThrow(/content/);
+  });
+});
+
+describe('production gateway trust composition', () => {
+  it('does not promote an arbitrary PATH binary into a pinned executable', () => {
+    const evilDir = tempDir();
+    writeExecutable(evilDir, 'major-shadow-probe', '#!/bin/sh\necho spawned\n');
+    const priorPath = process.env.PATH;
+    process.env.PATH = `${evilDir}:${priorPath ?? ''}`;
+    try {
+      expect(() => trustedExecutableRegistry('major-shadow-probe')).toThrow(
+        /cannot trust|not resolvable/,
+      );
+    } finally {
+      if (priorPath === undefined) delete process.env.PATH;
+      else process.env.PATH = priorPath;
+    }
   });
 });
 

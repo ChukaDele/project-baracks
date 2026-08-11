@@ -1,10 +1,9 @@
 /**
  * Build-level capability availability. This foundation build is DRY-RUN AND
- * INSPECTION ONLY: the five capabilities below are unavailable because their
- * security boundaries are incomplete (independent review found each one
- * bypassable at its claimed boundary). Each is quarantined behind this module
- * and re-enabled only by its own follow-up milestone
- * (docs/deferred-security-milestones.md) plus a fresh independent review.
+ * INSPECTION ONLY: the five capabilities below remain unavailable. Their
+ * release-candidate boundaries are implemented, but none may become reachable
+ * until the combined exact head passes fresh independent review and field
+ * validation.
  *
  * These are CODE CONSTANTS, deliberately not configuration: no config file,
  * environment variable, CLI flag, database row or constructor option is
@@ -17,33 +16,33 @@
 export const UNAVAILABLE_CAPABILITIES = Object.freeze({
   'live-agent-execution': Object.freeze({
     reason:
-      'executable identity is not content-verified at the spawn boundary and no OS-level ' +
-      'filesystem/network isolation is enforced',
-    milestone: 'M1 — trusted OS-isolated execution',
+      'the combined trusted-executable and macOS isolation boundary has not yet passed ' +
+      'fresh independent review and provider field validation',
+    milestone: 'M1 — combined validation and activation',
   }),
   'paid-provider-execution': Object.freeze({
     reason:
-      'billing authority and one-use, purpose-scoped paid approval are not enforced at the ' +
-      'durable boundary',
-    milestone: 'M2 — authoritative provider and billing control',
+      'the combined authoritative billing and one-use paid approval boundary has not yet ' +
+      'passed fresh independent review',
+    milestone: 'M2 — combined validation and activation',
   }),
   'automated-task-completion': Object.freeze({
     reason:
-      'task completion criteria are mutable, so the completion proof is not task-specific ' +
-      'and immutable',
-    milestone: 'M3 — immutable database completion proof',
+      'the combined immutable task-specific completion proof has not yet passed fresh ' +
+      'independent review',
+    milestone: 'M3 — combined validation and activation',
   }),
   'worker-owned-downstream-mutations': Object.freeze({
     reason:
-      'lease fencing does not cover every owner mutation and downstream write ' +
-      '(evidence, optional fences, review and roadmap-proposal writes)',
-    milestone: 'M4 — complete worker fencing',
+      'the combined worker and downstream-write fencing boundary has not yet passed fresh ' +
+      'independent review',
+    milestone: 'M4 — combined validation and activation',
   }),
   'external-roadmap-application': Object.freeze({
     reason:
-      'apply reconciliation does not compare-and-swap against the exact observed attempt, ' +
-      'so a delayed reconciler can displace a newer in-flight attempt',
-    milestone: 'M5 — crash-safe external roadmap application',
+      'the combined exact-attempt roadmap reconciliation boundary has not yet passed fresh ' +
+      'independent review or a representative live adapter test',
+    milestone: 'M5 — combined validation and activation',
   }),
 } as const);
 
