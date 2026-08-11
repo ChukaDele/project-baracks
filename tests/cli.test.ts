@@ -1,5 +1,12 @@
-import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -13,6 +20,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 const ROOT = join(import.meta.dirname, '..');
 const CLI = join(ROOT, 'dist', 'cli', 'index.js');
+const ENTRY = join(ROOT, 'dist', 'entry.js');
 
 interface CliResult {
   status: number;
@@ -90,6 +98,48 @@ beforeAll(() => {
 }, 300_000);
 
 describe('major CLI', () => {
+  it('preserves every concurrent session attachment', async () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'major-session-race-'));
+    const statePath = join(scratch, 'supervisor-state.json');
+    const env = {
+      ...process.env,
+      MAJOR_STATE_PATH: statePath,
+      MAJOR_POLICY_PATH: join(scratch, 'policies.json'),
+      MAJOR_RESOURCE_PATH: join(scratch, 'resources.json'),
+    };
+    const runs = Array.from(
+      { length: 12 },
+      (_, index) =>
+        new Promise<void>((resolveRun, rejectRun) => {
+          const child = spawn(
+            process.execPath,
+            [
+              ENTRY,
+              'session',
+              'attach',
+              '--cwd',
+              repoDir,
+              '--host',
+              'codex',
+              '--session-id',
+              `session-${index}`,
+            ],
+            { cwd: ROOT, env, stdio: 'ignore' },
+          );
+          child.once('error', rejectRun);
+          child.once('close', (code) =>
+            code === 0 ? resolveRun() : rejectRun(new Error(`session attach exited ${code}`)),
+          );
+        }),
+    );
+    await Promise.all(runs);
+    const state = JSON.parse(readFileSync(statePath, 'utf8')) as {
+      sessions: { sessionId?: string }[];
+    };
+    expect(state.sessions).toHaveLength(12);
+    expect(new Set(state.sessions.map((session) => session.sessionId)).size).toBe(12);
+  });
+
   it('project add validates config existence and git-repository shape', () => {
     expect(major('project', 'add', '/nope/missing.json').status).toBe(2);
 

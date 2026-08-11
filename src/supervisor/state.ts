@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import {
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readFileSync,
   readdirSync,
   renameSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
@@ -75,6 +78,43 @@ function emptyState(): SupervisorState {
   return { version: 1, goals: [], sessions: [] };
 }
 
+const stateLockSleep = new Int32Array(new SharedArrayBuffer(4));
+
+function mutateSupervisorState<T>(operation: (state: SupervisorState) => T): T {
+  const path = `${statePath()}.lock`;
+  mkdirSync(dirname(path), { recursive: true });
+  const deadline = Date.now() + 5_000;
+  let fd: number | undefined;
+  while (fd === undefined) {
+    try {
+      fd = openSync(path, 'wx', 0o600);
+      writeFileSync(fd, `${process.pid} ${new Date().toISOString()}\n`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      try {
+        if (Date.now() - statSync(path).mtimeMs > 30_000) unlinkSync(path);
+      } catch (staleError) {
+        if ((staleError as NodeJS.ErrnoException).code !== 'ENOENT') throw staleError;
+      }
+      if (Date.now() >= deadline) throw new Error(`Major supervisor lock timed out: ${path}`);
+      Atomics.wait(stateLockSleep, 0, 0, 10);
+    }
+  }
+  try {
+    const state = readSupervisorState();
+    const result = operation(state);
+    writeSupervisorState(state);
+    return result;
+  } finally {
+    closeSync(fd);
+    try {
+      unlinkSync(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+}
+
 export function readSupervisorState(): SupervisorState {
   const path = statePath();
   if (!existsSync(path)) return emptyState();
@@ -106,51 +146,50 @@ export function startGoal(input: {
   autonomous: boolean;
   preferredCoordinator?: WorkerHost;
 }): SupervisorGoal {
-  const state = readSupervisorState();
-  const now = new Date().toISOString();
-  for (const existing of state.goals) {
-    if (
-      existing.project === input.project &&
-      ['active', 'running', 'blocked'].includes(existing.status)
-    ) {
-      existing.goal = input.goal;
-      existing.repoPath = resolve(input.repoPath);
-      existing.autonomous = input.autonomous;
-      existing.status = 'active';
-      existing.updatedAt = now;
-      existing.ownerGate = undefined;
-      existing.pendingCompletion = undefined;
-      existing.nextRunAt = now;
-      writeSupervisorState(state);
-      return existing;
+  return mutateSupervisorState((state) => {
+    const now = new Date().toISOString();
+    for (const existing of state.goals) {
+      if (
+        existing.project === input.project &&
+        ['active', 'running', 'blocked'].includes(existing.status)
+      ) {
+        existing.goal = input.goal;
+        existing.repoPath = resolve(input.repoPath);
+        existing.autonomous = input.autonomous;
+        existing.status = 'active';
+        existing.updatedAt = now;
+        existing.ownerGate = undefined;
+        existing.pendingCompletion = undefined;
+        existing.nextRunAt = now;
+        return existing;
+      }
     }
-  }
-  const goal: SupervisorGoal = {
-    id: randomUUID(),
-    project: input.project,
-    repoPath: resolve(input.repoPath),
-    goal: input.goal,
-    autonomous: input.autonomous,
-    status: 'active',
-    preferredCoordinator: input.preferredCoordinator ?? 'claude',
-    cycle: 0,
-    consecutiveFailures: 0,
-    createdAt: now,
-    updatedAt: now,
-    nextRunAt: now,
-  };
-  state.goals.push(goal);
-  writeSupervisorState(state);
-  return goal;
+    const goal: SupervisorGoal = {
+      id: randomUUID(),
+      project: input.project,
+      repoPath: resolve(input.repoPath),
+      goal: input.goal,
+      autonomous: input.autonomous,
+      status: 'active',
+      preferredCoordinator: input.preferredCoordinator ?? 'claude',
+      cycle: 0,
+      consecutiveFailures: 0,
+      createdAt: now,
+      updatedAt: now,
+      nextRunAt: now,
+    };
+    state.goals.push(goal);
+    return goal;
+  });
 }
 
 export function updateGoal(id: string, patch: Partial<Omit<SupervisorGoal, 'id'>>): SupervisorGoal {
-  const state = readSupervisorState();
-  const goal = state.goals.find((candidate) => candidate.id === id);
-  if (!goal) throw new Error(`goal not found: ${id}`);
-  Object.assign(goal, patch, { updatedAt: new Date().toISOString() });
-  writeSupervisorState(state);
-  return goal;
+  return mutateSupervisorState((state) => {
+    const goal = state.goals.find((candidate) => candidate.id === id);
+    if (!goal) throw new Error(`goal not found: ${id}`);
+    Object.assign(goal, patch, { updatedAt: new Date().toISOString() });
+    return goal;
+  });
 }
 
 /** Apply an independent grade to the currently pending worker completion
@@ -161,37 +200,37 @@ export function applyIndependentCompletionGrade(input: {
   result: 'pass' | 'fail';
   evidence: string;
 }): SupervisorGoal {
-  const state = readSupervisorState();
-  const goal = state.goals.find((candidate) => candidate.id === input.goalId);
-  if (!goal) throw new Error(`goal not found: ${input.goalId}`);
-  const pending = goal.pendingCompletion;
-  if (!pending) throw new Error(`goal ${input.goalId} has no pending completion claim`);
-  if (pending.coordinator === input.provider) {
-    throw new Error(
-      `independent completion grade refused: ${input.provider} made the completion claim`,
-    );
-  }
-  const evidence = input.evidence.trim();
-  if (!evidence) throw new Error('independent completion evidence must not be empty');
-  goal.pendingCompletion = undefined;
-  goal.activePid = undefined;
-  goal.lastFinishedAt = new Date().toISOString();
-  goal.ownerGate = undefined;
-  goal.consecutiveFailures = 0;
-  if (input.result === 'pass') {
-    goal.status = 'done';
-    goal.nextRunAt = undefined;
-    goal.lastSummary = redactText(
-      `Independent validation passed: ${pending.summary}. Evidence: ${evidence}`,
-    );
-  } else {
-    goal.status = 'active';
-    goal.nextRunAt = new Date().toISOString();
-    goal.lastSummary = redactText(`Independent validation rejected completion: ${evidence}`);
-  }
-  goal.updatedAt = new Date().toISOString();
-  writeSupervisorState(state);
-  return goal;
+  return mutateSupervisorState((state) => {
+    const goal = state.goals.find((candidate) => candidate.id === input.goalId);
+    if (!goal) throw new Error(`goal not found: ${input.goalId}`);
+    const pending = goal.pendingCompletion;
+    if (!pending) throw new Error(`goal ${input.goalId} has no pending completion claim`);
+    if (pending.coordinator === input.provider) {
+      throw new Error(
+        `independent completion grade refused: ${input.provider} made the completion claim`,
+      );
+    }
+    const evidence = input.evidence.trim();
+    if (!evidence) throw new Error('independent completion evidence must not be empty');
+    goal.pendingCompletion = undefined;
+    goal.activePid = undefined;
+    goal.lastFinishedAt = new Date().toISOString();
+    goal.ownerGate = undefined;
+    goal.consecutiveFailures = 0;
+    if (input.result === 'pass') {
+      goal.status = 'done';
+      goal.nextRunAt = undefined;
+      goal.lastSummary = redactText(
+        `Independent validation passed: ${pending.summary}. Evidence: ${evidence}`,
+      );
+    } else {
+      goal.status = 'active';
+      goal.nextRunAt = new Date().toISOString();
+      goal.lastSummary = redactText(`Independent validation rejected completion: ${evidence}`);
+    }
+    goal.updatedAt = new Date().toISOString();
+    return goal;
+  });
 }
 
 export function getGoal(id: string): SupervisorGoal | undefined {
@@ -213,20 +252,20 @@ export function attachSession(input: {
   repoPath?: string;
   sessionId?: string;
 }): SessionAttachment {
-  const state = readSupervisorState();
-  const attachment: SessionAttachment = {
-    id: randomUUID(),
-    host: input.host,
-    cwd: resolve(input.cwd),
-    attachedAt: new Date().toISOString(),
-    ...(input.project ? { project: input.project } : {}),
-    ...(input.repoPath ? { repoPath: resolve(input.repoPath) } : {}),
-    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-  };
-  state.sessions = state.sessions.slice(-199);
-  state.sessions.push(attachment);
-  writeSupervisorState(state);
-  return attachment;
+  return mutateSupervisorState((state) => {
+    const attachment: SessionAttachment = {
+      id: randomUUID(),
+      host: input.host,
+      cwd: resolve(input.cwd),
+      attachedAt: new Date().toISOString(),
+      ...(input.project ? { project: input.project } : {}),
+      ...(input.repoPath ? { repoPath: resolve(input.repoPath) } : {}),
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+    };
+    state.sessions = state.sessions.slice(-199);
+    state.sessions.push(attachment);
+    return attachment;
+  });
 }
 
 function gitCommonDir(repoPath: string): string | undefined {
