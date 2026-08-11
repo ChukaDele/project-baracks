@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { taskClaims } from '../src/db/schema.js';
+import { taskClaims, tasks } from '../src/db/schema.js';
 import {
   claimNextTask,
   completeClaim,
@@ -49,6 +49,17 @@ function seedClaim(
   return row;
 }
 
+function startClaimedTask(
+  db: ReturnType<typeof testDb>,
+  taskId: string,
+  claim: ReturnType<typeof seedClaim>,
+) {
+  db.update(tasks)
+    .set({ status: 'running', mutationClaimId: claim.id, mutationWorkerId: claim.workerId })
+    .where(eq(tasks.id, taskId))
+    .run();
+}
+
 describe('worker claim operations are disabled (worker-owned-downstream-mutations)', () => {
   it('claimNextTask refuses even with a queued task waiting, leaving it untouched', () => {
     const db = testDb();
@@ -72,7 +83,6 @@ describe('worker claim operations are disabled (worker-owned-downstream-mutation
     const db = testDb();
     const project = seedProject(db);
     const task = queuedTask(db, project.id);
-    transitionTask(db, task.id, 'running');
     const claim = seedClaim(db, task.id);
     expect(() => heartbeatClaim(db, claim.id, claim.workerId)).toThrow(CapabilityUnavailableError);
     expect(() => completeClaim(db, claim.id, claim.workerId)).toThrow(CapabilityUnavailableError);
@@ -85,7 +95,6 @@ describe('claim model DB backstops (retained for M4)', () => {
     const db = testDb();
     const project = seedProject(db);
     const task = queuedTask(db, project.id);
-    transitionTask(db, task.id, 'running');
     seedClaim(db, task.id);
     expect(() => seedClaim(db, task.id, { id: 'tclm_forged', workerId: 'w2', attempt: 2 })).toThrow(
       /UNIQUE/i,
@@ -96,7 +105,6 @@ describe('claim model DB backstops (retained for M4)', () => {
     const db = testDb();
     const project = seedProject(db);
     const task = queuedTask(db, project.id);
-    transitionTask(db, task.id, 'running');
     const claim = seedClaim(db, task.id);
     expect(() =>
       db.update(taskClaims).set({ workerId: 'rewritten' }).where(eq(taskClaims.id, claim.id)).run(),
@@ -112,12 +120,13 @@ describe('crash recovery (supervisor-side, still runnable)', () => {
     const db = testDb();
     const project = seedProject(db);
     const task = queuedTask(db, project.id);
-    transitionTask(db, task.id, 'running');
-    const claim = seedClaim(db, task.id, {
-      leaseExpiresAt: new Date(Date.now() - 60_000).toISOString(),
-    });
+    const claim = seedClaim(db, task.id);
+    startClaimedTask(db, task.id, claim);
 
-    const recovered = recoverExpiredClaims(db);
+    const recovered = recoverExpiredClaims(
+      db,
+      () => new Date(new Date(claim.leaseExpiresAt).getTime() + 1_000),
+    );
     expect(recovered).toEqual([{ claimId: claim.id, taskId: task.id }]);
     expect(getTask(db, task.id).status).toBe('queued');
     expect(getClaim(db, claim.id).status).toBe('expired');
@@ -128,8 +137,8 @@ describe('crash recovery (supervisor-side, still runnable)', () => {
     const db = testDb();
     const project = seedProject(db);
     const task = queuedTask(db, project.id);
-    transitionTask(db, task.id, 'running');
     const claim = seedClaim(db, task.id);
+    startClaimedTask(db, task.id, claim);
     expect(recoverExpiredClaims(db)).toEqual([]);
     expect(getClaim(db, claim.id).status).toBe('active');
     expect(getTask(db, task.id).status).toBe('running');

@@ -247,7 +247,12 @@ export function applyTransition(
   assertTransition(task.status, to, guards);
   const result = db
     .update(tasks)
-    .set({ status: to, version: task.version + 1 })
+    .set({
+      status: to,
+      version: task.version + 1,
+      mutationClaimId: fence?.claimId ?? null,
+      mutationWorkerId: fence?.workerId ?? null,
+    })
     .where(
       and(eq(tasks.id, taskId), eq(tasks.status, task.status), eq(tasks.version, task.version)),
     )
@@ -290,11 +295,13 @@ export function addEvidence(
     summary: string;
     ref?: string;
     dataJson?: string;
+    agentRunId?: string;
   },
 ) {
   const row = {
     id: newId('evid'),
     taskId: input.taskId,
+    agentRunId: input.agentRunId ?? null,
     kind: input.kind,
     summary: input.summary,
     ref: input.ref ?? null,
