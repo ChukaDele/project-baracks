@@ -95,6 +95,13 @@ export function isApprovedDecision(
   if (expect.requireExpiry && !row.expiresAt) return false;
   if (row.expiresAt && row.expiresAt <= (expect.now ?? new Date()).toISOString()) return false;
   if (expect.scope !== undefined) {
+    if (
+      expect.scope.provider === undefined &&
+      expect.scope.modelRef === undefined &&
+      expect.scope.purpose === undefined
+    ) {
+      return false;
+    }
     let declared: DecisionScope | undefined;
     if (row.contextJson) {
       try {
@@ -103,6 +110,7 @@ export function isApprovedDecision(
         return false; // unparseable context cannot prove a matching scope
       }
     }
+    if (!declared || typeof declared !== 'object') return false;
     // Every expected field must be explicitly declared and match exactly.
     for (const field of ['provider', 'modelRef', 'purpose'] as const) {
       if (expect.scope[field] !== undefined && declared?.[field] !== expect.scope[field]) {

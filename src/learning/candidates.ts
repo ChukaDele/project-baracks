@@ -336,12 +336,7 @@ const PII_PATTERNS = [
 ];
 
 function unsafeGlobalText(text: string): boolean {
-  const normalized = normalizedText(text);
-  const knownIdentity = knownProjectIdentities()
-    .map((identity) => normalizedText(identity))
-    .filter(Boolean)
-    .some((identity) => ` ${normalized} `.includes(` ${identity} `));
-  return redactText(text) !== text || PII_PATTERNS.some((rule) => rule.test(text)) || knownIdentity;
+  return redactText(text) !== text || PII_PATTERNS.some((rule) => rule.test(text));
 }
 
 function assertSanitizedGlobalText(

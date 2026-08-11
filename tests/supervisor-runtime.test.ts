@@ -13,6 +13,7 @@ import {
   tryAcquireRepoCycleLock,
 } from '../src/supervisor/runtime.js';
 import type { SupervisorGoal } from '../src/supervisor/state.js';
+import { preserveWorkerReportEnvelope } from '../src/supervisor/worker-report.js';
 import type { ProviderInfo } from '../src/providers/types.js';
 import { model } from './helpers.js';
 
@@ -150,6 +151,26 @@ describe('Major coordinator contract', () => {
     expect(selectCoordinator(goal(repo), providers)).toMatchObject({ kind: 'checkpoint' });
   });
 
+  it('rotates after two coordinator failures when another provider is usable', () => {
+    const current = goal('/tmp/project');
+    current.preferredCoordinator = 'claude';
+    current.lastCoordinator = 'claude';
+    current.consecutiveFailures = 2;
+    const selection = selectCoordinator(current, [
+      {
+        name: 'claude-code',
+        installed: true,
+        models: [model({ modelRef: 'opus', routingClass: 'opus' })],
+      },
+      {
+        name: 'codex',
+        installed: true,
+        models: [model({ modelRef: 'gpt-codex', routingClass: 'codex' })],
+      },
+    ]);
+    expect(selection).toMatchObject({ kind: 'route', provider: 'codex' });
+  });
+
   it('keeps the product goal while loading durable project and correction learnings', () => {
     const repo = mkdtempSync(join(tmpdir(), 'major-runtime-'));
     roots.push(repo);
@@ -219,6 +240,10 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('website-design-qa');
     expect(prompt).toContain('BUILT = implementation exists');
     expect(prompt).toContain("You cannot access or mutate Major's global control state");
+    expect(prompt).toContain('the parent owns resource admission and learning capture');
+    expect(prompt).not.toContain('capture it with major learn capture');
+    expect(prompt).not.toContain('Reserve Major capacity before every worker');
+    expect(prompt).not.toContain('Delegate independent work across providers with the Major CLI');
     expect(prompt).toContain('MAJOR_RESULT: {"status":"active"');
     expect(prompt).not.toContain('major goal report');
     expect(prompt).toContain('Do not mark done unless the end-to-end goal is demonstrably true');
@@ -275,6 +300,34 @@ describe('Major coordinator contract', () => {
         `${JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: report } })}\n`,
       ),
     ).toMatchObject({ status: 'done', summary: 'runtime proof passed' });
+  });
+
+  it('finds a final provider-owned report after more than 500 earlier lines', () => {
+    const report = 'MAJOR_RESULT: {"status":"done","summary":"long run completed"}';
+    const output = Array.from({ length: 600 }, (_, index) =>
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'agent_message', text: `line ${index}` },
+      }),
+    );
+    output.push(JSON.stringify({ type: 'result', result: report }));
+    expect(parseWorkerReport(output.join('\n'))).toEqual({
+      status: 'done',
+      summary: 'long run completed',
+    });
+  });
+
+  it('preserves a final report from a single provider envelope larger than the output tail', () => {
+    const raw = JSON.stringify({
+      type: 'result',
+      result: `${'bulk output\n'.repeat(30_000)}MAJOR_RESULT: {"status":"done","summary":"large result completed"}`,
+    });
+    const preserved = preserveWorkerReportEnvelope(raw);
+    expect(preserved?.length).toBeLessThan(1_000);
+    expect(parseWorkerReport(preserved ?? '')).toEqual({
+      status: 'done',
+      summary: 'large result completed',
+    });
   });
 
   it('does not accept a report string echoed by a tool or user-message event', () => {

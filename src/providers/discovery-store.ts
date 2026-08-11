@@ -290,7 +290,11 @@ export function shouldProbe(
 }
 
 /** Build routing inputs from PERSISTED state, not fresh assertions. */
-export function loadPersistedProviderInfos(db: DbConn): ProviderInfo[] {
+export function loadPersistedProviderInfos(
+  db: DbConn,
+  now: () => Date = () => new Date(),
+): ProviderInfo[] {
+  const currentTime = now().toISOString();
   const providers = db.select().from(agentProviders).all();
   return providers.map((provider) => {
     const models = db
@@ -309,6 +313,13 @@ export function loadPersistedProviderInfos(db: DbConn): ProviderInfo[] {
         prohibited: m.prohibited,
         source: 'persisted',
       };
+      if (
+        (m.availability === 'rate_limited' || m.availability === 'exhausted') &&
+        m.nextProbeAt !== null &&
+        currentTime >= m.nextProbeAt
+      ) {
+        state.retryEligible = true;
+      }
       if (m.prohibitedReason !== null) state.prohibitedReason = m.prohibitedReason;
       return state;
     });

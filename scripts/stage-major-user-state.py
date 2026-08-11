@@ -233,6 +233,9 @@ def sanitize_staged_learning(staged: Path) -> None:
             sanitized.append(candidate)
         data["candidates"] = sanitized
         path.write_text(json.dumps(data, indent=2) + "\n")
+        path.chmod(0o600)
+    for directory in [staged, *[path for path in staged.rglob("*") if path.is_dir()]]:
+        directory.chmod(0o700)
 
 
 def stage_learning_state(stage: Path, home: Path, entries: list[dict[str, str]]) -> None:
@@ -284,8 +287,9 @@ def stage_learning_state(stage: Path, home: Path, entries: list[dict[str, str]])
 
     sanitize_staged_learning(staged)
     entries.append({"type": "directory", "source": str(staged), "target": str(target)})
-    if legacy.exists():
-        add_absent(entries, legacy)
+    # Preserve the legacy source until a later, verified cleanup. An old
+    # foreground 0.5.0 process does not honour the new migration lock, so
+    # deleting this file during activation could discard a concurrent write.
 
 
 def parse_args() -> argparse.Namespace:

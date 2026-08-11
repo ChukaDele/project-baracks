@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { agentModels, agentProviders, agentRuns, decisionRequests } from '../src/db/schema.js';
-import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
+import {
+  createDecisionRequest,
+  isApprovedDecision,
+  resolveDecision,
+} from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
 import { createRun } from '../src/domain/run-service.js';
 import { addTask } from '../src/domain/task-service.js';
@@ -112,6 +116,21 @@ function insertPaidRun(
 }
 
 describe('paid run creation is disabled (paid-provider-execution unavailable)', () => {
+  it('treats an empty expected decision scope as authorising nothing', () => {
+    const { db, project, task } = setup();
+    const decision = createDecisionRequest(db, {
+      projectId: project.id,
+      taskId: task.id,
+      category: 'paid_usage',
+      question: 'approve a scoped provider run?',
+      contextJson: JSON.stringify({
+        scope: { provider: 'claude-code', modelRef: 'opus', purpose: 'implementation' },
+      }),
+    });
+    resolveDecision(db, decision.id, 'approved');
+    expect(isApprovedDecision(db, decision.id, { category: 'paid_usage', scope: {} })).toBe(false);
+  });
+
   it('refuses a paid run with no decision reference', () => {
     const { db, task, providerId } = setup();
     expect(() => createRun(db, paidRunInput(task.id, providerId))).toThrow(

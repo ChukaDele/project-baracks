@@ -24,14 +24,15 @@ case "$DEST" in
 esac
 
 rm -rf "$DEST"
-mkdir -p "$DEST/scripts"
+mkdir -p "$DEST"
 cp "$ROOT/package.json" "$ROOT/pnpm-lock.yaml" "$DEST/"
 cp -R "$ROOT/dist" "$DEST/dist"
 cp -R "$ROOT/drizzle" "$DEST/drizzle"
 cp -R "$ROOT/guidance" "$DEST/guidance"
 cp -R "$ROOT/skills" "$DEST/skills"
 cp -R "$ROOT/evals" "$DEST/evals"
-cp "$ROOT/scripts/notify-human-blocker.sh" "$DEST/scripts/notify-human-blocker.sh"
+cp -R "$ROOT/scripts" "$DEST/scripts"
+cp -R "$ROOT/templates" "$DEST/templates"
 
 pnpm install --prod --frozen-lockfile --dir "$DEST"
 
@@ -41,6 +42,11 @@ test -f "$DEST/guidance/skills.registry.json"
 test -f "$DEST/skills/internal/skill-resolver/SKILL.md"
 test -f "$DEST/evals/skill-resolver/skill-resolver.json"
 test -x "$DEST/scripts/notify-human-blocker.sh"
+test -x "$DEST/scripts/bootstrap-major-project.sh"
+test -x "$DEST/scripts/install-major-skills.sh"
+test -f "$DEST/scripts/major-ingest-youtube.sh"
+test -f "$DEST/scripts/setup-major-knowledge-tools.sh"
+test -f "$DEST/templates/project/ARCHITECTURE.md"
 test -d "$DEST/node_modules"
 
 # Runtime smoke: execute from the immutable snapshot with isolated Major state.

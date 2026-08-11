@@ -201,7 +201,7 @@ describe('discovery persistence', () => {
     expect(after.availability).toBe('available');
   });
 
-  it('keeps the exhausted probe deadline during process-free discovery after expiry', () => {
+  it('keeps the observed state but makes one real retry eligible after backoff expiry', () => {
     const db = testDb();
     const observedAt = new Date('2026-01-01T00:00:00.000Z');
     persistProviderDiscovery(db, providerInfo(), { source: 'human', now: () => observedAt });
@@ -212,16 +212,29 @@ describe('discovery persistence', () => {
       backoffMs: 1_000,
       now: () => observedAt,
     });
+    recordBillingObservation(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      billingMode: 'subscription_included',
+      source: 'human',
+    });
     const deadline = db.select().from(agentModels).get()!.nextProbeAt;
     persistProviderDiscovery(db, providerInfo({ installed: false, authenticated: false }), {
       source: 'cli',
       now: () => new Date('2026-01-01T00:01:00.000Z'),
     });
-    const persisted = loadPersistedProviderInfos(db)[0]!.models.find(
-      (candidate) => candidate.modelRef === 'opus',
-    )!;
+    const persisted = loadPersistedProviderInfos(
+      db,
+      () => new Date('2026-01-01T00:01:00.000Z'),
+    )[0]!.models.find((candidate) => candidate.modelRef === 'opus')!;
     expect(persisted.availability).toBe('exhausted');
+    expect(persisted.retryEligible).toBe(true);
     expect(db.select().from(agentModels).get()!.nextProbeAt).toBe(deadline);
+    const decision = route(
+      { purpose: 'implementation', complexity: 'complex' },
+      loadPersistedProviderInfos(db, () => new Date('2026-01-01T00:01:00.000Z')),
+    );
+    expect(decision.kind).toBe('route');
   });
 
   it('an exhausted persisted model is not routed to', () => {

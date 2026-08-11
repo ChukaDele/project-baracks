@@ -11,6 +11,9 @@ export interface ModelState {
   visible: boolean;
   authenticated: boolean;
   availability: ModelAvailability;
+  /** A persisted rate-limit/exhaustion backoff has elapsed, so one real run
+   * may retry the model and record a new authoritative outcome. */
+  retryEligible?: boolean;
   /** Authoritative billing state. 'unknown' (unroutable) until a human
    * attestation or observed run outcome proves it — configuration defaults
    * never populate this field. */

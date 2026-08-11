@@ -16,7 +16,6 @@ import { loadPersistedProviderInfos, recordModelOutcome } from '../providers/dis
 import type { ProviderInfo } from '../providers/types.js';
 import { route } from '../routing/router.js';
 import { resolveSkills } from '../skills/resolver.js';
-import { redactText } from '../security/redact.js';
 import {
   assertExecutionAllowed,
   getProjectPolicy,
@@ -33,6 +32,9 @@ import {
   type WorkerHost,
 } from './state.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
+import { parseWorkerReport } from './worker-report.js';
+
+export { parseWorkerReport } from './worker-report.js';
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
@@ -103,12 +105,6 @@ export type CoordinatorSelection =
   | { kind: 'route'; host: WorkerHost; provider: string; modelRef: string; reason: string }
   | { kind: 'checkpoint'; reason: string };
 
-export interface WorkerReport {
-  status: 'active' | 'blocked' | 'done';
-  summary: string;
-  ownerGate?: string;
-}
-
 export function modelOutcomeForWorker(
   outcome: Pick<WorkerOutcome, 'host' | 'status' | 'rateLimited' | 'exhausted' | 'stderr'>,
 ): 'available' | 'rate_limited' | 'exhausted' | 'unknown' | undefined {
@@ -119,93 +115,13 @@ export function modelOutcomeForWorker(
     return 'unknown';
   }
   const providerAuthFailure: Record<WorkerHost, RegExp> = {
-    claude: /(?:invalid api key|not logged in|401 unauthorized|please run \/login)/i,
-    codex: /(?:invalid api key|401 unauthorized|not logged in|run[^\n]*codex login)/i,
-    cursor:
-      /(?:invalid api key|401 unauthorized|not authenticated|login required|cursor(?:-agent| agent) login)/i,
+    claude: /(?:invalid api key|not logged in|please run \/login)/i,
+    codex: /(?:invalid api key|not logged in|run[^\n]*codex login)/i,
+    cursor: /(?:invalid api key|not authenticated|login required|cursor(?:-agent| agent) login)/i,
     antigravity: /(?:antigravity[^\n]*not signed in|launch the cli without arguments to sign in)/i,
   };
   if (providerAuthFailure[outcome.host].test(outcome.stderr)) return 'unknown';
   return undefined;
-}
-
-const WORKER_REPORT_PREFIX = 'MAJOR_RESULT: ';
-
-function addStringLines(value: unknown, lines: string[]): void {
-  if (typeof value === 'string') {
-    for (const line of value.split(/\r?\n/)) {
-      if (lines.length >= 500) break;
-      lines.push(line.trim());
-    }
-  }
-}
-
-function collectProviderResultLines(value: unknown, lines: string[]): void {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
-  const event = value as Record<string, unknown>;
-  if (event.type === 'result') {
-    addStringLines(event.result, lines);
-    return;
-  }
-  if (event.type === 'item.completed' && event.item && typeof event.item === 'object') {
-    const item = event.item as Record<string, unknown>;
-    if (item.type === 'agent_message') addStringLines(item.text, lines);
-    return;
-  }
-  if (event.type === 'assistant' && event.message && typeof event.message === 'object') {
-    const content = (event.message as Record<string, unknown>).content;
-    if (!Array.isArray(content)) return;
-    for (const block of content) {
-      if (block && typeof block === 'object') {
-        const candidate = block as Record<string, unknown>;
-        if (candidate.type === undefined || candidate.type === 'text') {
-          addStringLines(candidate.text, lines);
-        }
-      }
-    }
-  }
-}
-
-function workerOutputLines(output: string): string[] {
-  const lines: string[] = [];
-  for (const rawLine of output.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line) continue;
-    try {
-      collectProviderResultLines(JSON.parse(line), lines);
-    } catch {
-      // Bare stdout is never completion authority. Only provider-owned JSON
-      // assistant/result envelopes are eligible.
-    }
-  }
-  return lines;
-}
-
-/** Parse the final bounded worker report. The parent remains the only process
- * allowed to mutate Major's control state. Provider CLIs return different
- * JSON/JSONL envelopes, so only known assistant-result fields are inspected.
- * Tool and user-message payloads are never eligible completion authority. */
-export function parseWorkerReport(output: string): WorkerReport | undefined {
-  const line = workerOutputLines(output)
-    .reverse()
-    .find((candidate) => candidate.startsWith(WORKER_REPORT_PREFIX));
-  if (!line) return undefined;
-  try {
-    const value = JSON.parse(line.slice(WORKER_REPORT_PREFIX.length)) as Record<string, unknown>;
-    if (!['active', 'blocked', 'done'].includes(String(value.status))) return undefined;
-    if (typeof value.summary !== 'string' || value.summary.trim().length === 0) return undefined;
-    const summary = redactText(value.summary.trim()).slice(0, 12_000);
-    const ownerGate =
-      typeof value.ownerGate === 'string' ? redactText(value.ownerGate.trim()).slice(0, 4_000) : '';
-    if (value.status === 'blocked' && !ownerGate) return undefined;
-    return {
-      status: value.status as WorkerReport['status'],
-      summary,
-      ...(ownerGate ? { ownerGate } : {}),
-    };
-  } catch {
-    return undefined;
-  }
 }
 
 export function selectCoordinator(
@@ -218,7 +134,17 @@ export function selectCoordinator(
     if (right.name === preferred) return 1;
     return left.name.localeCompare(right.name);
   });
-  const decision = route({ purpose: 'analysis', complexity: 'architectural' }, ordered);
+  const failedProvider =
+    goal.consecutiveFailures >= 2 && goal.lastCoordinator
+      ? HOST_PROVIDERS[goal.lastCoordinator]
+      : undefined;
+  const alternatives = failedProvider
+    ? ordered.filter((provider) => provider.name !== failedProvider)
+    : ordered;
+  let decision = route({ purpose: 'analysis', complexity: 'architectural' }, alternatives);
+  if (decision.kind === 'checkpoint' && alternatives.length !== ordered.length) {
+    decision = route({ purpose: 'analysis', complexity: 'architectural' }, ordered);
+  }
   if (decision.kind === 'checkpoint') return decision;
   const host = PROVIDER_HOSTS[decision.provider];
   if (!host) return { kind: 'checkpoint', reason: `unsupported provider: ${decision.provider}` };
@@ -302,9 +228,8 @@ MAJOR OPERATING CONTRACT:
 - For MCP/connectors/plugins, distinguish installed → configured → exposed → authenticated → permissioned → operational → integrated. Use mcp-integration-ops and prove the needed state with a representative real operation.
 - For customer-facing website QA, use website-design-qa. Pair responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js or viewport-motion work. Respect remote-first-web-development for browser preview/acceptance unless the owner explicitly permits a local exception.
 - Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, Skillify rather than growing the permanent supervisor workflow.
-- An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then capture it with major learn capture. A candidate recurring twice must be promoted or explicitly classified as unstable/project-specific.
-- Reserve Major capacity before every worker, browser, or build. Queue when capacity or memory pressure blocks admission.
-- Delegate independent work across providers with the Major CLI only within the project trust limit. Delegated workers must not create descendants beyond depth 1.
+- An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then include the sanitized candidate in your final report so the parent can capture it.
+- You are the leased worker. Do not start nested workers, browsers, builds, or Major CLI delegation from this sandbox. Request any additional capacity in your final report; the parent owns resource admission and learning capture.
 - Prefer lower-cost/abundant subscription capacity for bounded tasks. Use stronger reasoning for architecture, hard bugs, integration, and adjudication.
 - Concurrent writers must use isolated worktrees. Keep one integration owner.
 - Validate with objective evidence: browser/runtime behavior, tests, persisted state, exact SHA/PR, provider response, or deployed result.

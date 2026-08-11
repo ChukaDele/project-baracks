@@ -27,7 +27,7 @@ import {
   type GoalStatus,
   type WorkerHost,
 } from './state.js';
-import { runDaemon, runGoalCycle, supervisorSnapshot } from './runtime.js';
+import { runDaemon, runGoalCycle, supervisorSnapshot, tryAcquireRepoCycleLock } from './runtime.js';
 import { runGatewayCommand, runWorker } from './worker.js';
 import {
   RESOURCE_KINDS,
@@ -440,10 +440,20 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       }
       console.error(`Major worktree: ${runCwd} (${branch})`);
     }
-    const outcome = await runWorker({ host: provider, cwd: runCwd, prompt });
-    process.stdout.write(outcome.stdout);
-    if (outcome.stderr) process.stderr.write(outcome.stderr);
-    if (outcome.status !== 'succeeded') process.exitCode = 1;
+    const releaseRepoLock = worktree ? undefined : tryAcquireRepoCycleLock(project.repoPath);
+    if (!worktree && !releaseRepoLock) {
+      throw new Error(
+        `repository ${project.repoPath} already has an active Major integration owner`,
+      );
+    }
+    try {
+      const outcome = await runWorker({ host: provider, cwd: runCwd, prompt });
+      process.stdout.write(outcome.stdout);
+      if (outcome.stderr) process.stderr.write(outcome.stderr);
+      if (outcome.status !== 'succeeded') process.exitCode = 1;
+    } finally {
+      releaseRepoLock?.();
+    }
     return true;
   }
 

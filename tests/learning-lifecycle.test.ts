@@ -196,6 +196,21 @@ describe('Major learning lifecycle', () => {
     expect(existsSync(join(root, 'learning', 'global.json'))).toBe(false);
   });
 
+  it('keeps an already-sanitized global lesson readable after a colliding project is added', () => {
+    allowGlobalPromotion('bredge');
+    const candidate = recurringProjectCandidate();
+    const promoted = promoteLearning({
+      id: candidate.id,
+      project: 'bredge',
+      scope: 'global',
+      summary: 'Require representative runtime evidence before readiness.',
+      evidence: 'Verified twice with sanitized synthetic fixtures.',
+    });
+
+    allowGlobalPromotion('runtime', '/private/runtime');
+    expect(listLearningCandidates(undefined, 'promoted')).toEqual([promoted]);
+  });
+
   it('requires cross-project memory authority before global promotion', () => {
     const candidate = recurringProjectCandidate();
     configureProjectPolicy({

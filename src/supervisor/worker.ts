@@ -18,6 +18,7 @@ import {
   type ResourceLease,
 } from './resources.js';
 import type { WorkerHost } from './state.js';
+import { preserveWorkerReportEnvelope } from './worker-report.js';
 
 export interface WorkerOutcome {
   host: WorkerHost;
@@ -77,6 +78,7 @@ export async function runGatewayCommand(input: {
 }): Promise<GatewayCommandOutcome> {
   const started = Date.now();
   let stdout = '';
+  let reportEnvelope = '';
   try {
     if (globalStopRequested()) throw new Error('Major global kill switch is active');
     const handle = executeMajorCommand({
@@ -99,6 +101,7 @@ export async function runGatewayCommand(input: {
     try {
       for await (const event of handle.events) {
         const raw = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+        reportEnvelope = preserveWorkerReportEnvelope(raw) ?? reportEnvelope;
         stdout = appendLimited(stdout, `${redactText(raw)}\n`);
       }
       const outcome = await handle.outcome;
@@ -110,7 +113,7 @@ export async function runGatewayCommand(input: {
               ? 'timed_out'
               : 'failed',
         exitCode: outcome.exitCode,
-        stdout,
+        stdout: reportEnvelope ? appendLimited(stdout, `${reportEnvelope}\n`) : stdout,
         stderr:
           outcome.stderrTail ??
           (globalStopRequested() ? 'Major global kill switch cancelled execution.' : ''),
@@ -125,7 +128,7 @@ export async function runGatewayCommand(input: {
     return {
       status: 'failed',
       exitCode: null,
-      stdout,
+      stdout: reportEnvelope ? appendLimited(stdout, `${reportEnvelope}\n`) : stdout,
       stderr: redactText(error instanceof Error ? error.message : String(error)),
       durationMs: Date.now() - started,
       rateLimited: false,

@@ -101,7 +101,7 @@ They define:
 - installed does not mean loaded;
 - the resolver selects the smallest useful skill set;
 - positive/negative trigger examples and reachability/overlap checks are part of the skill lifecycle.
-- `major skill resolve --task "..."` returns only installed, reachable skill bodies;
+- `major skill resolve --task "..."` returns paths and metadata only for installed, reachable skills;
 - `major skill audit` detects missing, duplicate and orphan internal skills. The immutable runtime ships the registry, skill bodies and resolver evals used by these commands.
 
 Important recurring meta-skills:

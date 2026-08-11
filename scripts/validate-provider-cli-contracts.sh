@@ -36,4 +36,8 @@ if [ -x "$BIN_DIR/agy" ]; then
   CHECKED=$((CHECKED + 1))
 fi
 
-echo "Major provider CLI contract validation passed ($CHECKED canonical CLIs checked)."
+if [ "$CHECKED" -eq 0 ]; then
+  echo "Major provider CLI contract validation skipped: no canonical CLIs installed; provider field gate remains open."
+else
+  echo "Major provider CLI contract validation passed ($CHECKED canonical CLIs checked)."
+fi

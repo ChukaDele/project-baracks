@@ -86,7 +86,7 @@ function usable(candidate: Candidate): boolean {
     m.visible &&
     m.authenticated &&
     !m.prohibited &&
-    m.availability === 'available' &&
+    (m.availability === 'available' || m.retryEligible === true) &&
     m.billingMode !== 'unknown'
   );
 }

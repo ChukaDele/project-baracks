@@ -295,6 +295,9 @@ def main() -> None:
         assert not (learning_root / "global.json").exists()
         project_files = list((learning_root / "projects").glob("*.json"))
         assert len(project_files) == 1
+        assert stat.S_IMODE(learning_root.stat().st_mode) == 0o700
+        assert stat.S_IMODE((learning_root / "projects").stat().st_mode) == 0o700
+        assert stat.S_IMODE(project_files[0].stat().st_mode) == 0o600
         migrated = json.loads(project_files[0].read_text())["candidates"][0]
         assert migrated["id"] == "legacy-project-global"
         assert migrated["scope"] == "project"
@@ -303,7 +306,7 @@ def main() -> None:
         assert "e" * 32 not in json.dumps(migrated)
         assert "[REDACTED]" in json.dumps(migrated)
         assert json.loads((learning_root / "legacy-quarantine.json").read_text())["candidates"][0]["id"] == "legacy-unowned"
-        assert not (home / ".major" / "learning-candidates.json").exists()
+        assert (home / ".major" / "learning-candidates.json").exists()
 
         second_manifest = stage(temp / "stage-idempotent", home, env, wrapper, record)
         run([sys.executable, str(ACTIVATOR), "--manifest", str(second_manifest)], env)
@@ -319,7 +322,7 @@ def main() -> None:
         assert migration_lock.exists(), "staging removed the live migration lock"
         run([sys.executable, str(ACTIVATOR), "--manifest", str(lock_manifest)], lock_env)
         assert not migration_lock.exists(), "activated learning directory retained migration lock"
-        assert not (lock_home / ".major" / "learning-candidates.json").exists()
+        assert (lock_home / ".major" / "learning-candidates.json").exists()
 
     print("Major install transaction validation passed.")
 
