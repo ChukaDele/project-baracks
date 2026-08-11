@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import time
 from pathlib import Path
 
 MANAGED_START = "<!-- MAJOR-GLOBAL-START -->"
@@ -248,10 +249,29 @@ def stage_learning_state(stage: Path, home: Path, entries: list[dict[str, str]])
     if target.exists():
         if not target.is_dir() or target.is_symlink():
             raise SystemExit(f"Major learning root is not a safe directory: {target}")
+        # Installers create .migration.lock before invoking this stager. New
+        # writers therefore wait. Drain writers that acquired a per-store
+        # lock just before the migration lock appeared before taking the
+        # snapshot that activation will install.
+        deadline = time.monotonic() + 10
+        while True:
+            active_locks = [
+                path
+                for path in target.rglob("*.lock")
+                if path.name != ".migration.lock"
+            ]
+            if not active_locks:
+                break
+            if time.monotonic() >= deadline:
+                names = ", ".join(str(path) for path in active_locks[:3])
+                raise SystemExit(
+                    f"refusing to migrate Major learning while writers remain active: {names}"
+                )
+            time.sleep(0.01)
         symlink = next((path for path in target.rglob("*") if path.is_symlink()), None)
         if symlink is not None:
             raise SystemExit(f"refusing to migrate symlinked Major learning state: {symlink}")
-        shutil.copytree(target, staged, ignore=shutil.ignore_patterns(".migration.lock"))
+        shutil.copytree(target, staged)
     else:
         staged.mkdir(parents=True)
 

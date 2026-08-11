@@ -17,8 +17,8 @@ import {
   waitForResource,
   type ResourceLease,
 } from './resources.js';
-import type { WorkerHost } from './state.js';
-import { preserveWorkerReportEnvelope } from './worker-report.js';
+import { gitCommonDir, type WorkerHost } from './state.js';
+import { AMBIGUOUS_WORKER_REPORT_ENVELOPE, preserveWorkerReportEnvelope } from './worker-report.js';
 
 export interface WorkerOutcome {
   host: WorkerHost;
@@ -68,6 +68,21 @@ export function hostAvailable(host: WorkerHost): boolean {
   return executable.includes('/') ? existsSync(executable) : trustedExecutableInstalled(executable);
 }
 
+export function gatewayAllowedRoots(
+  cwd: string,
+  extraAllowedRoots: readonly string[] = [],
+): string[] {
+  const root = resolve(cwd);
+  const commonDir = gitCommonDir(root);
+  return [
+    ...new Set([
+      root,
+      ...(commonDir ? [commonDir] : []),
+      ...extraAllowedRoots.map((allowedRoot) => resolve(allowedRoot)),
+    ]),
+  ];
+}
+
 export async function runGatewayCommand(input: {
   executable: string;
   args: readonly string[];
@@ -79,13 +94,14 @@ export async function runGatewayCommand(input: {
   const started = Date.now();
   let stdout = '';
   let reportEnvelope = '';
+  let reportEnvelopeCount = 0;
   try {
     if (globalStopRequested()) throw new Error('Major global kill switch is active');
     const handle = executeMajorCommand({
       executable: input.executable,
       args: input.args,
       cwd: resolve(input.cwd),
-      allowedRoots: [resolve(input.cwd), ...(input.extraAllowedRoots ?? [])],
+      allowedRoots: gatewayAllowedRoots(input.cwd, input.extraAllowedRoots),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.resourceLeaseId ? { resourceLeaseId: input.resourceLeaseId } : {}),
       parseLine: (line) => ({ type: 'stdout', data: line }),
@@ -101,7 +117,11 @@ export async function runGatewayCommand(input: {
     try {
       for await (const event of handle.events) {
         const raw = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
-        reportEnvelope = preserveWorkerReportEnvelope(raw) ?? reportEnvelope;
+        const preserved = preserveWorkerReportEnvelope(raw);
+        if (preserved) {
+          reportEnvelopeCount += 1;
+          reportEnvelope = preserved;
+        }
         stdout = appendLimited(stdout, `${redactText(raw)}\n`);
       }
       const outcome = await handle.outcome;
@@ -113,7 +133,13 @@ export async function runGatewayCommand(input: {
               ? 'timed_out'
               : 'failed',
         exitCode: outcome.exitCode,
-        stdout: reportEnvelope ? appendLimited(stdout, `${reportEnvelope}\n`) : stdout,
+        stdout:
+          reportEnvelopeCount === 0
+            ? stdout
+            : appendLimited(
+                stdout,
+                `${reportEnvelopeCount === 1 ? reportEnvelope : AMBIGUOUS_WORKER_REPORT_ENVELOPE}\n`,
+              ),
         stderr:
           outcome.stderrTail ??
           (globalStopRequested() ? 'Major global kill switch cancelled execution.' : ''),
@@ -128,7 +154,13 @@ export async function runGatewayCommand(input: {
     return {
       status: 'failed',
       exitCode: null,
-      stdout: reportEnvelope ? appendLimited(stdout, `${reportEnvelope}\n`) : stdout,
+      stdout:
+        reportEnvelopeCount === 0
+          ? stdout
+          : appendLimited(
+              stdout,
+              `${reportEnvelopeCount === 1 ? reportEnvelope : AMBIGUOUS_WORKER_REPORT_ENVELOPE}\n`,
+            ),
       stderr: redactText(error instanceof Error ? error.message : String(error)),
       durationMs: Date.now() - started,
       rateLimited: false,

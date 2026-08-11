@@ -69,6 +69,7 @@ MANIFEST="$(python3 "$MAJOR_ROOT/scripts/stage-major-user-state.py" \
   --stage "$STAGE_DIR/user-state" \
   --global-rules-record "$RULES_RECORD")"
 python3 "$MAJOR_ROOT/scripts/activate-major-user-state.py" --manifest "$MANIFEST"
+rm -f "$LEARNING_MIGRATION_LOCK"
 LEARNING_LOCK_HELD=0
 
 SKILL_COUNT="$(find "$GLOBAL_SKILLS_DEST" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"

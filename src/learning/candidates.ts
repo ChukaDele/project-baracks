@@ -125,6 +125,19 @@ function waitForMigration(deadline: number): void {
   }
 }
 
+export function learningLockOwnerIsLive(pid: number): boolean {
+  if (!Number.isFinite(pid)) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EPERM') return true;
+    if (code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
 function withStoreLock<T>(path: string, action: () => T): T {
   mkdirSync(dirname(path), { recursive: true });
   const lock = `${path}.lock`;
@@ -156,15 +169,7 @@ function withStoreLock<T>(path: string, action: () => T): T {
       try {
         const lockText = readFileSync(lock, 'utf8').trim();
         const pid = Number.parseInt(lockText, 10);
-        let live = false;
-        if (Number.isFinite(pid)) {
-          try {
-            process.kill(pid, 0);
-            live = true;
-          } catch {
-            live = false;
-          }
-        }
+        const live = learningLockOwnerIsLive(pid);
         if (!live && Date.now() - statSync(lock).mtimeMs > 30_000) unlinkSync(lock);
       } catch (staleError) {
         if ((staleError as NodeJS.ErrnoException).code !== 'ENOENT') throw staleError;

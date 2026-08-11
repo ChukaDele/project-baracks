@@ -21,6 +21,7 @@ import {
 } from '../src/security/trusted-executables.js';
 import { ExecutionGateway, type ExecutionPolicyDecision } from '../src/security/gateway.js';
 import { trustedExecutableRegistry } from '../src/security/major-gateway.js';
+import { gatewayAllowedRoots } from '../src/supervisor/worker.js';
 
 const NODE = process.execPath;
 
@@ -207,6 +208,52 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
     expect(existsSync(descendantMarker)).toBe(false);
     expect(readFileSync(deniedMarker, 'utf8')).toBe('private');
   });
+
+  it('allows a linked worktree to update only its external Git common directory', () => {
+    const parent = tempDir();
+    const main = join(parent, 'main');
+    const worktree = join(parent, 'worktree');
+    for (const args of [
+      ['init', '--initial-branch=main', main],
+      ['-C', main, 'config', 'user.name', 'Major Test'],
+      ['-C', main, 'config', 'user.email', 'major@example.invalid'],
+    ]) {
+      const result = spawnSync('git', args, { encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+    }
+    writeFileSync(join(main, 'seed.txt'), 'seed\n');
+    for (const args of [
+      ['-C', main, 'add', 'seed.txt'],
+      ['-C', main, 'commit', '-m', 'seed'],
+      ['-C', main, 'worktree', 'add', '-b', 'test-worktree', worktree],
+    ]) {
+      const result = spawnSync('git', args, { encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+    }
+    writeFileSync(join(worktree, 'marker.txt'), 'contained\n');
+
+    const git = realpathSync('/usr/bin/git');
+    const wrapped = darwinSeatbeltContainment().wrap({
+      executable: git,
+      canonicalExecutable: git,
+      args: ['add', 'marker.txt'],
+      allowedRoots: gatewayAllowedRoots(worktree),
+    });
+    const result = spawnSync(wrapped.executable, wrapped.args, {
+      cwd: worktree,
+      encoding: 'utf8',
+      env: {
+        HOME: worktree,
+        PATH: '/usr/bin:/bin',
+        GIT_CONFIG_NOSYSTEM: '1',
+      },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    const status = spawnSync('git', ['-C', worktree, 'status', '--porcelain'], {
+      encoding: 'utf8',
+    });
+    expect(status.stdout).toContain('A  marker.txt');
+  }, 30_000);
 });
 
 describe('execution is unreachable through the gateway in this build', () => {

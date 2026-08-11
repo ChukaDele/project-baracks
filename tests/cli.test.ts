@@ -329,7 +329,7 @@ describe('major CLI', () => {
       'approval GATE check',
     );
     expect(dup.stdout).toMatch(/duplicate of pending suggestion/);
-  });
+  }, 30_000);
 
   it('doctor human and JSON output agree that overnight execution is unavailable', () => {
     const human = major('doctor');

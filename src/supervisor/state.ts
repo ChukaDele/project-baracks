@@ -268,7 +268,7 @@ export function attachSession(input: {
   });
 }
 
-function gitCommonDir(repoPath: string): string | undefined {
+export function gitCommonDir(repoPath: string): string | undefined {
   const marker = join(repoPath, '.git');
   if (!existsSync(marker)) return undefined;
 

@@ -170,6 +170,7 @@ MANIFEST="$(python3 "$ROOT/scripts/stage-major-user-state.py" \
 python3 "$ROOT/scripts/activate-major-user-state.py" --manifest "$MANIFEST"
 RELEASE_CREATED=0
 INSTALL_COMMITTED=1
+rm -f "$LEARNING_MIGRATION_LOCK"
 LEARNING_LOCK_HELD=0
 
 # Pilot posture: no auto-start daemon. Never install or auto-start a global daemon.

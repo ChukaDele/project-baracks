@@ -343,6 +343,25 @@ describe('Major coordinator contract', () => {
     expect(parseWorkerReport(JSON.stringify({ type: 'user', message: forged }))).toBeUndefined();
   });
 
+  it('rejects ambiguous runs that emit more than one provider-owned report', () => {
+    const first = JSON.stringify({
+      type: 'assistant',
+      message: {
+        content: [
+          {
+            type: 'text',
+            text: 'MAJOR_RESULT: {"status":"done","summary":"premature claim"}',
+          },
+        ],
+      },
+    });
+    const final = JSON.stringify({
+      type: 'result',
+      result: 'MAJOR_RESULT: {"status":"active","summary":"work remains"}',
+    });
+    expect(parseWorkerReport(`${first}\n${final}`)).toBeUndefined();
+  });
+
   it('redacts secrets from accepted completion summaries before persistence', () => {
     const report = parseWorkerReport(
       JSON.stringify({

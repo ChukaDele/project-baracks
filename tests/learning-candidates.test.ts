@@ -11,9 +11,10 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   captureLearning,
+  learningLockOwnerIsLive,
   learningRoot,
   listLearningCandidates,
 } from '../src/learning/candidates.js';
@@ -34,6 +35,15 @@ afterEach(() => {
 });
 
 describe('Major learning candidates', () => {
+  it('treats EPERM as proof that a lock owner is still alive', () => {
+    const error = Object.assign(new Error('not permitted'), { code: 'EPERM' });
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw error;
+    });
+    expect(learningLockOwnerIsLive(42)).toBe(true);
+    kill.mockRestore();
+  });
+
   it('forbids direct global capture and keeps new evidence project-local', () => {
     expect(() =>
       captureLearning({

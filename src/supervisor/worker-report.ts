@@ -1,6 +1,11 @@
 import { redactText } from '../security/redact.js';
 
 const WORKER_REPORT_PREFIX = 'MAJOR_RESULT: ';
+const FINAL_REPORT_TYPE = 'major.result.final';
+const AMBIGUOUS_REPORT_TYPE = 'major.result.ambiguous';
+export const AMBIGUOUS_WORKER_REPORT_ENVELOPE = JSON.stringify({
+  type: AMBIGUOUS_REPORT_TYPE,
+});
 
 export interface WorkerReport {
   status: 'active' | 'blocked' | 'done';
@@ -8,37 +13,35 @@ export interface WorkerReport {
   ownerGate?: string;
 }
 
-function reportLineFromText(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  let report: string | undefined;
-  for (const line of value.split(/\r?\n/)) {
-    const candidate = line.trim();
-    if (candidate.startsWith(WORKER_REPORT_PREFIX)) report = candidate;
-  }
-  return report;
+function reportLinesFromText(value: unknown): string[] {
+  if (typeof value !== 'string') return [];
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith(WORKER_REPORT_PREFIX));
 }
 
-function reportLineFromEnvelope(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+function reportLinesFromEnvelope(value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
   const event = value as Record<string, unknown>;
-  if (event.type === 'result') return reportLineFromText(event.result);
+  if (event.type === 'result') return reportLinesFromText(event.result);
   if (event.type === 'item.completed' && event.item && typeof event.item === 'object') {
     const item = event.item as Record<string, unknown>;
-    return item.type === 'agent_message' ? reportLineFromText(item.text) : undefined;
+    return item.type === 'agent_message' ? reportLinesFromText(item.text) : [];
   }
   if (event.type !== 'assistant' || !event.message || typeof event.message !== 'object') {
-    return undefined;
+    return [];
   }
   const content = (event.message as Record<string, unknown>).content;
-  if (!Array.isArray(content)) return undefined;
-  let report: string | undefined;
+  if (!Array.isArray(content)) return [];
+  const reports: string[] = [];
   for (const block of content) {
     if (!block || typeof block !== 'object') continue;
     const candidate = block as Record<string, unknown>;
     if (candidate.type !== undefined && candidate.type !== 'text') continue;
-    report = reportLineFromText(candidate.text) ?? report;
+    reports.push(...reportLinesFromText(candidate.text));
   }
-  return report;
+  return reports;
 }
 
 /** Preserve only the final provider-owned report from a complete event. This
@@ -46,8 +49,10 @@ function reportLineFromEnvelope(value: unknown): string | undefined {
  * truncated, without retaining unbounded model output. */
 export function preserveWorkerReportEnvelope(raw: string): string | undefined {
   try {
-    const report = reportLineFromEnvelope(JSON.parse(raw));
-    return report ? JSON.stringify({ type: 'result', result: report }) : undefined;
+    const reports = reportLinesFromEnvelope(JSON.parse(raw));
+    if (reports.length === 0) return undefined;
+    if (reports.length !== 1) return AMBIGUOUS_WORKER_REPORT_ENVELOPE;
+    return JSON.stringify({ type: FINAL_REPORT_TYPE, result: reports[0] });
   } catch {
     return undefined;
   }
@@ -56,17 +61,26 @@ export function preserveWorkerReportEnvelope(raw: string): string | undefined {
 /** Only known provider-owned assistant/result fields carry completion
  * authority. Bare stdout, tool output, and user-message payloads are ignored. */
 export function parseWorkerReport(output: string): WorkerReport | undefined {
-  let line: string | undefined;
+  const providerLines: string[] = [];
+  const finalLines: string[] = [];
   for (const rawLine of output.split(/\r?\n/)) {
     const candidate = rawLine.trim();
     if (!candidate) continue;
     try {
-      line = reportLineFromEnvelope(JSON.parse(candidate)) ?? line;
+      const event = JSON.parse(candidate) as Record<string, unknown>;
+      if (event.type === AMBIGUOUS_REPORT_TYPE) return undefined;
+      if (event.type === FINAL_REPORT_TYPE) {
+        finalLines.push(...reportLinesFromText(event.result));
+      } else {
+        providerLines.push(...reportLinesFromEnvelope(event));
+      }
     } catch {
       // Bare stdout is never completion authority.
     }
   }
-  if (!line) return undefined;
+  const eligible = finalLines.length > 0 ? finalLines : providerLines;
+  if (eligible.length !== 1) return undefined;
+  const line = eligible[0]!;
   try {
     const value = JSON.parse(line.slice(WORKER_REPORT_PREFIX.length)) as Record<string, unknown>;
     if (!['active', 'blocked', 'done'].includes(String(value.status))) return undefined;

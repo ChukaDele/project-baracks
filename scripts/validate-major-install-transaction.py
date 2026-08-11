@@ -321,8 +321,60 @@ def main() -> None:
         lock_manifest = stage(temp / "stage-migration-lock", lock_home, lock_env, wrapper, record)
         assert migration_lock.exists(), "staging removed the live migration lock"
         run([sys.executable, str(ACTIVATOR), "--manifest", str(lock_manifest)], lock_env)
-        assert not migration_lock.exists(), "activated learning directory retained migration lock"
+        assert migration_lock.exists(), "activation exposed learning writers before commit"
+        migration_lock.unlink()
+        assert not migration_lock.exists(), "committed migration lock cleanup failed"
         assert (lock_home / ".major" / "learning-candidates.json").exists()
+
+        drain_home = temp / "drain-home"
+        drain_codex = drain_home / ".codex"
+        drain_env = {**base_env, "HOME": str(drain_home), "CODEX_HOME": str(drain_codex)}
+        seed_home(drain_home, drain_codex)
+        drain_learning = drain_home / ".major" / "learning"
+        write(drain_learning / "projects" / "existing.json", '{"version":2,"candidates":[]}\n', 0o600)
+        write(drain_learning / ".migration.lock", "installer\n")
+        writer_lock = drain_learning / "projects" / "existing.json.lock"
+        write(writer_lock, "12345\n", 0o600)
+        drain_stage = temp / "stage-drain"
+        drain_process = subprocess.Popen(
+            [
+                sys.executable,
+                str(STAGER),
+                "--root",
+                str(ROOT),
+                "--stage",
+                str(drain_stage),
+                "--major-bin",
+                str(drain_home / ".local" / "bin" / "major"),
+                "--wrapper",
+                str(wrapper),
+                "--record",
+                str(record),
+                "--legacy-plist",
+                str(drain_home / "Library" / "LaunchAgents" / "com.chuka.major-supervisor.plist"),
+            ],
+            env=drain_env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        drain_deadline = time.monotonic() + 2
+        while time.monotonic() < drain_deadline and not drain_stage.exists():
+            if drain_process.poll() is not None:
+                break
+            time.sleep(0.01)
+        assert drain_stage.exists(), "learning stager did not reach the migration phase"
+        time.sleep(0.1)
+        assert drain_process.poll() is None, "learning stager did not wait for an in-flight writer"
+        writer_lock.unlink()
+        drain_stdout, drain_stderr = drain_process.communicate(timeout=5)
+        assert drain_process.returncode == 0, drain_stderr
+        drain_manifest = Path(drain_stdout.strip())
+        run([sys.executable, str(ACTIVATOR), "--manifest", str(drain_manifest)], drain_env)
+        assert (drain_learning / "projects" / "existing.json").exists()
+        assert (drain_learning / ".migration.lock").exists()
+        (drain_learning / ".migration.lock").unlink()
+        assert not (drain_learning / ".migration.lock").exists()
 
     print("Major install transaction validation passed.")
 
