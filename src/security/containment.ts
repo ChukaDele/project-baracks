@@ -1,69 +1,157 @@
-import { platform } from 'node:os';
+import { existsSync } from 'node:fs';
+import { homedir, platform, tmpdir } from 'node:os';
+import { canonicalize } from './paths.js';
+import { TrustedExecutableRegistry } from './trusted-executables.js';
 
-/**
- * Process containment for spawned agent processes.
- *
- * HONEST SCOPE: the only OS mechanism this foundation actually applies is
- * POSIX process-group containment — every spawn is a process-group leader, so
- * the COMPLETE descendant tree (not just Major's direct child) is signalled
- * and terminated together. That guarantees lifetime/termination containment of
- * the whole tree. It is NOT an OS filesystem or network sandbox: descendant
- * processes are not kernel-jailed to the allowed roots. Filesystem isolation
- * would require an external sandbox (e.g. sandbox-exec / bubblewrap /
- * namespaces) which is not wired here — so live agent execution stays disabled
- * until such containment is proven available (see doctor.liveExecutionReady).
- */
-export interface Containment {
-  /** True when the mechanism is actually applied to every spawn. */
-  readonly enforced: boolean;
-  /** Whether the OS confines descendants to the allowed filesystem roots.
-   * Always false in this foundation: no kernel sandbox is applied. */
-  readonly filesystemIsolation: boolean;
-  readonly mechanism: string;
-  readonly detail: string;
+export interface ContainmentCommand {
+  executable: string;
+  args: string[];
 }
 
-/**
- * Whole-process-tree termination containment. Applied by spawning each child
- * as a process-group leader and terminating the entire group on cancel/timeout
- * (see providers/exec.ts). Does not provide filesystem/network isolation.
- */
+export interface ContainmentRequest {
+  executable: string;
+  canonicalExecutable: string;
+  args: readonly string[];
+  allowedRoots: readonly string[];
+}
+
+/** An executable OS boundary, not a descriptive readiness flag. */
+export interface Containment {
+  readonly enforced: boolean;
+  readonly filesystemIsolation: boolean;
+  readonly networkIsolation: boolean;
+  readonly mechanism: string;
+  readonly detail: string;
+  wrap(request: ContainmentRequest): ContainmentCommand;
+}
+
+function unavailableContainment(os: string): Containment {
+  return {
+    enforced: false,
+    filesystemIsolation: false,
+    networkIsolation: false,
+    mechanism: 'unsupported',
+    detail: `trusted OS isolation is unavailable on ${os}`,
+    wrap() {
+      throw new Error(`trusted OS isolation is unavailable on ${os}`);
+    },
+  };
+}
+
+/** Process-group termination only. This is never sufficient for live execution. */
 export function processTreeContainment(os: string = platform()): Containment {
   const posix = os !== 'win32';
   return {
     enforced: posix,
     filesystemIsolation: false,
+    networkIsolation: false,
     mechanism: posix ? 'posix-process-group' : 'unsupported',
     detail: posix
-      ? 'spawned as a process-group leader; the entire descendant tree is terminated together. ' +
-        'No OS filesystem/network isolation is applied.'
+      ? 'descendants share a process group; filesystem and network access are not isolated'
       : `process-group containment is unavailable on ${os}`,
+    wrap(request) {
+      return { executable: request.executable, args: [...request.args] };
+    },
+  };
+}
+
+function schemeString(value: string): string {
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+}
+
+function canonicalRoots(roots: readonly string[]): string[] {
+  return [...new Set(roots.map((root) => canonicalize(root)))];
+}
+
+/**
+ * Build a macOS Seatbelt boundary for a single spawn.
+ *
+ * System files remain readable so signed provider binaries and the dynamic
+ * loader can start. User and temporary data are denied, then only the exact
+ * project/runtime roots are reopened. Writes are denied everywhere except
+ * those same roots. Network access is outbound-only.
+ */
+function seatbeltProfile(request: ContainmentRequest): string {
+  const roots = canonicalRoots(request.allowedRoots);
+  const deniedDataRoots = [
+    ...new Set(
+      ['/Users', '/Volumes', homedir(), '/private/tmp', '/tmp', tmpdir()].flatMap((root) => {
+        try {
+          return [root, canonicalize(root)];
+        } catch {
+          return [root];
+        }
+      }),
+    ),
+  ];
+  const exactExecutableRoots = [request.executable, request.canonicalExecutable].map((path) =>
+    canonicalize(path),
+  );
+  const forms = [
+    '(version 1)',
+    '(deny default)',
+    '(allow process*)',
+    '(allow signal)',
+    '(allow sysctl-read)',
+    '(allow mach-lookup)',
+    '(allow ipc-posix*)',
+    '(allow file-read*)',
+    ...deniedDataRoots.map((root) => `(deny file-read-data (subpath ${schemeString(root)}))`),
+    ...roots.map((root) => `(allow file-read* (subpath ${schemeString(root)}))`),
+    ...exactExecutableRoots.map((path) => `(allow file-read* (literal ${schemeString(path)}))`),
+    ...roots.map((root) => `(allow file-write* (subpath ${schemeString(root)}))`),
+    '(allow network-outbound)',
+  ];
+  return forms.join(' ');
+}
+
+/**
+ * macOS trusted execution boundary. The sandbox executable is pinned at
+ * construction and content-rehashed immediately before every wrapped spawn.
+ */
+export function darwinSeatbeltContainment(
+  os: string = platform(),
+  sandboxPath = '/usr/bin/sandbox-exec',
+): Containment {
+  if (os !== 'darwin' || !existsSync(sandboxPath)) return unavailableContainment(os);
+
+  const registry = new TrustedExecutableRegistry();
+  const trustedSandbox = registry.pin(sandboxPath);
+  return {
+    enforced: true,
+    filesystemIsolation: true,
+    networkIsolation: true,
+    mechanism: 'macos-seatbelt-outbound-only',
+    detail:
+      'macOS Seatbelt confines descendant reads and writes to explicit data roots; network is outbound-only',
+    wrap(request) {
+      const sandbox = registry.verify(trustedSandbox.name);
+      return {
+        executable: sandbox.spawnPath,
+        args: ['-p', seatbeltProfile(request), request.executable, ...request.args],
+      };
+    },
   };
 }
 
 export interface ContainmentStatus {
-  /** The whole descendant tree can be terminated together. */
   processTreeTermination: boolean;
-  /** The OS confines descendants to the allowed roots. */
   filesystemIsolation: boolean;
-  /**
-   * True only when the containment required for live agent execution is
-   * available AND enforced. This foundation ships no filesystem sandbox, so it
-   * is false and live agent execution stays disabled.
-   */
+  networkIsolation: boolean;
   liveExecutionReady: boolean;
   detail: string;
 }
 
-/** Report the containment the current platform can actually provide. */
+/** Report the containment the current platform can actually apply. */
 export function detectContainment(os: string = platform()): ContainmentStatus {
-  const c = processTreeContainment(os);
+  const containment = darwinSeatbeltContainment(os);
+  const ready =
+    containment.enforced && containment.filesystemIsolation && containment.networkIsolation;
   return {
-    processTreeTermination: c.enforced,
-    filesystemIsolation: c.filesystemIsolation,
-    liveExecutionReady: c.enforced && c.filesystemIsolation,
-    detail:
-      `${c.detail} OS-level descendant filesystem containment is not implemented, ` +
-      'so live agent execution remains disabled.',
+    processTreeTermination: os !== 'win32',
+    filesystemIsolation: containment.filesystemIsolation,
+    networkIsolation: containment.networkIsolation,
+    liveExecutionReady: ready,
+    detail: containment.detail,
   };
 }

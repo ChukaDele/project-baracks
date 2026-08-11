@@ -103,12 +103,7 @@ export async function runGatewayCommand(input: {
       executable: input.executable,
       args: input.args,
       cwd: resolve(input.cwd),
-      allowedRoots: [
-        resolve(input.cwd),
-        majorRepoRoot(),
-        join(homedir(), '.major'),
-        ...(input.extraAllowedRoots ?? []),
-      ],
+      allowedRoots: [resolve(input.cwd), ...(input.extraAllowedRoots ?? [])],
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.resourceLeaseId ? { resourceLeaseId: input.resourceLeaseId } : {}),
       parseLine: (line) => ({ type: 'stdout', data: line }),
@@ -188,6 +183,7 @@ export async function runWorker(input: {
       args: spec.args,
       cwd: input.cwd,
       resourceLeaseId: lease.id,
+      ...(input.host === 'antigravity' ? { extraAllowedRoots: [majorRepoRoot()] } : {}),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
     });
     return { host: input.host, ...outcome };

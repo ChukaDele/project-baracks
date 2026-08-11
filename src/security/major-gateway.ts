@@ -1,15 +1,12 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join, resolve } from 'node:path';
-import { executeMajorStreaming } from '../providers/exec.js';
+import { basename, join, resolve } from 'node:path';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
-import { checkArgv } from './commands.js';
-import { processTreeContainment } from './containment.js';
-import { sanitizeEnv } from './env.js';
-import { assertWithinRootsCanonical, canonicalize, isWithinRoots } from './paths.js';
+import { darwinSeatbeltContainment } from './containment.js';
+import { ExecutionGateway, type ExecutionPolicyDecision } from './gateway.js';
 import { TrustedExecutableRegistry } from './trusted-executables.js';
-import { assertCapabilityAvailable, CapabilityUnavailableError } from './capabilities.js';
 
 export interface MajorGatewayRequest {
   executable: string;
@@ -38,145 +35,72 @@ export function readSystemMemoryAvailablePercent(): number | undefined {
   }
 }
 
-function executableName(executable: string): string {
-  return basename(executable);
+function majorHome(): string {
+  return process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
 }
 
-function canonicalRoots(roots: readonly string[]): string[] {
-  return roots.flatMap((root) => {
-    try {
-      return [canonicalize(root)];
-    } catch {
-      return [resolve(root)];
-    }
-  });
-}
-
-function assertAbsoluteArgumentsContained(args: readonly string[], roots: readonly string[]): void {
-  const allowed = canonicalRoots(roots);
-  for (const arg of args) {
-    if (!isAbsolute(arg)) continue;
-    let candidate = resolve(arg);
-    try {
-      candidate = canonicalize(arg);
-    } catch {
-      // Non-existent paths such as a new worktree use the lexical absolute path.
-    }
-    if (!isWithinRoots(candidate, allowed)) {
-      throw new Error(`Major execution argument escapes allowed roots: ${arg}`);
-    }
-  }
-}
-
-function resolveTrustedExecutable(executable: string): string {
-  const registry = new TrustedExecutableRegistry();
-  const name = executableName(executable);
-  let spawnPath = executable;
-  if (!executable.includes('/')) {
-    const resolved = registry.resolveForReport(name, process.env.PATH);
-    if (!resolved) throw new Error(`Major worker executable not found on PATH: ${name}`);
-    spawnPath = resolved;
-  }
-  registry.trust(name, spawnPath, 'pinned');
-  return registry.verify(executable.includes('/') ? executable : name).spawnPath;
-}
-
-function recordExecution(input: {
-  executable: string;
-  cwd: string;
-  allowed: boolean;
-  reason: string;
-  strippedEnv: readonly string[];
-}): void {
-  const dir = process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
-  mkdirSync(dir, { recursive: true });
-  const record = {
-    at: new Date().toISOString(),
-    executable: input.executable,
-    cwd: input.cwd,
-    allowed: input.allowed,
-    reason: input.reason,
-    strippedEnv: input.strippedEnv,
-  };
-  appendFileSync(join(dir, 'execution-policy.jsonl'), `${JSON.stringify(record)}\n`, {
+function recordExecution(decision: ExecutionPolicyDecision): void {
+  const dir = majorHome();
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  appendFileSync(join(dir, 'execution-policy.jsonl'), `${JSON.stringify(decision)}\n`, {
     mode: 0o600,
   });
 }
 
-/**
- * Successor execution boundary. It shares the same hard capability gate as the
- * legacy gateway. The validation pipeline below remains compiled M1 groundwork,
- * but no supervisor path may spawn until trusted OS isolation is implemented
- * and the live-agent-execution gate is removed by reviewed code.
- */
+function resolveTrustedExecutable(executable: string): TrustedExecutableRegistry {
+  const registry = new TrustedExecutableRegistry();
+  const name = basename(executable);
+  if (executable.includes('/')) {
+    registry.trust(name, executable, 'pinned');
+    return registry;
+  }
+  const resolved = registry.resolveForReport(name, process.env.PATH);
+  if (!resolved) throw new Error(`Major worker executable not found on PATH: ${name}`);
+  registry.trust(name, resolved, 'pinned');
+  return registry;
+}
+
+/** Production adapter for the single canonical execution gateway. */
 export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle {
-  try {
-    assertCapabilityAvailable('live-agent-execution');
-  } catch (error) {
-    const reason =
-      error instanceof CapabilityUnavailableError
-        ? error.message
-        : 'live agent execution capability check failed';
-    recordExecution({
-      executable: executableName(request.executable),
-      cwd: resolve(request.cwd),
-      allowed: false,
-      reason,
-      strippedEnv: [],
-    });
-    throw error;
-  }
+  const executable = basename(request.executable);
+  const projectKey = createHash('sha256').update(resolve(request.cwd)).digest('hex').slice(0, 24);
+  const runtimeHome = majorHome();
+  const executionRoot = join(runtimeHome, 'execution', projectKey);
+  const runtimeTmp = join(executionRoot, 'tmp');
+  mkdirSync(runtimeTmp, { recursive: true, mode: 0o700 });
+  const roots = [...new Set([...request.allowedRoots.map((root) => resolve(root)), executionRoot])];
 
-  const cwd = assertWithinRootsCanonical(request.cwd, request.allowedRoots);
-  const executable = executableName(request.executable);
-  const commandCheck = checkArgv(request.executable, request.args, {
-    allowedExecutables: [executable],
-    protectedBranches: ['main', 'master'],
-  });
-  if (!commandCheck.allowed) {
-    recordExecution({
-      executable,
-      cwd,
-      allowed: false,
-      reason: commandCheck.reason,
-      strippedEnv: [],
-    });
-    throw new Error(`Major execution refused: ${commandCheck.reason}`);
-  }
-
-  assertAbsoluteArgumentsContained(request.args, request.allowedRoots);
-  const spawnPath = resolveTrustedExecutable(request.executable);
-  const sanitized = sanitizeEnv(process.env, {
-    allowlist: [
+  const baseEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    MAJOR_HOME: runtimeHome,
+    TMPDIR: runtimeTmp,
+    ...(request.resourceLeaseId ? { MAJOR_RESOURCE_LEASE_ID: request.resourceLeaseId } : {}),
+  };
+  const gateway = new ExecutionGateway({
+    allowedRoots: roots,
+    commandPolicy: {
+      allowedExecutables: [executable],
+      protectedBranches: ['main', 'master'],
+    },
+    trustedExecutables: resolveTrustedExecutable(request.executable),
+    containment: darwinSeatbeltContainment(),
+    baseEnv,
+    envAllowlist: [
       'MAJOR_HOME',
+      'MAJOR_RESOURCE_LEASE_ID',
       'CODEX_HOME',
       'CLAUDE_CONFIG_DIR',
       'XDG_CONFIG_HOME',
       'XDG_DATA_HOME',
       'XDG_CACHE_HOME',
     ],
-  });
-  const containment = processTreeContainment();
-  if (!containment.enforced) throw new Error('Major process-tree containment is unavailable');
-
-  recordExecution({
-    executable: spawnPath,
-    cwd,
-    allowed: true,
-    reason: containment.mechanism,
-    strippedEnv: sanitized.stripped,
+    recordDecision: recordExecution,
   });
 
-  return executeMajorStreaming({
-    executable: spawnPath,
-    args: [...request.args],
-    cwd,
-    env: {
-      ...sanitized.env,
-      ...(request.resourceLeaseId ? { MAJOR_RESOURCE_LEASE_ID: request.resourceLeaseId } : {}),
-    },
-    allowedRoots: request.allowedRoots,
-    detached: true,
+  return gateway.execute({
+    executable: request.executable,
+    args: request.args,
+    cwd: request.cwd,
     ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
     ...(request.parseLine ? { parseLine: request.parseLine } : {}),
   });

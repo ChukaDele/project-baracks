@@ -1,9 +1,23 @@
-import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
-import { detectContainment, processTreeContainment } from '../src/security/containment.js';
+import {
+  darwinSeatbeltContainment,
+  detectContainment,
+  processTreeContainment,
+} from '../src/security/containment.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
@@ -59,7 +73,7 @@ describe('executable trust does not come from inherited PATH ordering (M1 ground
   });
 });
 
-describe('executable identity revalidation (M1 groundwork, known-incomplete)', () => {
+describe('executable identity revalidation', () => {
   it('refuses a same-basename replacement / in-place mutation after trust', () => {
     const dir = tempDir();
     const tool = writeExecutable(dir, 'tool', '#!/bin/sh\necho original\n');
@@ -72,13 +86,91 @@ describe('executable identity revalidation (M1 groundwork, known-incomplete)', (
     expect(() => registry.verify('tool')).toThrow(ExecutableTrustError);
     expect(() => registry.verify(tool)).toThrow(ExecutableTrustError);
   });
+
+  it('rehashes content when an attacker preserves inode, size and mtime', () => {
+    const dir = tempDir();
+    const original = '#!/bin/sh\necho ORIGINAL\n';
+    const changed = '#!/bin/sh\necho TAMPERED\n';
+    expect(changed).toHaveLength(original.length);
+    const tool = writeExecutable(dir, 'tool', original);
+    const fixedTime = new Date(Math.floor(Date.now() / 1000) * 1000);
+    utimesSync(tool, fixedTime, fixedTime);
+    const registry = new TrustedExecutableRegistry({ allowedDirs: [dir] });
+    registry.pin(tool);
+    const before = statSync(tool);
+
+    writeFileSync(tool, changed);
+    chmodSync(tool, 0o755);
+    utimesSync(tool, before.atime, before.mtime);
+    const after = statSync(tool);
+    expect(after.ino).toBe(before.ino);
+    expect(after.size).toBe(before.size);
+    expect(after.mtimeMs).toBe(before.mtimeMs);
+    expect(() => registry.verify('tool')).toThrow(/content/);
+  });
 });
 
 describe('containment status is reported honestly', () => {
-  it('never reports live-execution readiness (no OS filesystem sandbox exists)', () => {
+  it('reports readiness only when the macOS Seatbelt executable is present', () => {
     const status = detectContainment();
-    expect(status.filesystemIsolation).toBe(false);
-    expect(status.liveExecutionReady).toBe(false);
+    const expected = platform() === 'darwin' && existsSync('/usr/bin/sandbox-exec');
+    expect(status.filesystemIsolation).toBe(expected);
+    expect(status.networkIsolation).toBe(expected);
+    expect(status.liveExecutionReady).toBe(expected);
+  });
+
+  it('fails closed when the platform has no supported OS sandbox', () => {
+    const containment = darwinSeatbeltContainment('linux');
+    expect(containment.enforced).toBe(false);
+    expect(() =>
+      containment.wrap({
+        executable: NODE,
+        canonicalExecutable: realpathSync(NODE),
+        args: [],
+        allowedRoots: [tempDir()],
+      }),
+    ).toThrow(/unavailable/);
+  });
+});
+
+describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
+  it('allows the declared root and denies sibling reads, writes and descendant escapes', () => {
+    const allowed = tempDir();
+    const denied = tempDir();
+    const allowedMarker = join(allowed, 'allowed.txt');
+    const deniedMarker = join(denied, 'denied.txt');
+    writeFileSync(deniedMarker, 'private');
+    const descendantMarker = join(denied, 'descendant.txt');
+    const containment = darwinSeatbeltContainment();
+    const script = [
+      "const fs=require('node:fs')",
+      "const cp=require('node:child_process')",
+      `fs.writeFileSync(${JSON.stringify(allowedMarker)}, 'ok')`,
+      `let readDenied=false; try { fs.readFileSync(${JSON.stringify(deniedMarker)}) } catch { readDenied=true }`,
+      `let writeDenied=false; try { fs.writeFileSync(${JSON.stringify(deniedMarker)}, 'bad') } catch { writeDenied=true }`,
+      `const child=cp.spawnSync(process.execPath,['-e',${JSON.stringify(`require('node:fs').writeFileSync(${JSON.stringify(descendantMarker)}, 'bad')`)}])`,
+      'process.stdout.write(JSON.stringify({readDenied,writeDenied,childFailed:child.status!==0}))',
+    ].join(';');
+    const wrapped = containment.wrap({
+      executable: NODE,
+      canonicalExecutable: realpathSync(NODE),
+      args: ['-e', script],
+      allowedRoots: [allowed],
+    });
+    const result = spawnSync(wrapped.executable, wrapped.args, {
+      cwd: allowed,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin' },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({
+      readDenied: true,
+      writeDenied: true,
+      childFailed: true,
+    });
+    expect(existsSync(allowedMarker)).toBe(true);
+    expect(existsSync(descendantMarker)).toBe(false);
+    expect(readFileSync(deniedMarker, 'utf8')).toBe('private');
   });
 });
 
