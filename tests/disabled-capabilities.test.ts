@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -34,6 +34,7 @@ import {
   type UnavailableCapability,
 } from '../src/security/capabilities.js';
 import { ExecutionGateway } from '../src/security/gateway.js';
+import { executeMajorCommand } from '../src/security/major-gateway.js';
 import { TrustedExecutableRegistry } from '../src/security/trusted-executables.js';
 import { model, seedProject, testDb } from './helpers.js';
 
@@ -91,6 +92,34 @@ describe('provider execution surface', () => {
       expect(() => provider.execute({ prompt: 'do work', cwd: process.cwd() })).toThrow(
         CapabilityUnavailableError,
       );
+    }
+  });
+
+  it('the successor supervisor gateway refuses before spawning and audits the refusal', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-successor-gate-'));
+    const marker = join(home, 'spawned');
+    const previous = process.env.MAJOR_HOME;
+    process.env.MAJOR_HOME = home;
+    try {
+      expect(() =>
+        executeMajorCommand({
+          executable: process.execPath,
+          args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'bad')`],
+          cwd: home,
+          allowedRoots: [home],
+        }),
+      ).toThrow(CapabilityUnavailableError);
+      expect(existsSync(marker)).toBe(false);
+      const decisions = readFileSync(join(home, 'execution-policy.jsonl'), 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { allowed: boolean; reason: string });
+      expect(decisions).toHaveLength(1);
+      expect(decisions[0]).toMatchObject({ allowed: false });
+      expect(decisions[0]?.reason).toMatch(/live-agent-execution/);
+    } finally {
+      if (previous === undefined) delete process.env.MAJOR_HOME;
+      else process.env.MAJOR_HOME = previous;
     }
   });
 });

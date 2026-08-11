@@ -7,7 +7,8 @@ cd "$ROOT"
 fail() { echo "MAJOR VALIDATION FAILED: $*" >&2; exit 1; }
 
 for script in scripts/*.sh; do bash -n "$script" || fail "shell syntax: $script"; done
-python3 -m py_compile scripts/major-antigravity-worker.py || fail "Antigravity worker Python syntax"
+PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/major-validation-pycache" \
+  python3 -m py_compile scripts/*.py || fail "Python helper syntax"
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -62,7 +63,8 @@ if registered_internal != actual_internal:
     )
 for required_skill in [
     'source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code',
-    'learning-capture', 'remote-first-web-development', 'human-blocker-orchestration', 'dev-server-management'
+    'learning-capture', 'remote-first-web-development', 'human-blocker-orchestration',
+    'dev-server-management', 'video-generation-routing'
 ]:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
@@ -87,6 +89,7 @@ for fixture in [
     'evals/skill-resolver/learning-capture.json',
     'evals/skill-resolver/remote-first-web-development.json',
     'evals/skill-resolver/dev-server-management.json',
+    'evals/skill-resolver/video-generation-routing.json',
 ]:
     if not Path(fixture).is_file():
         raise SystemExit(f"resolver eval missing: {fixture}")
@@ -183,6 +186,7 @@ grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability 
 [ -f src/security/major-gateway.ts ] || fail "Major successor execution gateway missing"
 [ -f src/dev/ports.ts ] || fail "dev-port allocator missing"
 [ -f src/learning/candidates.ts ] || fail "learning candidate queue missing"
+[ -f src/learning/lifecycle-cli.ts ] || fail "canonical learning lifecycle CLI missing"
 [ -f scripts/install-major-runtime.sh ] || fail "runtime installer missing"
 
 grep -Fq '"major": "./dist/entry.js"' package.json || fail "package bin must enter the supervisor runtime"
@@ -191,7 +195,7 @@ grep -Fq "project-policies.json" src/supervisor/policy.ts || fail "durable proje
 grep -Fq "dev-ports.json" src/dev/ports.ts || fail "durable dev-port registry missing"
 grep -Fq "learning-candidates.json" src/learning/candidates.ts || fail "durable learning candidate registry missing"
 grep -Fq "command === 'dev'" src/supervisor/cli.ts || fail "dev-port CLI path missing"
-grep -Fq "command === 'learn'" src/supervisor/cli.ts || fail "learning-capture CLI path missing"
+grep -Fq "args[1] === 'capture'" src/learning/lifecycle-cli.ts || fail "learning-capture CLI path missing"
 grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts || fail "project classes missing"
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
 grep -Fq "maxWorkers: 3" src/supervisor/policy.ts || fail "assist worker ceiling missing"
@@ -218,8 +222,8 @@ grep -Fq "execution-policy.jsonl" src/security/major-gateway.ts || fail "success
 grep -Fq "globalStopRequested" src/supervisor/worker.ts || fail "active workers ignore global kill switch"
 
 # Pilot deployment: Major is globally present, but no global autonomous daemon/swarm is installed.
-grep -Fq "SessionStart" scripts/install-major-runtime.sh || fail "Claude automatic session attach hook missing"
-grep -Fq "startup|resume|clear|compact" scripts/install-major-runtime.sh || fail "Claude attach hook does not cover session lifecycle"
+grep -Fq "SessionStart" scripts/stage-major-user-state.py || fail "Claude automatic session attach hook missing"
+grep -Fq "startup|resume|clear|compact" scripts/stage-major-user-state.py || fail "Claude attach hook does not cover session lifecycle"
 grep -Fq "no auto-start daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
 grep -Fq "Ruflo is NOT attached globally" scripts/install-major-runtime.sh || fail "pilot installer must avoid global Ruflo blast radius"
 grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "optional observe pilot path must remain available"

@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 37
+## Major internal skills — 38
 
 These are canonical Major-owned skills.
 
@@ -47,6 +47,7 @@ These are canonical Major-owned skills.
 | `pdf-reporting-qa` | Reliable generated PDF reports with visual QA. |
 | `cost-control` | Subscription/rate-limit/paid-spend routing and usage discipline. |
 | `exploratory-creative-dev` | Awwwards/FWA/heavy-motion/immersive execution after art direction is settled. |
+| `video-generation-routing` | Route explicit generative-video work through Google Flow, Higgsfield or deterministic rendering with project-local inputs and human-confirmed credit use. |
 
 ## Skill-pack standard
 
@@ -150,6 +151,8 @@ These are tools/capability packs, not policy authorities and not necessarily age
 | Major remote-preview preflight | Block local or non-Cloudflare browser targets | `major web preflight` before browser work. |
 | Major project context guard | Prevent edits in the wrong repo and provide the canonical target path | `major project guard <target>` / `major project locate <target>`. |
 | Major learning candidate queue | Durable process-learning inbox | `major learn capture` after explicit corrections/repeated mistakes once the real task is fixed. |
+| Google Flow | Interactive scene and video generation with Google models | Verify the current model and visible credit cost; require human confirmation before generation. |
+| Higgsfield | Interactive cinematic, advertising and social video generation | Treat API/CLI reachability as unverified until proved; require human confirmation before credit use. |
 
 ## Default project / work profiles
 
@@ -184,6 +187,7 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 - Reusable successful procedure / recurring solved failure → `skillify` after the real task succeeds.
 - Repeated deterministic tool/retrieval mechanics → `tools-as-code`.
 - Named URL/video/file/source → `source-ingestion`.
+- Explicit AI video/cinematic clip/storyboard-to-video/Google Flow/Higgsfield request → `video-generation-routing` + `cost-control`; add `human-blocker-orchestration` for login or credit use.
 - Substantial research/strategy/comparison → `knowledge-work`.
 - Figma work → Figma skill set.
 - MCP server authoring → `mcp-builder`.

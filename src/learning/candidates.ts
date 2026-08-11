@@ -14,8 +14,12 @@ export type LearningSource = (typeof LEARNING_SOURCES)[number];
 export const LEARNING_SCOPES = ['undecided', 'project', 'global'] as const;
 export type LearningScope = (typeof LEARNING_SCOPES)[number];
 
+export const LEARNING_STATUSES = ['candidate', 'promoted', 'dismissed'] as const;
+export type LearningStatus = (typeof LEARNING_STATUSES)[number];
+
 export interface LearningCandidate {
   id: string;
+  key?: string | undefined;
   project?: string | undefined;
   repoPath?: string | undefined;
   source: LearningSource;
@@ -23,9 +27,19 @@ export interface LearningCandidate {
   scope: LearningScope;
   occurrences: number;
   evidence: string[];
-  status: 'candidate' | 'promoted' | 'dismissed';
+  status: LearningStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface LearningCaptureInput {
+  source: LearningSource;
+  summary: string;
+  key?: string | undefined;
+  scope?: LearningScope | undefined;
+  evidence?: string | undefined;
+  project?: string | undefined;
+  repoPath?: string | undefined;
 }
 
 interface LearningStore {
@@ -42,6 +56,7 @@ export function learningPath(): string {
 function readStore(): LearningStore {
   const path = learningPath();
   if (!existsSync(path)) return { version: 1, candidates: [] };
+
   const parsed = JSON.parse(readFileSync(path, 'utf8')) as LearningStore;
   if (parsed.version !== 1 || !Array.isArray(parsed.candidates)) {
     throw new Error(`invalid Major learning store: ${path}`);
@@ -61,28 +76,75 @@ function normalizedSummary(summary: string): string {
   return summary.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-export function captureLearning(input: {
-  source: LearningSource;
-  summary: string;
-  scope?: LearningScope | undefined;
-  evidence?: string | undefined;
-  project?: string | undefined;
-  repoPath?: string | undefined;
-}): LearningCandidate {
+function normalizedKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+
+  const value = key.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{1,79}$/.test(value)) {
+    throw new Error('learning key must be 2-80 lowercase letters, numbers or hyphens');
+  }
+  return value;
+}
+
+function sameLesson(
+  candidate: LearningCandidate,
+  key: string | undefined,
+  fingerprint: string,
+): boolean {
+  if (key) return candidate.key === key;
+  if (candidate.key) return false;
+  return normalizedSummary(candidate.summary) === fingerprint;
+}
+
+function sameLearningScope(candidate: LearningCandidate, input: LearningCaptureInput): boolean {
+  const globalCandidate = candidate.scope === 'global';
+  const globalInput = input.scope === 'global';
+  if (globalCandidate || globalInput) return globalCandidate && globalInput;
+  return candidate.project === input.project;
+}
+
+function candidateMatches(
+  candidate: LearningCandidate,
+  key: string | undefined,
+  fingerprint: string,
+  input: LearningCaptureInput,
+): boolean {
+  if (candidate.status !== 'candidate') return false;
+  return sameLesson(candidate, key, fingerprint) && sameLearningScope(candidate, input);
+}
+
+function visibleToProject(candidate: LearningCandidate, project?: string): boolean {
+  if (!project) return true;
+  if (candidate.scope === 'global') return true;
+  return candidate.project === project;
+}
+
+function projectMetadata(
+  input: LearningCaptureInput,
+): Pick<LearningCandidate, 'project' | 'repoPath'> {
+  if (input.scope === 'global') return {};
+  return {
+    ...(input.project ? { project: input.project } : {}),
+    ...(input.repoPath ? { repoPath: resolve(input.repoPath) } : {}),
+  };
+}
+
+export function captureLearning(input: LearningCaptureInput): LearningCandidate {
   const summary = input.summary.trim();
   if (!summary) throw new Error('learning summary must not be empty');
-  const store = readStore();
+
+  const key = normalizedKey(input.key);
   const fingerprint = normalizedSummary(summary);
-  const existing = store.candidates.find(
-    (candidate) =>
-      candidate.status === 'candidate' &&
-      normalizedSummary(candidate.summary) === fingerprint &&
-      (candidate.scope === 'global' || candidate.project === input.project),
-  );
+  const store = readStore();
+  const existing = store.candidates.find((candidate) => {
+    return candidateMatches(candidate, key, fingerprint, input);
+  });
   const now = new Date().toISOString();
+
   if (existing) {
     existing.occurrences += 1;
     existing.updatedAt = now;
+    if (key && !existing.key) existing.key = key;
     if (input.scope && existing.scope === 'undecided') existing.scope = input.scope;
     if (input.evidence && !existing.evidence.includes(input.evidence)) {
       existing.evidence.push(input.evidence);
@@ -101,16 +163,79 @@ export function captureLearning(input: {
     status: 'candidate',
     createdAt: now,
     updatedAt: now,
-    ...(input.project ? { project: input.project } : {}),
-    ...(input.repoPath ? { repoPath: resolve(input.repoPath) } : {}),
+    ...(key ? { key } : {}),
+    ...projectMetadata(input),
   };
+
   store.candidates.push(candidate);
   writeStore(store);
   return candidate;
 }
 
-export function listLearningCandidates(project?: string): LearningCandidate[] {
-  return readStore().candidates.filter(
-    (candidate) => !project || candidate.scope === 'global' || candidate.project === project,
-  );
+export function listLearningCandidates(
+  project?: string,
+  status?: LearningStatus,
+): LearningCandidate[] {
+  return readStore().candidates.filter((candidate) => {
+    if (!visibleToProject(candidate, project)) return false;
+    if (status && candidate.status !== status) return false;
+    return true;
+  });
+}
+
+export function learningReviewDue(project?: string): LearningCandidate[] {
+  const candidates = listLearningCandidates(project, 'candidate');
+  return candidates.filter(({ occurrences }) => occurrences >= 2);
+}
+
+export function promoteLearning(input: {
+  id: string;
+  scope: Exclude<LearningScope, 'undecided'>;
+  evidence: string;
+  summary?: string | undefined;
+}): LearningCandidate {
+  const evidence = input.evidence.trim();
+  if (!evidence) throw new Error('promotion evidence is required');
+
+  const store = readStore();
+  const candidate = store.candidates.find((item) => item.id === input.id);
+  if (!candidate) throw new Error(`learning candidate not found: ${input.id}`);
+  if (candidate.status !== 'candidate') {
+    throw new Error(`learning candidate ${input.id} is already ${candidate.status}`);
+  }
+
+  if (input.scope === 'global') {
+    const summary = input.summary?.trim();
+    if (!summary) throw new Error('global promotion requires a sanitized summary');
+    candidate.summary = summary;
+    candidate.project = undefined;
+    candidate.repoPath = undefined;
+    candidate.evidence = [evidence];
+  } else if (!candidate.evidence.includes(evidence)) {
+    candidate.evidence.push(evidence);
+  }
+
+  candidate.status = 'promoted';
+  candidate.scope = input.scope;
+  candidate.updatedAt = new Date().toISOString();
+  writeStore(store);
+  return candidate;
+}
+
+export function dismissLearning(input: { id: string; evidence: string }): LearningCandidate {
+  const evidence = input.evidence.trim();
+  if (!evidence) throw new Error('dismissal evidence/reason is required');
+
+  const store = readStore();
+  const candidate = store.candidates.find((item) => item.id === input.id);
+  if (!candidate) throw new Error(`learning candidate not found: ${input.id}`);
+  if (candidate.status !== 'candidate') {
+    throw new Error(`learning candidate ${input.id} is already ${candidate.status}`);
+  }
+
+  candidate.status = 'dismissed';
+  candidate.updatedAt = new Date().toISOString();
+  if (!candidate.evidence.includes(evidence)) candidate.evidence.push(evidence);
+  writeStore(store);
+  return candidate;
 }

@@ -13,7 +13,7 @@ Trigger only when the brief explicitly calls for exploratory/experimental/high-c
 2. Preserve the chosen visual grammar and define a coherent motion narrative rather than saying “make it Awwwards”.
 3. Prototype the signature/highest-risk interaction before commodity sections.
 4. Use specialised parallel roles only when useful: frontend/layout, GSAP/motion, WebGL/3D when justified, performance and browser/visual QA. Do not spawn a redundant second creative director after the direction is settled.
-5. Default techniques may include image/SVG assets, GSAP + ScrollTrigger, Lenis and Motion. Add R3F/Three.js, Rive, Spline, Remotion or shaders only when the concept actually needs them. Follow the project hosting/preview policy rather than assuming a provider.
+5. Default techniques may include image/SVG assets, GSAP + ScrollTrigger, Lenis and Motion. Add R3F/Three.js, Rive, Spline, Remotion or shaders only when the concept actually needs them. Load `video-generation-routing` when the concept requires generative video through Google Flow, Higgsfield or another provider. Follow the project hosting/preview policy rather than assuming a provider.
 6. Avoid generic SaaS hero/card grids, random fade-ups, gratuitous 3D, default AI gradient blobs and animation without narrative purpose. These are anti-default checks, not bans when the brief genuinely calls for them.
 7. Load `responsive-motion-systems` for sticky/pinned/ScrollTrigger/Three.js geometry and lifecycle.
 8. Load `website-design-qa` for responsive/browser/production/launch verification. Use bounded critique/fix passes; do not polish indefinitely.

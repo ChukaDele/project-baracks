@@ -1,0 +1,18 @@
+{
+  "skill": "video-generation-routing",
+  "should_trigger": [
+    "Generate a cinematic product-launch video in Google Flow.",
+    "Use Higgsfield to turn this storyboard into a social ad with deliberate camera movement.",
+    "Which AI video generator should we use for consistent characters across these scenes?",
+    "Create one representative generative-video shot before we spend credits on the full sequence."
+  ],
+  "should_not_trigger": [
+    "Add this existing MP4 to the landing-page hero.",
+    "Fix the Remotion render failing in CI without changing the production method.",
+    "Compress these video files for the web.",
+    "Debug this ScrollTrigger animation."
+  ],
+  "conflicts": [
+    "video-generation-routing owns provider and production-path selection; cost-control owns spend limits; human-blocker-orchestration owns login and credit confirmation; exploratory-creative-dev owns immersive web execution; responsive-motion-systems owns browser motion geometry."
+  ]
+}

@@ -3,14 +3,6 @@ import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { allocateDevPort, listDevPorts } from '../dev/ports.js';
 import {
-  LEARNING_SCOPES,
-  LEARNING_SOURCES,
-  captureLearning,
-  listLearningCandidates,
-  type LearningScope,
-  type LearningSource,
-} from '../learning/candidates.js';
-import {
   PROJECT_CLASSES,
   TRUST_LEVELS,
   assertExecutionAllowed,
@@ -82,20 +74,6 @@ function validTrust(value: string): TrustLevel {
     throw new Error(`unsupported trust level: ${value}`);
   }
   return value as TrustLevel;
-}
-
-function validLearningSource(value: string): LearningSource {
-  if (!LEARNING_SOURCES.includes(value as LearningSource)) {
-    throw new Error(`unsupported learning source: ${value}`);
-  }
-  return value as LearningSource;
-}
-
-function validLearningScope(value: string): LearningScope {
-  if (!LEARNING_SCOPES.includes(value as LearningScope)) {
-    throw new Error(`unsupported learning scope: ${value}`);
-  }
-  return value as LearningScope;
 }
 
 function validResourceKind(value: string): ResourceKind {
@@ -219,36 +197,6 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     else {
       for (const assignment of assignments) {
         console.log(`${assignment.port}\t${assignment.project}\t${assignment.repoPath}`);
-      }
-    }
-    return true;
-  }
-
-  if (command === 'learn' && args[1] === 'capture') {
-    const project = resolveProject(flag(args, '--project') ?? 'current');
-    const candidate = captureLearning({
-      source: validLearningSource(requireFlag(args, '--source')),
-      summary: requireFlag(args, '--summary'),
-      scope: validLearningScope(flag(args, '--scope') ?? 'undecided'),
-      project: project.project,
-      repoPath: project.repoPath,
-      ...(flag(args, '--evidence') ? { evidence: flag(args, '--evidence') } : {}),
-    });
-    console.log(JSON.stringify(candidate, null, 2));
-    return true;
-  }
-
-  if (command === 'learn' && args[1] === 'list') {
-    const projectArg = flag(args, '--project');
-    const project = projectArg ? resolveProject(projectArg).project : undefined;
-    const candidates = listLearningCandidates(project);
-    if (hasFlag(args, '--json')) console.log(JSON.stringify(candidates, null, 2));
-    else if (candidates.length === 0) console.log('No Major learning candidates.');
-    else {
-      for (const candidate of candidates) {
-        console.log(
-          `${candidate.occurrences}x\t${candidate.scope}\t${candidate.source}\t${candidate.summary}`,
-        );
       }
     }
     return true;

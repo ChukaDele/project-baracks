@@ -51,6 +51,16 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - UI may lead backend using clearly labelled, replaceable fixtures/contracts when that accelerates proof.
 - Do not build more harness infrastructure when the current product task can be solved directly.
 
+## Code simplicity
+
+- Default to the **smallest correct modular implementation** that achieves the required outcome.
+- Give each module/function one clear responsibility and keep inputs/outputs explicit.
+- Keep side effects at boundaries; keep business rules independent of UI, database and provider SDKs where practical.
+- Do not add abstraction for hypothetical future needs, a second implementation that does not exist, or ceremony that does not improve the current outcome.
+- Reuse one canonical implementation instead of keeping duplicate code paths that can drift.
+- Before merge, simplify any code that can lose moving parts without losing clarity, correctness, testability or replaceability.
+- Load `simple-modular-code` for architecture and implementation work when more detailed guidance is useful.
+
 ## Skill-first execution
 
 - Resolve the smallest relevant set of installed skills before inventing a new workflow.

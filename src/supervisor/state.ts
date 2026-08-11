@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 
 export const GOAL_STATUSES = ['active', 'running', 'blocked', 'done', 'failed', 'paused'] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
@@ -179,8 +179,31 @@ export function attachSession(input: {
   return attachment;
 }
 
+function gitCommonDir(repoPath: string): string | undefined {
+  const marker = join(repoPath, '.git');
+  if (!existsSync(marker)) return undefined;
+
+  try {
+    if (statSync(marker).isDirectory()) return marker;
+    const text = readFileSync(marker, 'utf8').trim();
+    const match = /^gitdir:\s*(.+)$/i.exec(text);
+    const rawGitDir = match?.[1]?.trim();
+    if (!rawGitDir) return undefined;
+    const gitDir = isAbsolute(rawGitDir) ? rawGitDir : resolve(repoPath, rawGitDir);
+    const commonDirFile = join(gitDir, 'commondir');
+    if (!existsSync(commonDirFile)) return gitDir;
+    const common = readFileSync(commonDirFile, 'utf8').trim();
+    if (!common) return gitDir;
+    return isAbsolute(common) ? common : resolve(gitDir, common);
+  } catch {
+    return undefined;
+  }
+}
+
 function readRemoteName(repoPath: string): string | undefined {
-  const config = join(repoPath, '.git', 'config');
+  const commonDir = gitCommonDir(repoPath);
+  if (!commonDir) return undefined;
+  const config = join(commonDir, 'config');
   if (!existsSync(config)) return undefined;
   const text = readFileSync(config, 'utf8');
   const matches = [...text.matchAll(/^\s*url\s*=\s*(.+)$/gm)];
@@ -202,6 +225,13 @@ function gitRootFrom(path: string): string | undefined {
     if (parent === current) return undefined;
     current = parent;
   }
+}
+
+function validRememberedRepoPath(path: string | undefined): string | undefined {
+  if (!path) return undefined;
+  const remembered = resolve(path);
+  const root = gitRootFrom(remembered);
+  return root === remembered ? remembered : undefined;
 }
 
 function scanRepos(root: string, depth: number): string[] {
@@ -246,8 +276,14 @@ export function resolveProject(
     }
   }
 
-  const prior = readSupervisorState().goals.find((goal) => goal.project === project);
-  if (prior && existsSync(prior.repoPath)) return { project, repoPath: prior.repoPath };
+  const state = readSupervisorState();
+  const priorGoal = [...state.goals].reverse().find((goal) => goal.project === project);
+  const priorGoalPath = validRememberedRepoPath(priorGoal?.repoPath);
+  if (priorGoalPath) return { project, repoPath: priorGoalPath };
+
+  const priorSession = [...state.sessions].reverse().find((session) => session.project === project);
+  const priorSessionPath = validRememberedRepoPath(priorSession?.repoPath);
+  if (priorSessionPath) return { project, repoPath: priorSessionPath };
 
   const roots = [join(homedir(), 'Projects'), join(homedir(), 'Documents')];
   for (const root of roots) {
@@ -260,7 +296,7 @@ export function resolveProject(
     }
   }
   throw new Error(
-    `cannot resolve project '${project}'. Run Major from inside the repo once, or bootstrap/register the project.`,
+    `cannot resolve project '${project}'. Open a Major-managed session inside the repo once, or bootstrap/register the project.`,
   );
 }
 
