@@ -91,7 +91,12 @@ export function claimNextTask(db: Db, options: ClaimOptions) {
           heartbeatAt: iso(nowMs),
         };
         tx.insert(taskClaims).values(claim).run();
-        const updated = applyTransition(tx, task.id, 'running');
+        const fence = {
+          claimId: claim.id,
+          workerId: claim.workerId,
+          ...(options.now ? { now: options.now } : {}),
+        };
+        const updated = applyTransition(tx, task.id, 'running', { fence });
         return { claim: getClaim(tx, claim.id), task: updated };
       }
       return undefined;

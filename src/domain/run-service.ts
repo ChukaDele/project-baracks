@@ -32,6 +32,7 @@ export interface NewRunInput {
   taskId: string;
   providerId: string;
   claimId?: string;
+  claimWorkerId?: string;
   modelId?: string;
   modelRef: string;
   purpose: (typeof agentRuns.$inferInsert)['purpose'];
@@ -73,6 +74,7 @@ export function createRun(db: Db, rawInput: NewRunInput) {
     taskId: rawInput.taskId,
     providerId: rawInput.providerId,
     claimId: rawInput.claimId,
+    claimWorkerId: rawInput.claimWorkerId,
     modelId: rawInput.modelId,
     modelRef: rawInput.modelRef,
     purpose: rawInput.purpose,
@@ -140,7 +142,8 @@ export function createRun(db: Db, rawInput: NewRunInput) {
           !claim ||
           claim.taskId !== input.taskId ||
           claim.status !== 'active' ||
-          claim.leaseExpiresAt <= nowIsoStr
+          claim.leaseExpiresAt <= nowIsoStr ||
+          claim.workerId !== input.claimWorkerId
         ) {
           throw new StaleClaimError(
             `claim ${input.claimId} is not the current active, unexpired claim of task ${input.taskId}`,
@@ -186,6 +189,7 @@ export function createRun(db: Db, rawInput: NewRunInput) {
         taskId: input.taskId,
         providerId: input.providerId,
         claimId: input.claimId ?? null,
+        claimWorkerId: input.claimWorkerId ?? null,
         modelId: input.modelId ?? null,
         modelRef: input.modelRef,
         purpose: input.purpose,

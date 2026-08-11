@@ -79,6 +79,9 @@ export const tasks = sqliteTable(
     complexity: text('complexity', { enum: TASK_COMPLEXITIES }).notNull().default('bounded'),
     /** Optimistic-concurrency version; bumped on every guarded transition. */
     version: integer('version').notNull().default(0),
+    /** Fence that authorised the latest worker-owned status transition. */
+    mutationClaimId: text('mutation_claim_id').references((): AnySQLiteColumn => taskClaims.id),
+    mutationWorkerId: text('mutation_worker_id'),
     /** Optional task-specific completion criteria (JSON, see domain/completion). */
     completionCriteriaJson: text('completion_criteria_json'),
     /** Immutable criteria captured at the first dispatch to queued. */
@@ -342,6 +345,8 @@ export const agentRuns = sqliteTable(
       .references(() => tasks.id),
     /** The claim under which this run executes. */
     claimId: text('claim_id').references(() => taskClaims.id),
+    /** Worker identity paired with claimId at the durable insert boundary. */
+    claimWorkerId: text('claim_worker_id'),
     providerId: text('provider_id')
       .notNull()
       .references(() => agentProviders.id),
@@ -466,6 +471,8 @@ export const reviewFindings = sqliteTable(
       .notNull()
       .references(() => tasks.id),
     agentRunId: text('agent_run_id'),
+    /** Run whose live fence authorised resolution of this finding. */
+    resolutionRunId: text('resolution_run_id'),
     severity: text('severity', { enum: FINDING_SEVERITIES }).notNull(),
     summary: text('summary').notNull(),
     detail: text('detail'),
@@ -540,6 +547,8 @@ export const evidence = sqliteTable(
     taskId: text('task_id')
       .notNull()
       .references(() => tasks.id),
+    /** Worker run that produced this evidence, when worker-owned. */
+    agentRunId: text('agent_run_id'),
     kind: text('kind', { enum: EVIDENCE_KINDS }).notNull(),
     ref: text('ref'),
     summary: text('summary').notNull(),

@@ -248,6 +248,8 @@ export function applyTransition(
   const patch: Partial<typeof tasks.$inferInsert> = {
     status: to,
     version: task.version + 1,
+    mutationClaimId: fence?.claimId ?? null,
+    mutationWorkerId: fence?.workerId ?? null,
   };
   if (to === 'queued' && task.completionCriteriaSnapshotJson === null) {
     patch.completionCriteriaSnapshotJson = task.completionCriteriaJson ?? '{}';
@@ -298,11 +300,13 @@ export function addEvidence(
     summary: string;
     ref?: string;
     dataJson?: string;
+    agentRunId?: string;
   },
 ) {
   const row = {
     id: newId('evid'),
     taskId: input.taskId,
+    agentRunId: input.agentRunId ?? null,
     kind: input.kind,
     summary: input.summary,
     ref: input.ref ?? null,
