@@ -120,13 +120,13 @@ describe('crash recovery (supervisor-side, still runnable)', () => {
     const db = testDb();
     const project = seedProject(db);
     const task = queuedTask(db, project.id);
-    const claim = seedClaim(db, task.id);
+    const claim = seedClaim(db, task.id, {
+      leaseExpiresAt: new Date(Date.now() + 50).toISOString(),
+    });
     startClaimedTask(db, task.id, claim);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 75);
 
-    const recovered = recoverExpiredClaims(
-      db,
-      () => new Date(new Date(claim.leaseExpiresAt).getTime() + 1_000),
-    );
+    const recovered = recoverExpiredClaims(db);
     expect(recovered).toEqual([{ claimId: claim.id, taskId: task.id }]);
     expect(getTask(db, task.id).status).toBe('queued');
     expect(getClaim(db, claim.id).status).toBe('expired');

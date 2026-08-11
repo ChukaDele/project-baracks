@@ -133,6 +133,36 @@ describe('discovery persistence', () => {
     });
   });
 
+  it('process-free discovery cannot clear an authoritative model prohibition', () => {
+    const db = testDb();
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        models: [
+          model({
+            modelRef: 'opus',
+            routingClass: 'opus',
+            prohibited: true,
+            prohibitedReason: 'operator prohibition',
+          }),
+        ],
+      }),
+      { source: 'human' },
+    );
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        models: [model({ modelRef: 'opus', routingClass: 'sonnet', prohibited: false })],
+      }),
+      { source: 'cli' },
+    );
+    expect(loadPersistedProviderInfos(db)[0]!.models[0]).toMatchObject({
+      routingClass: 'opus',
+      prohibited: true,
+      prohibitedReason: 'operator prohibition',
+    });
+  });
+
   it('an observed authentication failure revokes stale availability', () => {
     const db = testDb();
     persistProviderDiscovery(db, providerInfo(), { source: 'human' });

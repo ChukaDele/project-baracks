@@ -3,13 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { auditSkillReachability, resolveSkills } from '../src/skills/resolver.js';
+import { runSkillCli } from '../src/skills/cli.js';
 
 const roots: string[] = [];
 const priorMajorHome = process.env.MAJOR_HOME;
+const priorSkillsRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 
 afterEach(() => {
   if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
   else process.env.MAJOR_HOME = priorMajorHome;
+  if (priorSkillsRegistry === undefined) delete process.env.MAJOR_SKILLS_REGISTRY;
+  else process.env.MAJOR_SKILLS_REGISTRY = priorSkillsRegistry;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -74,5 +78,29 @@ describe('runtime skill resolver', () => {
     });
     expect(resolved.skills[0]?.path).not.toBe(shadow);
     expect(resolved.skills[0]?.source).toBe('major-internal');
+  });
+
+  it('fails a strict audit when a registered internal skill is unreachable', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-strict-skill-audit-'));
+    roots.push(root);
+    const registry = join(root, 'skills.registry.json');
+    writeFileSync(
+      registry,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: 'definitely-missing-skill',
+            source: 'major-internal',
+            availability: 'installed',
+            load: 'missing fixture',
+          },
+        ],
+      }),
+    );
+    process.env.MAJOR_SKILLS_REGISTRY = registry;
+    await expect(runSkillCli(['skill', 'audit', '--strict', '--json'])).rejects.toThrow(
+      /skill audit failed/,
+    );
   });
 });

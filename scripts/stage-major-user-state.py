@@ -295,6 +295,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--major-bin")
     parser.add_argument("--wrapper")
     parser.add_argument("--record")
+    parser.add_argument("--global-rules-record")
     parser.add_argument("--legacy-plist")
     return parser.parse_args()
 
@@ -384,6 +385,11 @@ def main() -> None:
 
     for label, source_arg, target in (
         ("record", args.record, home / ".major" / "installed-release.json"),
+        (
+            "global-rules-record",
+            args.global_rules_record,
+            home / ".major" / "installed-global-rules.json",
+        ),
         ("wrapper", args.wrapper, Path(args.major_bin) if args.major_bin else None),
     ):
         if not source_arg:

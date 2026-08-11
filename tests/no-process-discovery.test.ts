@@ -113,8 +113,18 @@ describe('discovery is process-free', () => {
 
   it('never grants Antigravity unattended host authority in provider or worker commands', () => {
     const request = { prompt: 'review this change', cwd: '/tmp' };
-    expect(antigravityArgs(request)).toEqual(['-p', 'review this change']);
-    expect(workerCommand('antigravity', request.prompt).args).toEqual(['-p', 'review this change']);
+    expect(antigravityArgs(request)).toEqual([
+      '--output-format',
+      'stream-json',
+      '-p',
+      'review this change',
+    ]);
+    expect(workerCommand('antigravity', request.prompt).args).toEqual([
+      '--output-format',
+      'json',
+      '-p',
+      'review this change',
+    ]);
     expect([...antigravityArgs(request), ...workerCommand('antigravity', '').args]).not.toContain(
       '--dangerously-skip-permissions',
     );

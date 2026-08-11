@@ -78,6 +78,7 @@ grep -Fq 'priorSession' src/supervisor/state.ts || fail "project resolution igno
 
 grep -Fq 'GLOBAL_SKILLS_DEST' scripts/install-major-global-rules.sh || fail "global internal skill sync missing"
 grep -Fq 'STABILITY_SRC' scripts/install-major-global-rules.sh || fail "stability invariants not installed globally"
+grep -Fq 'installed-global-rules.json' scripts/install-major-global-rules.sh || fail "global rules install provenance record missing"
 grep -Fq 'A correct change in the wrong repo is a failed task' templates/project/major-core.md || fail "project template lacks wrong-repo invariant"
 grep -Fq 'major learn list --project current' templates/project/major-core.md || fail "project template lacks learning preload"
 grep -Fq 'mcp-integration-ops' templates/project/major-core.md || fail "project template lacks MCP integration routing"
@@ -95,9 +96,11 @@ grep -Fq 'unopened branch' skills/internal/major-self-maintenance/SKILL.md || fa
 # Runtime installation is a release boundary. A red/partial or mutable checkout
 # must never silently replace/change the active global Major runtime.
 grep -Fq 'refusing to install Major from a dirty checkout' scripts/install-major-runtime.sh || fail "runtime installer does not reject dirty source"
-grep -Fq 'MAJOR_ALLOW_NON_MAIN_INSTALL' scripts/install-major-runtime.sh || fail "runtime installer does not gate non-main installs"
-grep -Fq 'MAJOR_ALLOW_UNPUSHED_INSTALL' scripts/install-major-runtime.sh || fail "runtime installer does not verify origin/main"
+grep -Fq '[ "$INSTALL_BRANCH" != "main" ]' scripts/install-major-runtime.sh || fail "runtime installer does not gate non-main installs"
 grep -Fq 'refs/remotes/origin/main' scripts/install-major-runtime.sh || fail "runtime installer does not compare local and remote main"
+if grep -Eq 'MAJOR_ALLOW_(DIRTY|NON_MAIN|UNPUSHED)_INSTALL' scripts/install-major-runtime.sh scripts/install-major-global-rules.sh; then
+  fail "installer preflight bypass returned"
+fi
 grep -Fq 'validate-major-release.sh' scripts/install-major-runtime.sh || fail "runtime installer skips canonical release gate"
 grep -Fq 'validate-major.sh' scripts/validate-major-release.sh || fail "canonical release gate skips Major doctrine validation"
 grep -Fq 'validate-major-stability.sh' scripts/validate-major-release.sh || fail "canonical release gate skips stability validation"
@@ -129,7 +132,7 @@ grep -Fq 'did not restore live state exactly' scripts/validate-major-install-tra
 [ -f scripts/build-major-runtime-snapshot.sh ] || fail "runtime snapshot builder missing"
 grep -Fq 'pnpm install --prod --frozen-lockfile --dir' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot does not install production dependencies"
 grep -Fq 'cp -R "$ROOT/drizzle"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits DB migrations"
-grep -Fq "command: 'agy'" src/supervisor/worker.ts || fail "supervisor does not use the official Antigravity CLI"
+grep -Fq "return 'agy'" src/providers/commands.ts || fail "supervisor does not use the official Antigravity CLI"
 ! grep -Rq 'google-antigravity\|antigravity-venv' src scripts/install-major-runtime.sh scripts/build-major-runtime-snapshot.sh || fail "obsolete Antigravity SDK path returned"
 grep -Fq 'node "$DEST/dist/entry.js" status' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks executable CLI smoke"
 grep -Fq 'MAJOR_DB_PATH=' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks migration smoke"

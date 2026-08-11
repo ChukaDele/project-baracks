@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
 import { isCapabilityAvailable } from './capabilities.js';
 import { darwinSeatbeltContainment } from './containment.js';
@@ -77,15 +77,20 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
     TMPDIR: runtimeTmp,
     ...(request.resourceLeaseId ? { MAJOR_RESOURCE_LEASE_ID: request.resourceLeaseId } : {}),
   };
+  const trustedExecutables = isCapabilityAvailable('live-agent-execution')
+    ? trustedExecutableRegistry(request.executable)
+    : new TrustedExecutableRegistry();
+  const trusted = isCapabilityAvailable('live-agent-execution')
+    ? trustedExecutables.verify(request.executable)
+    : undefined;
   const gateway = new ExecutionGateway({
     allowedRoots: roots,
+    ...(trusted ? { readOnlyRoots: [dirname(trusted.canonicalPath)] } : {}),
     commandPolicy: {
       allowedExecutables: [executable],
       protectedBranches: ['main', 'master'],
     },
-    trustedExecutables: isCapabilityAvailable('live-agent-execution')
-      ? trustedExecutableRegistry(request.executable)
-      : new TrustedExecutableRegistry(),
+    trustedExecutables,
     containment: darwinSeatbeltContainment(),
     baseEnv,
     envAllowlist: [

@@ -41,14 +41,14 @@ function runningTask(db: ReturnType<typeof testDb>) {
   return { project, roadmapItemId, task, providerId };
 }
 
-function seedClaim(db: ReturnType<typeof testDb>, taskId: string, expired = false) {
+function seedClaim(db: ReturnType<typeof testDb>, taskId: string, leaseMs = 60_000) {
   const row = {
     id: newId('tclm'),
     taskId,
     workerId: 'w1',
     attempt: 1,
     status: 'active' as const,
-    leaseExpiresAt: new Date(Date.now() + (expired ? -60_000 : 60_000)).toISOString(),
+    leaseExpiresAt: new Date(Date.now() + leaseMs).toISOString(),
     heartbeatAt: new Date().toISOString(),
   };
   db.insert(taskClaims).values(row).run();
@@ -104,9 +104,9 @@ describe('claim-bound writes are disabled (worker-owned-downstream-mutations)', 
 });
 
 describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
-  function seededClaimedRun(db: ReturnType<typeof testDb>) {
+  function seededClaimedRun(db: ReturnType<typeof testDb>, leaseMs = 60_000) {
     const { task, providerId, roadmapItemId } = runningTask(db);
-    const claim = seedClaim(db, task.id);
+    const claim = seedClaim(db, task.id, leaseMs);
     db.update(tasks)
       .set({ status: 'running', mutationClaimId: claim.id, mutationWorkerId: claim.workerId })
       .where(eq(tasks.id, task.id))
@@ -145,7 +145,7 @@ describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
         })
         .run(),
     ).toThrow(/next monotonic/);
-    const expired = seedClaim(db, task.id, true);
+    const expired = seedClaim(db, task.id, -60_000);
     expect(() =>
       db
         .update(taskClaims)
@@ -160,7 +160,15 @@ describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
 
   it('refuses run status changes and run events once the claim lease expired', () => {
     const db = testDb();
-    const { claim, run } = seededClaimedRun(db);
+    const { claim, run } = seededClaimedRun(db, 50);
+    expect(() =>
+      db
+        .update(taskClaims)
+        .set({ status: 'expired', outcomeReason: 'premature recovery' })
+        .where(eq(taskClaims.id, claim.id))
+        .run(),
+    ).toThrow(/cannot expire a live task claim/);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 75);
     db.update(taskClaims)
       .set({ status: 'expired', outcomeReason: 'simulated recovery' })
       .where(eq(taskClaims.id, claim.id))
@@ -213,7 +221,7 @@ describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
 
   it('requires a live claim-bound run across every downstream write surface', () => {
     const db = testDb();
-    const { task, claim, run, providerId, roadmapItemId } = seededClaimedRun(db);
+    const { task, claim, run, providerId, roadmapItemId } = seededClaimedRun(db, 50);
 
     expect(() =>
       db
@@ -326,6 +334,7 @@ describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
       })
       .run();
 
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 75);
     db.update(taskClaims)
       .set({ status: 'expired', outcomeReason: 'simulated recovery' })
       .where(eq(taskClaims.id, claim.id))

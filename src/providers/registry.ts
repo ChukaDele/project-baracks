@@ -229,9 +229,8 @@ export const modelAvailabilitySchema = z.enum(MODEL_AVAILABILITIES);
  */
 export {
   CapabilityUnavailableError,
-  UNAVAILABLE_CAPABILITIES,
+  CAPABILITY_DEFINITIONS,
   capabilityStatuses,
-  unavailableCapabilityStatuses,
   type CapabilityStatus,
   type UnavailableCapability,
 } from '../security/capabilities.js';

@@ -23,8 +23,8 @@ import {
   DEFAULT_MODEL_REGISTRY,
   loadModelRegistry,
   registryModels,
-  UNAVAILABLE_CAPABILITIES,
-  unavailableCapabilityStatuses,
+  CAPABILITY_DEFINITIONS,
+  capabilityStatuses,
 } from '../src/providers/registry.js';
 import { MockSheetsAdapter } from '../src/roadmap/mock-sheets.js';
 import { applyRoadmapUpdate, reconcileRoadmapApplies } from '../src/roadmap/proposal-service.js';
@@ -57,8 +57,8 @@ const ALL_FIVE: UnavailableCapability[] = [
 
 describe('the capability gate itself', () => {
   it('declares exactly the five capabilities unavailable, frozen', () => {
-    expect(Object.keys(UNAVAILABLE_CAPABILITIES).sort()).toEqual([...ALL_FIVE].sort());
-    expect(Object.isFrozen(UNAVAILABLE_CAPABILITIES)).toBe(true);
+    expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual([...ALL_FIVE].sort());
+    expect(Object.isFrozen(CAPABILITY_DEFINITIONS)).toBe(true);
     for (const cap of ALL_FIVE) {
       expect(isCapabilityAvailable(cap)).toBe(false);
       expect(() => assertCapabilityAvailable(cap)).toThrow(CapabilityUnavailableError);
@@ -66,7 +66,7 @@ describe('the capability gate itself', () => {
   });
 
   it('is surfaced by the capability/model registry as unavailable', () => {
-    const statuses = unavailableCapabilityStatuses();
+    const statuses = capabilityStatuses().filter((status) => !status.available);
     expect(statuses.map((s) => s.capability).sort()).toEqual([...ALL_FIVE].sort());
     for (const status of statuses) {
       expect(status.available).toBe(false);

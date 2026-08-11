@@ -1,9 +1,7 @@
 import type { ExecutionGateway } from '../security/gateway.js';
 import { loadModelRegistry, registryModels, type ModelRegistry } from './registry.js';
 import type { ExecuteHandle, ExecuteRequest, ProviderAdapter, ProviderInfo } from './types.js';
-
-const RATE_LIMIT_PATTERN = /rate.?limit|overloaded|429|too many requests|slow down/i;
-const EXHAUSTION_PATTERN = /usage limit|quota exceeded|out of credits|allowance|plan limit/i;
+import { EXHAUSTION_PATTERN, RATE_LIMIT_PATTERN } from './commands.js';
 
 export interface CliProviderOptions {
   name: string;

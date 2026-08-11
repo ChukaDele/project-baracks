@@ -13,7 +13,7 @@
  * paths that call into this module.
  */
 
-export const UNAVAILABLE_CAPABILITIES = Object.freeze({
+export const CAPABILITY_DEFINITIONS = Object.freeze({
   'live-agent-execution': Object.freeze({
     available: false,
     reason:
@@ -51,11 +51,11 @@ export const UNAVAILABLE_CAPABILITIES = Object.freeze({
   }),
 } as const);
 
-export type UnavailableCapability = keyof typeof UNAVAILABLE_CAPABILITIES;
+export type UnavailableCapability = keyof typeof CAPABILITY_DEFINITIONS;
 
 export class CapabilityUnavailableError extends Error {
   constructor(readonly capability: UnavailableCapability) {
-    const entry = UNAVAILABLE_CAPABILITIES[capability];
+    const entry = CAPABILITY_DEFINITIONS[capability];
     super(
       `capability '${capability}' is not available in this build: ${entry.reason} ` +
         `(deferred to ${entry.milestone})`,
@@ -71,7 +71,7 @@ export class CapabilityUnavailableError extends Error {
  * impossible act of deleting a key that the type system still requires.
  */
 export function isCapabilityAvailable(capability: UnavailableCapability): boolean {
-  return UNAVAILABLE_CAPABILITIES[capability].available;
+  return CAPABILITY_DEFINITIONS[capability].available;
 }
 
 /** Fail closed: throw unless the capability is available (it never is). */
@@ -90,15 +90,10 @@ export interface CapabilityStatus {
 
 /** All build capabilities as report rows (doctor, docs, tests). */
 export function capabilityStatuses(): CapabilityStatus[] {
-  return (Object.keys(UNAVAILABLE_CAPABILITIES) as UnavailableCapability[]).map((capability) => ({
+  return (Object.keys(CAPABILITY_DEFINITIONS) as UnavailableCapability[]).map((capability) => ({
     capability,
-    available: UNAVAILABLE_CAPABILITIES[capability].available,
-    reason: UNAVAILABLE_CAPABILITIES[capability].reason,
-    milestone: UNAVAILABLE_CAPABILITIES[capability].milestone,
+    available: CAPABILITY_DEFINITIONS[capability].available,
+    reason: CAPABILITY_DEFINITIONS[capability].reason,
+    milestone: CAPABILITY_DEFINITIONS[capability].milestone,
   }));
-}
-
-/** Backward-compatible unavailable-only view. */
-export function unavailableCapabilityStatuses(): CapabilityStatus[] {
-  return capabilityStatuses().filter((status) => !status.available);
 }

@@ -13,11 +13,8 @@ import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
-import {
-  darwinSeatbeltContainment,
-  detectContainment,
-  processTreeContainment,
-} from '../src/security/containment.js';
+import { darwinSeatbeltContainment, detectContainment } from '../src/security/containment.js';
+import type { Containment } from '../src/security/containment.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
@@ -26,6 +23,17 @@ import { ExecutionGateway, type ExecutionPolicyDecision } from '../src/security/
 import { trustedExecutableRegistry } from '../src/security/major-gateway.js';
 
 const NODE = process.execPath;
+
+function testContainment(): Containment {
+  return {
+    enforced: true,
+    filesystemIsolation: true,
+    networkIsolation: true,
+    mechanism: 'test-only',
+    detail: 'test-only containment; execution remains capability-gated',
+    wrap: (request) => ({ executable: request.executable, args: [...request.args] }),
+  };
+}
 
 function tempDir(): string {
   return realpathSync(mkdtempSync(join(tmpdir(), 'major-cont-')));
@@ -49,7 +57,7 @@ function makeGateway(overrides: Partial<ConstructorParameters<typeof ExecutionGa
     trustedExecutables: registry,
     baseEnv: { PATH: process.env.PATH ?? '' },
     recordDecision: (d) => decisions.push(d),
-    containment: processTreeContainment(),
+    containment: testContainment(),
     ...overrides,
   });
   return { gateway, decisions, root, registry };
@@ -154,26 +162,33 @@ describe('containment status is reported honestly', () => {
 describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
   it('allows the declared root and denies sibling reads, writes and descendant escapes', () => {
     const allowed = tempDir();
+    const readOnly = tempDir();
     const denied = tempDir();
     const allowedMarker = join(allowed, 'allowed.txt');
     const deniedMarker = join(denied, 'denied.txt');
     writeFileSync(deniedMarker, 'private');
+    const readOnlyMarker = join(readOnly, 'provider-runtime.json');
+    writeFileSync(readOnlyMarker, 'read-only');
     const descendantMarker = join(denied, 'descendant.txt');
     const containment = darwinSeatbeltContainment();
     const script = [
       "const fs=require('node:fs')",
       "const cp=require('node:child_process')",
       `fs.writeFileSync(${JSON.stringify(allowedMarker)}, 'ok')`,
+      `const readOnlyValue=fs.readFileSync(${JSON.stringify(readOnlyMarker)}, 'utf8')`,
+      `let readOnlyWriteDenied=false; try { fs.writeFileSync(${JSON.stringify(readOnlyMarker)}, 'bad') } catch { readOnlyWriteDenied=true }`,
+      `fs.writeFileSync('/dev/null', 'discarded')`,
       `let readDenied=false; try { fs.readFileSync(${JSON.stringify(deniedMarker)}) } catch { readDenied=true }`,
       `let writeDenied=false; try { fs.writeFileSync(${JSON.stringify(deniedMarker)}, 'bad') } catch { writeDenied=true }`,
       `const child=cp.spawnSync(process.execPath,['-e',${JSON.stringify(`require('node:fs').writeFileSync(${JSON.stringify(descendantMarker)}, 'bad')`)}])`,
-      'process.stdout.write(JSON.stringify({readDenied,writeDenied,childFailed:child.status!==0}))',
+      'process.stdout.write(JSON.stringify({readOnlyValue,readOnlyWriteDenied,readDenied,writeDenied,childFailed:child.status!==0}))',
     ].join(';');
     const wrapped = containment.wrap({
       executable: NODE,
       canonicalExecutable: realpathSync(NODE),
       args: ['-e', script],
       allowedRoots: [allowed],
+      readOnlyRoots: [readOnly],
     });
     const result = spawnSync(wrapped.executable, wrapped.args, {
       cwd: allowed,
@@ -182,6 +197,8 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
     });
     expect(result.status, result.stderr).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual({
+      readOnlyValue: 'read-only',
+      readOnlyWriteDenied: true,
       readDenied: true,
       writeDenied: true,
       childFailed: true,

@@ -15,9 +15,9 @@ LEARNING_MIGRATION_LOCK="$MAJOR_HOME/learning/.migration.lock"
 LEARNING_LOCK_HELD=0
 cd "$ROOT"
 
-if [ "${MAJOR_ALLOW_DIRTY_INSTALL:-0}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   echo "ERROR: refusing to install Major from a dirty checkout." >&2
-  echo "Commit/stash/remove local changes first, or set MAJOR_ALLOW_DIRTY_INSTALL=1 only for an intentional local pilot." >&2
+  echo "Commit, stash or remove local changes first." >&2
   exit 1
 fi
 
@@ -49,22 +49,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [ "${MAJOR_ALLOW_NON_MAIN_INSTALL:-0}" != "1" ] && [ "$INSTALL_BRANCH" != "main" ]; then
+if [ "$INSTALL_BRANCH" != "main" ]; then
   echo "ERROR: refusing to install Major from branch '$INSTALL_BRANCH'." >&2
-  echo "Install releases from main after green CI. Set MAJOR_ALLOW_NON_MAIN_INSTALL=1 only for an intentional field pilot." >&2
+  echo "Install releases from main after green CI." >&2
   exit 1
 fi
 
-if [ "${MAJOR_ALLOW_UNPUSHED_INSTALL:-0}" != "1" ]; then
-  git fetch --quiet origin main
-  REMOTE_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
-  if [ "$INSTALL_SHA" != "$REMOTE_MAIN_SHA" ]; then
-    echo "ERROR: refusing to install Major because local HEAD is not the current origin/main." >&2
-    echo "local:  $INSTALL_SHA" >&2
-    echo "remote: $REMOTE_MAIN_SHA" >&2
-    echo "Pull the green main release first. Use MAJOR_ALLOW_UNPUSHED_INSTALL=1 only for an intentional local pilot." >&2
-    exit 1
-  fi
+git fetch --quiet origin main
+REMOTE_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+if [ "$INSTALL_SHA" != "$REMOTE_MAIN_SHA" ]; then
+  echo "ERROR: refusing to install Major because local HEAD is not the current origin/main." >&2
+  echo "local:  $INSTALL_SHA" >&2
+  echo "remote: $REMOTE_MAIN_SHA" >&2
+  echo "Pull the green main release first." >&2
+  exit 1
 fi
 
 corepack enable >/dev/null 2>&1 || true

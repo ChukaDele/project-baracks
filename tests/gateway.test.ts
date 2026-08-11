@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { checkArgv } from '../src/security/commands.js';
-import { processTreeContainment } from '../src/security/containment.js';
+import type { Containment } from '../src/security/containment.js';
 import { BILLING_ENV_NAMES, sanitizeEnv } from '../src/security/env.js';
 import {
   ExecutionGateway,
@@ -14,6 +14,17 @@ import {
 import { TrustedExecutableRegistry } from '../src/security/trusted-executables.js';
 
 const NODE = process.execPath;
+
+function testContainment(): Containment {
+  return {
+    enforced: true,
+    filesystemIsolation: true,
+    networkIsolation: true,
+    mechanism: 'test-only',
+    detail: 'test-only containment; execution remains capability-gated',
+    wrap: (request) => ({ executable: request.executable, args: [...request.args] }),
+  };
+}
 
 function tempRoot(): string {
   return realpathSync(mkdtempSync(join(tmpdir(), 'major-gw-')));
@@ -40,7 +51,7 @@ function makeGateway(overrides: Partial<ConstructorParameters<typeof ExecutionGa
     trustedExecutables: trustingNode(),
     baseEnv: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' },
     recordDecision: (d) => decisions.push(d),
-    containment: processTreeContainment(),
+    containment: testContainment(),
     ...overrides,
   });
   return { gateway, decisions, root };
@@ -253,7 +264,7 @@ describe('policy decision audit trail', () => {
       trustedExecutables: trustingNode(),
       baseEnv: { PATH: process.env.PATH ?? '' },
       recordDecision: dbDecisionRecorder(db),
-      containment: processTreeContainment(),
+      containment: testContainment(),
     });
     expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
       CapabilityUnavailableError,

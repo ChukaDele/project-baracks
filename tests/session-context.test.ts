@@ -15,6 +15,7 @@ const envKeys = [
   'MAJOR_LEARNING_ROOT',
   'MAJOR_RESOURCE_PATH',
   'MAJOR_STOP_PATH',
+  'MAJOR_SKILLS_REGISTRY',
 ] as const;
 
 beforeEach(() => {
@@ -148,5 +149,27 @@ describe('fresh session context', () => {
     expect(output).toContain('RESOURCE GUARD');
     expect(output).not.toContain('sk-ant-api03');
     expect(output).not.toContain('raw private evidence');
+  });
+
+  it('keeps session attach active when the skill registry is malformed', async () => {
+    const current = repo('safe-project');
+    startGoal({
+      project: 'safe-project',
+      repoPath: current,
+      goal: 'Resolve the correct implementation skill.',
+      autonomous: false,
+    });
+    const malformed = join(root, 'malformed-skills.json');
+    writeFileSync(malformed, '{not json');
+    process.env.MAJOR_SKILLS_REGISTRY = malformed;
+
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    expect(
+      await runSessionContextCli(['session', 'attach', '--host', 'codex', '--cwd', current]),
+    ).toBe(true);
+    const output = lines.join('\n');
+    expect(output).toContain('MAJOR CONTROL PLANE: ACTIVE');
+    expect(output).toContain('Major skill registry unavailable');
   });
 });

@@ -112,4 +112,33 @@ describe('M5 exact-attempt reconciliation', () => {
     expect(bindRoadmapRuntimeHost(db, 'host-a')).toBe('host-a');
     expect(() => bindRoadmapRuntimeHost(db, 'host-b')).toThrow(/bound to host host-a/);
   });
+
+  it('rejects one malformed legacy apply row and continues the reconciliation sweep', async () => {
+    const { db, adapter, update } = await setup();
+    db.update(roadmapUpdates)
+      .set({
+        status: 'applying',
+        applyAttemptId: newId('rapl'),
+        applyStartedAt: new Date(Date.now() - 120_000).toISOString(),
+        applyWorkerId: null,
+        applyLeaseExpiresAt: null,
+      })
+      .where(eq(roadmapUpdates.id, update.id))
+      .run();
+
+    const second = await proposeRoadmapUpdate(db, adapter, {
+      roadmapItemId: update.roadmapItemId,
+      baseKey: 'rm1-second',
+      changes: [{ stableId: 'RM-1', columns: { Status: 'Ready' } }],
+      rationale: 'second update',
+    });
+    seedApplying(db, second.id, newId('rapl'));
+
+    expect(await reconcileRoadmapApplies(db, adapter)).toEqual(
+      expect.arrayContaining([
+        { updateId: update.id, outcome: 'rejected' },
+        { updateId: second.id, outcome: 'requeued' },
+      ]),
+    );
+  });
 });

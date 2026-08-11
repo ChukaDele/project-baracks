@@ -47,7 +47,7 @@ test -d "$DEST/node_modules"
 SMOKE_HOME="$DEST/.smoke-major-home"
 mkdir -p "$SMOKE_HOME"
 MAJOR_HOME="$SMOKE_HOME" node "$DEST/dist/entry.js" status >/dev/null
-MAJOR_HOME="$SMOKE_HOME" node "$DEST/dist/entry.js" skill audit --json >/dev/null
+MAJOR_HOME="$SMOKE_HOME" node "$DEST/dist/entry.js" skill audit --json --strict >/dev/null
 
 # Migration smoke: prove the packaged drizzle migrations are discoverable from
 # the snapshot and can initialize a fresh SQLite database.

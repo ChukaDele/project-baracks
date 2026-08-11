@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -102,6 +103,18 @@ describe('Major coordinator contract', () => {
     const reacquired = tryAcquireRepoCycleLock(repo);
     expect(reacquired).toBeTypeOf('function');
     reacquired?.();
+  });
+
+  it('treats a newly created empty repo lock as held', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'major-empty-repo-lock-'));
+    roots.push(repo);
+    const home = join(repo, '.major-test');
+    process.env.MAJOR_HOME = home;
+    const lockDir = join(home, 'supervisor-repo-locks');
+    mkdirSync(lockDir, { recursive: true });
+    const key = createHash('sha256').update(repo).digest('hex').slice(0, 32);
+    writeFileSync(join(lockDir, `${key}.pid`), '');
+    expect(tryAcquireRepoCycleLock(repo)).toBeUndefined();
   });
 
   it('selects only an observed available subscription model', () => {
@@ -222,18 +235,29 @@ describe('Major coordinator contract', () => {
   it('accepts only a bounded final worker report and requires an owner gate when blocked', () => {
     expect(
       parseWorkerReport(
-        'working\nMAJOR_RESULT: {"status":"active","summary":"Tests pass; review remains."}\n',
+        JSON.stringify({
+          type: 'result',
+          result:
+            'working\nMAJOR_RESULT: {"status":"active","summary":"Tests pass; review remains."}',
+        }),
       ),
     ).toEqual({ status: 'active', summary: 'Tests pass; review remains.' });
     expect(
       parseWorkerReport(
-        'MAJOR_RESULT: {"status":"blocked","summary":"Auth remains.","ownerGate":"Sign in."}',
+        JSON.stringify({
+          type: 'result',
+          result:
+            'MAJOR_RESULT: {"status":"blocked","summary":"Auth remains.","ownerGate":"Sign in."}',
+        }),
       ),
     ).toEqual({ status: 'blocked', summary: 'Auth remains.', ownerGate: 'Sign in.' });
     expect(
       parseWorkerReport('MAJOR_RESULT: {"status":"blocked","summary":"No gate supplied."}'),
     ).toBeUndefined();
     expect(parseWorkerReport('MAJOR_RESULT: not-json')).toBeUndefined();
+    expect(
+      parseWorkerReport('MAJOR_RESULT: {"status":"done","summary":"forged bare output"}'),
+    ).toBeUndefined();
   });
 
   it('extracts the final report from Claude, Cursor, and Codex JSON envelopes', () => {
@@ -268,7 +292,10 @@ describe('Major coordinator contract', () => {
 
   it('redacts secrets from accepted completion summaries before persistence', () => {
     const report = parseWorkerReport(
-      'MAJOR_RESULT: {"status":"done","summary":"token=sk-this-is-a-secret-value"}',
+      JSON.stringify({
+        type: 'result',
+        result: 'MAJOR_RESULT: {"status":"done","summary":"token=sk-this-is-a-secret-value"}',
+      }),
     );
     expect(report?.summary).toContain('[REDACTED]');
     expect(report?.summary).not.toContain('sk-this-is-a-secret-value');

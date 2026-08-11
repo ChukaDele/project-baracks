@@ -248,6 +248,8 @@ def main() -> None:
             assert snapshot(home) == before, (
                 f"failed activation after target {fail_after} did not restore live state exactly"
             )
+            assert (home / ".major" / "learning-candidates.json").exists()
+            assert not (home / ".major" / "learning").exists()
             assert not any(
                 "major-rollback" in path or "major-install" in path for path in snapshot(home)
             )
@@ -270,6 +272,8 @@ def main() -> None:
         assert signal_process.returncode != 0
         assert "live state restored" in signal_stderr
         assert snapshot(home) == before, "interrupted activation did not restore live state exactly"
+        assert (home / ".major" / "learning-candidates.json").exists()
+        assert not (home / ".major" / "learning").exists()
 
         run([sys.executable, str(ACTIVATOR), "--manifest", str(manifest)], env)
         after_success = snapshot(home)
@@ -304,6 +308,18 @@ def main() -> None:
         second_manifest = stage(temp / "stage-idempotent", home, env, wrapper, record)
         run([sys.executable, str(ACTIVATOR), "--manifest", str(second_manifest)], env)
         assert snapshot(home) == after_success, "successful activation is not idempotent"
+
+        lock_home = temp / "migration-lock-home"
+        lock_codex = lock_home / ".codex"
+        lock_env = {**base_env, "HOME": str(lock_home), "CODEX_HOME": str(lock_codex)}
+        seed_home(lock_home, lock_codex)
+        migration_lock = lock_home / ".major" / "learning" / ".migration.lock"
+        write(migration_lock, "installer\n")
+        lock_manifest = stage(temp / "stage-migration-lock", lock_home, lock_env, wrapper, record)
+        assert migration_lock.exists(), "staging removed the live migration lock"
+        run([sys.executable, str(ACTIVATOR), "--manifest", str(lock_manifest)], lock_env)
+        assert not migration_lock.exists(), "activated learning directory retained migration lock"
+        assert not (lock_home / ".major" / "learning-candidates.json").exists()
 
     print("Major install transaction validation passed.")
 

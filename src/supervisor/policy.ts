@@ -6,7 +6,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
 import { majorHome } from './state.js';
 import type { WorkerHost } from './state.js';
@@ -137,6 +137,17 @@ export function getProjectPolicy(project: string, repoPath: string): ProjectPoli
     readStore().projects.find((candidate) => candidate.project === project) ??
     defaultProjectPolicy(project, repoPath)
   );
+}
+
+/** Project identities that must never appear in cross-project learning. */
+export function knownProjectIdentities(): string[] {
+  const identities = new Set<string>();
+  for (const policy of readStore().projects) {
+    identities.add(policy.project);
+    identities.add(policy.repoPath);
+    identities.add(basename(policy.repoPath));
+  }
+  return [...identities].filter(Boolean);
 }
 
 export function configureProjectPolicy(input: {

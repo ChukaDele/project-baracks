@@ -67,6 +67,7 @@ function recurringProjectCandidate() {
 describe('Major learning lifecycle', () => {
   it('requires recurrence plus sanitized summary and evidence for global promotion', () => {
     allowGlobalPromotion('bredge');
+    allowGlobalPromotion('creative-site');
     const oneOff = captureLearning({
       source: 'manual',
       key: 'one-off',
@@ -91,6 +92,15 @@ describe('Major learning lifecycle', () => {
         scope: 'global',
         summary: 'Use Bredge at /private/bredge before browser QA.',
         evidence: 'Verified with synthetic regression tests.',
+      }),
+    ).toThrow(/not sanitized/);
+    expect(() =>
+      promoteLearning({
+        id: candidate.id,
+        project: 'bredge',
+        scope: 'global',
+        summary: 'Use the creative-site port allocation procedure before browser QA.',
+        evidence: 'Verified twice with synthetic regression fixtures.',
       }),
     ).toThrow(/not sanitized/);
     expect(() =>

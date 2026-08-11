@@ -5,6 +5,7 @@ import {
   openSync,
   closeSync,
   readFileSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -31,7 +32,7 @@ import {
   type SupervisorGoal,
   type WorkerHost,
 } from './state.js';
-import { hostAvailable, runWorker, type WorkerOutcome } from './worker.js';
+import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
@@ -170,11 +171,11 @@ function workerOutputLines(output: string): string[] {
   for (const rawLine of output.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) continue;
-    lines.push(line);
     try {
       collectProviderResultLines(JSON.parse(line), lines);
     } catch {
-      // Plain provider output remains eligible below.
+      // Bare stdout is never completion authority. Only provider-owned JSON
+      // assistant/result envelopes are eligible.
     }
   }
   return lines;
@@ -257,9 +258,16 @@ function trustContract(policy: ProjectPolicy): string {
 export function coordinatorPrompt(goal: SupervisorGoal): string {
   const context = readProjectContext(goal.repoPath);
   const learningContext = readLearningContext(goal.project);
-  const resolvedSkills = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills;
-  const skillContext =
-    resolvedSkills.length === 0
+  let resolvedSkills: ReturnType<typeof resolveSkills>['skills'] = [];
+  let skillResolutionFailed = false;
+  try {
+    resolvedSkills = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills;
+  } catch {
+    skillResolutionFailed = true;
+  }
+  const skillContext = skillResolutionFailed
+    ? '(Major skill registry unavailable. Continue without skill context and report the degraded resolver.)'
+    : resolvedSkills.length === 0
       ? '(No installed skill matched deterministically. Inspect the registry before inventing a new workflow.)'
       : resolvedSkills.map((skill) => `- ${skill.id}: ${skill.path}`).join('\n');
   const policy = getProjectPolicy(goal.project, goal.repoPath);
@@ -341,8 +349,12 @@ export function tryAcquireRepoCycleLock(repoPath: string): (() => void) | undefi
   const key = createHash('sha256').update(resolve(repoPath)).digest('hex').slice(0, 32);
   const path = join(dir, `${key}.pid`);
   if (existsSync(path)) {
-    const prior = Number.parseInt(readFileSync(path, 'utf8').trim(), 10);
+    const lockText = readFileSync(path, 'utf8').trim();
+    const lockAgeMs = Date.now() - statSync(path).mtimeMs;
+    if (!lockText && lockAgeMs <= 30_000) return undefined;
+    const prior = Number.parseInt(lockText, 10);
     if (Number.isFinite(prior) && pidAlive(prior)) return undefined;
+    if (lockAgeMs <= 30_000) return undefined;
     unlinkSync(path);
   }
   let fd: number;
@@ -409,9 +421,11 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
     return;
   }
   if (!hostAvailable(selection.host)) {
+    const executable = workerCommand(selection.host, '').command;
     const summary =
       `Provider routing checkpoint: ${selection.provider}/${selection.modelRef} is persisted as ` +
-      'available but its CLI is not currently on PATH. Run major doctor to refresh discovery.';
+      `available but the canonical CLI is missing at ${resolve(majorHome(), '..', '.local', 'bin', executable)}. ` +
+      'Install or link that exact provider CLI, then attest availability again.';
     updateGoal(goal.id, {
       status: 'active',
       activePid: undefined,

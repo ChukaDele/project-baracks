@@ -214,8 +214,9 @@ fi
 grep -Fq "Skillify" src/supervisor/runtime.ts || fail "coordinator is not skill-first"
 grep -Fq "Tools-as-Code" src/supervisor/runtime.ts || fail "coordinator lacks Tools-as-Code guidance"
 for provider in claude codex cursor antigravity; do
-  grep -Fq "case '$provider'" src/supervisor/worker.ts || fail "live worker adapter missing: $provider"
+  grep -Fq "case '$provider'" src/providers/commands.ts || fail "live worker adapter missing: $provider"
 done
+grep -Fq 'providerArgs' src/supervisor/worker.ts || fail "worker bypasses shared provider command builder"
 
 if grep -R -F -n "node:child_process" src/supervisor; then
   fail "supervisor bypasses the execution gateway"
@@ -231,9 +232,23 @@ grep -Fq "startup|resume|clear|compact" scripts/stage-major-user-state.py || fai
 grep -Fq "no auto-start daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
 grep -Fq "Ruflo is NOT attached globally" scripts/install-major-runtime.sh || fail "pilot installer must avoid global Ruflo blast radius"
 grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "optional observe pilot path must remain available"
-if grep -F "launchctl bootstrap" scripts/install-major-runtime.sh | grep -Fv '$LEGACY_PLIST'; then
-  fail "pilot installer must not start a login daemon outside rollback restoration"
-fi
+python3 - <<'PY'
+import re
+from pathlib import Path
+
+lines = Path('scripts/install-major-runtime.sh').read_text().splitlines()
+commands = [
+    line.strip()
+    for line in lines
+    if re.match(r'^\s*(?:if\s+!\s+)?launchctl\s+bootstrap\b', line)
+]
+expected = ['if ! launchctl bootstrap "gui/$UID" "$LEGACY_PLIST" >/dev/null 2>&1; then']
+if commands != expected:
+    raise SystemExit(
+        'MAJOR VALIDATION FAILED: pilot installer contains an unexpected launchctl bootstrap command: '
+        + repr(commands)
+    )
+PY
 if grep -Fq "claude mcp add ruflo" scripts/install-major-runtime.sh || grep -Fq "codex mcp add ruflo" scripts/install-major-runtime.sh; then
   fail "Ruflo must not be globally attached during pilot"
 fi

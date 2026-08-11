@@ -45,6 +45,35 @@ BEGIN
 END;
 --> statement-breakpoint
 
+-- Claim closure cannot be used to erase a live worker fence. Recovery may
+-- expire only an already-lapsed lease. Worker completion/release requires the
+-- task to carry that same live claim and worker as its latest mutation fence.
+CREATE TRIGGER task_claims_status_transition_fenced
+BEFORE UPDATE OF status ON task_claims
+WHEN NEW.status <> OLD.status
+BEGIN
+  SELECT CASE WHEN OLD.status <> 'active'
+    THEN RAISE(ABORT, 'closed task claims are immutable')
+  END;
+  SELECT CASE WHEN NEW.status = 'expired'
+    AND OLD.lease_expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    THEN RAISE(ABORT, 'cannot expire a live task claim')
+  END;
+  SELECT CASE WHEN NEW.status IN ('completed', 'released')
+    AND (
+      OLD.lease_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      OR NOT EXISTS (
+        SELECT 1 FROM tasks t
+        WHERE t.id = OLD.task_id
+          AND t.mutation_claim_id = OLD.id
+          AND t.mutation_worker_id = OLD.worker_id
+      )
+    )
+    THEN RAISE(ABORT, 'claim closure requires its current live task fence')
+  END;
+END;
+--> statement-breakpoint
+
 -- A task status mutation is worker-owned whenever an active claim exists.
 -- The exact claim and worker must be carried on the task update itself.
 CREATE TRIGGER tasks_status_requires_current_fence

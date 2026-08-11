@@ -1,9 +1,7 @@
 import type { ExecutionGateway } from '../security/gateway.js';
 import { loadModelRegistry, registryModels, type ModelRegistry } from './registry.js';
 import type { ExecuteHandle, ExecuteRequest, ProviderAdapter, ProviderInfo } from './types.js';
-
-const RATE_LIMIT_PATTERN = /rate.?limit|429|too many requests|slow down/i;
-const EXHAUSTION_PATTERN = /usage limit|quota exceeded|out of credits|plan limit/i;
+import { EXHAUSTION_PATTERN, providerExecuteArgs, RATE_LIMIT_PATTERN } from './commands.js';
 
 /** Canonical executable name resolved for reporting. Environment overrides are
  * deliberately NOT consulted for discovery in this build. */
@@ -60,29 +58,7 @@ export class CodexProvider implements ProviderAdapter {
   /** Unreachable in this build: gateway.execute() refuses unconditionally
    * (live agent execution is an unavailable capability). */
   execute(request: ExecuteRequest): ExecuteHandle {
-    const args = request.resumeSessionRef
-      ? [
-          'exec',
-          '--sandbox',
-          'workspace-write',
-          '--ignore-user-config',
-          'resume',
-          request.resumeSessionRef,
-          '--json',
-          request.prompt,
-        ]
-      : [
-          'exec',
-          '--sandbox',
-          'workspace-write',
-          '--ignore-user-config',
-          '--ephemeral',
-          '--json',
-          request.prompt,
-        ];
-    if (request.modelRef && request.modelRef !== 'auto') {
-      args.splice(1, 0, '--model', request.modelRef);
-    }
+    const args = providerExecuteArgs('codex', request);
     const spec: Parameters<ExecutionGateway['execute']>[0] = {
       // The gateway resolves this through the trusted-executable registry;
       // an unregistered or shadowed installation is refused at spawn time.

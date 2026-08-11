@@ -36,12 +36,12 @@ function durableCandidates(project: string): string {
     return '(Major learning store unavailable: unsafe record withheld from session context.)';
   }
   const learnings = candidates
+    .filter((candidate) => candidate.status !== 'dismissed')
     .sort((left, right) => {
       if (left.status !== right.status) return left.status === 'promoted' ? -1 : 1;
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
       return right.updatedAt.localeCompare(left.updatedAt);
     })
-    .filter((candidate) => candidate.status !== 'dismissed')
     .slice(0, 20);
   if (learnings.length === 0) return '(No active Major learnings.)';
   return learnings
@@ -59,10 +59,14 @@ function resolvedGoalSkills(project: string, repoPath: string): string {
   if (goals.length === 0)
     return '(No active goal. Resolve skills against the substantive task when it arrives.)';
   const unique = new Map<string, string>();
-  for (const goal of goals) {
-    for (const skill of resolveSkills({ task: goal.goal, cwd: repoPath }).skills) {
-      unique.set(skill.id, skill.path);
+  try {
+    for (const goal of goals) {
+      for (const skill of resolveSkills({ task: goal.goal, cwd: repoPath }).skills) {
+        unique.set(skill.id, skill.path);
+      }
     }
+  } catch {
+    return '(Major skill registry unavailable: skill context withheld without blocking session attach.)';
   }
   if (unique.size === 0) return '(No installed skill matched the active goal.)';
   return [...unique].map(([id, path]) => `- ${id}: ${path}`).join('\n');

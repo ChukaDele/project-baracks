@@ -4,6 +4,12 @@ import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { executeMajorCommand } from '../security/major-gateway.js';
 import { redactText } from '../security/redact.js';
+import {
+  EXHAUSTION_PATTERN,
+  providerArgs,
+  providerExecutable,
+  RATE_LIMIT_PATTERN,
+} from '../providers/commands.js';
 import { globalStopRequested } from './policy.js';
 import {
   releaseResource,
@@ -41,53 +47,10 @@ export function workerCommand(
   prompt: string,
   modelRef?: string,
 ): { command: string; args: string[] } {
-  switch (host) {
-    case 'claude': {
-      const args = [
-        '-p',
-        prompt,
-        '--output-format',
-        'json',
-        '--max-turns',
-        '80',
-        '--permission-mode',
-        'auto',
-        '--safe-mode',
-        '--no-session-persistence',
-        '--no-chrome',
-      ];
-      if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
-      return {
-        command: 'claude',
-        args,
-      };
-    }
-    case 'codex': {
-      const args = [
-        'exec',
-        '--json',
-        '--sandbox',
-        'workspace-write',
-        '--ignore-user-config',
-        '--ephemeral',
-      ];
-      if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
-      args.push(prompt);
-      return { command: 'codex', args };
-    }
-    case 'cursor': {
-      const args = ['-p', '--auto-review', '--sandbox', 'enabled', '--output-format', 'json'];
-      if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
-      args.push(prompt);
-      return { command: 'cursor-agent', args };
-    }
-    case 'antigravity': {
-      const args: string[] = [];
-      if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
-      args.push('-p', prompt);
-      return { command: 'agy', args };
-    }
-  }
+  return {
+    command: providerExecutable(host),
+    args: providerArgs(host, { prompt, modelRef, outputMode: 'batch' }),
+  };
 }
 
 function appendLimited(current: string, chunk: string): string {
@@ -124,10 +87,8 @@ export async function runGatewayCommand(input: {
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.resourceLeaseId ? { resourceLeaseId: input.resourceLeaseId } : {}),
       parseLine: (line) => ({ type: 'stdout', data: line }),
-      detectRateLimit: (value) =>
-        /rate.?limit|overloaded|429|too many requests|slow down/i.test(value),
-      detectExhaustion: (value) =>
-        /usage limit|quota exceeded|out of credits|allowance|plan limit/i.test(value),
+      detectRateLimit: (value) => RATE_LIMIT_PATTERN.test(value),
+      detectExhaustion: (value) => EXHAUSTION_PATTERN.test(value),
     });
 
     const stopWatcher = setInterval(() => {

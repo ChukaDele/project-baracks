@@ -1,6 +1,7 @@
 import { CliProvider } from './cli-provider.js';
 import type { ExecutionGateway } from '../security/gateway.js';
 import type { ModelRegistry } from './registry.js';
+import { providerExecuteArgs } from './commands.js';
 
 export function cursorProvider(options: {
   gateway: ExecutionGateway;
@@ -11,19 +12,6 @@ export function cursorProvider(options: {
     executable: 'cursor-agent',
     gateway: options.gateway,
     ...(options.registry ? { registry: options.registry } : {}),
-    args: (request) => {
-      const args = [
-        '-p',
-        '--auto-review',
-        '--sandbox',
-        'enabled',
-        '--output-format',
-        'stream-json',
-      ];
-      if (request.modelRef && request.modelRef !== 'auto') args.push('--model', request.modelRef);
-      if (request.resumeSessionRef) args.push(`--resume=${request.resumeSessionRef}`);
-      args.push(request.prompt);
-      return args;
-    },
+    args: (request) => providerExecuteArgs('cursor', request),
   });
 }

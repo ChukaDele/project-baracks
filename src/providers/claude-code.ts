@@ -1,10 +1,7 @@
 import type { ExecutionGateway } from '../security/gateway.js';
 import { loadModelRegistry, registryModels, type ModelRegistry } from './registry.js';
 import type { ExecuteHandle, ExecuteRequest, ProviderAdapter, ProviderInfo } from './types.js';
-
-const RATE_LIMIT_PATTERN = /rate.?limit|overloaded|429|too many requests/i;
-const EXHAUSTION_PATTERN =
-  /usage limit|out of credits|allowance (reached|exhausted)|quota exceeded/i;
+import { EXHAUSTION_PATTERN, providerExecuteArgs, RATE_LIMIT_PATTERN } from './commands.js';
 
 /** Canonical executable name resolved for reporting. Environment overrides are
  * deliberately NOT consulted for discovery in this build. */
@@ -61,20 +58,7 @@ export class ClaudeCodeProvider implements ProviderAdapter {
   /** Unreachable in this build: gateway.execute() refuses unconditionally
    * (live agent execution is an unavailable capability). */
   execute(request: ExecuteRequest): ExecuteHandle {
-    const args = [
-      '-p',
-      request.prompt,
-      '--output-format',
-      'stream-json',
-      '--verbose',
-      '--permission-mode',
-      'auto',
-      '--safe-mode',
-      '--no-chrome',
-    ];
-    if (!request.resumeSessionRef) args.push('--no-session-persistence');
-    if (request.modelRef) args.push('--model', request.modelRef);
-    if (request.resumeSessionRef) args.push('--resume', request.resumeSessionRef);
+    const args = providerExecuteArgs('claude', request);
     const spec: Parameters<ExecutionGateway['execute']>[0] = {
       // The gateway resolves this through the trusted-executable registry;
       // an unregistered or shadowed installation is refused at spawn time.

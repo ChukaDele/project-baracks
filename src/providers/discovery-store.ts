@@ -112,13 +112,15 @@ export function persistProviderDiscovery(
         // value if one exists, otherwise stay 'unknown' (unroutable).
         const billingMode = existing ? existing.billingMode : 'unknown';
         const state = {
-          routingClass: model.routingClass,
+          routingClass: preserveAuthoritativeState ? existing.routingClass : model.routingClass,
           visible: preserveAuthoritativeState ? existing.visible : model.visible,
           authenticated: preserveAuthoritativeState ? existing.authenticated : model.authenticated,
           availability,
           billingMode,
-          prohibited: model.prohibited,
-          prohibitedReason: model.prohibitedReason ?? null,
+          prohibited: preserveAuthoritativeState ? existing.prohibited : model.prohibited,
+          prohibitedReason: preserveAuthoritativeState
+            ? existing.prohibitedReason
+            : (model.prohibitedReason ?? null),
           lastProbedAt: now,
           nextProbeAt,
         };

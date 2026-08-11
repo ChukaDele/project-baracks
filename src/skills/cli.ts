@@ -31,6 +31,14 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
       if (result.orphanInternalSkills.length)
         console.log(`orphan internal skills: ${result.orphanInternalSkills.join(', ')}`);
     }
+    if (
+      args.includes('--strict') &&
+      (result.internal.some((skill) => !skill.reachable) ||
+        result.duplicateIds.length > 0 ||
+        result.orphanInternalSkills.length > 0)
+    ) {
+      throw new Error('Major skill audit failed: unreachable, duplicate or orphan skills found');
+    }
     return true;
   }
   return false;

@@ -25,7 +25,7 @@ describe('single execution boundary', () => {
     const root = resolve(import.meta.dirname, '..');
     const importers = sourceFiles(join(root, 'src')).flatMap((path) => {
       const source = readFileSync(path, 'utf8');
-      if (!source.includes("from '../providers/exec.js'")) return [];
+      if (!/from\s+['"][^'"]*providers\/exec\.js['"]/.test(source)) return [];
       return [relative(root, path)];
     });
     expect(importers).toEqual(['src/security/gateway.ts']);

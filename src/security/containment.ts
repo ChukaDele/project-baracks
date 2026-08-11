@@ -13,6 +13,7 @@ export interface ContainmentRequest {
   canonicalExecutable: string;
   args: readonly string[];
   allowedRoots: readonly string[];
+  readOnlyRoots?: readonly string[];
 }
 
 /** An executable OS boundary, not a descriptive readiness flag. */
@@ -38,23 +39,6 @@ function unavailableContainment(os: string): Containment {
   };
 }
 
-/** Process-group termination only. This is never sufficient for live execution. */
-export function processTreeContainment(os: string = platform()): Containment {
-  const posix = os !== 'win32';
-  return {
-    enforced: posix,
-    filesystemIsolation: false,
-    networkIsolation: false,
-    mechanism: posix ? 'posix-process-group' : 'unsupported',
-    detail: posix
-      ? 'descendants share a process group; filesystem and network access are not isolated'
-      : `process-group containment is unavailable on ${os}`,
-    wrap(request) {
-      return { executable: request.executable, args: [...request.args] };
-    },
-  };
-}
-
 function schemeString(value: string): string {
   return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
@@ -73,6 +57,7 @@ function canonicalRoots(roots: readonly string[]): string[] {
  */
 function seatbeltProfile(request: ContainmentRequest): string {
   const roots = canonicalRoots(request.allowedRoots);
+  const readOnlyRoots = canonicalRoots(request.readOnlyRoots ?? []);
   const deniedDataRoots = [
     ...new Set(
       ['/Users', '/Volumes', homedir(), '/private/tmp', '/tmp', tmpdir()].flatMap((root) => {
@@ -98,8 +83,12 @@ function seatbeltProfile(request: ContainmentRequest): string {
     '(allow file-read*)',
     ...deniedDataRoots.map((root) => `(deny file-read-data (subpath ${schemeString(root)}))`),
     ...roots.map((root) => `(allow file-read* (subpath ${schemeString(root)}))`),
+    ...roots.map((root) => `(allow file-read-data (subpath ${schemeString(root)}))`),
+    ...readOnlyRoots.map((root) => `(allow file-read* (subpath ${schemeString(root)}))`),
+    ...readOnlyRoots.map((root) => `(allow file-read-data (subpath ${schemeString(root)}))`),
     ...exactExecutableRoots.map((path) => `(allow file-read* (literal ${schemeString(path)}))`),
     ...roots.map((root) => `(allow file-write* (subpath ${schemeString(root)}))`),
+    `(allow file-write* (literal ${schemeString('/dev/null')}))`,
     '(allow network-outbound)',
   ];
   return forms.join(' ');
@@ -148,7 +137,7 @@ export function detectContainment(os: string = platform()): ContainmentStatus {
   const ready =
     containment.enforced && containment.filesystemIsolation && containment.networkIsolation;
   return {
-    processTreeTermination: os !== 'win32',
+    processTreeTermination: ready,
     filesystemIsolation: containment.filesystemIsolation,
     networkIsolation: containment.networkIsolation,
     liveExecutionReady: ready,

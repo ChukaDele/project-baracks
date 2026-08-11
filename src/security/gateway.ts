@@ -83,6 +83,8 @@ export interface GatewayExecuteRequest {
 export interface GatewayOptions {
   /** Mandatory, non-empty for an executing gateway. Canonicalised per call. */
   allowedRoots: readonly string[];
+  /** Provider/runtime/config roots that may be read but never written. */
+  readOnlyRoots?: readonly string[];
   /** Must carry a non-empty allowedExecutables list. */
   commandPolicy: CommandPolicy;
   /**
@@ -343,6 +345,7 @@ export class ExecutionGateway {
         canonicalExecutable: trusted.canonicalPath,
         args: request.args,
         allowedRoots: this.options.allowedRoots,
+        ...(this.options.readOnlyRoots ? { readOnlyRoots: this.options.readOnlyRoots } : {}),
       });
     } catch (error) {
       this.refuse(

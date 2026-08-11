@@ -356,10 +356,16 @@ export async function reconcileRoadmapApplies(
   bindRoadmapRuntimeHost(db);
   const nowIsoStr = (options.now?.() ?? new Date()).toISOString();
   const stuck = db.select().from(roadmapUpdates).where(eq(roadmapUpdates.status, 'applying')).all();
-  const resolved: { updateId: string; outcome: 'applied' | 'requeued' }[] = [];
+  const resolved: { updateId: string; outcome: 'applied' | 'requeued' | 'rejected' }[] = [];
   for (const update of stuck) {
     if (!update.applyAttemptId || !update.applyWorkerId || !update.applyLeaseExpiresAt) {
-      throw new Error(`roadmap update ${update.id} has incomplete apply-attempt identity`);
+      const rejected = db
+        .update(roadmapUpdates)
+        .set({ status: 'rejected' })
+        .where(and(eq(roadmapUpdates.id, update.id), eq(roadmapUpdates.status, 'applying')))
+        .run();
+      if (rejected.changes === 1) resolved.push({ updateId: update.id, outcome: 'rejected' });
+      continue;
     }
     if (await adapter.wasApplied(update.idempotencyKey)) {
       const settled = db

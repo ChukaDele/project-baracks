@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
-import { getProjectPolicy } from '../supervisor/policy.js';
+import { getProjectPolicy, knownProjectIdentities } from '../supervisor/policy.js';
 import { majorHome } from '../supervisor/state.js';
 
 export const LEARNING_SOURCES = [
@@ -79,12 +79,13 @@ function globalStorePath(): string {
   return join(learningRoot(), 'global.json');
 }
 
-function readStore(path: string): LearningStore {
+function readStore(path: string, redact = true): LearningStore {
   if (!existsSync(path)) return emptyStore();
   const parsed = JSON.parse(readFileSync(path, 'utf8')) as LearningStore;
   if (parsed.version !== 2 || !Array.isArray(parsed.candidates)) {
     throw new Error(`invalid Major learning store: ${path}`);
   }
+  if (!redact) return parsed;
   return {
     ...parsed,
     candidates: parsed.candidates.map((candidate) => ({
@@ -133,7 +134,18 @@ function withStoreLock<T>(path: string, action: () => T): T {
     waitForMigration(deadline);
     try {
       fd = openSync(lock, 'wx', 0o600);
-      writeFileSync(fd, `${process.pid}\n`);
+      try {
+        writeFileSync(fd, `${process.pid}\n`);
+      } catch (error) {
+        closeSync(fd);
+        fd = undefined;
+        try {
+          unlinkSync(lock);
+        } catch {
+          // Preserve the original write failure.
+        }
+        throw error;
+      }
       if (existsSync(migrationLockPath())) {
         closeSync(fd);
         fd = undefined;
@@ -142,7 +154,18 @@ function withStoreLock<T>(path: string, action: () => T): T {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       try {
-        if (Date.now() - statSync(lock).mtimeMs > 30_000) unlinkSync(lock);
+        const lockText = readFileSync(lock, 'utf8').trim();
+        const pid = Number.parseInt(lockText, 10);
+        let live = false;
+        if (Number.isFinite(pid)) {
+          try {
+            process.kill(pid, 0);
+            live = true;
+          } catch {
+            live = false;
+          }
+        }
+        if (!live && Date.now() - statSync(lock).mtimeMs > 30_000) unlinkSync(lock);
       } catch (staleError) {
         if ((staleError as NodeJS.ErrnoException).code !== 'ENOENT') throw staleError;
       }
@@ -155,7 +178,11 @@ function withStoreLock<T>(path: string, action: () => T): T {
     return action();
   } finally {
     closeSync(fd);
-    unlinkSync(lock);
+    try {
+      unlinkSync(lock);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
   }
 }
 
@@ -245,7 +272,7 @@ export function captureLearning(input: LearningCaptureInput): LearningCandidate 
 }
 
 function visibleGlobalCandidates(status?: LearningStatus): LearningCandidate[] {
-  const store = readStore(globalStorePath());
+  const store = readStore(globalStorePath(), false);
   for (const candidate of store.candidates) {
     if (
       candidate.scope !== 'global' ||
@@ -309,7 +336,12 @@ const PII_PATTERNS = [
 ];
 
 function unsafeGlobalText(text: string): boolean {
-  return redactText(text) !== text || PII_PATTERNS.some((rule) => rule.test(text));
+  const normalized = normalizedText(text);
+  const knownIdentity = knownProjectIdentities()
+    .map((identity) => normalizedText(identity))
+    .filter(Boolean)
+    .some((identity) => ` ${normalized} `.includes(` ${identity} `));
+  return redactText(text) !== text || PII_PATTERNS.some((rule) => rule.test(text)) || knownIdentity;
 }
 
 function assertSanitizedGlobalText(
@@ -323,6 +355,7 @@ function assertSanitizedGlobalText(
     candidate.project,
     candidate.repoPath,
     candidate.repoPath ? basename(candidate.repoPath) : undefined,
+    ...knownProjectIdentities(),
   ]
     .filter((item): item is string => Boolean(item))
     .map((item) => normalizedText(item));
