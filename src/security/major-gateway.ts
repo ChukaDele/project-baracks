@@ -9,6 +9,7 @@ import { processTreeContainment } from './containment.js';
 import { sanitizeEnv } from './env.js';
 import { assertWithinRootsCanonical, canonicalize, isWithinRoots } from './paths.js';
 import { TrustedExecutableRegistry } from './trusted-executables.js';
+import { assertCapabilityAvailable, CapabilityUnavailableError } from './capabilities.js';
 
 export interface MajorGatewayRequest {
   executable: string;
@@ -87,7 +88,7 @@ function recordExecution(input: {
   reason: string;
   strippedEnv: readonly string[];
 }): void {
-  const dir = join(homedir(), '.major');
+  const dir = process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
   mkdirSync(dir, { recursive: true });
   const record = {
     at: new Date().toISOString(),
@@ -103,16 +104,29 @@ function recordExecution(input: {
 }
 
 /**
- * Major 0.3's successor execution boundary.
- *
- * This intentionally optimizes for the user's chosen MVP/autonomy posture:
- * project/worktree root confinement at the gateway, a strict top-level
- * executable allowlist, no shell command strings, stripped API/secret env,
- * trusted executable identity, and whole-process-tree termination. It does not
- * wait for the old v1 filesystem/network sandbox milestone before allowing
- * normal reversible local development.
+ * Successor execution boundary. It shares the same hard capability gate as the
+ * legacy gateway. The validation pipeline below remains compiled M1 groundwork,
+ * but no supervisor path may spawn until trusted OS isolation is implemented
+ * and the live-agent-execution gate is removed by reviewed code.
  */
 export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle {
+  try {
+    assertCapabilityAvailable('live-agent-execution');
+  } catch (error) {
+    const reason =
+      error instanceof CapabilityUnavailableError
+        ? error.message
+        : 'live agent execution capability check failed';
+    recordExecution({
+      executable: executableName(request.executable),
+      cwd: resolve(request.cwd),
+      allowed: false,
+      reason,
+      strippedEnv: [],
+    });
+    throw error;
+  }
+
   const cwd = assertWithinRootsCanonical(request.cwd, request.allowedRoots);
   const executable = executableName(request.executable);
   const commandCheck = checkArgv(request.executable, request.args, {
