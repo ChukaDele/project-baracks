@@ -143,7 +143,7 @@ def stage_learning_state(stage: Path, home: Path, entries: list[dict[str, str]])
         symlink = next((path for path in target.rglob("*") if path.is_symlink()), None)
         if symlink is not None:
             raise SystemExit(f"refusing to migrate symlinked Major learning state: {symlink}")
-        shutil.copytree(target, staged)
+        shutil.copytree(target, staged, ignore=shutil.ignore_patterns(".migration.lock"))
     else:
         staged.mkdir(parents=True)
 

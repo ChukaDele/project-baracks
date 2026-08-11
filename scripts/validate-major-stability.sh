@@ -116,6 +116,11 @@ grep -Fq 'runtimeImmutableSnapshot' scripts/install-major-runtime.sh || fail "re
 [ -f scripts/validate-major-install-transaction.py ] || fail "install rollback validator missing"
 grep -Fq 'stage-major-user-state.py' scripts/install-major-runtime.sh || fail "runtime installer does not stage complete user state"
 grep -Fq 'activate-major-user-state.py' scripts/install-major-runtime.sh || fail "runtime installer does not activate user state transactionally"
+grep -Fq 'launchctl print "$LEGACY_SERVICE"' scripts/install-major-runtime.sh || fail "installer does not verify legacy daemon absence"
+grep -Fq 'could not restart the legacy supervisor' scripts/install-major-runtime.sh || fail "installer does not restore a stopped legacy service after rollback"
+grep -Fq '.migration.lock' scripts/install-major-runtime.sh || fail "runtime installer does not lock learning migration"
+grep -Fq '.migration.lock' scripts/install-major-global-rules.sh || fail "global rules installer does not lock learning migration"
+grep -Fq 'ignore_patterns(".migration.lock")' scripts/stage-major-user-state.py || fail "learning migration lock would leak into installed state"
 grep -Fq 'MAJOR_INSTALL_FAIL_AFTER' scripts/activate-major-user-state.py || fail "transaction activator lacks deterministic failure probe"
 grep -Fq 'did not restore live state exactly' scripts/validate-major-install-transaction.py || fail "transaction validator does not compare restored state"
 

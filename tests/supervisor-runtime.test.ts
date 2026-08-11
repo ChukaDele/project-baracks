@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { captureLearning, promoteLearning } from '../src/learning/candidates.js';
 import { configureProjectPolicy, recordShadowGrade } from '../src/supervisor/policy.js';
-import { coordinatorPrompt, selectCoordinator } from '../src/supervisor/runtime.js';
+import {
+  coordinatorPrompt,
+  parseWorkerReport,
+  selectCoordinator,
+} from '../src/supervisor/runtime.js';
 import type { SupervisorGoal } from '../src/supervisor/state.js';
 import type { ProviderInfo } from '../src/providers/types.js';
 import { model } from './helpers.js';
@@ -144,7 +148,9 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('mcp-integration-ops');
     expect(prompt).toContain('website-design-qa');
     expect(prompt).toContain('BUILT = implementation exists');
-    expect(prompt).toContain('major goal report --id "goal-1" --status active');
+    expect(prompt).toContain("You cannot access or mutate Major's global control state");
+    expect(prompt).toContain('MAJOR_RESULT: {"status":"active"');
+    expect(prompt).not.toContain('major goal report');
     expect(prompt).toContain('Do not mark done unless the end-to-end goal is demonstrably true');
     expect(prompt).toContain('source → assess → tailor');
     expect(prompt).toContain('Do not fabricate an employer submission');
@@ -154,5 +160,22 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('PROMOTED 1x [project/user-correction]');
     expect(prompt).toContain('RESOLVED MAJOR SKILLS');
     expect(prompt).toContain('mvp-speed-prioritisation');
+  });
+
+  it('accepts only a bounded final worker report and requires an owner gate when blocked', () => {
+    expect(
+      parseWorkerReport(
+        'working\nMAJOR_RESULT: {"status":"active","summary":"Tests pass; review remains."}\n',
+      ),
+    ).toEqual({ status: 'active', summary: 'Tests pass; review remains.' });
+    expect(
+      parseWorkerReport(
+        'MAJOR_RESULT: {"status":"blocked","summary":"Auth remains.","ownerGate":"Sign in."}',
+      ),
+    ).toEqual({ status: 'blocked', summary: 'Auth remains.', ownerGate: 'Sign in.' });
+    expect(
+      parseWorkerReport('MAJOR_RESULT: {"status":"blocked","summary":"No gate supplied."}'),
+    ).toBeUndefined();
+    expect(parseWorkerReport('MAJOR_RESULT: not-json')).toBeUndefined();
   });
 });

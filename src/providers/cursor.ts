@@ -12,7 +12,14 @@ export function cursorProvider(options: {
     gateway: options.gateway,
     ...(options.registry ? { registry: options.registry } : {}),
     args: (request) => {
-      const args = ['-p', '--force', '--output-format', 'stream-json'];
+      const args = [
+        '-p',
+        '--auto-review',
+        '--sandbox',
+        'enabled',
+        '--output-format',
+        'stream-json',
+      ];
       if (request.modelRef && request.modelRef !== 'auto') args.push('--model', request.modelRef);
       if (request.resumeSessionRef) args.push(`--resume=${request.resumeSessionRef}`);
       args.push(request.prompt);

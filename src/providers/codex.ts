@@ -61,8 +61,25 @@ export class CodexProvider implements ProviderAdapter {
    * (live agent execution is an unavailable capability). */
   execute(request: ExecuteRequest): ExecuteHandle {
     const args = request.resumeSessionRef
-      ? ['exec', 'resume', request.resumeSessionRef, '--json', request.prompt]
-      : ['exec', '--json', request.prompt];
+      ? [
+          'exec',
+          '--sandbox',
+          'workspace-write',
+          '--ignore-user-config',
+          'resume',
+          request.resumeSessionRef,
+          '--json',
+          request.prompt,
+        ]
+      : [
+          'exec',
+          '--sandbox',
+          'workspace-write',
+          '--ignore-user-config',
+          '--ephemeral',
+          '--json',
+          request.prompt,
+        ];
     if (request.modelRef) args.splice(1, 0, '--model', request.modelRef);
     const spec: Parameters<ExecutionGateway['execute']>[0] = {
       // The gateway resolves this through the trusted-executable registry;

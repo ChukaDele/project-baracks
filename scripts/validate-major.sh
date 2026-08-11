@@ -207,7 +207,10 @@ grep -Fq "GLOBAL_RESOURCE_LIMITS" src/supervisor/resources.ts || fail "global re
 grep -Fq "maxSubagentDepth: 1" src/supervisor/resources.ts || fail "subagent depth cap missing"
 grep -Fq "three consecutive independently graded shadow passes" src/supervisor/policy.ts || fail "observe-to-assist shadow gate missing"
 grep -Fq "recordShadowGrade" src/supervisor/cli.ts || fail "shadow grade CLI path missing"
-grep -Fq "major goal report" src/supervisor/runtime.ts || fail "coordinator cannot durably report goal state"
+grep -Fq 'MAJOR_RESULT:' src/supervisor/runtime.ts || fail "coordinator has no parent-owned result channel"
+if grep -Fq "major goal report" src/supervisor/runtime.ts; then
+  fail "sandboxed coordinator must not mutate Major global state directly"
+fi
 grep -Fq "Skillify" src/supervisor/runtime.ts || fail "coordinator is not skill-first"
 grep -Fq "Tools-as-Code" src/supervisor/runtime.ts || fail "coordinator lacks Tools-as-Code guidance"
 for provider in claude codex cursor antigravity; do
@@ -228,8 +231,8 @@ grep -Fq "startup|resume|clear|compact" scripts/stage-major-user-state.py || fai
 grep -Fq "no auto-start daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
 grep -Fq "Ruflo is NOT attached globally" scripts/install-major-runtime.sh || fail "pilot installer must avoid global Ruflo blast radius"
 grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "optional observe pilot path must remain available"
-if grep -Fq "launchctl bootstrap" scripts/install-major-runtime.sh; then
-  fail "pilot installer must not start a login daemon"
+if grep -F "launchctl bootstrap" scripts/install-major-runtime.sh | grep -Fv '$LEGACY_PLIST'; then
+  fail "pilot installer must not start a login daemon outside rollback restoration"
 fi
 if grep -Fq "claude mcp add ruflo" scripts/install-major-runtime.sh || grep -Fq "codex mcp add ruflo" scripts/install-major-runtime.sh; then
   fail "Ruflo must not be globally attached during pilot"

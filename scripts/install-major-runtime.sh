@@ -7,6 +7,12 @@ MAJOR_HOME="$HOME/.major"
 RELEASES_DIR="$MAJOR_HOME/releases"
 LEGACY_PLIST="$HOME/Library/LaunchAgents/com.chuka.major-supervisor.plist"
 RELEASE_RECORD="$MAJOR_HOME/installed-release.json"
+LEGACY_SERVICE="gui/$UID/com.chuka.major-supervisor"
+LEGACY_WAS_LOADED=0
+LEGACY_STOPPED=0
+INSTALL_COMMITTED=0
+LEARNING_MIGRATION_LOCK="$MAJOR_HOME/learning/.migration.lock"
+LEARNING_LOCK_HELD=0
 cd "$ROOT"
 
 if [ "${MAJOR_ALLOW_DIRTY_INSTALL:-0}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=all)" ]; then
@@ -26,8 +32,19 @@ RELEASE_CREATED=0
 cleanup() {
   local status=$?
   [ -z "$INSTALL_STAGE" ] || rm -rf "$INSTALL_STAGE"
+  if [ "$LEARNING_LOCK_HELD" = "1" ]; then
+    rm -f "$LEARNING_MIGRATION_LOCK"
+  fi
   if [ "$status" -ne 0 ] && [ "$RELEASE_CREATED" = "1" ]; then
     rm -rf "$RELEASE_DIR"
+  fi
+  if [ "$status" -ne 0 ] && [ "$LEGACY_WAS_LOADED" = "1" ] && \
+     [ "$LEGACY_STOPPED" = "1" ] && [ "$INSTALL_COMMITTED" = "0" ] && \
+     [ -f "$LEGACY_PLIST" ]; then
+    if ! launchctl bootstrap "gui/$UID" "$LEGACY_PLIST" >/dev/null 2>&1; then
+      echo "CRITICAL: Major restored the prior files but could not restart the legacy supervisor." >&2
+      echo "Run: launchctl bootstrap gui/$UID '$LEGACY_PLIST'" >&2
+    fi
   fi
 }
 trap cleanup EXIT
@@ -119,6 +136,28 @@ record = {
 path.write_text(json.dumps(record, indent=2) + "\n")
 PY
 
+# A loaded legacy service survives deletion of its plist. Stop the exact
+# service before activation, while the old plist remains available for a
+# rollback restart. Stop it before staging so it cannot mutate legacy learning
+# state after the migration snapshot is taken.
+if launchctl print "$LEGACY_SERVICE" >/dev/null 2>&1; then
+  LEGACY_WAS_LOADED=1
+  if ! launchctl bootout "$LEGACY_SERVICE" >/dev/null 2>&1; then
+    echo "ERROR: refusing to install Major because the legacy supervisor could not be stopped." >&2
+    exit 1
+  fi
+  LEGACY_STOPPED=1
+fi
+
+# Prevent current Major writers from changing learning state between staging
+# and activation. Refuse a pre-existing lock; never guess that it is stale.
+mkdir -p "$MAJOR_HOME/learning"
+if ! (set -C; : > "$LEARNING_MIGRATION_LOCK") 2>/dev/null; then
+  echo "ERROR: refusing to install Major while another learning migration is active." >&2
+  exit 1
+fi
+LEARNING_LOCK_HELD=1
+
 # The user-level installation is one rollback-capable transaction. The old
 # wrapper and every existing rule/settings file remain recoverable until all
 # replacements have completed.
@@ -129,12 +168,17 @@ MANIFEST="$(python3 "$ROOT/scripts/stage-major-user-state.py" \
   --record "$RECORD_TMP" \
   --wrapper "$WRAPPER_TMP" \
   --legacy-plist "$LEGACY_PLIST")"
+
 python3 "$ROOT/scripts/activate-major-user-state.py" --manifest "$MANIFEST"
 RELEASE_CREATED=0
+INSTALL_COMMITTED=1
+LEARNING_LOCK_HELD=0
 
-# Pilot posture: no auto-start daemon. Never install or auto-start a global daemon. Removing a
-# previously loaded legacy service is cleanup after the committed transaction.
-launchctl bootout "gui/$UID/com.chuka.major-supervisor" >/dev/null 2>&1 || true
+# Pilot posture: no auto-start daemon. Never install or auto-start a global daemon.
+if launchctl print "$LEGACY_SERVICE" >/dev/null 2>&1; then
+  echo "CRITICAL: legacy Major supervisor is still loaded after installation." >&2
+  exit 1
+fi
 
 # Ruflo is NOT attached globally. Provider CLIs are separate user tools. Major
 # never installs or authenticates them as an unattended side effect.

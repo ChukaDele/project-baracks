@@ -42,7 +42,6 @@ export function workerCommand(
 ): { command: string; args: string[] } {
   switch (host) {
     case 'claude': {
-      const permissionMode = process.env.MAJOR_CLAUDE_PERMISSION_MODE ?? 'auto';
       const args = [
         '-p',
         prompt,
@@ -51,7 +50,10 @@ export function workerCommand(
         '--max-turns',
         '80',
         '--permission-mode',
-        permissionMode,
+        'auto',
+        '--safe-mode',
+        '--no-session-persistence',
+        '--no-chrome',
       ];
       if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
       return {
@@ -60,13 +62,20 @@ export function workerCommand(
       };
     }
     case 'codex': {
-      const args = ['exec', '--json'];
+      const args = [
+        'exec',
+        '--json',
+        '--sandbox',
+        'workspace-write',
+        '--ignore-user-config',
+        '--ephemeral',
+      ];
       if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
       args.push(prompt);
       return { command: 'codex', args };
     }
     case 'cursor': {
-      const args = ['-p', '--force', '--output-format', 'json'];
+      const args = ['-p', '--auto-review', '--sandbox', 'enabled', '--output-format', 'json'];
       if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
       args.push(prompt);
       return { command: 'cursor-agent', args };

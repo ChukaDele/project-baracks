@@ -61,7 +61,18 @@ export class ClaudeCodeProvider implements ProviderAdapter {
   /** Unreachable in this build: gateway.execute() refuses unconditionally
    * (live agent execution is an unavailable capability). */
   execute(request: ExecuteRequest): ExecuteHandle {
-    const args = ['-p', request.prompt, '--output-format', 'stream-json', '--verbose'];
+    const args = [
+      '-p',
+      request.prompt,
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-mode',
+      'auto',
+      '--safe-mode',
+      '--no-chrome',
+    ];
+    if (!request.resumeSessionRef) args.push('--no-session-persistence');
     if (request.modelRef) args.push('--model', request.modelRef);
     if (request.resumeSessionRef) args.push('--resume', request.resumeSessionRef);
     const spec: Parameters<ExecutionGateway['execute']>[0] = {

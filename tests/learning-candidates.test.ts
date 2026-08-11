@@ -1,5 +1,13 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -146,4 +154,35 @@ describe('Major learning candidates', () => {
     expect(candidate?.occurrences).toBe(8);
     expect(candidate?.evidence).toHaveLength(8);
   }, 30_000);
+
+  it('waits for an installation migration lock before writing', async () => {
+    const lock = join(learningRoot(), '.migration.lock');
+    mkdirSync(learningRoot(), { recursive: true });
+    writeFileSync(lock, 'installer\n');
+    const moduleUrl = pathToFileURL(
+      join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
+    );
+    const script = `
+      import { captureLearning } from ${JSON.stringify(moduleUrl.href)};
+      captureLearning({ project: 'locked-project', source: 'manual', summary: 'Captured after migration.' });
+    `;
+    const child = spawn(
+      process.execPath,
+      ['--import', 'tsx', '--input-type=module', '-e', script],
+      {
+        cwd: join(import.meta.dirname, '..'),
+        env: { ...process.env, MAJOR_LEARNING_ROOT: learningRoot() },
+        stdio: ['ignore', 'ignore', 'pipe'],
+      },
+    );
+    const completed = new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('exit', resolve);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(listLearningCandidates('locked-project')).toEqual([]);
+    unlinkSync(lock);
+    expect(await completed).toBe(0);
+    expect(listLearningCandidates('locked-project')[0]?.summary).toBe('Captured after migration.');
+  });
 });

@@ -93,15 +93,35 @@ function writeStore(path: string, store: LearningStore): void {
   renameSync(temp, path);
 }
 
+function migrationLockPath(): string {
+  return join(learningRoot(), '.migration.lock');
+}
+
+function waitForMigration(deadline: number): void {
+  const lock = migrationLockPath();
+  while (existsSync(lock)) {
+    if (Date.now() >= deadline) {
+      throw new Error(`timed out waiting for Major learning migration: ${lock}`);
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+  }
+}
+
 function withStoreLock<T>(path: string, action: () => T): T {
   mkdirSync(dirname(path), { recursive: true });
   const lock = `${path}.lock`;
   const deadline = Date.now() + 5_000;
   let fd: number | undefined;
   while (fd === undefined) {
+    waitForMigration(deadline);
     try {
       fd = openSync(lock, 'wx', 0o600);
       writeFileSync(fd, `${process.pid}\n`);
+      if (existsSync(migrationLockPath())) {
+        closeSync(fd);
+        fd = undefined;
+        unlinkSync(lock);
+      }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       try {

@@ -94,6 +94,39 @@ export type CoordinatorSelection =
   | { kind: 'route'; host: WorkerHost; provider: string; modelRef: string; reason: string }
   | { kind: 'checkpoint'; reason: string };
 
+export interface WorkerReport {
+  status: 'active' | 'blocked' | 'done';
+  summary: string;
+  ownerGate?: string;
+}
+
+const WORKER_REPORT_PREFIX = 'MAJOR_RESULT: ';
+
+/** Parse the final bounded worker report. The parent remains the only process
+ * allowed to mutate Major's control state. */
+export function parseWorkerReport(output: string): WorkerReport | undefined {
+  const line = output
+    .split(/\r?\n/)
+    .reverse()
+    .find((candidate) => candidate.startsWith(WORKER_REPORT_PREFIX));
+  if (!line) return undefined;
+  try {
+    const value = JSON.parse(line.slice(WORKER_REPORT_PREFIX.length)) as Record<string, unknown>;
+    if (!['active', 'blocked', 'done'].includes(String(value.status))) return undefined;
+    if (typeof value.summary !== 'string' || value.summary.trim().length === 0) return undefined;
+    const summary = value.summary.trim().slice(0, 12_000);
+    const ownerGate = typeof value.ownerGate === 'string' ? value.ownerGate.trim() : '';
+    if (value.status === 'blocked' && !ownerGate) return undefined;
+    return {
+      status: value.status as WorkerReport['status'],
+      summary,
+      ...(ownerGate ? { ownerGate: ownerGate.slice(0, 4_000) } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export function selectCoordinator(
   goal: SupervisorGoal,
   providers: ProviderInfo[],
@@ -201,10 +234,11 @@ READINESS LANGUAGE:
 Never use these terms interchangeably.
 
 DURABLE CONTROL:
-Before ending this coordinator turn, report the goal back to Major with exactly one of:
-  major goal report --id "${goal.id}" --status active --summary "<what now works and next critical path>"
-  major goal report --id "${goal.id}" --status done --summary "<objective completion evidence>"
-  major goal report --id "${goal.id}" --status blocked --summary "<what is complete>" --owner-gate "<exact owner action>"
+You cannot access or mutate Major's global control state. Before ending, emit exactly one final
+single-line result for the parent coordinator to validate and apply:
+  MAJOR_RESULT: {"status":"active","summary":"what now works and next critical path"}
+  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence"}
+  MAJOR_RESULT: {"status":"blocked","summary":"what is complete","ownerGate":"exact owner action"}
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
 
 ACTIVE MAJOR LEARNINGS:
@@ -298,14 +332,37 @@ export async function runGoalCycle(goalId: string): Promise<void> {
   }
 
   if (outcome.status === 'succeeded') {
+    const report = parseWorkerReport(outcome.stdout);
+    if (report?.status === 'blocked') {
+      updateGoal(goal.id, {
+        status: 'blocked',
+        consecutiveFailures: 0,
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary: report.summary,
+        ownerGate: report.ownerGate,
+      });
+      return;
+    }
+    if (report?.status === 'done') {
+      updateGoal(goal.id, {
+        status: 'active',
+        consecutiveFailures: 0,
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary: `Worker completion claim awaiting independent validation: ${report.summary}`,
+        nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      });
+      return;
+    }
     updateGoal(goal.id, {
       status: 'active',
       consecutiveFailures: 0,
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
-      lastSummary: trim(
-        outcome.stdout || 'Coordinator cycle completed without an explicit Major report.',
-      ),
+      lastSummary:
+        report?.summary ??
+        trim(outcome.stdout || 'Coordinator cycle completed without an explicit Major report.'),
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
     });
   } else {
