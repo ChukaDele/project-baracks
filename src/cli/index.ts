@@ -419,7 +419,7 @@ program
     console.log(`task ${taskRow.id} [${taskRow.status}] ${taskRow.title}`);
     if (decision.kind === 'route') {
       console.log(
-        `DRY RUN — would dispatch to ${decision.provider}/${decision.modelRef} ` +
+        `ROUTING PLAN — ${decision.provider}/${decision.modelRef} ` +
           `(${decision.routingClass}, ${decision.billingMode})`,
       );
       console.log(`routing reason: ${decision.reason}`);
@@ -427,7 +427,7 @@ program
         console.log(`independence loss: ${decision.independenceLoss}`);
       }
     } else {
-      console.log(`DRY RUN — checkpoint: ${decision.reason}`);
+      console.log(`ROUTING PLAN — checkpoint: ${decision.reason}`);
     }
   });
 

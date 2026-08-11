@@ -185,7 +185,8 @@ def sanitize_staged_learning(staged: Path) -> None:
             if not isinstance(raw, dict):
                 continue
             candidate = dict(raw)
-            candidate["summary"] = redact_learning_text(str(candidate.get("summary", "")))
+            raw_summary = str(candidate.get("summary", ""))
+            candidate["summary"] = redact_learning_text(raw_summary)
             evidence = candidate.get("evidence", [])
             candidate["evidence"] = [
                 redact_learning_text(str(item)) for item in evidence if isinstance(item, str)
@@ -198,7 +199,7 @@ def sanitize_staged_learning(staged: Path) -> None:
                         key in candidate
                         for key in ("key", "project", "repoPath", "promotedToGlobalId")
                     )
-                    and global_summary_is_safe(candidate["summary"])
+                    and global_summary_is_safe(raw_summary)
                     and candidate["evidence"]
                     and all(
                         re.fullmatch(r"promotion-evidence-sha256:[a-f0-9]{64}", item)
@@ -217,20 +218,10 @@ def sanitize_staged_learning(staged: Path) -> None:
                     )
                 )
                 if not promoted_safe and not dismissed_safe:
-                    digest = hashlib.sha256(
-                        json.dumps(raw, sort_keys=True).encode()
-                    ).hexdigest()
-                    candidate = {
-                        "id": str(candidate.get("id", digest)),
-                        "source": str(candidate.get("source", "manual")),
-                        "summary": "Retracted global learning.",
-                        "scope": "global",
-                        "occurrences": 0,
-                        "evidence": [f"dismissal-reason-sha256:{digest}"],
-                        "status": "dismissed",
-                        "createdAt": str(candidate.get("createdAt", "1970-01-01T00:00:00.000Z")),
-                        "updatedAt": str(candidate.get("updatedAt", "1970-01-01T00:00:00.000Z")),
-                    }
+                    record_id = str(candidate.get("id", "unknown"))
+                    raise SystemExit(
+                        f"refusing to migrate unsafe or malformed global Major learning record: {record_id}"
+                    )
             sanitized.append(candidate)
         data["candidates"] = sanitized
         path.write_text(json.dumps(data, indent=2) + "\n")

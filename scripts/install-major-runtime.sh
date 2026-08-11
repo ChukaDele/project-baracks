@@ -93,6 +93,7 @@ fi
 
 WRAPPER_TMP="$INSTALL_STAGE/major"
 RECORD_TMP="$INSTALL_STAGE/installed-release.json"
+RULES_RECORD_TMP="$INSTALL_STAGE/installed-global-rules.json"
 
 # Build and execute-smoke the same immutable runtime shape used in production.
 if [ ! -d "$RELEASE_DIR" ]; then
@@ -134,6 +135,27 @@ record = {
 path.write_text(json.dumps(record, indent=2) + "\n")
 PY
 
+python3 - "$RULES_RECORD_TMP" "$INSTALL_SHA" "$INSTALL_BRANCH" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path(sys.argv[1])
+path.write_text(
+    json.dumps(
+        {
+            "sha": sys.argv[2],
+            "branch": sys.argv[3],
+            "installedAt": datetime.now(timezone.utc).isoformat(),
+            "preflightBypasses": [],
+        },
+        indent=2,
+    )
+    + "\n"
+)
+PY
+
 # A loaded legacy service survives deletion of its plist. Stop the exact
 # service before activation, while the old plist remains available for a
 # rollback restart. Stop it before staging so it cannot mutate legacy learning
@@ -148,10 +170,9 @@ if launchctl print "$LEGACY_SERVICE" >/dev/null 2>&1; then
 fi
 
 # Prevent current Major writers from changing learning state between staging
-# and activation. Refuse a pre-existing lock; never guess that it is stale.
+# and activation. Reclaim only an old lock with no live owning process.
 mkdir -p "$MAJOR_HOME/learning"
-if ! (set -C; : > "$LEARNING_MIGRATION_LOCK") 2>/dev/null; then
-  echo "ERROR: refusing to install Major while another learning migration is active." >&2
+if ! python3 "$ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK"; then
   exit 1
 fi
 LEARNING_LOCK_HELD=1
@@ -164,6 +185,7 @@ MANIFEST="$(python3 "$ROOT/scripts/stage-major-user-state.py" \
   --stage "$INSTALL_STAGE/user-state" \
   --major-bin "$BIN_DIR/major" \
   --record "$RECORD_TMP" \
+  --global-rules-record "$RULES_RECORD_TMP" \
   --wrapper "$WRAPPER_TMP" \
   --legacy-plist "$LEGACY_PLIST")"
 

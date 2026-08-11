@@ -1,11 +1,13 @@
 import { spawn } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
   unlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -211,5 +213,22 @@ describe('Major learning candidates', () => {
     unlinkSync(lock);
     expect(await completed).toBe(0);
     expect(listLearningCandidates('locked-project')[0]?.summary).toBe('Captured after migration.');
+  });
+
+  it('recovers an abandoned stale installation migration lock', () => {
+    const lock = join(learningRoot(), '.migration.lock');
+    mkdirSync(learningRoot(), { recursive: true });
+    writeFileSync(lock, 'invalid-owner\n');
+    const stale = new Date(Date.now() - 31_000);
+    utimesSync(lock, stale, stale);
+
+    captureLearning({
+      project: 'recovered-project',
+      source: 'manual',
+      summary: 'Captured after stale migration recovery.',
+    });
+
+    expect(listLearningCandidates('recovered-project')).toHaveLength(1);
+    expect(existsSync(lock)).toBe(false);
   });
 });

@@ -16,7 +16,6 @@ import {
   type TrustLevel,
 } from './policy.js';
 import {
-  attachSession,
   applyIndependentCompletionGrade,
   getGoal,
   resolveProject,
@@ -83,14 +82,6 @@ function validResourceKind(value: string): ResourceKind {
     throw new Error(`unsupported resource kind: ${value}`);
   }
   return value as ResourceKind;
-}
-
-async function readStdin(): Promise<string> {
-  if (process.stdin.isTTY) return '';
-  process.stdin.setEncoding('utf8');
-  let text = '';
-  for await (const chunk of process.stdin) text += String(chunk);
-  return text;
 }
 
 export async function runSupervisorCli(args: string[]): Promise<boolean> {
@@ -371,40 +362,6 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     };
     updateGoal(id, patch);
     console.log(`goal ${id}: ${statusRaw}`);
-    return true;
-  }
-
-  if (command === 'session' && (args[1] === 'attach' || args[1] === 'hook')) {
-    const host = flag(args, '--host') ?? 'unknown';
-    let cwd = flag(args, '--cwd') ?? process.cwd();
-    let sessionId = flag(args, '--session-id');
-    if (args[1] === 'hook') {
-      const input = await readStdin();
-      if (input) {
-        try {
-          const parsed = JSON.parse(input) as { cwd?: string; session_id?: string };
-          cwd = parsed.cwd ?? cwd;
-          sessionId = parsed.session_id ?? sessionId;
-        } catch {
-          // Keep defaults; hook context is advisory.
-        }
-      }
-    }
-    const project = resolveProjectForCwd(cwd);
-    attachSession({
-      host,
-      cwd,
-      ...(project ? { project: project.project, repoPath: project.repoPath } : {}),
-      ...(sessionId ? { sessionId } : {}),
-    });
-    const active = project
-      ? supervisorSnapshot(project.project)
-      : 'No git project detected in this session.';
-    const policy = project ? getProjectPolicy(project.project, project.repoPath) : undefined;
-    const resources = formatResourceTelemetry(resourceSnapshot().telemetry);
-    console.log(
-      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}\n` : ''}${active}\n\nRESOURCE GUARD\n${resources}\nsubagent depth: 1\nbrowser hard cap: 2\nconcurrent build cap: 1\n\nMajor is the default control plane. Reserve shared capacity before workers, browsers, or builds; queued work must wait. Owner-approved build projects may coordinate normal reversible engineering work immediately; client data remains project-local and destructive/irreversible owner gates still apply.`,
-    );
     return true;
   }
 

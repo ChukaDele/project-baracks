@@ -118,6 +118,27 @@ function migrationLockPath(): string {
 function waitForMigration(deadline: number): void {
   const lock = migrationLockPath();
   while (existsSync(lock)) {
+    try {
+      const before = statSync(lock);
+      if (Date.now() - before.mtimeMs > 30_000) {
+        const owner = readFileSync(lock, 'utf8').trim();
+        const pid = /^\d+$/.test(owner) ? Number.parseInt(owner, 10) : Number.NaN;
+        if (!learningLockOwnerIsLive(pid)) {
+          const after = statSync(lock);
+          if (
+            before.dev === after.dev &&
+            before.ino === after.ino &&
+            before.mtimeMs === after.mtimeMs
+          ) {
+            unlinkSync(lock);
+            continue;
+          }
+        }
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
     if (Date.now() >= deadline) {
       throw new Error(`timed out waiting for Major learning migration: ${lock}`);
     }
@@ -126,7 +147,7 @@ function waitForMigration(deadline: number): void {
 }
 
 export function learningLockOwnerIsLive(pid: number): boolean {
-  if (!Number.isFinite(pid)) return false;
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;

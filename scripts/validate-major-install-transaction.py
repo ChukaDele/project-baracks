@@ -15,6 +15,7 @@ from typing import Optional
 ROOT = Path(__file__).resolve().parent.parent
 STAGER = ROOT / "scripts" / "stage-major-user-state.py"
 ACTIVATOR = ROOT / "scripts" / "activate-major-user-state.py"
+MIGRATION_LOCK_ACQUIRER = ROOT / "scripts" / "acquire-major-learning-migration-lock.py"
 
 
 def write(path: Path, content: str, mode: Optional[int] = None) -> None:
@@ -105,6 +106,51 @@ def assert_invalid_settings_are_safe(temp: Path, env: dict[str, str]) -> None:
     assert snapshot(home) == before, "staging malformed settings changed live state"
 
 
+def assert_unsafe_global_learning_is_safe(temp: Path, env: dict[str, str]) -> None:
+    home = temp / "unsafe-learning-home"
+    learning = home / ".major" / "learning" / "global.json"
+    write(
+        learning,
+        json.dumps(
+            {
+                "version": 2,
+                "candidates": [
+                    {
+                        "id": "unsafe-global",
+                        "source": "manual",
+                        "summary": "Use /Users/alice/private-client evidence.",
+                        "scope": "global",
+                        "occurrences": 1,
+                        "evidence": [f"promotion-evidence-sha256:{'a' * 64}"],
+                        "status": "promoted",
+                        "createdAt": "2026-01-01T00:00:00.000Z",
+                        "updatedAt": "2026-01-01T00:00:00.000Z",
+                    }
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+    )
+    before = snapshot(home)
+    result = run(
+        [
+            sys.executable,
+            str(STAGER),
+            "--root",
+            str(ROOT),
+            "--stage",
+            str(temp / "unsafe-learning-stage"),
+            "--major-bin",
+            str(home / ".local" / "bin" / "major"),
+        ],
+        {**env, "HOME": str(home), "CODEX_HOME": str(home / ".codex")},
+        expect_success=False,
+    )
+    assert "refusing to migrate unsafe or malformed global Major learning record" in result.stderr
+    assert snapshot(home) == before, "unsafe global-learning rejection changed live state"
+
+
 def assert_installer_preflight_is_safe(temp: Path, env: dict[str, str]) -> None:
     remote = temp / "origin.git"
     seed = temp / "seed"
@@ -146,6 +192,26 @@ def assert_installer_preflight_is_safe(temp: Path, env: dict[str, str]) -> None:
     )
     assert "local HEAD is not the current origin/main" in mismatch.stderr
     assert snapshot(fake_home) == before, "origin/main rejection changed user state"
+
+
+def assert_migration_lock_recovery(temp: Path, env: dict[str, str]) -> None:
+    lock = temp / "migration-lock-recovery" / ".migration.lock"
+    write(lock, f"{os.getpid()}\n", 0o600)
+    stale = time.time() - 31
+    os.utime(lock, (stale, stale))
+    live = run(
+        [sys.executable, str(MIGRATION_LOCK_ACQUIRER), str(lock)],
+        env,
+        expect_success=False,
+    )
+    assert "another learning migration is active" in live.stderr
+    assert lock.read_text() == f"{os.getpid()}\n"
+
+    write(lock, "invalid-owner\n", 0o600)
+    os.utime(lock, (stale, stale))
+    run([sys.executable, str(MIGRATION_LOCK_ACQUIRER), str(lock)], env)
+    assert lock.read_text() == f"{os.getpid()}\n"
+    lock.unlink()
 
 
 def seed_home(home: Path, codex_home: Path) -> None:
@@ -221,7 +287,9 @@ def main() -> None:
         temp = Path(raw_temp)
         base_env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
         assert_installer_preflight_is_safe(temp, base_env)
+        assert_migration_lock_recovery(temp, base_env)
         assert_invalid_settings_are_safe(temp, base_env)
+        assert_unsafe_global_learning_is_safe(temp, base_env)
 
         home = temp / "home"
         codex_home = home / ".codex-custom"

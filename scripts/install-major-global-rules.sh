@@ -8,6 +8,15 @@ STAGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/major-global-rules.XXXXXX")"
 LEARNING_MIGRATION_LOCK="$HOME/.major/learning/.migration.lock"
 LEARNING_LOCK_HELD=0
 RULES_RECORD="$STAGE_DIR/installed-global-rules.json"
+
+cleanup() {
+  rm -rf "$STAGE_DIR"
+  if [ "$LEARNING_LOCK_HELD" = "1" ]; then
+    rm -f "$LEARNING_MIGRATION_LOCK"
+  fi
+}
+trap cleanup EXIT
+
 cd "$MAJOR_ROOT"
 
 if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
@@ -49,17 +58,8 @@ path.write_text(
 )
 PY
 
-cleanup() {
-  rm -rf "$STAGE_DIR"
-  if [ "$LEARNING_LOCK_HELD" = "1" ]; then
-    rm -f "$LEARNING_MIGRATION_LOCK"
-  fi
-}
-trap cleanup EXIT
-
 mkdir -p "$HOME/.major/learning"
-if ! (set -C; : > "$LEARNING_MIGRATION_LOCK") 2>/dev/null; then
-  echo "ERROR: refusing to install Major rules while another learning migration is active." >&2
+if ! python3 "$MAJOR_ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK"; then
   exit 1
 fi
 LEARNING_LOCK_HELD=1
