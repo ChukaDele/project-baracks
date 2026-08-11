@@ -64,6 +64,13 @@
       "when": 1784800300000,
       "tag": "0008_roadmap_apply_lease",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1784800600000,
+      "tag": "0011_complete_worker_fencing",
+      "breakpoints": true
     }
   ]
 }
