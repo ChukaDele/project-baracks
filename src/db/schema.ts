@@ -81,6 +81,9 @@ export const tasks = sqliteTable(
     version: integer('version').notNull().default(0),
     /** Optional task-specific completion criteria (JSON, see domain/completion). */
     completionCriteriaJson: text('completion_criteria_json'),
+    /** Immutable criteria captured at the first dispatch to queued. */
+    completionCriteriaSnapshotJson: text('completion_criteria_snapshot_json'),
+    completionCriteriaLockedAt: text('completion_criteria_locked_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

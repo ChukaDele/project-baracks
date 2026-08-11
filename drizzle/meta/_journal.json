@@ -71,6 +71,13 @@
       "when": 1784800400000,
       "tag": "0009_paid_authority_boundary",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1784800500000,
+      "tag": "0010_immutable_completion_snapshot",
+      "breakpoints": true
     }
   ]
 }
