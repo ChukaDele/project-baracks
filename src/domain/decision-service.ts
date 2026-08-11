@@ -56,6 +56,7 @@ export function resolveDecision(
 export interface DecisionScope {
   provider?: string;
   modelRef?: string;
+  purpose?: string;
 }
 
 /**
@@ -102,15 +103,11 @@ export function isApprovedDecision(
         return false; // unparseable context cannot prove a matching scope
       }
     }
-    // A scope must be explicitly declared and match exactly; missing scope
-    // authorises nothing.
-    if (
-      declared?.provider === undefined ||
-      declared.provider !== expect.scope.provider ||
-      declared.modelRef === undefined ||
-      declared.modelRef !== expect.scope.modelRef
-    ) {
-      return false;
+    // Every expected field must be explicitly declared and match exactly.
+    for (const field of ['provider', 'modelRef', 'purpose'] as const) {
+      if (expect.scope[field] !== undefined && declared?.[field] !== expect.scope[field]) {
+        return false;
+      }
     }
   }
   return true;

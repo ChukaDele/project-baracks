@@ -36,6 +36,7 @@ import {
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import {
   completeTaskProperly,
+  ensureObservedModel,
   recordQualifyingVerification,
   seedProject,
   testDb,
@@ -272,6 +273,7 @@ describe('completion proof (model preserved; the completed transition is disable
 
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'mock-reviewer' }).run();
+    ensureObservedModel(db, providerId, 'codex');
     const run = createRun(db, {
       taskId: task.id,
       providerId,
@@ -374,6 +376,7 @@ describe('agent runs', () => {
     const task = addTask(db, { projectId: project.id, title: 'work' });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'mock' }).run();
+    ensureObservedModel(db, providerId);
     const run = createRun(db, {
       taskId: task.id,
       providerId,
@@ -387,6 +390,7 @@ describe('agent runs', () => {
 
   it('supports many runs per task and records routing metadata', () => {
     const { db, task, providerId, run } = seedRun(testDb());
+    ensureObservedModel(db, providerId, 'opus');
     const second = createRun(db, {
       taskId: task.id,
       providerId,
@@ -454,7 +458,7 @@ describe('agent runs', () => {
           routingReason: 'forged direct insert',
         })
         .run(),
-    ).toThrow(/authoritatively known billing mode/);
+    ).toThrow(/authoritatively (known|observed).*billing/);
   });
 
   it('records usage observations', () => {
