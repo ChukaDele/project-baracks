@@ -17,6 +17,8 @@ import {
 } from '../src/domain/task-service.js';
 import { ClaudeCodeProvider } from '../src/providers/claude-code.js';
 import { CodexProvider } from '../src/providers/codex.js';
+import { cursorProvider } from '../src/providers/cursor.js';
+import { antigravityProvider } from '../src/providers/antigravity.js';
 import {
   DEFAULT_MODEL_REGISTRY,
   loadModelRegistry,
@@ -76,19 +78,24 @@ describe('the capability gate itself', () => {
 describe('provider execution surface', () => {
   function probeGateway() {
     return ExecutionGateway.probeOnly({
-      commandPolicy: { allowedExecutables: ['claude', 'codex', 'which'] },
+      commandPolicy: { allowedExecutables: ['claude', 'codex', 'cursor-agent', 'agy', 'which'] },
       trustedExecutables: new TrustedExecutableRegistry(),
       recordDecision: () => undefined,
     });
   }
 
-  it('both provider adapters refuse execute() via the gateway gate', () => {
+  it('all four provider adapters refuse execute() via the gateway gate', () => {
     const claude = new ClaudeCodeProvider({
       gateway: probeGateway(),
       registry: DEFAULT_MODEL_REGISTRY,
     });
     const codex = new CodexProvider({ gateway: probeGateway(), registry: DEFAULT_MODEL_REGISTRY });
-    for (const provider of [claude, codex]) {
+    const cursor = cursorProvider({ gateway: probeGateway(), registry: DEFAULT_MODEL_REGISTRY });
+    const antigravity = antigravityProvider({
+      gateway: probeGateway(),
+      registry: DEFAULT_MODEL_REGISTRY,
+    });
+    for (const provider of [claude, codex, cursor, antigravity]) {
       expect(() => provider.execute({ prompt: 'do work', cwd: process.cwd() })).toThrow(
         CapabilityUnavailableError,
       );

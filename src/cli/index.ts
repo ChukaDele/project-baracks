@@ -20,6 +20,8 @@ import { addProject, getProjectByName, listProjects } from '../config/project-se
 import { runDoctor } from '../doctor/doctor.js';
 import { ClaudeCodeProvider } from '../providers/claude-code.js';
 import { CodexProvider } from '../providers/codex.js';
+import { cursorProvider } from '../providers/cursor.js';
+import { antigravityProvider } from '../providers/antigravity.js';
 import { persistProviderDiscovery } from '../providers/discovery-store.js';
 import { route, type RoutingRequest } from '../routing/router.js';
 import { dbDecisionRecorder } from '../security/audit.js';
@@ -72,6 +74,8 @@ function db(): Db {
 const PROBE_EXECUTABLES = [
   'claude',
   'codex',
+  'cursor-agent',
+  'agy',
   'git',
   'pnpm',
   'gh',
@@ -92,7 +96,12 @@ function probeGateway(database: Db): ExecutionGateway {
 }
 
 function providers(gateway: ExecutionGateway) {
-  return [new ClaudeCodeProvider({ gateway }), new CodexProvider({ gateway })];
+  return [
+    new ClaudeCodeProvider({ gateway }),
+    new CodexProvider({ gateway }),
+    cursorProvider({ gateway }),
+    antigravityProvider({ gateway }),
+  ];
 }
 
 program

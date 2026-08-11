@@ -152,6 +152,42 @@ def seed_home(home: Path, codex_home: Path) -> None:
     write(home / ".major" / "global-worker-rules.md", "old global rules\n")
     write(home / ".major" / "skills" / "internal" / "old-skill" / "SKILL.md", "old\n")
     write(home / ".major" / "installed-release.json", '{"sha":"old"}\n')
+    write(
+        home / ".major" / "learning-candidates.json",
+        json.dumps(
+            {
+                "version": 1,
+                "candidates": [
+                    {
+                        "id": "legacy-project-global",
+                        "project": "private-client",
+                        "repoPath": "/private/client",
+                        "source": "user-correction",
+                        "summary": "Private client evidence must remain local.",
+                        "scope": "global",
+                        "occurrences": 2,
+                        "evidence": ["candidate@example.com"],
+                        "status": "promoted",
+                        "createdAt": "2026-01-01T00:00:00.000Z",
+                        "updatedAt": "2026-01-01T00:00:00.000Z",
+                    },
+                    {
+                        "id": "legacy-unowned",
+                        "source": "manual",
+                        "summary": "Unknown legacy ownership.",
+                        "scope": "global",
+                        "occurrences": 1,
+                        "evidence": [],
+                        "status": "candidate",
+                        "createdAt": "2026-01-01T00:00:00.000Z",
+                        "updatedAt": "2026-01-01T00:00:00.000Z",
+                    },
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+    )
     write(home / ".claude" / "major-global.md", "old claude rules\n")
     write(home / ".claude" / "major-communication.md", "obsolete but recoverable\n")
     write(home / ".claude" / "CLAUDE.md", "user claude rule\n")
@@ -251,6 +287,16 @@ def main() -> None:
         assert not (home / "Library" / "LaunchAgents" / "com.chuka.major-supervisor.plist").exists()
         assert 'export PATH="$HOME/.local/bin:$PATH"' in (home / ".zshrc").read_text()
         assert (home / ".major" / "skills" / "internal" / "skill-resolver" / "SKILL.md").is_file()
+        learning_root = home / ".major" / "learning"
+        assert not (learning_root / "global.json").exists()
+        project_files = list((learning_root / "projects").glob("*.json"))
+        assert len(project_files) == 1
+        migrated = json.loads(project_files[0].read_text())["candidates"][0]
+        assert migrated["id"] == "legacy-project-global"
+        assert migrated["scope"] == "project"
+        assert migrated["status"] == "candidate"
+        assert json.loads((learning_root / "legacy-quarantine.json").read_text())["candidates"][0]["id"] == "legacy-unowned"
+        assert not (home / ".major" / "learning-candidates.json").exists()
 
         second_manifest = stage(temp / "stage-idempotent", home, env, wrapper, record)
         run([sys.executable, str(ACTIVATOR), "--manifest", str(second_manifest)], env)

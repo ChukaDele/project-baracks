@@ -136,14 +136,10 @@ RELEASE_CREATED=0
 # previously loaded legacy service is cleanup after the committed transaction.
 launchctl bootout "gui/$UID/com.chuka.major-supervisor" >/dev/null 2>&1 || true
 
-# Ruflo is NOT attached globally. Antigravity remains an explicit, non-critical
-# post-install option and cannot roll back or replace the working Major runtime.
-if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
-  if [ ! -x "$MAJOR_HOME/antigravity-venv/bin/python" ]; then
-    python3 -m venv "$MAJOR_HOME/antigravity-venv"
-  fi
-  "$MAJOR_HOME/antigravity-venv/bin/python" -m pip install --quiet --upgrade pip google-antigravity || \
-    echo "WARN: Antigravity SDK install failed; Major will route around this worker until fixed."
+# Ruflo is NOT attached globally. Provider CLIs are separate user tools. Major
+# never installs or authenticates them as an unattended side effect.
+if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ]; then
+  echo "WARN: MAJOR_INSTALL_ANTIGRAVITY is retired. Install the official 'agy' CLI and complete Google OAuth interactively."
 fi
 
 cat <<EOF

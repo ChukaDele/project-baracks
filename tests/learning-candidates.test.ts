@@ -1,77 +1,149 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { captureLearning, listLearningCandidates } from '../src/learning/candidates.js';
+import {
+  captureLearning,
+  learningRoot,
+  listLearningCandidates,
+} from '../src/learning/candidates.js';
 
 let root = '';
-let priorPath: string | undefined;
+let priorRoot: string | undefined;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-learning-'));
-  priorPath = process.env.MAJOR_LEARNING_PATH;
-  process.env.MAJOR_LEARNING_PATH = join(root, 'learning.json');
+  priorRoot = process.env.MAJOR_LEARNING_ROOT;
+  process.env.MAJOR_LEARNING_ROOT = join(root, 'learning');
 });
 
 afterEach(() => {
-  if (priorPath === undefined) delete process.env.MAJOR_LEARNING_PATH;
-  else process.env.MAJOR_LEARNING_PATH = priorPath;
+  if (priorRoot === undefined) delete process.env.MAJOR_LEARNING_ROOT;
+  else process.env.MAJOR_LEARNING_ROOT = priorRoot;
   rmSync(root, { recursive: true, force: true });
 });
 
 describe('Major learning candidates', () => {
-  it('captures explicit corrections durably with scope and evidence', () => {
+  it('forbids direct global capture and keeps new evidence project-local', () => {
+    expect(() =>
+      captureLearning({
+        project: 'bredge',
+        repoPath: '/tmp/bredge',
+        source: 'user-correction',
+        scope: 'global',
+        summary: 'Allocate a stable project-specific dev port.',
+        evidence: 'Private Bredge incident evidence.',
+      }),
+    ).toThrow(/direct global capture is forbidden/);
+
     const candidate = captureLearning({
       project: 'bredge',
       repoPath: '/tmp/bredge',
       source: 'user-correction',
-      scope: 'global',
-      summary: 'Allocate a stable project-specific local dev port before starting browser QA.',
-      evidence: 'Bredge reused localhost:3001 while another project needed it.',
+      scope: 'project',
+      summary: 'Allocate a stable project-specific dev port.',
+      evidence: 'Private Bredge incident evidence.',
     });
-
-    expect(candidate.occurrences).toBe(1);
-    expect(candidate.scope).toBe('global');
-    expect(candidate.evidence).toHaveLength(1);
-    expect(listLearningCandidates()).toHaveLength(1);
+    expect(candidate.project).toBe('bredge');
+    expect(listLearningCandidates()).toEqual([]);
+    expect(listLearningCandidates('bredge')).toHaveLength(1);
   });
 
-  it('folds repeated corrections into one candidate and increments occurrences', () => {
-    const input = {
+  it('folds repeated project corrections without merging unrelated projects', () => {
+    const first = captureLearning({
       project: 'bredge',
-      repoPath: '/tmp/bredge',
-      source: 'user-correction' as const,
-      scope: 'global' as const,
-      summary: 'Allocate a stable project-specific local dev port before starting browser QA.',
-    };
-    const first = captureLearning({ ...input, evidence: 'first recurrence' });
-    const second = captureLearning({ ...input, evidence: 'second recurrence' });
+      source: 'user-correction',
+      key: 'stable-dev-port',
+      summary: 'Allocate a stable project port.',
+      evidence: 'first recurrence',
+    });
+    const second = captureLearning({
+      project: 'bredge',
+      source: 'recurring-failure',
+      key: 'stable-dev-port',
+      summary: 'Do not reuse another project port.',
+      evidence: 'second recurrence',
+    });
+    const unrelated = captureLearning({
+      project: 'surface-talent',
+      source: 'user-correction',
+      key: 'stable-dev-port',
+      summary: 'A private project-specific port lesson.',
+    });
 
     expect(second.id).toBe(first.id);
     expect(second.occurrences).toBe(2);
-    expect(second.evidence).toEqual(['first recurrence', 'second recurrence']);
-    expect(listLearningCandidates()).toHaveLength(1);
+    expect(unrelated.id).not.toBe(first.id);
+    expect(listLearningCandidates('bredge')).toHaveLength(1);
+    expect(listLearningCandidates('surface-talent')).toHaveLength(1);
   });
 
-  it('keeps project-local candidates out of unrelated project views', () => {
-    captureLearning({
-      project: 'surface-talent',
-      repoPath: '/tmp/st',
-      source: 'recurring-failure',
-      scope: 'project',
-      summary: 'Surface Talent-specific Recruitly mapping rule.',
-    });
+  it('uses physically separate opaque project stores', () => {
     captureLearning({
       project: 'jss-tool',
-      repoPath: '/tmp/jss',
-      source: 'successful-procedure',
-      scope: 'global',
-      summary: 'Generic idempotent external writeback pattern.',
+      repoPath: '/private/jss',
+      source: 'manual',
+      summary: 'Private JSS lesson.',
+    });
+    captureLearning({
+      project: 'surface-talent',
+      repoPath: '/private/surface',
+      source: 'manual',
+      summary: 'Private Surface lesson.',
     });
 
-    const jssView = listLearningCandidates('jss-tool');
-    expect(jssView.map((candidate) => candidate.summary)).toEqual([
-      'Generic idempotent external writeback pattern.',
-    ]);
+    const files = readdirSync(join(learningRoot(), 'projects'));
+    expect(files).toHaveLength(2);
+    expect(files.every((name) => /^[a-f0-9]{24}\.json$/.test(name))).toBe(true);
+    const bodies = files.map((name) =>
+      readFileSync(join(learningRoot(), 'projects', name), 'utf8'),
+    );
+    expect(bodies.some((body) => body.includes('Private JSS lesson.'))).toBe(true);
+    expect(bodies.some((body) => body.includes('Private Surface lesson.'))).toBe(true);
+    expect(
+      bodies.every((body) => !(body.includes('Private JSS') && body.includes('Private Surface'))),
+    ).toBe(true);
   });
+
+  it('deduplicates concurrent cross-process captures without losing occurrences', async () => {
+    const moduleUrl = pathToFileURL(
+      join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
+    );
+    const captures = Array.from({ length: 8 }, (_, index) => {
+      const script = `
+        import { captureLearning } from ${JSON.stringify(moduleUrl.href)};
+        captureLearning({
+          project: 'concurrent-project',
+          source: 'recurring-failure',
+          key: 'same-concurrent-lesson',
+          summary: 'The same lesson.',
+          evidence: ${JSON.stringify(`process-${index}`)}
+        });
+      `;
+      return new Promise<void>((resolve, reject) => {
+        const child = spawn(
+          process.execPath,
+          ['--import', 'tsx', '--input-type=module', '-e', script],
+          {
+            cwd: join(import.meta.dirname, '..'),
+            env: { ...process.env, MAJOR_LEARNING_ROOT: learningRoot() },
+            stdio: ['ignore', 'ignore', 'pipe'],
+          },
+        );
+        let stderr = '';
+        child.stderr.setEncoding('utf8');
+        child.stderr.on('data', (chunk) => (stderr += String(chunk)));
+        child.once('error', reject);
+        child.once('exit', (code) =>
+          code === 0 ? resolve() : reject(new Error(`capture child exited ${code}: ${stderr}`)),
+        );
+      });
+    });
+    await Promise.all(captures);
+    const [candidate] = listLearningCandidates('concurrent-project');
+    expect(candidate?.occurrences).toBe(8);
+    expect(candidate?.evidence).toHaveLength(8);
+  }, 30_000);
 });

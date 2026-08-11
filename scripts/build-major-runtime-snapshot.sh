@@ -28,19 +28,24 @@ mkdir -p "$DEST/scripts"
 cp "$ROOT/package.json" "$ROOT/pnpm-lock.yaml" "$DEST/"
 cp -R "$ROOT/dist" "$DEST/dist"
 cp -R "$ROOT/drizzle" "$DEST/drizzle"
-cp "$ROOT/scripts/major-antigravity-worker.py" "$DEST/scripts/major-antigravity-worker.py"
+cp -R "$ROOT/guidance" "$DEST/guidance"
+cp -R "$ROOT/skills" "$DEST/skills"
+cp -R "$ROOT/evals" "$DEST/evals"
 
 pnpm install --prod --frozen-lockfile --dir "$DEST"
 
 test -f "$DEST/dist/entry.js"
 test -d "$DEST/drizzle"
-test -f "$DEST/scripts/major-antigravity-worker.py"
+test -f "$DEST/guidance/skills.registry.json"
+test -f "$DEST/skills/internal/skill-resolver/SKILL.md"
+test -f "$DEST/evals/skill-resolver/skill-resolver.json"
 test -d "$DEST/node_modules"
 
 # Runtime smoke: execute from the immutable snapshot with isolated Major state.
 SMOKE_HOME="$DEST/.smoke-major-home"
 mkdir -p "$SMOKE_HOME"
 MAJOR_HOME="$SMOKE_HOME" node "$DEST/dist/entry.js" status >/dev/null
+MAJOR_HOME="$SMOKE_HOME" node "$DEST/dist/entry.js" skill audit --json >/dev/null
 
 # Migration smoke: prove the packaged drizzle migrations are discoverable from
 # the snapshot and can initialize a fresh SQLite database.

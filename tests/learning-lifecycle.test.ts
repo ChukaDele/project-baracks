@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -11,166 +11,191 @@ import {
 } from '../src/learning/candidates.js';
 
 let root = '';
-let priorLearningPath: string | undefined;
+let priorRoot: string | undefined;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-learning-lifecycle-'));
-  priorLearningPath = process.env.MAJOR_LEARNING_PATH;
-  process.env.MAJOR_LEARNING_PATH = join(root, 'learning-candidates.json');
+  priorRoot = process.env.MAJOR_LEARNING_ROOT;
+  process.env.MAJOR_LEARNING_ROOT = join(root, 'learning');
 });
 
 afterEach(() => {
-  if (priorLearningPath === undefined) delete process.env.MAJOR_LEARNING_PATH;
-  else process.env.MAJOR_LEARNING_PATH = priorLearningPath;
+  if (priorRoot === undefined) delete process.env.MAJOR_LEARNING_ROOT;
+  else process.env.MAJOR_LEARNING_ROOT = priorRoot;
   rmSync(root, { recursive: true, force: true });
 });
 
+function recurringProjectCandidate() {
+  const first = captureLearning({
+    source: 'user-correction',
+    key: 'remote-preview-not-localhost',
+    summary: 'Private project wording that must not become global.',
+    scope: 'project',
+    project: 'bredge',
+    repoPath: '/private/bredge',
+    evidence: 'Private incident evidence.',
+  });
+  captureLearning({
+    source: 'recurring-failure',
+    key: 'remote-preview-not-localhost',
+    summary: 'The same private correction happened again.',
+    scope: 'project',
+    project: 'bredge',
+    repoPath: '/private/bredge',
+    evidence: 'Second private incident.',
+  });
+  return first;
+}
+
 describe('Major learning lifecycle', () => {
-  it('coalesces sanitized global corrections when they share a stable learning key', () => {
-    const first = captureLearning({
-      source: 'user-correction',
-      key: 'wrong-project-edit',
-      summary: 'Confirm the target repository before editing.',
-      scope: 'global',
-      project: 'jss-tool',
-      repoPath: root,
-      evidence: 'Sanitized first correction',
-    });
-    const second = captureLearning({
-      source: 'recurring-failure',
-      key: 'wrong-project-edit',
-      summary: 'Do not patch whichever repo happens to be open.',
-      scope: 'global',
-      project: 'surface-talent',
-      repoPath: root,
-      evidence: 'Sanitized second correction',
-    });
-
-    expect(second.id).toBe(first.id);
-    expect(second.occurrences).toBe(2);
-    expect(second.project).toBeUndefined();
-    expect(second.repoPath).toBeUndefined();
-    expect(second.evidence).toEqual(['Sanitized first correction', 'Sanitized second correction']);
-    expect(learningReviewDue()).toHaveLength(1);
-  });
-
-  it('does not merge project-scoped evidence into an existing global candidate', () => {
-    const globalCandidate = captureLearning({
+  it('requires recurrence plus sanitized summary and evidence for global promotion', () => {
+    const oneOff = captureLearning({
       source: 'manual',
-      key: 'browser-evidence-required',
-      summary: 'Use browser evidence for visual claims.',
-      scope: 'global',
-      project: 'jss-tool',
-      repoPath: root,
-      evidence: 'Sanitized global evidence',
-    });
-    const projectCandidate = captureLearning({
-      source: 'user-correction',
-      key: 'browser-evidence-required',
-      summary: 'This project had a private visual QA correction.',
-      scope: 'project',
-      project: 'surface-talent',
-      repoPath: root,
-      evidence: 'Project-local evidence that must not enter global learning',
-    });
-
-    expect(projectCandidate.id).not.toBe(globalCandidate.id);
-    expect(globalCandidate.occurrences).toBe(1);
-    expect(globalCandidate.project).toBeUndefined();
-    expect(globalCandidate.repoPath).toBeUndefined();
-    expect(globalCandidate.evidence).toEqual(['Sanitized global evidence']);
-    expect(projectCandidate.scope).toBe('project');
-  });
-
-  it('requires evidence and a sanitized summary before global promotion', () => {
-    const candidate = captureLearning({
-      source: 'user-correction',
-      key: 'remote-preview-not-localhost',
-      summary: 'Private project wording that should not become global.',
-      scope: 'project',
+      key: 'one-off',
+      summary: 'A one-off lesson.',
       project: 'bredge',
-      repoPath: root,
-      evidence: 'Private project evidence',
     });
+    expect(() =>
+      promoteLearning({
+        id: oneOff.id,
+        project: 'bredge',
+        scope: 'global',
+        summary: 'Use a remote preview before browser QA.',
+        evidence: 'Verified with synthetic regression tests.',
+      }),
+    ).toThrow(/at least two occurrences/);
 
+    const candidate = recurringProjectCandidate();
     expect(() =>
       promoteLearning({
         id: candidate.id,
+        project: 'bredge',
         scope: 'global',
-        evidence: '   ',
-        summary: 'Use the approved remote preview path.',
+        summary: 'Use Bredge at /private/bredge before browser QA.',
+        evidence: 'Verified with synthetic regression tests.',
       }),
-    ).toThrow(/promotion evidence is required/);
-
+    ).toThrow(/not sanitized/);
     expect(() =>
       promoteLearning({
         id: candidate.id,
+        project: 'bredge',
         scope: 'global',
-        evidence: 'Promoted into tested remote-first guidance.',
-        summary: '   ',
+        summary: 'Use an approved remote preview before browser QA.',
+        evidence: 'See owner@example.com and https://private.example/evidence',
       }),
-    ).toThrow(/sanitized summary/);
+    ).toThrow(/not sanitized/);
 
-    const promoted = promoteLearning({
-      id: candidate.id,
-      scope: 'global',
-      evidence: 'Promoted into tested remote-first guidance.',
-      summary: 'Use the approved remote preview path.',
-    });
-
-    expect(promoted.status).toBe('promoted');
-    expect(promoted.scope).toBe('global');
-    expect(promoted.summary).toBe('Use the approved remote preview path.');
-    expect(promoted.project).toBeUndefined();
-    expect(promoted.repoPath).toBeUndefined();
-    expect(promoted.evidence).toEqual(['Promoted into tested remote-first guidance.']);
-  });
-
-  it('removes a candidate from review due after its durable replacement is promoted', () => {
-    const candidate = captureLearning({
-      source: 'user-correction',
-      key: 'remote-preview-not-localhost',
-      summary: 'Use the approved remote preview path.',
-      scope: 'global',
-      project: 'bredge',
+    const shortName = captureLearning({
+      source: 'manual',
+      key: 'short-project-name',
+      summary: 'Private short-name project lesson.',
+      project: 'AI',
     });
     captureLearning({
       source: 'recurring-failure',
-      key: 'remote-preview-not-localhost',
-      summary: 'Avoid local preview regressions.',
-      scope: 'global',
-      project: 'jss-tool',
+      key: 'short-project-name',
+      summary: 'Private short-name project lesson repeated.',
+      project: 'AI',
     });
+    expect(() =>
+      promoteLearning({
+        id: shortName.id,
+        project: 'AI',
+        scope: 'global',
+        summary: 'Reuse the AI project procedure.',
+        evidence: 'Verified twice with synthetic fixtures.',
+      }),
+    ).toThrow(/not sanitized/);
 
-    expect(learningReviewDue()).toHaveLength(1);
     const promoted = promoteLearning({
       id: candidate.id,
+      project: 'bredge',
       scope: 'global',
-      evidence: 'Promoted into tested remote-first guidance.',
-      summary: 'Use the approved remote preview path.',
+      summary: 'Use an approved remote preview before browser QA.',
+      evidence: 'Verified twice with synthetic regression fixtures.',
     });
-
-    expect(promoted.status).toBe('promoted');
-    expect(learningReviewDue()).toHaveLength(0);
-    expect(listLearningCandidates(undefined, 'promoted')).toHaveLength(1);
+    expect(promoted.scope).toBe('global');
+    expect(promoted.project).toBeUndefined();
+    expect(promoted.repoPath).toBeUndefined();
+    expect(listLearningCandidates(undefined, 'promoted')).toEqual([promoted]);
+    const globalPath = join(root, 'learning', 'global.json');
+    expect(existsSync(globalPath)).toBe(true);
+    const raw = readFileSync(globalPath, 'utf8');
+    expect(raw).not.toMatch(/bredge|\/private\/|owner@example\.com/i);
   });
 
-  it('requires evidence to dismiss a recurring learning candidate', () => {
-    const candidate = captureLearning({
-      source: 'manual',
-      key: 'temporary-provider-workaround',
-      summary: 'Temporary provider-specific workaround.',
-      project: 'example-project',
-    });
+  it('scopes promotion and dismissal lookup to the current project', () => {
+    const candidate = recurringProjectCandidate();
+    expect(() =>
+      promoteLearning({
+        id: candidate.id,
+        project: 'surface-talent',
+        scope: 'project',
+        evidence: 'Wrong project attempt.',
+      }),
+    ).toThrow(/not found in project surface-talent/);
+    expect(() =>
+      dismissLearning({
+        id: candidate.id,
+        project: 'surface-talent',
+        evidence: 'Wrong project attempt.',
+      }),
+    ).toThrow(/not found in project surface-talent/);
+  });
 
-    expect(() => dismissLearning({ id: candidate.id, evidence: '   ' })).toThrow(
-      /evidence\/reason is required/,
+  it('refuses tampered global records carrying metadata or PII', () => {
+    const path = join(root, 'learning', 'global.json');
+    mkdirSync(join(root, 'learning'), { recursive: true });
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: 2,
+        candidates: [
+          {
+            id: 'tampered',
+            project: 'private-client',
+            source: 'manual',
+            summary: 'Contact owner@example.com.',
+            scope: 'global',
+            occurrences: 2,
+            evidence: ['Private evidence.'],
+            status: 'promoted',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      }),
     );
+    expect(() => listLearningCandidates()).toThrow(/unsafe or malformed global/);
+  });
 
-    const dismissed = dismissLearning({
-      id: candidate.id,
-      evidence: 'Provider bug was fixed upstream; rule is now obsolete.',
+  it('promotes or dismisses recurring project candidates with evidence', () => {
+    const promotedCandidate = recurringProjectCandidate();
+    expect(learningReviewDue('bredge')).toHaveLength(1);
+    const promoted = promoteLearning({
+      id: promotedCandidate.id,
+      project: 'bredge',
+      scope: 'project',
+      evidence: 'Regression test added to this project.',
     });
-    expect(dismissed.status).toBe('dismissed');
+    expect(promoted.status).toBe('promoted');
+    expect(learningReviewDue('bredge')).toHaveLength(0);
+
+    const dismissedCandidate = captureLearning({
+      source: 'manual',
+      key: 'temporary-workaround',
+      summary: 'Temporary provider workaround.',
+      project: 'bredge',
+    });
+    expect(() =>
+      dismissLearning({ id: dismissedCandidate.id, project: 'bredge', evidence: '   ' }),
+    ).toThrow(/evidence\/reason is required/);
+    expect(
+      dismissLearning({
+        id: dismissedCandidate.id,
+        project: 'bredge',
+        evidence: 'Provider defect was fixed upstream.',
+      }).status,
+    ).toBe('dismissed');
   });
 });

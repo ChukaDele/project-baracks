@@ -34,13 +34,16 @@ vi.mock('node:child_process', () => {
 // Imported AFTER the mock (vi.mock is hoisted): these are the discovery paths.
 import { ClaudeCodeProvider } from '../src/providers/claude-code.js';
 import { CodexProvider } from '../src/providers/codex.js';
+import { cursorProvider } from '../src/providers/cursor.js';
+import { antigravityArgs, antigravityProvider } from '../src/providers/antigravity.js';
 import { route } from '../src/routing/router.js';
 import { ExecutionGateway } from '../src/security/gateway.js';
 import { TrustedExecutableRegistry } from '../src/security/trusted-executables.js';
+import { workerCommand } from '../src/supervisor/worker.js';
 
 function probeGateway() {
   return ExecutionGateway.probeOnly({
-    commandPolicy: { allowedExecutables: ['claude', 'codex'] },
+    commandPolicy: { allowedExecutables: ['claude', 'codex', 'cursor-agent', 'agy'] },
     trustedExecutables: new TrustedExecutableRegistry(),
     recordDecision: () => undefined,
   });
@@ -48,7 +51,12 @@ function probeGateway() {
 
 function providers() {
   const gateway = probeGateway();
-  return [new ClaudeCodeProvider({ gateway }), new CodexProvider({ gateway })];
+  return [
+    new ClaudeCodeProvider({ gateway }),
+    new CodexProvider({ gateway }),
+    cursorProvider({ gateway }),
+    antigravityProvider({ gateway }),
+  ];
 }
 
 beforeEach(() => {
@@ -101,6 +109,15 @@ describe('discovery is process-free', () => {
     // than routing to a model — and it does so without any subprocess.
     expect(decision.kind).toBe('checkpoint');
     expect(calls).toEqual([]);
+  });
+
+  it('never grants Antigravity unattended host authority in provider or worker commands', () => {
+    const request = { prompt: 'review this change', cwd: '/tmp' };
+    expect(antigravityArgs(request)).toEqual(['-p', 'review this change']);
+    expect(workerCommand('antigravity', request.prompt).args).toEqual(['-p', 'review this change']);
+    expect([...antigravityArgs(request), ...workerCommand('antigravity', '').args]).not.toContain(
+      '--dangerously-skip-permissions',
+    );
   });
 });
 

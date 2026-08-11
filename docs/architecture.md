@@ -101,6 +101,8 @@ They define:
 - installed does not mean loaded;
 - the resolver selects the smallest useful skill set;
 - positive/negative trigger examples and reachability/overlap checks are part of the skill lifecycle.
+- `major skill resolve --task "..."` returns only installed, reachable skill bodies;
+- `major skill audit` detects missing, duplicate and orphan internal skills. The immutable runtime ships the registry, skill bodies and resolver evals used by these commands.
 
 Important recurring meta-skills:
 
@@ -153,6 +155,8 @@ Thin adapters invoke available coding/reasoning environments:
 - Google Antigravity;
 - Cursor Agent CLI.
 
+The executable contracts are `claude`, `codex`, `agy` and `cursor-agent`. Major does not substitute the Cursor editor command for the separate headless CLI and does not substitute an uninstalled Antigravity Python SDK for the official `agy` CLI. Provider installation, OAuth, workspace trust and tool-permission selection remain interactive user setup. Major never adds Antigravity's dangerous permission-bypass flag. A provider is routable only after persisted availability plus authoritative billing observation; executable presence alone grants nothing.
+
 Worker/model choice is dynamic. Prefer subscription-included capacity. Paid API/credit spend remains an explicit authority boundary.
 
 Major should not encode fixed permanent agent factories. The coordinator may create a small dynamic worker graph when the task contains genuinely independent work.
@@ -203,6 +207,12 @@ Learning priority:
 `deterministic rule/tool → tested skill → memory`
 
 Only sanitized transferable lessons cross into global Major learning. Client/candidate/PII material never does.
+
+Project learning candidates are stored in physically separate opaque project files. Direct global capture is forbidden. Global promotion requires a recurring project candidate plus newly supplied sanitized summary and evidence. Global records contain no project identity, repository path or project-local evidence. Promoted project and global lessons are recalled in fresh session and coordinator context; dismissed lessons are not.
+
+## Generative video
+
+Google Flow and Higgsfield are interactive creative providers, not unattended worker daemons. Major routes explicit generative-video work through `video-generation-routing`, prepares the smallest representative shot first, keeps source media and provenance project-local, and pauses in the visible app browser for login or credit confirmation. Remotion remains the deterministic route for frame-exact code-rendered motion.
 
 ## Communication adapters
 

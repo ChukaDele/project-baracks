@@ -20,6 +20,8 @@ export interface WorkerOutcome {
   stdout: string;
   stderr: string;
   durationMs: number;
+  rateLimited: boolean;
+  exhausted: boolean;
 }
 
 export interface GatewayCommandOutcome {
@@ -28,6 +30,8 @@ export interface GatewayCommandOutcome {
   stdout: string;
   stderr: string;
   durationMs: number;
+  rateLimited: boolean;
+  exhausted: boolean;
 }
 
 const OUTPUT_LIMIT = 200_000;
@@ -36,35 +40,47 @@ function majorRepoRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 }
 
-function commandFor(host: WorkerHost, prompt: string): { command: string; args: string[] } {
+export function workerCommand(
+  host: WorkerHost,
+  prompt: string,
+  modelRef?: string,
+): { command: string; args: string[] } {
   switch (host) {
     case 'claude': {
       const permissionMode = process.env.MAJOR_CLAUDE_PERMISSION_MODE ?? 'auto';
+      const args = [
+        '-p',
+        prompt,
+        '--output-format',
+        'json',
+        '--max-turns',
+        '80',
+        '--permission-mode',
+        permissionMode,
+      ];
+      if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
       return {
         command: 'claude',
-        args: [
-          '-p',
-          prompt,
-          '--output-format',
-          'json',
-          '--max-turns',
-          '80',
-          '--permission-mode',
-          permissionMode,
-        ],
+        args,
       };
     }
-    case 'codex':
-      return { command: 'codex', args: ['exec', '--json', prompt] };
-    case 'cursor':
-      return {
-        command: 'cursor-agent',
-        args: ['-p', '--force', '--output-format', 'json', prompt],
-      };
+    case 'codex': {
+      const args = ['exec', '--json'];
+      if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
+      args.push(prompt);
+      return { command: 'codex', args };
+    }
+    case 'cursor': {
+      const args = ['-p', '--force', '--output-format', 'json'];
+      if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
+      args.push(prompt);
+      return { command: 'cursor-agent', args };
+    }
     case 'antigravity': {
-      const python = join(homedir(), '.major', 'antigravity-venv', 'bin', 'python');
-      const helper = join(majorRepoRoot(), 'scripts', 'major-antigravity-worker.py');
-      return { command: python, args: [helper, '--prompt', prompt] };
+      const args: string[] = [];
+      if (modelRef && modelRef !== 'auto') args.push('--model', modelRef);
+      args.push('-p', prompt);
+      return { command: 'agy', args };
     }
   }
 }
@@ -80,10 +96,7 @@ function executableOnPath(name: string): boolean {
 }
 
 export function hostAvailable(host: WorkerHost): boolean {
-  if (host === 'antigravity') {
-    return existsSync(join(homedir(), '.major', 'antigravity-venv', 'bin', 'python'));
-  }
-  const executable = commandFor(host, '').command;
+  const executable = workerCommand(host, '').command;
   return executable.includes('/') ? existsSync(executable) : executableOnPath(executable);
 }
 
@@ -112,6 +125,10 @@ export async function runGatewayCommand(input: {
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.resourceLeaseId ? { resourceLeaseId: input.resourceLeaseId } : {}),
       parseLine: (line) => ({ type: 'stdout', data: line }),
+      detectRateLimit: (value) =>
+        /rate.?limit|overloaded|429|too many requests|slow down/i.test(value),
+      detectExhaustion: (value) =>
+        /usage limit|quota exceeded|out of credits|allowance|plan limit/i.test(value),
     });
 
     const stopWatcher = setInterval(() => {
@@ -138,6 +155,8 @@ export async function runGatewayCommand(input: {
           outcome.stderrTail ??
           (globalStopRequested() ? 'Major global kill switch cancelled execution.' : ''),
         durationMs: Date.now() - started,
+        rateLimited: outcome.rateLimited,
+        exhausted: outcome.exhausted,
       };
     } finally {
       clearInterval(stopWatcher);
@@ -149,6 +168,8 @@ export async function runGatewayCommand(input: {
       stdout,
       stderr: error instanceof Error ? error.message : String(error),
       durationMs: Date.now() - started,
+      rateLimited: false,
+      exhausted: false,
     };
   }
 }
@@ -158,6 +179,7 @@ export async function runWorker(input: {
   prompt: string;
   cwd: string;
   timeoutMs?: number;
+  modelRef?: string;
 }): Promise<WorkerOutcome> {
   const started = Date.now();
   const request = requestResource({
@@ -173,6 +195,8 @@ export async function runWorker(input: {
       stdout: '',
       stderr: `Major resource guard refused worker: ${request.reason}`,
       durationMs: Date.now() - started,
+      rateLimited: false,
+      exhausted: false,
     };
   }
 
@@ -182,7 +206,7 @@ export async function runWorker(input: {
       request.status === 'active'
         ? request.lease
         : await waitForResource(request.request, input.timeoutMs);
-    const spec = commandFor(input.host, input.prompt);
+    const spec = workerCommand(input.host, input.prompt, input.modelRef);
     const outcome = await runGatewayCommand({
       executable: spec.command,
       args: spec.args,
@@ -199,6 +223,8 @@ export async function runWorker(input: {
       stdout: '',
       stderr: error instanceof Error ? error.message : String(error),
       durationMs: Date.now() - started,
+      rateLimited: false,
+      exhausted: false,
     };
   } finally {
     if (lease) releaseResource(lease.id);

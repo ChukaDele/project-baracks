@@ -8,7 +8,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { openDb } from '../db/client.js';
 import { listLearningCandidates } from '../learning/candidates.js';
+import { loadPersistedProviderInfos, recordModelOutcome } from '../providers/discovery-store.js';
+import type { ProviderInfo } from '../providers/types.js';
+import { route } from '../routing/router.js';
+import { resolveSkills } from '../skills/resolver.js';
 import {
   assertExecutionAllowed,
   getProjectPolicy,
@@ -25,8 +30,6 @@ import {
   type WorkerHost,
 } from './state.js';
 import { hostAvailable, runWorker } from './worker.js';
-
-const COORDINATOR_ORDER: WorkerHost[] = ['claude', 'codex', 'cursor', 'antigravity'];
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
@@ -57,8 +60,9 @@ function readProjectContext(repoPath: string): string {
 
 function readLearningContext(project: string): string {
   const candidates = listLearningCandidates(project)
-    .filter((candidate) => candidate.status === 'candidate')
+    .filter((candidate) => candidate.status !== 'dismissed')
     .sort((left, right) => {
+      if (left.status !== right.status) return left.status === 'promoted' ? -1 : 1;
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
       return right.updatedAt.localeCompare(left.updatedAt);
     })
@@ -67,17 +71,50 @@ function readLearningContext(project: string): string {
   return candidates
     .map(
       (candidate) =>
-        `- ${candidate.occurrences}x [${candidate.scope}/${candidate.source}] ${candidate.summary}`,
+        `- ${candidate.status.toUpperCase()} ${candidate.occurrences}x [${candidate.scope}/${candidate.source}] ${candidate.summary}`,
     )
     .join('\n');
 }
 
-function coordinatorFor(goal: SupervisorGoal): WorkerHost {
-  const available = COORDINATOR_ORDER.filter(hostAvailable);
-  if (available.length === 0) return goal.preferredCoordinator;
-  const preferredIndex = available.indexOf(goal.preferredCoordinator);
-  const start = preferredIndex >= 0 ? preferredIndex : 0;
-  return available[(start + goal.consecutiveFailures) % available.length] ?? available[0]!;
+const PROVIDER_HOSTS: Record<string, WorkerHost> = {
+  'claude-code': 'claude',
+  codex: 'codex',
+  cursor: 'cursor',
+  antigravity: 'antigravity',
+};
+
+const HOST_PROVIDERS: Record<WorkerHost, string> = {
+  claude: 'claude-code',
+  codex: 'codex',
+  cursor: 'cursor',
+  antigravity: 'antigravity',
+};
+
+export type CoordinatorSelection =
+  | { kind: 'route'; host: WorkerHost; provider: string; modelRef: string; reason: string }
+  | { kind: 'checkpoint'; reason: string };
+
+export function selectCoordinator(
+  goal: SupervisorGoal,
+  providers: ProviderInfo[],
+): CoordinatorSelection {
+  const preferred = HOST_PROVIDERS[goal.preferredCoordinator];
+  const ordered = [...providers].sort((left, right) => {
+    if (left.name === preferred) return -1;
+    if (right.name === preferred) return 1;
+    return left.name.localeCompare(right.name);
+  });
+  const decision = route({ purpose: 'analysis', complexity: 'architectural' }, ordered);
+  if (decision.kind === 'checkpoint') return decision;
+  const host = PROVIDER_HOSTS[decision.provider];
+  if (!host) return { kind: 'checkpoint', reason: `unsupported provider: ${decision.provider}` };
+  return {
+    kind: 'route',
+    host,
+    provider: decision.provider,
+    modelRef: decision.modelRef,
+    reason: decision.reason,
+  };
 }
 
 function trustContract(policy: ProjectPolicy): string {
@@ -107,6 +144,11 @@ function trustContract(policy: ProjectPolicy): string {
 export function coordinatorPrompt(goal: SupervisorGoal): string {
   const context = readProjectContext(goal.repoPath);
   const learningContext = readLearningContext(goal.project);
+  const resolvedSkills = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills;
+  const skillContext =
+    resolvedSkills.length === 0
+      ? '(No installed skill matched deterministically. Inspect the registry before inventing a new workflow.)'
+      : resolvedSkills.map((skill) => `- ${skill.id}: ${skill.path}`).join('\n');
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const workerLanguage =
     policy.maxWorkers <= 1
@@ -165,8 +207,11 @@ Before ending this coordinator turn, report the goal back to Major with exactly 
   major goal report --id "${goal.id}" --status blocked --summary "<what is complete>" --owner-gate "<exact owner action>"
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
 
-ACTIVE MAJOR LEARNING CANDIDATES:
+ACTIVE MAJOR LEARNINGS:
 ${learningContext}
+
+RESOLVED MAJOR SKILLS:
+${skillContext}
 
 CURRENT PROJECT CONTEXT:
 ${context || '(No canonical project context files found. Inspect the repository directly.)'}
@@ -180,7 +225,40 @@ export async function runGoalCycle(goalId: string): Promise<void> {
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   assertExecutionAllowed(policy);
 
-  const host = coordinatorFor(goal);
+  const providerState = openDb();
+  let selection: CoordinatorSelection;
+  try {
+    selection = selectCoordinator(goal, loadPersistedProviderInfos(providerState.db));
+  } finally {
+    providerState.sqlite.close();
+  }
+  if (selection.kind === 'checkpoint') {
+    const summary = `Provider routing checkpoint: ${selection.reason}`;
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: summary,
+      nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    console.error(summary);
+    return;
+  }
+  if (!hostAvailable(selection.host)) {
+    const summary =
+      `Provider routing checkpoint: ${selection.provider}/${selection.modelRef} is persisted as ` +
+      'available but its CLI is not currently on PATH. Run major doctor to refresh discovery.';
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: summary,
+      nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    console.error(summary);
+    return;
+  }
+  const host = selection.host;
   updateGoal(goal.id, {
     status: 'running',
     cycle: goal.cycle + 1,
@@ -194,7 +272,24 @@ export async function runGoalCycle(goalId: string): Promise<void> {
     prompt: coordinatorPrompt(goal),
     cwd: goal.repoPath,
     timeoutMs: Math.max(1, policy.maxRunMinutes) * 60 * 1000,
+    modelRef: selection.modelRef,
   });
+  if (outcome.rateLimited || outcome.exhausted || outcome.status === 'succeeded') {
+    const outcomeState = openDb();
+    try {
+      recordModelOutcome(outcomeState.db, {
+        providerName: selection.provider,
+        modelRef: selection.modelRef,
+        outcome: outcome.exhausted
+          ? 'exhausted'
+          : outcome.rateLimited
+            ? 'rate_limited'
+            : 'available',
+      });
+    } finally {
+      outcomeState.sqlite.close();
+    }
+  }
   const after = getGoal(goal.id);
   if (!after) return;
   if (after.status === 'done' || after.status === 'blocked' || after.status === 'paused') {
