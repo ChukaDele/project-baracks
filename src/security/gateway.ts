@@ -41,12 +41,10 @@ import {
  * The validation pipeline below the gate (path canonicalisation, trusted
  * executable binding, argv policy, path-argument confinement, environment
  * sanitisation, process-group containment) is retained as the starting point
- * for milestone M1 (docs/deferred-security-milestones.md). It is groundwork,
- * not a complete boundary: independent review found the executable identity
- * check skips content hashing when file metadata appears unchanged, and no
- * OS-level filesystem/network isolation is enforced. It must not be presented
- * or relied on as a production execution boundary until M1 closes those gaps
- * and is independently reviewed.
+ * for milestone M1 (docs/deferred-security-milestones.md). The implementation
+ * now rehashes executable content at every spawn and applies an OS sandbox,
+ * but the build gate remains closed until that boundary receives the required
+ * fresh independent review.
  */
 
 export interface ExecutionPolicyDecision {
@@ -296,12 +294,15 @@ export class ExecutionGateway {
     }
 
     // Fail closed unless a containment mechanism is configured and enforced.
-    if (!this.options.containment?.enforced) {
+    if (
+      !this.options.containment?.enforced ||
+      !this.options.containment.filesystemIsolation ||
+      !this.options.containment.networkIsolation
+    ) {
       this.refuse(
         'execute',
         request,
-        'execution containment is not configured or unavailable on this platform: ' +
-          'live execution is disabled',
+        'trusted filesystem and network isolation is not configured or unavailable on this platform',
       );
     }
 
@@ -338,6 +339,22 @@ export class ExecutionGateway {
 
     const env = this.buildEnv('execute', request);
 
+    let wrapped: ReturnType<Containment['wrap']>;
+    try {
+      wrapped = this.options.containment.wrap({
+        executable: trusted.canonicalPath,
+        canonicalExecutable: trusted.canonicalPath,
+        args: request.args,
+        allowedRoots: this.options.allowedRoots,
+      });
+    } catch (error) {
+      this.refuse(
+        'execute',
+        request,
+        `execution containment could not be applied: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     this.record({
       kind: 'execute',
       allowed: true,
@@ -353,8 +370,8 @@ export class ExecutionGateway {
     });
 
     const spec: StreamingSpawnSpec = {
-      executable: trusted.spawnPath,
-      args: [...request.args],
+      executable: wrapped.executable,
+      args: wrapped.args,
       cwd: canonicalCwd,
       env: env.env,
       allowedRoots: this.options.allowedRoots,

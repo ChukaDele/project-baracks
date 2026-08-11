@@ -1,7 +1,11 @@
 import { existsSync } from 'node:fs';
 import { platform, release } from 'node:os';
 import type { ProviderAdapter, ProviderInfo } from '../providers/types.js';
-import { unavailableCapabilityStatuses, type CapabilityStatus } from '../security/capabilities.js';
+import {
+  isCapabilityAvailable,
+  unavailableCapabilityStatuses,
+  type CapabilityStatus,
+} from '../security/capabilities.js';
 import { detectContainment } from '../security/containment.js';
 import { redactText } from '../security/redact.js';
 
@@ -152,6 +156,12 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     detail: containment.detail,
   });
   const liveExecutionBlockers: string[] = [];
+  const liveExecutionCapabilityAvailable = isCapabilityAvailable('live-agent-execution');
+  if (!liveExecutionCapabilityAvailable) {
+    liveExecutionBlockers.push(
+      'live-agent-execution capability remains disabled pending M1 review',
+    );
+  }
   if (!containment.liveExecutionReady) {
     liveExecutionBlockers.push(`descendant containment insufficient: ${containment.detail}`);
   }
@@ -213,7 +223,7 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     overnightExecutionReasons,
     inspectionEnvironmentOk: inspectionEnvironmentIssues.length === 0,
     inspectionEnvironmentIssues,
-    liveExecutionReady: containment.liveExecutionReady,
+    liveExecutionReady: liveExecutionCapabilityAvailable && containment.liveExecutionReady,
     liveExecutionBlockers,
     capabilities,
   };

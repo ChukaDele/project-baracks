@@ -115,8 +115,12 @@ describe('execute() is disabled in this build (live-agent-execution unavailable)
       containment: {
         enforced: true,
         filesystemIsolation: true,
+        networkIsolation: true,
         mechanism: 'claimed-sandbox',
         detail: 'a configuration claim, not enforcement',
+        wrap() {
+          throw new Error('claimed containment must never be reached while the gate is closed');
+        },
       },
     });
     expect(() => gateway.execute({ executable: 'node', args: ['-e', '1'], cwd: root })).toThrow(
