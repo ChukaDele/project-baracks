@@ -5,7 +5,7 @@ import { createDecisionRequest, resolveDecision } from '../src/domain/decision-s
 import { newId } from '../src/domain/ids.js';
 import { createRun, recordVerificationRun, setRunStatus } from '../src/domain/run-service.js';
 import { addEvidence, addTask, transitionTask } from '../src/domain/task-service.js';
-import { seedProject } from './helpers.js';
+import { ensureObservedModel, seedProject } from './helpers.js';
 
 /**
  * P1-3 reproducer: task-specific completion criteria must be enforced at the
@@ -19,6 +19,7 @@ function harness() {
   const project = seedProject(db);
   const providerId = newId('aprov');
   db.insert(agentProviders).values({ id: providerId, name: 'p' }).run();
+  ensureObservedModel(db, providerId);
 
   // Criteria the service enforces: two verifications, an artifact, a merge decision.
   const task = addTask(db, {

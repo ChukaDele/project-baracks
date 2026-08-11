@@ -174,10 +174,6 @@ export function recordBillingObservation(
         .get();
       if (!model) throw new Error(`model not persisted: ${input.providerName}/${input.modelRef}`);
       const now = (input.now?.() ?? new Date()).toISOString();
-      tx.update(agentModels)
-        .set({ billingMode: input.billingMode })
-        .where(eq(agentModels.id, model.id))
-        .run();
       tx.insert(discoveryObservations)
         .values({
           id: newId('dobs'),
@@ -192,6 +188,10 @@ export function recordBillingObservation(
           confidence: CONFIDENCE_BY_SOURCE[input.source],
           observedAt: now,
         })
+        .run();
+      tx.update(agentModels)
+        .set({ billingMode: input.billingMode })
+        .where(eq(agentModels.id, model.id))
         .run();
       return { modelId: model.id, billingMode: input.billingMode };
     },

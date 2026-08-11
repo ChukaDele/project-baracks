@@ -1,11 +1,18 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { openDb, type Db } from '../src/db/client.js';
 import { addProject } from '../src/config/project-service.js';
 import { projectConfigSchema } from '../src/config/project-config.js';
-import { agentProviders, tasks, taskSuggestions } from '../src/db/schema.js';
+import {
+  agentModels,
+  agentProviders,
+  discoveryObservations,
+  tasks,
+  taskSuggestions,
+  type BillingMode,
+} from '../src/db/schema.js';
 import { newId, nowIso } from '../src/domain/ids.js';
 import { addEvidence, getSuggestion, transitionTask, getTask } from '../src/domain/task-service.js';
 import { createRun, recordVerificationRun, setRunStatus } from '../src/domain/run-service.js';
@@ -22,10 +29,45 @@ export function tempDbPath(): string {
 
 function ensureProvider(db: Db, name = 'test-provider'): string {
   const existing = db.select().from(agentProviders).where(eq(agentProviders.name, name)).get();
-  if (existing) return existing.id;
-  const id = newId('aprov');
-  db.insert(agentProviders).values({ id, name }).run();
+  const id = existing?.id ?? newId('aprov');
+  if (!existing) db.insert(agentProviders).values({ id, name }).run();
+  ensureObservedModel(db, id, 'sonnet');
   return id;
+}
+
+/** Persist the minimum authoritative billing state required by run fixtures. */
+export function ensureObservedModel(
+  db: Db,
+  providerId: string,
+  modelRef = 'sonnet',
+  billingMode: Exclude<BillingMode, 'unknown'> = 'subscription_included',
+): string {
+  let model = db
+    .select()
+    .from(agentModels)
+    .where(and(eq(agentModels.providerId, providerId), eq(agentModels.modelRef, modelRef)))
+    .get();
+  if (!model) {
+    const id = newId('amodel');
+    db.insert(agentModels)
+      .values({ id, providerId, modelRef, routingClass: 'sonnet', billingMode: 'unknown' })
+      .run();
+    model = db.select().from(agentModels).where(eq(agentModels.id, id)).get()!;
+  }
+  if (model.billingMode !== billingMode) {
+    db.insert(discoveryObservations)
+      .values({
+        id: newId('dobs'),
+        providerId,
+        modelId: model.id,
+        observedJson: JSON.stringify({ modelRef, billingMode, note: 'test fixture' }),
+        source: 'human',
+        confidence: 'configured',
+      })
+      .run();
+    db.update(agentModels).set({ billingMode }).where(eq(agentModels.id, model.id)).run();
+  }
+  return model.id;
 }
 
 /**
