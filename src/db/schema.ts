@@ -627,6 +627,13 @@ export const roadmapUpdates = sqliteTable(
   ],
 );
 
+/** Enforces the supported single-host roadmap mutation model durably. */
+export const roadmapRuntimeHosts = sqliteTable('roadmap_runtime_hosts', {
+  id: text('id').primaryKey(),
+  hostId: text('host_id').notNull(),
+  createdAt: createdAt(),
+});
+
 export const usageObservations = sqliteTable(
   'usage_observations',
   {

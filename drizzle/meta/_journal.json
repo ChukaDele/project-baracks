@@ -85,6 +85,13 @@
       "when": 1784800600000,
       "tag": "0011_complete_worker_fencing",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1784800700000,
+      "tag": "0012_roadmap_exact_attempt",
+      "breakpoints": true
     }
   ]
 }
