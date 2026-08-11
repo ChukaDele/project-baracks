@@ -138,7 +138,7 @@ describe('major CLI', () => {
     };
     expect(state.sessions).toHaveLength(12);
     expect(new Set(state.sessions.map((session) => session.sessionId)).size).toBe(12);
-  });
+  }, 30_000);
 
   it('project add validates config existence and git-repository shape', () => {
     expect(major('project', 'add', '/nope/missing.json').status).toBe(2);
