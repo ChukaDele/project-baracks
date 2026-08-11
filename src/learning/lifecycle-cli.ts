@@ -92,8 +92,7 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
   }
 
   if (args[1] === 'review') {
-    const projectArg = flag(args, '--project');
-    const project = projectArg ? resolveProject(projectArg).project : undefined;
+    const project = resolveProject(flag(args, '--project') ?? 'current').project;
     const due = learningReviewDue(project);
     if (args.includes('--json')) console.log(JSON.stringify(due, null, 2));
     else if (due.length === 0)
@@ -110,8 +109,10 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
 
   if (args[1] === 'promote') {
     const scope = promotionScope(required(args, '--scope'));
+    const project = resolveProject(flag(args, '--project') ?? 'current').project;
     const candidate = promoteLearning({
       id: required(args, '--id'),
+      project,
       scope,
       evidence: required(args, '--evidence'),
       ...(scope === 'global' ? { summary: required(args, '--summary') } : {}),
@@ -121,8 +122,10 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
   }
 
   if (args[1] === 'dismiss') {
+    const project = resolveProject(flag(args, '--project') ?? 'current').project;
     const candidate = dismissLearning({
       id: required(args, '--id'),
+      project,
       evidence: required(args, '--evidence'),
     });
     console.log(JSON.stringify(candidate, null, 2));

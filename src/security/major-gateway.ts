@@ -18,6 +18,8 @@ export interface MajorGatewayRequest {
   allowedRoots: readonly string[];
   timeoutMs?: number;
   parseLine?: (line: string) => ProviderEvent | null;
+  detectRateLimit?: (text: string) => boolean;
+  detectExhaustion?: (text: string) => boolean;
   resourceLeaseId?: string;
 }
 
@@ -179,5 +181,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
     detached: true,
     ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
     ...(request.parseLine ? { parseLine: request.parseLine } : {}),
+    ...(request.detectRateLimit ? { detectRateLimit: request.detectRateLimit } : {}),
+    ...(request.detectExhaustion ? { detectExhaustion: request.detectExhaustion } : {}),
   });
 }

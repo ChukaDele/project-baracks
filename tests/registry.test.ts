@@ -74,4 +74,23 @@ describe('capability registry', () => {
     expect(invisible?.availability).toBe('unknown');
     expect(invisible?.visible).toBe(false);
   });
+
+  it('registers all four worker environments without treating config as billing proof', () => {
+    expect(DEFAULT_MODEL_REGISTRY.entries.map((entry) => entry.provider)).toEqual([
+      'claude-code',
+      'codex',
+      'cursor',
+      'antigravity',
+    ]);
+    for (const provider of ['cursor', 'antigravity']) {
+      const models = registryModels(DEFAULT_MODEL_REGISTRY, provider, {
+        visible: false,
+        authenticated: false,
+      });
+      expect(models).toHaveLength(1);
+      expect(models[0]?.modelRef).toBe('auto');
+      expect(models[0]?.billingMode).toBe('unknown');
+      expect(models[0]?.availability).toBe('unknown');
+    }
+  });
 });

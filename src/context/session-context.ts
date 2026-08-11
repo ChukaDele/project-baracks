@@ -4,7 +4,8 @@ import { listLearningCandidates } from '../learning/candidates.js';
 import { getProjectPolicy } from '../supervisor/policy.js';
 import { formatResourceTelemetry, resourceSnapshot } from '../supervisor/resources.js';
 import { supervisorSnapshot } from '../supervisor/runtime.js';
-import { attachSession, resolveProjectForCwd } from '../supervisor/state.js';
+import { resolveSkills } from '../skills/resolver.js';
+import { activeGoals, attachSession, resolveProjectForCwd } from '../supervisor/state.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -28,20 +29,37 @@ function projectLearningFile(repoPath: string): string {
 }
 
 function durableCandidates(project: string): string {
-  const candidates = listLearningCandidates(project, 'candidate')
+  const learnings = listLearningCandidates(project)
     .sort((left, right) => {
+      if (left.status !== right.status) return left.status === 'promoted' ? -1 : 1;
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
       return right.updatedAt.localeCompare(left.updatedAt);
     })
-    .slice(0, 15);
-  if (candidates.length === 0) return '(No active Major learning candidates.)';
-  return candidates
+    .filter((candidate) => candidate.status !== 'dismissed')
+    .slice(0, 20);
+  if (learnings.length === 0) return '(No active Major learnings.)';
+  return learnings
     .map((candidate) => {
-      const review = candidate.occurrences >= 2 ? ' REVIEW-DUE' : '';
+      const review =
+        candidate.status === 'candidate' && candidate.occurrences >= 2 ? ' REVIEW-DUE' : '';
       const key = candidate.key ? ` key=${candidate.key}` : '';
-      return `- ${candidate.occurrences}x${review} [${candidate.scope}/${candidate.source}]${key} ${candidate.summary}`;
+      return `- ${candidate.status.toUpperCase()} ${candidate.occurrences}x${review} [${candidate.scope}/${candidate.source}]${key} ${candidate.summary}`;
     })
     .join('\n');
+}
+
+function resolvedGoalSkills(project: string, repoPath: string): string {
+  const goals = activeGoals(project);
+  if (goals.length === 0)
+    return '(No active goal. Resolve skills against the substantive task when it arrives.)';
+  const unique = new Map<string, string>();
+  for (const goal of goals) {
+    for (const skill of resolveSkills({ task: goal.goal, cwd: repoPath }).skills) {
+      unique.set(skill.id, skill.path);
+    }
+  }
+  if (unique.size === 0) return '(No installed skill matched the active goal.)';
+  return [...unique].map(([id, path]) => `- ${id}: ${path}`).join('\n');
 }
 
 export async function runSessionContextCli(args: string[]): Promise<boolean> {
@@ -94,8 +112,11 @@ ${supervisorSnapshot(project.project)}
 DURABLE PROJECT LEARNINGS
 ${projectLearningFile(project.repoPath)}
 
-ACTIVE MAJOR LEARNING CANDIDATES
+ACTIVE MAJOR LEARNINGS
 ${durableCandidates(project.project)}
+
+RESOLVED SKILLS FOR ACTIVE GOALS
+${resolvedGoalSkills(project.project, project.repoPath)}
 
 RESOURCE GUARD
 ${resources}

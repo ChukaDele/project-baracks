@@ -2,25 +2,27 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { captureLearning } from '../src/learning/candidates.js';
+import { captureLearning, promoteLearning } from '../src/learning/candidates.js';
 import { configureProjectPolicy, recordShadowGrade } from '../src/supervisor/policy.js';
-import { coordinatorPrompt } from '../src/supervisor/runtime.js';
+import { coordinatorPrompt, selectCoordinator } from '../src/supervisor/runtime.js';
 import type { SupervisorGoal } from '../src/supervisor/state.js';
+import type { ProviderInfo } from '../src/providers/types.js';
+import { model } from './helpers.js';
 
 const roots: string[] = [];
 let priorPolicyPath: string | undefined;
-let priorLearningPath: string | undefined;
+let priorLearningRoot: string | undefined;
 
 beforeEach(() => {
   priorPolicyPath = process.env.MAJOR_POLICY_PATH;
-  priorLearningPath = process.env.MAJOR_LEARNING_PATH;
+  priorLearningRoot = process.env.MAJOR_LEARNING_ROOT;
 });
 
 afterEach(() => {
   if (priorPolicyPath === undefined) delete process.env.MAJOR_POLICY_PATH;
   else process.env.MAJOR_POLICY_PATH = priorPolicyPath;
-  if (priorLearningPath === undefined) delete process.env.MAJOR_LEARNING_PATH;
-  else process.env.MAJOR_LEARNING_PATH = priorLearningPath;
+  if (priorLearningRoot === undefined) delete process.env.MAJOR_LEARNING_ROOT;
+  else process.env.MAJOR_LEARNING_ROOT = priorLearningRoot;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -41,11 +43,44 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('selects only an observed available subscription model', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'major-runtime-routing-'));
+    roots.push(repo);
+    const providers: ProviderInfo[] = [
+      {
+        name: 'claude-code',
+        installed: true,
+        authenticated: true,
+        models: [model({ modelRef: 'opus', routingClass: 'opus', billingMode: 'unknown' })],
+      },
+      {
+        name: 'codex',
+        installed: true,
+        authenticated: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            billingMode: 'subscription_included',
+          }),
+        ],
+      },
+    ];
+    expect(selectCoordinator(goal(repo), providers)).toMatchObject({
+      kind: 'route',
+      host: 'codex',
+      provider: 'codex',
+      modelRef: 'gpt-codex',
+    });
+    providers[1]!.models[0]!.billingMode = 'unknown';
+    expect(selectCoordinator(goal(repo), providers)).toMatchObject({ kind: 'checkpoint' });
+  });
+
   it('keeps the product goal while loading durable project and correction learnings', () => {
     const repo = mkdtempSync(join(tmpdir(), 'major-runtime-'));
     roots.push(repo);
     process.env.MAJOR_POLICY_PATH = join(repo, 'policies.json');
-    process.env.MAJOR_LEARNING_PATH = join(repo, 'learning.json');
+    process.env.MAJOR_LEARNING_ROOT = join(repo, 'learning');
     mkdirSync(join(repo, '.git'));
     writeFileSync(
       join(repo, 'GOAL_STATE.md'),
@@ -57,13 +92,19 @@ describe('Major coordinator contract', () => {
     );
     writeFileSync(join(repo, 'AGENTS.md'), '# Project contract\nContinue through safe blockers.\n');
 
-    captureLearning({
+    const correction = captureLearning({
       project: 'jss-tool',
       repoPath: repo,
       source: 'user-correction',
       scope: 'project',
       summary: 'Use the existing project instead of creating a duplicate implementation elsewhere.',
       evidence: 'Owner correction from a prior run.',
+    });
+    promoteLearning({
+      id: correction.id,
+      project: 'jss-tool',
+      scope: 'project',
+      evidence: 'Project regression check passed.',
     });
 
     configureProjectPolicy({
@@ -110,5 +151,8 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain(
       'Use the existing project instead of creating a duplicate implementation',
     );
+    expect(prompt).toContain('PROMOTED 1x [project/user-correction]');
+    expect(prompt).toContain('RESOLVED MAJOR SKILLS');
+    expect(prompt).toContain('mvp-speed-prioritisation');
   });
 });

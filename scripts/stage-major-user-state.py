@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -112,6 +113,75 @@ def add_absent(entries: list[dict[str, str]], target: Path) -> None:
     entries.append({"type": "absent", "target": str(target)})
 
 
+def learning_project_path(root: Path, project: str) -> Path:
+    key = hashlib.sha256(project.encode()).hexdigest()[:24]
+    return root / "projects" / f"{key}.json"
+
+
+def read_learning_store(path: Path, version: int) -> dict:
+    if not path.exists():
+        return {"version": version, "candidates": []}
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"refusing to migrate malformed Major learning store: {path}") from exc
+    if not isinstance(data, dict) or data.get("version") != version or not isinstance(data.get("candidates"), list):
+        raise SystemExit(f"unsupported Major learning store schema: {path}")
+    return data
+
+
+def stage_learning_state(stage: Path, home: Path, entries: list[dict[str, str]]) -> None:
+    target = home / ".major" / "learning"
+    legacy = home / ".major" / "learning-candidates.json"
+    if not target.exists() and not legacy.exists():
+        return
+
+    staged = stage / "learning"
+    if target.exists():
+        if not target.is_dir() or target.is_symlink():
+            raise SystemExit(f"Major learning root is not a safe directory: {target}")
+        symlink = next((path for path in target.rglob("*") if path.is_symlink()), None)
+        if symlink is not None:
+            raise SystemExit(f"refusing to migrate symlinked Major learning state: {symlink}")
+        shutil.copytree(target, staged)
+    else:
+        staged.mkdir(parents=True)
+
+    if legacy.exists():
+        if legacy.is_symlink():
+            raise SystemExit(f"refusing to migrate symlinked Major learning store: {legacy}")
+        legacy_store = read_learning_store(legacy, 1)
+        quarantine = []
+        for raw in legacy_store["candidates"]:
+            if not isinstance(raw, dict):
+                raise SystemExit(f"invalid legacy Major learning candidate in {legacy}")
+            candidate = dict(raw)
+            project = candidate.get("project")
+            if not isinstance(project, str) or not project.strip():
+                quarantine.append(candidate)
+                continue
+            # Old direct-global capture was not sanitization-safe. Preserve it
+            # only in its originating project and require a fresh review.
+            candidate["project"] = project
+            candidate["scope"] = "project" if candidate.get("scope") == "global" else candidate.get("scope", "undecided")
+            if candidate.get("status") == "promoted" and raw.get("scope") == "global":
+                candidate["status"] = "candidate"
+            path = learning_project_path(staged, project)
+            store = read_learning_store(path, 2)
+            if not any(item.get("id") == candidate.get("id") for item in store["candidates"] if isinstance(item, dict)):
+                store["candidates"].append(candidate)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(store, indent=2) + "\n")
+        if quarantine:
+            (staged / "legacy-quarantine.json").write_text(
+                json.dumps({"version": 1, "candidates": quarantine}, indent=2) + "\n"
+            )
+
+    entries.append({"type": "directory", "source": str(staged), "target": str(target)})
+    if legacy.exists():
+        add_absent(entries, legacy)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
@@ -143,6 +213,8 @@ def main() -> None:
 
     rules = global_base.read_text().rstrip() + "\n\n" + stability.read_text().strip() + "\n"
     entries: list[dict[str, str]] = []
+
+    stage_learning_state(stage, home, entries)
 
     global_rules = write_stage_file(stage, "global-worker-rules.md", rules)
     add_file(entries, global_rules, home / ".major" / "global-worker-rules.md")
