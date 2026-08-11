@@ -11,6 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { redactText } from '../security/redact.js';
 import { getProjectPolicy } from '../supervisor/policy.js';
 import { majorHome } from '../supervisor/state.js';
 
@@ -84,13 +85,28 @@ function readStore(path: string): LearningStore {
   if (parsed.version !== 2 || !Array.isArray(parsed.candidates)) {
     throw new Error(`invalid Major learning store: ${path}`);
   }
-  return parsed;
+  return {
+    ...parsed,
+    candidates: parsed.candidates.map((candidate) => ({
+      ...candidate,
+      summary: redactText(candidate.summary),
+      evidence: candidate.evidence.map((item) => redactText(item)),
+    })),
+  };
 }
 
 function writeStore(path: string, store: LearningStore): void {
   mkdirSync(dirname(path), { recursive: true });
   const temp = `${path}.${process.pid}.tmp`;
-  writeFileSync(temp, `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
+  const sanitized: LearningStore = {
+    ...store,
+    candidates: store.candidates.map((candidate) => ({
+      ...candidate,
+      summary: redactText(candidate.summary),
+      evidence: candidate.evidence.map((item) => redactText(item)),
+    })),
+  };
+  writeFileSync(temp, `${JSON.stringify(sanitized, null, 2)}\n`, { mode: 0o600 });
   renameSync(temp, path);
 }
 
@@ -182,7 +198,7 @@ export function captureLearning(input: LearningCaptureInput): LearningCandidate 
   if (input.scope === 'global') {
     throw new Error('direct global capture is forbidden; capture project-local, then promote');
   }
-  const summary = input.summary.trim();
+  const summary = redactText(input.summary.trim());
   if (!summary) throw new Error('learning summary must not be empty');
   const identity = requireProject(input);
   const key = normalizedKey(input.key);
@@ -200,8 +216,9 @@ export function captureLearning(input: LearningCaptureInput): LearningCandidate 
       existing.updatedAt = now;
       if (key && !existing.key) existing.key = key;
       if (input.scope === 'project' && existing.scope === 'undecided') existing.scope = 'project';
-      if (input.evidence && !existing.evidence.includes(input.evidence)) {
-        existing.evidence.push(input.evidence);
+      const evidence = input.evidence ? redactText(input.evidence) : undefined;
+      if (evidence && !existing.evidence.includes(evidence)) {
+        existing.evidence.push(evidence);
       }
       writeStore(path, store);
       return existing;
@@ -213,7 +230,7 @@ export function captureLearning(input: LearningCaptureInput): LearningCandidate 
       summary,
       scope: input.scope ?? 'undecided',
       occurrences: 1,
-      evidence: input.evidence ? [input.evidence] : [],
+      evidence: input.evidence ? [redactText(input.evidence)] : [],
       status: 'candidate',
       project: identity.project,
       ...(identity.repoPath ? { repoPath: identity.repoPath } : {}),
@@ -237,15 +254,17 @@ function visibleGlobalCandidates(status?: LearningStatus): LearningCandidate[] {
       candidate.repoPath !== undefined ||
       candidate.promotedToGlobalId !== undefined ||
       candidate.key !== undefined ||
+      (candidate.status === 'promoted' &&
+        (candidate.evidence.length < 1 ||
+          candidate.evidence.some(
+            (item) => !/^promotion-evidence-sha256:[a-f0-9]{64}$/.test(item),
+          ))) ||
       (candidate.status === 'dismissed' &&
         (candidate.summary !== 'Retracted global learning.' ||
           candidate.evidence.length !== 1 ||
           !/^dismissal-reason-sha256:[a-f0-9]{64}$/.test(candidate.evidence[0] ?? '') ||
           candidate.occurrences !== 0)) ||
-      PII_PATTERNS.some(
-        (rule) =>
-          rule.test(candidate.summary) || candidate.evidence.some((item) => rule.test(item)),
-      )
+      unsafeGlobalText(candidate.summary)
     ) {
       throw new Error(`unsafe or malformed global Major learning record: ${candidate.id}`);
     }
@@ -284,8 +303,14 @@ const PII_PATTERNS = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
   /\b(?:\+?\d[\d\s().-]{7,}\d)\b/,
   /\b(?:https?:\/\/|git@|ssh:\/\/)/i,
-  /(?:^|\s)(?:\/Users\/|\/home\/|[A-Za-z]:\\)/,
+  /(?:^|[\s("'])(?:\/(?:Users|home|private|tmp|etc|opt|var)\/|[A-Za-z]:\\)/i,
+  /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/,
+  /\b(?:Ltd|Limited|LLC|Inc|Corp|Corporation|PLC)\b/i,
 ];
+
+function unsafeGlobalText(text: string): boolean {
+  return redactText(text) !== text || PII_PATTERNS.some((rule) => rule.test(text));
+}
 
 function assertSanitizedGlobalText(
   value: string,
@@ -302,10 +327,7 @@ function assertSanitizedGlobalText(
     .filter((item): item is string => Boolean(item))
     .map((item) => normalizedText(item));
   const normalized = normalizedText(text);
-  if (
-    forbidden.some((item) => ` ${normalized} `.includes(` ${item} `)) ||
-    PII_PATTERNS.some((rule) => rule.test(text))
-  ) {
+  if (forbidden.some((item) => ` ${normalized} `.includes(` ${item} `)) || unsafeGlobalText(text)) {
     throw new Error(
       `global promotion ${label} is not sanitized: remove project identity, paths, URLs and PII`,
     );
@@ -339,7 +361,7 @@ export function promoteLearning(input: {
     }
 
     if (input.scope === 'project') {
-      const evidence = input.evidence.trim();
+      const evidence = redactText(input.evidence.trim());
       if (!evidence) throw new Error('promotion evidence is required');
       if (!candidate.evidence.includes(evidence)) candidate.evidence.push(evidence);
       candidate.status = 'promoted';
@@ -360,6 +382,9 @@ export function promoteLearning(input: {
     }
     const summary = assertSanitizedGlobalText(input.summary ?? '', 'summary', candidate);
     const evidence = assertSanitizedGlobalText(input.evidence, 'evidence', candidate);
+    const evidenceDigest = `promotion-evidence-sha256:${createHash('sha256')
+      .update(evidence)
+      .digest('hex')}`;
     const globalPath = globalStorePath();
     const now = new Date().toISOString();
     const promoted = withStoreLock(globalPath, () => {
@@ -369,9 +394,9 @@ export function promoteLearning(input: {
         (item) => item.status === 'promoted' && normalizedSummary(item.summary) === fingerprint,
       );
       if (existing) {
-        if (!existing.evidence.includes(evidence)) {
+        if (!existing.evidence.includes(evidenceDigest)) {
           existing.occurrences += candidate.occurrences;
-          existing.evidence.push(evidence);
+          existing.evidence.push(evidenceDigest);
         }
         existing.updatedAt = now;
         writeStore(globalPath, globalStore);
@@ -383,7 +408,7 @@ export function promoteLearning(input: {
         summary,
         scope: 'global',
         occurrences: candidate.occurrences,
-        evidence: [evidence],
+        evidence: [evidenceDigest],
         status: 'promoted',
         createdAt: now,
         updatedAt: now,
@@ -432,7 +457,7 @@ export function dismissLearning(input: {
   project: string;
   evidence: string;
 }): LearningCandidate {
-  const evidence = input.evidence.trim();
+  const evidence = redactText(input.evidence.trim());
   if (!evidence) throw new Error('dismissal evidence/reason is required');
   const path = projectStorePath(input.project);
   return withStoreLock(path, () => {

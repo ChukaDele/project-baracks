@@ -61,7 +61,13 @@ function readProjectContext(repoPath: string): string {
 }
 
 function readLearningContext(project: string): string {
-  const candidates = listLearningCandidates(project)
+  let visible;
+  try {
+    visible = listLearningCandidates(project);
+  } catch {
+    return '(Major learning store unavailable: unsafe record withheld from coordinator context.)';
+  }
+  const candidates = visible
     .filter((candidate) => candidate.status !== 'dismissed')
     .sort((left, right) => {
       if (left.status !== right.status) return left.status === 'promoted' ? -1 : 1;

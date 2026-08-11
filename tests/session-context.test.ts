@@ -113,4 +113,40 @@ describe('fresh session context', () => {
     expect(output).not.toContain('PRIVATE CLIENT EVIDENCE MUST NOT APPEAR.');
     expect(output).toContain('video-generation-routing');
   });
+
+  it('keeps the control-plane banner active when a malformed global record is withheld', async () => {
+    const current = repo('safe-project');
+    const learning = join(root, 'learning');
+    mkdirSync(learning, { recursive: true });
+    writeFileSync(
+      join(learning, 'global.json'),
+      JSON.stringify({
+        version: 2,
+        candidates: [
+          {
+            id: 'unsafe',
+            source: 'manual',
+            summary: `Use token sk-ant-api03-${'A'.repeat(24)}`,
+            scope: 'global',
+            occurrences: 2,
+            evidence: ['raw private evidence'],
+            status: 'promoted',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    expect(
+      await runSessionContextCli(['session', 'attach', '--host', 'codex', '--cwd', current]),
+    ).toBe(true);
+    const output = lines.join('\n');
+    expect(output).toContain('MAJOR CONTROL PLANE: ACTIVE');
+    expect(output).toContain('unsafe record withheld from session context');
+    expect(output).toContain('RESOURCE GUARD');
+    expect(output).not.toContain('sk-ant-api03');
+    expect(output).not.toContain('raw private evidence');
+  });
 });

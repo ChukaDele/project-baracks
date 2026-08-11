@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -130,6 +131,110 @@ def read_learning_store(path: Path, version: int) -> dict:
     return data
 
 
+LEARNING_SECRET_PATTERNS = [
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"),
+    re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),
+    re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    re.compile(r"\bAIza[0-9A-Za-z_-]{30,}\b"),
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),
+    re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
+    re.compile(r"\b[Bb]earer\s+[A-Za-z0-9._~+/=-]{16,}"),
+]
+LEARNING_KEY_VALUE = re.compile(
+    r"""([A-Za-z0-9_-]*(?:password|passwd|secret|token|api[_-]?key|apikey|private[_-]?key|client[_-]?secret|credential)s?[A-Za-z0-9_-]*["']?\s*[:=]\s*)("[^"\n]*"|'[^'\n]*'|[^\s"',;}]+)""",
+    re.IGNORECASE,
+)
+GLOBAL_PII_PATTERNS = [
+    re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE),
+    re.compile(r"\b(?:\+?\d[\d\s().-]{7,}\d)\b"),
+    re.compile(r"\b(?:https?://|git@|ssh://)", re.IGNORECASE),
+    re.compile(r"""(?:^|[\s("'])(?:/(?:Users|home|private|tmp|etc|opt|var)/|[A-Za-z]:\\)""", re.IGNORECASE),
+    re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b"),
+    re.compile(r"\b(?:Ltd|Limited|LLC|Inc|Corp|Corporation|PLC)\b", re.IGNORECASE),
+]
+
+
+def redact_learning_text(value: str) -> str:
+    out = value
+    for pattern in LEARNING_SECRET_PATTERNS:
+        out = pattern.sub("[REDACTED]", out)
+    out = LEARNING_KEY_VALUE.sub(lambda match: match.group(1) + "[REDACTED]", out)
+    return out
+
+
+def global_summary_is_safe(value: str) -> bool:
+    return redact_learning_text(value) == value and not any(
+        pattern.search(value) for pattern in GLOBAL_PII_PATTERNS
+    )
+
+
+def sanitize_staged_learning(staged: Path) -> None:
+    for path in staged.rglob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        candidates = data.get("candidates") if isinstance(data, dict) else None
+        if not isinstance(candidates, list):
+            continue
+        sanitized = []
+        for raw in candidates:
+            if not isinstance(raw, dict):
+                continue
+            candidate = dict(raw)
+            candidate["summary"] = redact_learning_text(str(candidate.get("summary", "")))
+            evidence = candidate.get("evidence", [])
+            candidate["evidence"] = [
+                redact_learning_text(str(item)) for item in evidence if isinstance(item, str)
+            ]
+            if path.name == "global.json":
+                promoted_safe = (
+                    candidate.get("scope") == "global"
+                    and candidate.get("status") == "promoted"
+                    and not any(
+                        key in candidate
+                        for key in ("key", "project", "repoPath", "promotedToGlobalId")
+                    )
+                    and global_summary_is_safe(candidate["summary"])
+                    and candidate["evidence"]
+                    and all(
+                        re.fullmatch(r"promotion-evidence-sha256:[a-f0-9]{64}", item)
+                        for item in candidate["evidence"]
+                    )
+                )
+                dismissed_safe = (
+                    candidate.get("scope") == "global"
+                    and candidate.get("status") == "dismissed"
+                    and candidate.get("summary") == "Retracted global learning."
+                    and candidate.get("occurrences") == 0
+                    and len(candidate["evidence"]) == 1
+                    and re.fullmatch(
+                        r"dismissal-reason-sha256:[a-f0-9]{64}",
+                        candidate["evidence"][0],
+                    )
+                )
+                if not promoted_safe and not dismissed_safe:
+                    digest = hashlib.sha256(
+                        json.dumps(raw, sort_keys=True).encode()
+                    ).hexdigest()
+                    candidate = {
+                        "id": str(candidate.get("id", digest)),
+                        "source": str(candidate.get("source", "manual")),
+                        "summary": "Retracted global learning.",
+                        "scope": "global",
+                        "occurrences": 0,
+                        "evidence": [f"dismissal-reason-sha256:{digest}"],
+                        "status": "dismissed",
+                        "createdAt": str(candidate.get("createdAt", "1970-01-01T00:00:00.000Z")),
+                        "updatedAt": str(candidate.get("updatedAt", "1970-01-01T00:00:00.000Z")),
+                    }
+            sanitized.append(candidate)
+        data["candidates"] = sanitized
+        path.write_text(json.dumps(data, indent=2) + "\n")
+
+
 def stage_learning_state(stage: Path, home: Path, entries: list[dict[str, str]]) -> None:
     target = home / ".major" / "learning"
     legacy = home / ".major" / "learning-candidates.json"
@@ -177,6 +282,7 @@ def stage_learning_state(stage: Path, home: Path, entries: list[dict[str, str]])
                 json.dumps({"version": 1, "candidates": quarantine}, indent=2) + "\n"
             )
 
+    sanitize_staged_learning(staged)
     entries.append({"type": "directory", "source": str(staged), "target": str(target)})
     if legacy.exists():
         add_absent(entries, legacy)

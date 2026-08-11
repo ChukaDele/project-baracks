@@ -163,10 +163,10 @@ def seed_home(home: Path, codex_home: Path) -> None:
                         "project": "private-client",
                         "repoPath": "/private/client",
                         "source": "user-correction",
-                        "summary": "Private client evidence must remain local.",
+                        "summary": "Private client evidence must remain local. API_KEY=sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAA",
                         "scope": "global",
                         "occurrences": 2,
-                        "evidence": ["candidate@example.com"],
+                        "evidence": ["candidate@example.com Bearer eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"],
                         "status": "promoted",
                         "createdAt": "2026-01-01T00:00:00.000Z",
                         "updatedAt": "2026-01-01T00:00:00.000Z",
@@ -295,6 +295,9 @@ def main() -> None:
         assert migrated["id"] == "legacy-project-global"
         assert migrated["scope"] == "project"
         assert migrated["status"] == "candidate"
+        assert "sk-ant-api03" not in json.dumps(migrated)
+        assert "e" * 32 not in json.dumps(migrated)
+        assert "[REDACTED]" in json.dumps(migrated)
         assert json.loads((learning_root / "legacy-quarantine.json").read_text())["candidates"][0]["id"] == "legacy-unowned"
         assert not (home / ".major" / "learning-candidates.json").exists()
 

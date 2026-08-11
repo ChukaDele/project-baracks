@@ -59,6 +59,23 @@ describe('Major learning candidates', () => {
     expect(listLearningCandidates('bredge')).toHaveLength(1);
   });
 
+  it('redacts credentials before project-local learning persistence or recall', () => {
+    const token = `sk-ant-api03-${'A'.repeat(24)}`;
+    const candidate = captureLearning({
+      project: 'secure-project',
+      source: 'user-correction',
+      summary: `Never print ANTHROPIC_API_KEY=${token}`,
+      evidence: `provider returned Bearer ${'e'.repeat(32)}`,
+    });
+    expect(candidate.summary).not.toContain(token);
+    expect(candidate.evidence.join(' ')).not.toContain('e'.repeat(32));
+    const files = readdirSync(join(learningRoot(), 'projects'));
+    const raw = readFileSync(join(learningRoot(), 'projects', files[0]!), 'utf8');
+    expect(raw).not.toContain(token);
+    expect(raw).not.toContain('e'.repeat(32));
+    expect(raw).toContain('[REDACTED]');
+  });
+
   it('folds repeated project corrections without merging unrelated projects', () => {
     const first = captureLearning({
       project: 'bredge',

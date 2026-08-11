@@ -137,11 +137,53 @@ describe('Major learning lifecycle', () => {
     expect(promoted.project).toBeUndefined();
     expect(promoted.repoPath).toBeUndefined();
     expect(promoted.key).toBeUndefined();
+    expect(promoted.evidence).toHaveLength(1);
+    expect(promoted.evidence[0]).toMatch(/^promotion-evidence-sha256:[a-f0-9]{64}$/);
     expect(listLearningCandidates(undefined, 'promoted')).toEqual([promoted]);
     const globalPath = join(root, 'learning', 'global.json');
     expect(existsSync(globalPath)).toBe(true);
     const raw = readFileSync(globalPath, 'utf8');
     expect(raw).not.toMatch(/bredge|\/private\/|owner@example\.com/i);
+    expect(raw).not.toContain('Verified twice with synthetic regression fixtures.');
+  });
+
+  it('rejects secrets, absolute system paths, personal names and company names globally', () => {
+    allowGlobalPromotion('bredge');
+    const unsafe = [
+      `Use ANTHROPIC_API_KEY=sk-ant-api03-${'A'.repeat(24)} for retries.`,
+      'Load credentials from /etc/major/creds.',
+      'Ask Jane Doe before retrying.',
+      'Use the Acme Holdings Ltd escalation path.',
+    ];
+    for (const summary of unsafe) {
+      const candidate = recurringProjectCandidate();
+      expect(() =>
+        promoteLearning({
+          id: candidate.id,
+          project: 'bredge',
+          scope: 'global',
+          summary,
+          evidence: 'Verified twice with synthetic fixtures.',
+        }),
+      ).toThrow(/not sanitized/);
+      dismissLearning({
+        id: candidate.id,
+        project: 'bredge',
+        evidence: 'Rejected unsafe global summary.',
+      });
+    }
+
+    const candidate = recurringProjectCandidate();
+    expect(() =>
+      promoteLearning({
+        id: candidate.id,
+        project: 'bredge',
+        scope: 'global',
+        summary: 'Require representative evidence before readiness.',
+        evidence: `Bearer ${'e'.repeat(32)}`,
+      }),
+    ).toThrow(/not sanitized/);
+    expect(existsSync(join(root, 'learning', 'global.json'))).toBe(false);
   });
 
   it('requires cross-project memory authority before global promotion', () => {

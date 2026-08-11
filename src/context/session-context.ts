@@ -29,7 +29,13 @@ function projectLearningFile(repoPath: string): string {
 }
 
 function durableCandidates(project: string): string {
-  const learnings = listLearningCandidates(project)
+  let candidates;
+  try {
+    candidates = listLearningCandidates(project);
+  } catch {
+    return '(Major learning store unavailable: unsafe record withheld from session context.)';
+  }
+  const learnings = candidates
     .sort((left, right) => {
       if (left.status !== right.status) return left.status === 'promoted' ? -1 : 1;
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;

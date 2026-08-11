@@ -31,6 +31,7 @@ cp -R "$ROOT/drizzle" "$DEST/drizzle"
 cp -R "$ROOT/guidance" "$DEST/guidance"
 cp -R "$ROOT/skills" "$DEST/skills"
 cp -R "$ROOT/evals" "$DEST/evals"
+cp "$ROOT/scripts/notify-human-blocker.sh" "$DEST/scripts/notify-human-blocker.sh"
 
 pnpm install --prod --frozen-lockfile --dir "$DEST"
 
@@ -39,6 +40,7 @@ test -d "$DEST/drizzle"
 test -f "$DEST/guidance/skills.registry.json"
 test -f "$DEST/skills/internal/skill-resolver/SKILL.md"
 test -f "$DEST/evals/skill-resolver/skill-resolver.json"
+test -x "$DEST/scripts/notify-human-blocker.sh"
 test -d "$DEST/node_modules"
 
 # Runtime smoke: execute from the immutable snapshot with isolated Major state.
