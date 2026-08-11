@@ -15,30 +15,35 @@
 
 export const UNAVAILABLE_CAPABILITIES = Object.freeze({
   'live-agent-execution': Object.freeze({
+    available: false,
     reason:
       'the combined trusted-executable and macOS isolation boundary has not yet passed ' +
       'fresh independent review and provider field validation',
     milestone: 'M1 — combined validation and activation',
   }),
   'paid-provider-execution': Object.freeze({
+    available: false,
     reason:
       'the combined authoritative billing and one-use paid approval boundary has not yet ' +
       'passed fresh independent review',
     milestone: 'M2 — combined validation and activation',
   }),
   'automated-task-completion': Object.freeze({
+    available: false,
     reason:
       'the combined immutable task-specific completion proof has not yet passed fresh ' +
       'independent review',
     milestone: 'M3 — combined validation and activation',
   }),
   'worker-owned-downstream-mutations': Object.freeze({
+    available: false,
     reason:
       'the combined worker and downstream-write fencing boundary has not yet passed fresh ' +
       'independent review',
     milestone: 'M4 — combined validation and activation',
   }),
   'external-roadmap-application': Object.freeze({
+    available: false,
     reason:
       'the combined exact-attempt roadmap reconciliation boundary has not yet passed fresh ' +
       'independent review or a representative live adapter test',
@@ -60,13 +65,13 @@ export class CapabilityUnavailableError extends Error {
 }
 
 /**
- * Whether a capability is available in this build. Always false for the five
- * quarantined capabilities — the boolean return type exists so guarded code
- * paths stay compiled and type-checked while remaining unreachable at
- * runtime.
+ * Whether a capability is available in this build. Availability is an
+ * immutable reviewed code constant. This keeps every guarded path compiled
+ * while making activation an explicit one-line code review rather than the
+ * impossible act of deleting a key that the type system still requires.
  */
 export function isCapabilityAvailable(capability: UnavailableCapability): boolean {
-  return !(capability in UNAVAILABLE_CAPABILITIES);
+  return UNAVAILABLE_CAPABILITIES[capability].available;
 }
 
 /** Fail closed: throw unless the capability is available (it never is). */
@@ -78,17 +83,22 @@ export function assertCapabilityAvailable(capability: UnavailableCapability): vo
 
 export interface CapabilityStatus {
   capability: UnavailableCapability;
-  available: false;
+  available: boolean;
   reason: string;
   milestone: string;
 }
 
-/** The five unavailable capabilities as report rows (doctor, docs, tests). */
-export function unavailableCapabilityStatuses(): CapabilityStatus[] {
+/** All build capabilities as report rows (doctor, docs, tests). */
+export function capabilityStatuses(): CapabilityStatus[] {
   return (Object.keys(UNAVAILABLE_CAPABILITIES) as UnavailableCapability[]).map((capability) => ({
     capability,
-    available: false,
+    available: UNAVAILABLE_CAPABILITIES[capability].available,
     reason: UNAVAILABLE_CAPABILITIES[capability].reason,
     milestone: UNAVAILABLE_CAPABILITIES[capability].milestone,
   }));
+}
+
+/** Backward-compatible unavailable-only view. */
+export function unavailableCapabilityStatuses(): CapabilityStatus[] {
+  return capabilityStatuses().filter((status) => !status.available);
 }

@@ -142,12 +142,12 @@ describe('major CLI', () => {
     expect(parsed.data[0]).toMatchObject({ title: 'first task', status: 'draft' });
   });
 
-  it('refuses live execution with the policy-refusal exit code', () => {
+  it('keeps task routing inspection distinct from the live supervisor run command', () => {
     const list = major('task', 'list', '--project', 'demo', '--json');
     const taskId = (JSON.parse(list.stdout) as { data: { id: string }[] }).data[0]!.id;
-    const result = major('run', '--task', taskId);
-    expect(result.status).toBe(4);
-    expect(result.stderr).toMatch(/live execution is not enabled/);
+    const result = major('route', '--task', taskId, '--json');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ kind: 'route-inspection' });
   });
 
   it('folds duplicate suggestions and suppresses rejected scopes with exit 4', () => {
@@ -193,19 +193,20 @@ describe('major CLI', () => {
     expect(parsed.data.capabilities.every((c) => c.available === false)).toBe(true);
   }, 90_000);
 
-  it('exposes no command that could complete tasks, claim work or apply roadmap writes', () => {
+  it('keeps the legacy task-ledger CLI free of execution and downstream-write commands', () => {
     const listCommands = (helpText: string) =>
       [...helpText.matchAll(/^ {2}([a-z]\S*)/gm)].map((m) => m[1]);
 
     const help = major('--help');
     expect(help.status).toBe(0);
-    // the full production command surface of this build:
+    // This is the Commander task-ledger surface. The successor supervisor is
+    // routed by src/entry.ts before Commander and has separate contract tests.
     expect(listCommands(help.stdout).sort()).toEqual([
       'doctor',
       'help',
       'project',
       'queue',
-      'run',
+      'route',
       'task',
     ]);
 
@@ -322,8 +323,8 @@ describe('major CLI', () => {
     if (!doctor.stdout.trim()) throw new Error(`doctor produced no output: ${doctor.stderr}`);
     expect(existsSync(sentinel)).toBe(false);
 
-    // run --dry-run performs provider/model discovery + routing
-    const dry = majorEnv(hostileEnv, 'run', '--task', taskId, '--dry-run', '--json');
+    // route performs process-free provider/model discovery + routing
+    const dry = majorEnv(hostileEnv, 'route', '--task', taskId, '--json');
     expect(dry.status).toBe(0);
     expect(existsSync(sentinel)).toBe(false);
 

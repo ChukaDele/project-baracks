@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { executeMajorCommand } from '../security/major-gateway.js';
+import { redactText } from '../security/redact.js';
 import { globalStopRequested } from './policy.js';
 import {
   releaseResource,
@@ -136,8 +137,8 @@ export async function runGatewayCommand(input: {
 
     try {
       for await (const event of handle.events) {
-        const text = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
-        stdout = appendLimited(stdout, `${text}\n`);
+        const raw = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+        stdout = appendLimited(stdout, `${redactText(raw)}\n`);
       }
       const outcome = await handle.outcome;
       return {
@@ -164,7 +165,7 @@ export async function runGatewayCommand(input: {
       status: 'failed',
       exitCode: null,
       stdout,
-      stderr: error instanceof Error ? error.message : String(error),
+      stderr: redactText(error instanceof Error ? error.message : String(error)),
       durationMs: Date.now() - started,
       rateLimited: false,
       exhausted: false,
@@ -219,7 +220,7 @@ export async function runWorker(input: {
       status: 'failed',
       exitCode: null,
       stdout: '',
-      stderr: error instanceof Error ? error.message : String(error),
+      stderr: redactText(error instanceof Error ? error.message : String(error)),
       durationMs: Date.now() - started,
       rateLimited: false,
       exhausted: false,

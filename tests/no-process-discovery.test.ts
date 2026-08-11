@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * moment it is called, so if provider discovery or dry-run routing tried to
  * spawn or execFile a binary — including an environment/PATH-selected override
  * — these tests would fail loudly. (End-to-end, compiled-CLI, sentinel-based
- * coverage of doctor and run --dry-run lives in cli.test.ts.)
+ * coverage of doctor and route inspection lives in cli.test.ts.)
  */
 
 // `calls` is hoisted alongside vi.mock so the (hoisted) factory can reference it.

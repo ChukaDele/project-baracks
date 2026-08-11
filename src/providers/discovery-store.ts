@@ -8,6 +8,7 @@ import {
   type ModelAvailability,
 } from '../db/schema.js';
 import { newId } from '../domain/ids.js';
+import { redactText } from '../security/redact.js';
 import type { ModelState, ProviderInfo } from './types.js';
 
 /**
@@ -74,7 +75,7 @@ function upsertProvider(db: DbConn, info: ProviderInfo, now: string) {
 export function persistProviderDiscovery(
   db: Db,
   info: ProviderInfo,
-  options: { source: ObservationSource; now?: () => Date },
+  options: { source: ObservationSource; note?: string; now?: () => Date },
 ) {
   return db.transaction(
     (tx) => {
@@ -125,7 +126,11 @@ export function persistProviderDiscovery(
             id: newId('dobs'),
             providerId,
             modelId,
-            observedJson: JSON.stringify({ modelRef: model.modelRef, ...state }),
+            observedJson: JSON.stringify({
+              modelRef: model.modelRef,
+              ...state,
+              ...(options.note ? { note: redactText(options.note).slice(0, 4_000) } : {}),
+            }),
             source: options.source,
             confidence: CONFIDENCE_BY_SOURCE[options.source],
             observedAt: now,

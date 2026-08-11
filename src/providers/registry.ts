@@ -230,6 +230,7 @@ export const modelAvailabilitySchema = z.enum(MODEL_AVAILABILITIES);
 export {
   CapabilityUnavailableError,
   UNAVAILABLE_CAPABILITIES,
+  capabilityStatuses,
   unavailableCapabilityStatuses,
   type CapabilityStatus,
   type UnavailableCapability,

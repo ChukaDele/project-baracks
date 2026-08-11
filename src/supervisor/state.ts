@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { redactText } from '../security/redact.js';
 
 export const GOAL_STATUSES = ['active', 'running', 'blocked', 'done', 'failed', 'paused'] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
@@ -35,6 +36,13 @@ export interface SupervisorGoal {
   activePid?: number | undefined;
   nextRunAt?: string | undefined;
   lastCoordinator?: WorkerHost | undefined;
+  pendingCompletion?:
+    | {
+        summary: string;
+        coordinator: WorkerHost;
+        claimedAt: string;
+      }
+    | undefined;
 }
 
 export interface SessionAttachment {
@@ -111,6 +119,7 @@ export function startGoal(input: {
       existing.status = 'active';
       existing.updatedAt = now;
       existing.ownerGate = undefined;
+      existing.pendingCompletion = undefined;
       existing.nextRunAt = now;
       writeSupervisorState(state);
       return existing;
@@ -140,6 +149,47 @@ export function updateGoal(id: string, patch: Partial<Omit<SupervisorGoal, 'id'>
   const goal = state.goals.find((candidate) => candidate.id === id);
   if (!goal) throw new Error(`goal not found: ${id}`);
   Object.assign(goal, patch, { updatedAt: new Date().toISOString() });
+  writeSupervisorState(state);
+  return goal;
+}
+
+/** Apply an independent grade to the currently pending worker completion
+ * claim. A worker claim alone can never mark a goal done. */
+export function applyIndependentCompletionGrade(input: {
+  goalId: string;
+  provider: WorkerHost;
+  result: 'pass' | 'fail';
+  evidence: string;
+}): SupervisorGoal {
+  const state = readSupervisorState();
+  const goal = state.goals.find((candidate) => candidate.id === input.goalId);
+  if (!goal) throw new Error(`goal not found: ${input.goalId}`);
+  const pending = goal.pendingCompletion;
+  if (!pending) throw new Error(`goal ${input.goalId} has no pending completion claim`);
+  if (pending.coordinator === input.provider) {
+    throw new Error(
+      `independent completion grade refused: ${input.provider} made the completion claim`,
+    );
+  }
+  const evidence = input.evidence.trim();
+  if (!evidence) throw new Error('independent completion evidence must not be empty');
+  goal.pendingCompletion = undefined;
+  goal.activePid = undefined;
+  goal.lastFinishedAt = new Date().toISOString();
+  goal.ownerGate = undefined;
+  goal.consecutiveFailures = 0;
+  if (input.result === 'pass') {
+    goal.status = 'done';
+    goal.nextRunAt = undefined;
+    goal.lastSummary = redactText(
+      `Independent validation passed: ${pending.summary}. Evidence: ${evidence}`,
+    );
+  } else {
+    goal.status = 'active';
+    goal.nextRunAt = new Date().toISOString();
+    goal.lastSummary = redactText(`Independent validation rejected completion: ${evidence}`);
+  }
+  goal.updatedAt = new Date().toISOString();
   writeSupervisorState(state);
   return goal;
 }

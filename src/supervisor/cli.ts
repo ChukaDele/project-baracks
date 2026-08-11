@@ -17,6 +17,7 @@ import {
 } from './policy.js';
 import {
   attachSession,
+  applyIndependentCompletionGrade,
   getGoal,
   resolveProject,
   resolveProjectForCwd,
@@ -39,6 +40,7 @@ import {
   type ResourceKind,
 } from './resources.js';
 import { assertRemotePreviewUrl } from '../web/remote-preview.js';
+import { redactText } from '../security/redact.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -273,14 +275,23 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         `independent grade refused: ${provider} was the last coordinator for goal ${goalId}`,
       );
     }
+    const evidence = requireFlag(args, '--evidence');
     const policy = recordIndependentGrade({
       project: project.project,
       repoPath: project.repoPath,
       provider,
       result: resultRaw,
-      evidence: requireFlag(args, '--evidence'),
+      evidence,
       goalId,
     });
+    if (goal.pendingCompletion) {
+      applyIndependentCompletionGrade({
+        goalId,
+        provider,
+        result: resultRaw,
+        evidence,
+      });
+    }
     console.log(JSON.stringify(policy, null, 2));
     return true;
   }
@@ -345,7 +356,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'goal' && args[1] === 'report') {
     const id = requireFlag(args, '--id');
     const statusRaw = requireFlag(args, '--status');
-    const allowed: GoalStatus[] = ['active', 'blocked', 'done', 'failed', 'paused', 'running'];
+    const allowed: GoalStatus[] = ['active', 'blocked', 'failed', 'paused'];
     if (!allowed.includes(statusRaw as GoalStatus)) {
       throw new Error(`invalid goal status: ${statusRaw}`);
     }
@@ -353,9 +364,10 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const ownerGate = flag(args, '--owner-gate');
     const patch: Parameters<typeof updateGoal>[1] = {
       status: statusRaw as GoalStatus,
-      lastSummary: summary,
+      lastSummary: redactText(summary).slice(0, 12_000),
       lastFinishedAt: new Date().toISOString(),
-      ownerGate,
+      ownerGate: ownerGate ? redactText(ownerGate).slice(0, 4_000) : undefined,
+      pendingCompletion: undefined,
     };
     updateGoal(id, patch);
     console.log(`goal ${id}: ${statusRaw}`);

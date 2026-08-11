@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { redactText } from '../security/redact.js';
 import { majorHome } from './state.js';
 import type { WorkerHost } from './state.js';
 
@@ -223,7 +224,7 @@ function storeGrade(input: {
   const grade: IndependentGrade = {
     provider: input.provider,
     result: input.result,
-    evidence: input.evidence,
+    evidence: redactText(input.evidence).slice(0, 12_000),
     at: new Date().toISOString(),
     kind: input.kind,
     trustAtGrade: current.trust,

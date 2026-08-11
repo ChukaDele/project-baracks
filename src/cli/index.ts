@@ -25,7 +25,6 @@ import { antigravityProvider } from '../providers/antigravity.js';
 import { persistProviderDiscovery } from '../providers/discovery-store.js';
 import { route, type RoutingRequest } from '../routing/router.js';
 import { dbDecisionRecorder } from '../security/audit.js';
-import { CapabilityUnavailableError } from '../security/capabilities.js';
 import { ExecutionGateway } from '../security/gateway.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
 import type { RunPurpose } from '../db/schema.js';
@@ -145,7 +144,9 @@ program
         console.log(`missing prerequisites: ${report.missingPrerequisites.join(', ')}`);
       }
       for (const cap of report.capabilities) {
-        console.log(`✗ capability ${cap.capability}: unavailable (${cap.milestone})`);
+        console.log(
+          `${cap.available ? '✓' : '✗'} capability ${cap.capability}: ${cap.available ? 'available' : `unavailable (${cap.milestone})`}`,
+        );
       }
       // Overnight/autonomous LIVE execution is categorically unavailable in
       // this foundation; it is never reported as SAFE.
@@ -386,28 +387,16 @@ program
   });
 
 program
-  .command('run')
-  .description('Plan an agent run for a task (dry-run only: live execution is unavailable)')
+  .command('route')
+  .description('Inspect the provider/model routing decision for a task without executing it')
   .requiredOption('--task <taskId>', 'task to run')
   .addOption(
     new Option('--purpose <purpose>', 'run purpose')
       .choices(RUN_PURPOSES)
       .default('implementation'),
   )
-  .option('--dry-run', 'show the routing decision without executing anything')
   .option('--json', 'emit versioned JSON')
-  .action(async (opts: { task: string; purpose: RunPurpose; dryRun?: boolean; json?: boolean }) => {
-    if (!opts.dryRun) {
-      // Fail closed before any routing, run creation or subprocess: live
-      // agent execution is an unavailable capability in this build, and the
-      // same hard-coded gate refuses again at every deeper boundary
-      // (gateway/exec/run-service) even if this check were bypassed.
-      fail(
-        'live execution is not enabled in this foundation build; use --dry-run — ' +
-          new CapabilityUnavailableError('live-agent-execution').message,
-        EXIT.refused,
-      );
-    }
+  .action(async (opts: { task: string; purpose: RunPurpose; json?: boolean }) => {
     const database = db();
     let taskRow;
     try {
@@ -424,7 +413,7 @@ program
     };
     const decision = route(request, infos);
     if (opts.json) {
-      emitJson('run-dry-run', { task: taskRow, decision });
+      emitJson('route-inspection', { task: taskRow, decision });
       return;
     }
     console.log(`task ${taskRow.id} [${taskRow.status}] ${taskRow.title}`);

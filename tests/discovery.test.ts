@@ -40,6 +40,22 @@ describe('discovery persistence', () => {
     }
   });
 
+  it('redacts human availability evidence before persistence', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo(), {
+      source: 'human',
+      note: 'verified with token=sk-this-is-a-secret-value',
+    });
+    const observations = db.select().from(discoveryObservations).all();
+    expect(observations).toHaveLength(2);
+    for (const observation of observations) {
+      expect(observation.observedJson).not.toContain('sk-this-is-a-secret-value');
+      expect(JSON.parse(observation.observedJson).note).toContain('[REDACTED]');
+      expect(observation.source).toBe('human');
+      expect(observation.confidence).toBe('configured');
+    }
+  });
+
   it('routing consumes persisted state, and billing stays unroutable until observed', () => {
     const db = testDb();
     // The discovery input CLAIMS subscription billing, but discovery is not

@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import { platform, release } from 'node:os';
 import type { ProviderAdapter, ProviderInfo } from '../providers/types.js';
 import {
+  capabilityStatuses,
   isCapabilityAvailable,
-  unavailableCapabilityStatuses,
   type CapabilityStatus,
 } from '../security/capabilities.js';
 import { detectContainment } from '../security/containment.js';
@@ -170,7 +170,7 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     .filter((c) => c.required && c.status === 'missing')
     .map((c) => c.name);
 
-  const capabilities = unavailableCapabilityStatuses();
+  const capabilities = capabilityStatuses();
 
   // Inspection / dry-run health — the SUPPORTED use of this build. Truthful and
   // independent of execution: it only asks whether the prerequisites for
@@ -189,10 +189,16 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
   // then the environmental factors that would ALSO have to hold once execution
   // is enabled by a future milestone.
   const liveCap = capabilities.find((c) => c.capability === 'live-agent-execution');
-  const overnightExecutionReasons: string[] = [
-    `live agent execution is unavailable in this build (${liveCap?.milestone ?? 'M1'})`,
-  ];
+  const overnightExecutionReasons: string[] = [];
+  if (!liveCap?.available) {
+    overnightExecutionReasons.push(
+      `live agent execution is unavailable in this build (${liveCap?.milestone ?? 'M1'})`,
+    );
+  }
   overnightExecutionReasons.push(...liveExecutionBlockers);
+  overnightExecutionReasons.push(
+    'background execution requires an unattended project policy and an explicitly started daemon',
+  );
   if (missingPrerequisites.length > 0) {
     overnightExecutionReasons.push(`missing prerequisites: ${missingPrerequisites.join(', ')}`);
   }

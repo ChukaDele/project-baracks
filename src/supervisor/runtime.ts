@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -7,13 +8,14 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { openDb } from '../db/client.js';
 import { listLearningCandidates } from '../learning/candidates.js';
 import { loadPersistedProviderInfos, recordModelOutcome } from '../providers/discovery-store.js';
 import type { ProviderInfo } from '../providers/types.js';
 import { route } from '../routing/router.js';
 import { resolveSkills } from '../skills/resolver.js';
+import { redactText } from '../security/redact.js';
 import {
   assertExecutionAllowed,
   getProjectPolicy,
@@ -102,11 +104,62 @@ export interface WorkerReport {
 
 const WORKER_REPORT_PREFIX = 'MAJOR_RESULT: ';
 
+function addStringLines(value: unknown, lines: string[]): void {
+  if (typeof value === 'string') {
+    for (const line of value.split(/\r?\n/)) {
+      if (lines.length >= 500) break;
+      lines.push(line.trim());
+    }
+  }
+}
+
+function collectProviderResultLines(value: unknown, lines: string[]): void {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+  const event = value as Record<string, unknown>;
+  if (event.type === 'result') {
+    addStringLines(event.result, lines);
+    return;
+  }
+  if (event.type === 'item.completed' && event.item && typeof event.item === 'object') {
+    const item = event.item as Record<string, unknown>;
+    if (item.type === 'agent_message') addStringLines(item.text, lines);
+    return;
+  }
+  if (event.type === 'assistant' && event.message && typeof event.message === 'object') {
+    const content = (event.message as Record<string, unknown>).content;
+    if (!Array.isArray(content)) return;
+    for (const block of content) {
+      if (block && typeof block === 'object') {
+        const candidate = block as Record<string, unknown>;
+        if (candidate.type === undefined || candidate.type === 'text') {
+          addStringLines(candidate.text, lines);
+        }
+      }
+    }
+  }
+}
+
+function workerOutputLines(output: string): string[] {
+  const lines: string[] = [];
+  for (const rawLine of output.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    lines.push(line);
+    try {
+      collectProviderResultLines(JSON.parse(line), lines);
+    } catch {
+      // Plain provider output remains eligible below.
+    }
+  }
+  return lines;
+}
+
 /** Parse the final bounded worker report. The parent remains the only process
- * allowed to mutate Major's control state. */
+ * allowed to mutate Major's control state. Provider CLIs return different
+ * JSON/JSONL envelopes, so only known assistant-result fields are inspected.
+ * Tool and user-message payloads are never eligible completion authority. */
 export function parseWorkerReport(output: string): WorkerReport | undefined {
-  const line = output
-    .split(/\r?\n/)
+  const line = workerOutputLines(output)
     .reverse()
     .find((candidate) => candidate.startsWith(WORKER_REPORT_PREFIX));
   if (!line) return undefined;
@@ -114,13 +167,14 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
     const value = JSON.parse(line.slice(WORKER_REPORT_PREFIX.length)) as Record<string, unknown>;
     if (!['active', 'blocked', 'done'].includes(String(value.status))) return undefined;
     if (typeof value.summary !== 'string' || value.summary.trim().length === 0) return undefined;
-    const summary = value.summary.trim().slice(0, 12_000);
-    const ownerGate = typeof value.ownerGate === 'string' ? value.ownerGate.trim() : '';
+    const summary = redactText(value.summary.trim()).slice(0, 12_000);
+    const ownerGate =
+      typeof value.ownerGate === 'string' ? redactText(value.ownerGate.trim()).slice(0, 4_000) : '';
     if (value.status === 'blocked' && !ownerGate) return undefined;
     return {
       status: value.status as WorkerReport['status'],
       summary,
-      ...(ownerGate ? { ownerGate: ownerGate.slice(0, 4_000) } : {}),
+      ...(ownerGate ? { ownerGate } : {}),
     };
   } catch {
     return undefined;
@@ -252,10 +306,60 @@ ${context || '(No canonical project context files found. Inspect the repository 
 `;
 }
 
+/** Acquire the single integration-owner slot for a repository. This prevents
+ * two goals, aliases, manual invocations, or daemon cycles from concurrently
+ * writing the same working tree. Delegated writers still require worktrees. */
+export function tryAcquireRepoCycleLock(repoPath: string): (() => void) | undefined {
+  const dir = join(majorHome(), 'supervisor-repo-locks');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const key = createHash('sha256').update(resolve(repoPath)).digest('hex').slice(0, 32);
+  const path = join(dir, `${key}.pid`);
+  if (existsSync(path)) {
+    const prior = Number.parseInt(readFileSync(path, 'utf8').trim(), 10);
+    if (Number.isFinite(prior) && pidAlive(prior)) return undefined;
+    unlinkSync(path);
+  }
+  let fd: number;
+  try {
+    fd = openSync(path, 'wx', 0o600);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
+    throw error;
+  }
+  writeFileSync(fd, `${process.pid}\n`);
+  closeSync(fd);
+  return () => {
+    try {
+      if (existsSync(path) && readFileSync(path, 'utf8').trim() === String(process.pid)) {
+        unlinkSync(path);
+      }
+    } catch {
+      // Best effort. A stale lock is reclaimed after this process exits.
+    }
+  };
+}
+
 export async function runGoalCycle(goalId: string): Promise<void> {
   const goal = getGoal(goalId);
   if (!goal) throw new Error(`goal not found: ${goalId}`);
   if (goal.status === 'done' || goal.status === 'paused') return;
+  if (goal.pendingCompletion) {
+    console.error(`Goal ${goal.id} is awaiting an independent completion grade.`);
+    return;
+  }
+  const releaseRepoLock = tryAcquireRepoCycleLock(goal.repoPath);
+  if (!releaseRepoLock) {
+    console.error(`Repository ${goal.repoPath} already has an active Major integration owner.`);
+    return;
+  }
+  try {
+    await runLockedGoalCycle(goal);
+  } finally {
+    releaseRepoLock();
+  }
+}
+
+async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   assertExecutionAllowed(policy);
 
@@ -299,6 +403,7 @@ export async function runGoalCycle(goalId: string): Promise<void> {
     lastStartedAt: new Date().toISOString(),
     activePid: process.pid,
     lastCoordinator: host,
+    pendingCompletion: undefined,
   });
 
   const outcome = await runWorker({
@@ -341,17 +446,20 @@ export async function runGoalCycle(goalId: string): Promise<void> {
         lastFinishedAt: new Date().toISOString(),
         lastSummary: report.summary,
         ownerGate: report.ownerGate,
+        pendingCompletion: undefined,
       });
       return;
     }
     if (report?.status === 'done') {
+      const claimedAt = new Date().toISOString();
       updateGoal(goal.id, {
         status: 'active',
         consecutiveFailures: 0,
         activePid: undefined,
-        lastFinishedAt: new Date().toISOString(),
+        lastFinishedAt: claimedAt,
         lastSummary: `Worker completion claim awaiting independent validation: ${report.summary}`,
-        nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+        nextRunAt: undefined,
+        pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
       });
       return;
     }
@@ -364,6 +472,7 @@ export async function runGoalCycle(goalId: string): Promise<void> {
         report?.summary ??
         trim(outcome.stdout || 'Coordinator cycle completed without an explicit Major report.'),
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      pendingCompletion: undefined,
     });
   } else {
     const failures = after.consecutiveFailures + 1;
@@ -374,6 +483,7 @@ export async function runGoalCycle(goalId: string): Promise<void> {
       lastFinishedAt: new Date().toISOString(),
       lastSummary: trim(outcome.stderr || outcome.stdout || `Coordinator ${host} failed.`),
       nextRunAt: new Date(Date.now() + Math.min(60_000, failures * 10_000)).toISOString(),
+      pendingCompletion: undefined,
     });
   }
 }
@@ -431,6 +541,7 @@ export async function runDaemon(): Promise<void> {
       const policy = getProjectPolicy(goal.project, goal.repoPath);
       if (policy.trust !== 'unattended' || !policy.allowBackground) return false;
       if (!goal.autonomous || goal.status === 'blocked') return false;
+      if (goal.pendingCompletion) return false;
       if (goal.activePid && pidAlive(goal.activePid)) return false;
       return !goal.nextRunAt || Date.parse(goal.nextRunAt) <= now;
     });
@@ -453,6 +564,11 @@ export function supervisorSnapshot(project?: string): string {
         `goal=${goal.id} cycle=${goal.cycle} failures=${goal.consecutiveFailures}`,
       ];
       if (goal.lastSummary) lines.push(`last: ${trim(goal.lastSummary, 1_500)}`);
+      if (goal.pendingCompletion) {
+        lines.push(
+          `completion: awaiting independent grade of ${goal.pendingCompletion.coordinator} claim`,
+        );
+      }
       if (goal.ownerGate) lines.push(`OWNER GATE: ${goal.ownerGate}`);
       return lines.join('\n');
     })
