@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { discoveryObservations, routingCheckpoints } from '../src/db/schema.js';
+import { agentModels, discoveryObservations, routingCheckpoints } from '../src/db/schema.js';
 import {
   loadPersistedProviderInfos,
   persistProviderDiscovery,
@@ -101,6 +101,52 @@ describe('discovery persistence', () => {
     expect(sonnet.billingMode).toBe('unknown');
   });
 
+  it('process-free doctor discovery cannot erase human-attested availability', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo({ executable: '/trusted/provider' }), {
+      source: 'human',
+      note: 'operator verified login and model visibility',
+    });
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        executable: '/hostile/path/provider',
+        installed: false,
+        authenticated: false,
+        models: [
+          model({
+            modelRef: 'opus',
+            visible: false,
+            authenticated: false,
+            availability: 'unknown',
+          }),
+        ],
+      }),
+      { source: 'cli' },
+    );
+    const info = loadPersistedProviderInfos(db)[0]!;
+    expect(info.executable).toBe('/trusted/provider');
+    expect(info.models.find((candidate) => candidate.modelRef === 'opus')).toMatchObject({
+      visible: true,
+      authenticated: true,
+      availability: 'available',
+    });
+  });
+
+  it('an observed authentication failure revokes stale availability', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo(), { source: 'human' });
+    recordModelOutcome(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      outcome: 'unknown',
+    });
+    expect(
+      loadPersistedProviderInfos(db)[0]!.models.find((candidate) => candidate.modelRef === 'opus')!
+        .availability,
+    ).toBe('unknown');
+  });
+
   it('persists exhaustion with a next-probe time and blocks early re-probing', () => {
     const db = testDb();
     persistProviderDiscovery(db, providerInfo(), { source: 'cli' });
@@ -123,6 +169,29 @@ describe('discovery persistence', () => {
     recordModelOutcome(db, { providerName: 'claude-code', modelRef: 'opus', outcome: 'available' });
     const after = loadPersistedProviderInfos(db)[0]!.models.find((m) => m.modelRef === 'opus')!;
     expect(after.availability).toBe('available');
+  });
+
+  it('keeps the exhausted probe deadline during process-free discovery after expiry', () => {
+    const db = testDb();
+    const observedAt = new Date('2026-01-01T00:00:00.000Z');
+    persistProviderDiscovery(db, providerInfo(), { source: 'human', now: () => observedAt });
+    recordModelOutcome(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      outcome: 'exhausted',
+      backoffMs: 1_000,
+      now: () => observedAt,
+    });
+    const deadline = db.select().from(agentModels).get()!.nextProbeAt;
+    persistProviderDiscovery(db, providerInfo({ installed: false, authenticated: false }), {
+      source: 'cli',
+      now: () => new Date('2026-01-01T00:01:00.000Z'),
+    });
+    const persisted = loadPersistedProviderInfos(db)[0]!.models.find(
+      (candidate) => candidate.modelRef === 'opus',
+    )!;
+    expect(persisted.availability).toBe('exhausted');
+    expect(db.select().from(agentModels).get()!.nextProbeAt).toBe(deadline);
   });
 
   it('an exhausted persisted model is not routed to', () => {

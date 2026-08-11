@@ -11,6 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { getProjectPolicy } from '../supervisor/policy.js';
 import { majorHome } from '../supervisor/state.js';
 
 export const LEARNING_SOURCES = [
@@ -231,10 +232,16 @@ function visibleGlobalCandidates(status?: LearningStatus): LearningCandidate[] {
   for (const candidate of store.candidates) {
     if (
       candidate.scope !== 'global' ||
-      candidate.status !== 'promoted' ||
+      (candidate.status !== 'promoted' && candidate.status !== 'dismissed') ||
       candidate.project !== undefined ||
       candidate.repoPath !== undefined ||
       candidate.promotedToGlobalId !== undefined ||
+      candidate.key !== undefined ||
+      (candidate.status === 'dismissed' &&
+        (candidate.summary !== 'Retracted global learning.' ||
+          candidate.evidence.length !== 1 ||
+          !/^dismissal-reason-sha256:[a-f0-9]{64}$/.test(candidate.evidence[0] ?? '') ||
+          candidate.occurrences !== 0)) ||
       PII_PATTERNS.some(
         (rule) =>
           rule.test(candidate.summary) || candidate.evidence.some((item) => rule.test(item)),
@@ -250,10 +257,18 @@ export function listLearningCandidates(
   project?: string,
   status?: LearningStatus,
 ): LearningCandidate[] {
-  const global = visibleGlobalCandidates(status);
+  const allGlobal = visibleGlobalCandidates();
+  const global = allGlobal.filter((candidate) => !status || candidate.status === status);
   if (!project) return global;
+  const activeGlobalIds = new Set(
+    allGlobal
+      .filter((candidate) => candidate.status === 'promoted')
+      .map((candidate) => candidate.id),
+  );
   const local = readStore(projectStorePath(project)).candidates.filter((candidate) => {
-    if (candidate.promotedToGlobalId) return false;
+    if (candidate.promotedToGlobalId && activeGlobalIds.has(candidate.promotedToGlobalId)) {
+      return false;
+    }
     return !status || candidate.status === status;
   });
   return [...global, ...local];
@@ -339,6 +354,10 @@ export function promoteLearning(input: {
         'global promotion requires a recurring candidate with at least two occurrences',
       );
     }
+    const policy = getProjectPolicy(input.project, candidate.repoPath ?? input.project);
+    if (!policy.allowCrossProjectMemory) {
+      throw new Error(`global promotion is forbidden by the project policy for ${input.project}`);
+    }
     const summary = assertSanitizedGlobalText(input.summary ?? '', 'summary', candidate);
     const evidence = assertSanitizedGlobalText(input.evidence, 'evidence', candidate);
     const globalPath = globalStorePath();
@@ -347,7 +366,7 @@ export function promoteLearning(input: {
       const globalStore = readStore(globalPath);
       const fingerprint = normalizedSummary(summary);
       const existing = globalStore.candidates.find(
-        (item) => item.status === 'promoted' && sameLesson(item, candidate.key, fingerprint),
+        (item) => item.status === 'promoted' && normalizedSummary(item.summary) === fingerprint,
       );
       if (existing) {
         if (!existing.evidence.includes(evidence)) {
@@ -368,7 +387,6 @@ export function promoteLearning(input: {
         status: 'promoted',
         createdAt: now,
         updatedAt: now,
-        ...(candidate.key ? { key: candidate.key } : {}),
       };
       globalStore.candidates.push(created);
       writeStore(globalPath, globalStore);
@@ -380,6 +398,32 @@ export function promoteLearning(input: {
     candidate.updatedAt = now;
     writeStore(projectPath, projectStore);
     return promoted;
+  });
+}
+
+export function dismissGlobalLearning(input: { id: string; evidence: string }): LearningCandidate {
+  if (!input.evidence.trim()) throw new Error('dismissal evidence/reason is required');
+  const path = globalStorePath();
+  return withStoreLock(path, () => {
+    const store = readStore(path);
+    const candidate = store.candidates.find((item) => item.id === input.id);
+    if (!candidate) throw new Error(`global learning candidate not found: ${input.id}`);
+    if (candidate.scope !== 'global' || candidate.status !== 'promoted') {
+      throw new Error(`global learning candidate ${input.id} is already ${candidate.status}`);
+    }
+    candidate.status = 'dismissed';
+    candidate.summary = 'Retracted global learning.';
+    candidate.evidence = [
+      `dismissal-reason-sha256:${createHash('sha256').update(input.evidence.trim()).digest('hex')}`,
+    ];
+    candidate.occurrences = 0;
+    candidate.updatedAt = new Date().toISOString();
+    delete candidate.key;
+    delete candidate.project;
+    delete candidate.repoPath;
+    delete candidate.promotedToGlobalId;
+    writeStore(path, store);
+    return candidate;
   });
 }
 

@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { majorHome } from '../supervisor/state.js';
 
 const registryEntrySchema = z.object({
   id: z.string(),
@@ -108,14 +108,19 @@ function normalizedText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
 
-function skillPath(id: string, cwd: string): string | undefined {
-  const roots = [
-    join(cwd, '.agents', 'skills'),
-    join(cwd, '.claude', 'skills'),
-    join(cwd, '.codex', 'skills'),
-    join(homedir(), '.major', 'skills', 'internal'),
-    join(runtimeRoot(), 'skills', 'internal'),
-  ];
+function skillPath(id: string, cwd: string, source: string): string | undefined {
+  const immutable = join(runtimeRoot(), 'skills', 'internal');
+  const mutableGlobal = join(majorHome(), 'skills', 'internal');
+  const roots =
+    source === 'major-internal'
+      ? [immutable, mutableGlobal]
+      : [
+          join(cwd, '.agents', 'skills'),
+          join(cwd, '.claude', 'skills'),
+          join(cwd, '.codex', 'skills'),
+          mutableGlobal,
+          immutable,
+        ];
   for (const root of roots) {
     const path = join(root, id, 'SKILL.md');
     if (existsSync(path)) return path;
@@ -176,7 +181,7 @@ export function resolveSkills(input: {
 
   const skills: ResolvedSkill[] = [];
   for (const match of matches) {
-    const path = skillPath(match.entry.id, cwd);
+    const path = skillPath(match.entry.id, cwd, match.entry.source);
     if (!path) continue;
     skills.push({
       id: match.entry.id,
@@ -203,7 +208,7 @@ export function auditSkillReachability(cwd = process.cwd()): SkillAudit {
   const internal = entries
     .filter((entry) => entry.source === 'major-internal')
     .map((entry) => {
-      const path = skillPath(entry.id, resolve(cwd));
+      const path = skillPath(entry.id, resolve(cwd), entry.source);
       return { id: entry.id, reachable: Boolean(path), ...(path ? { path } : {}) };
     });
   const registered = new Set(internal.map((entry) => entry.id));

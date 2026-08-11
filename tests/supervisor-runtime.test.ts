@@ -6,6 +6,7 @@ import { captureLearning, promoteLearning } from '../src/learning/candidates.js'
 import { configureProjectPolicy, recordShadowGrade } from '../src/supervisor/policy.js';
 import {
   coordinatorPrompt,
+  modelOutcomeForWorker,
   parseWorkerReport,
   selectCoordinator,
   tryAcquireRepoCycleLock,
@@ -52,6 +53,44 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('revokes stale routing state on authentication or executable-trust failure', () => {
+    const base = {
+      host: 'claude' as const,
+      status: 'failed' as const,
+      rateLimited: false,
+      exhausted: false,
+    };
+    expect(
+      modelOutcomeForWorker({ ...base, stderr: 'Not logged in. Run /login for Claude.' }),
+    ).toBe('unknown');
+    expect(modelOutcomeForWorker({ ...base, stderr: 'no trusted installation registered' })).toBe(
+      'unknown',
+    );
+    expect(modelOutcomeForWorker({ ...base, stderr: 'task tests failed' })).toBeUndefined();
+    expect(
+      modelOutcomeForWorker({
+        ...base,
+        stderr: 'gh: authentication required before accessing this repository',
+      }),
+    ).toBeUndefined();
+    expect(
+      modelOutcomeForWorker({
+        ...base,
+        host: 'cursor',
+        stderr: 'Not authenticated. Please run cursor-agent login.',
+      }),
+    ).toBe('unknown');
+    expect(
+      modelOutcomeForWorker({
+        ...base,
+        stderr: 'Invalid API key · Please run /login',
+      }),
+    ).toBe('unknown');
+    expect(
+      modelOutcomeForWorker({ ...base, rateLimited: true, stderr: 'authentication required' }),
+    ).toBe('rate_limited');
+  });
+
   it('permits only one integration owner per repository at a time', () => {
     const repo = mkdtempSync(join(tmpdir(), 'major-repo-lock-'));
     roots.push(repo);

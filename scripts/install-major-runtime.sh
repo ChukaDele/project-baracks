@@ -105,7 +105,7 @@ if [ ! -d "$RELEASE_DIR" ]; then
   "branch": "$INSTALL_BRANCH"
 }
 EOF
-  mkdir -p "$BIN_DIR" "$MAJOR_HOME/logs" "$RELEASES_DIR"
+  mkdir -p "$BIN_DIR" "$RELEASES_DIR"
   mv "$INSTALL_STAGE/runtime" "$RELEASE_DIR"
   RELEASE_CREATED=1
 fi

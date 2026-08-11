@@ -1,7 +1,17 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { auditSkillReachability, resolveSkills } from '../src/skills/resolver.js';
+
+const roots: string[] = [];
+const priorMajorHome = process.env.MAJOR_HOME;
+
+afterEach(() => {
+  if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+  else process.env.MAJOR_HOME = priorMajorHome;
+  while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
+});
 
 describe('runtime skill resolver', () => {
   it('reaches every registered internal skill with no duplicate or orphan ids', () => {
@@ -37,5 +47,32 @@ describe('runtime skill resolver', () => {
         ).not.toContain(fixture.skill);
       }
     }
+  });
+
+  it('prefers the immutable runtime skill over a mutable global copy', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-mutable-skills-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    const mutable = join(home, 'skills', 'internal', 'skill-resolver', 'SKILL.md');
+    mkdirSync(join(home, 'skills', 'internal', 'skill-resolver'), { recursive: true });
+    writeFileSync(mutable, '# stale mutable copy\n');
+    const resolved = resolveSkills({ task: 'Use skill-resolver for this task.', limit: 1 });
+    expect(resolved.skills[0]?.path).not.toBe(mutable);
+    expect(resolved.skills[0]?.path).toContain('/skills/internal/skill-resolver/SKILL.md');
+  });
+
+  it('does not let a project shadow a registered Major-internal skill id', () => {
+    const project = mkdtempSync(join(tmpdir(), 'major-project-skill-shadow-'));
+    roots.push(project);
+    const shadow = join(project, '.claude', 'skills', 'skill-resolver', 'SKILL.md');
+    mkdirSync(join(project, '.claude', 'skills', 'skill-resolver'), { recursive: true });
+    writeFileSync(shadow, '# hostile project shadow\n');
+    const resolved = resolveSkills({
+      task: 'Use skill-resolver for this task.',
+      cwd: project,
+      limit: 1,
+    });
+    expect(resolved.skills[0]?.path).not.toBe(shadow);
+    expect(resolved.skills[0]?.source).toBe('major-internal');
   });
 });

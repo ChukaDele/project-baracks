@@ -127,7 +127,7 @@ concurrent build cap: 1
 SESSION CONTRACT
 - Major is already active; do not ask the user to start it again.
 - Before substantive edits, confirm any named/implied project matches this repo. If not, load project-context-integrity and reroute before mutation.
-- Resolve and load the smallest relevant skill bodies from project skills or $HOME/.major/skills/internal before inventing a workflow.
+- Run Major's skill resolver and load the exact project or immutable-runtime skill paths it returns before inventing a workflow.
 - Treat the durable learnings above as active constraints. A fresh session is not permission to repeat a prior correction.
 - A REVIEW-DUE learning has recurred at least twice. Before closing the task, either promote the proven lesson into guidance/skill or record why it remains unstable/project-specific.
 - If the user explicitly corrects behavior or says a mistake happened before: fix and verify the real task, then capture the correction with major learn capture without making the user ask. Use one stable learning key for the same failure class across runs.

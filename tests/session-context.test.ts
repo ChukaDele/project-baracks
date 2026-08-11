@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runSessionContextCli } from '../src/context/session-context.js';
 import { captureLearning, promoteLearning } from '../src/learning/candidates.js';
+import { configureProjectPolicy } from '../src/supervisor/policy.js';
 import { startGoal } from '../src/supervisor/state.js';
 
 let root = '';
@@ -78,6 +79,13 @@ describe('fresh session context', () => {
       source: 'recurring-failure',
       key: 'verify-before-ready',
       summary: 'Private source wording repeated.',
+    });
+    configureProjectPolicy({
+      project: 'procedure-lab',
+      repoPath: join(root, 'procedure-lab'),
+      projectClass: 'knowledge',
+      trust: 'build',
+      ownerApprovedBuild: true,
     });
     promoteLearning({
       id: recurring.id,

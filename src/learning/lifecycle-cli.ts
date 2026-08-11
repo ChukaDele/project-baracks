@@ -3,6 +3,7 @@ import {
   LEARNING_SOURCES,
   LEARNING_STATUSES,
   captureLearning,
+  dismissGlobalLearning,
   dismissLearning,
   learningReviewDue,
   listLearningCandidates,
@@ -122,6 +123,14 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
   }
 
   if (args[1] === 'dismiss') {
+    if (args.includes('--global')) {
+      const candidate = dismissGlobalLearning({
+        id: required(args, '--id'),
+        evidence: required(args, '--evidence'),
+      });
+      console.log(JSON.stringify(candidate, null, 2));
+      return true;
+    }
     const project = resolveProject(flag(args, '--project') ?? 'current').project;
     const candidate = dismissLearning({
       id: required(args, '--id'),

@@ -4,26 +4,43 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   captureLearning,
+  dismissGlobalLearning,
   dismissLearning,
   learningReviewDue,
   listLearningCandidates,
   promoteLearning,
 } from '../src/learning/candidates.js';
+import { configureProjectPolicy } from '../src/supervisor/policy.js';
 
 let root = '';
 let priorRoot: string | undefined;
+let priorPolicyPath: string | undefined;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-learning-lifecycle-'));
   priorRoot = process.env.MAJOR_LEARNING_ROOT;
+  priorPolicyPath = process.env.MAJOR_POLICY_PATH;
   process.env.MAJOR_LEARNING_ROOT = join(root, 'learning');
+  process.env.MAJOR_POLICY_PATH = join(root, 'policies.json');
 });
 
 afterEach(() => {
   if (priorRoot === undefined) delete process.env.MAJOR_LEARNING_ROOT;
   else process.env.MAJOR_LEARNING_ROOT = priorRoot;
+  if (priorPolicyPath === undefined) delete process.env.MAJOR_POLICY_PATH;
+  else process.env.MAJOR_POLICY_PATH = priorPolicyPath;
   rmSync(root, { recursive: true, force: true });
 });
+
+function allowGlobalPromotion(project: string, repoPath = `/private/${project}`) {
+  configureProjectPolicy({
+    project,
+    repoPath,
+    projectClass: 'knowledge',
+    trust: 'build',
+    ownerApprovedBuild: true,
+  });
+}
 
 function recurringProjectCandidate() {
   const first = captureLearning({
@@ -49,6 +66,7 @@ function recurringProjectCandidate() {
 
 describe('Major learning lifecycle', () => {
   it('requires recurrence plus sanitized summary and evidence for global promotion', () => {
+    allowGlobalPromotion('bredge');
     const oneOff = captureLearning({
       source: 'manual',
       key: 'one-off',
@@ -97,6 +115,7 @@ describe('Major learning lifecycle', () => {
       summary: 'Private short-name project lesson repeated.',
       project: 'AI',
     });
+    allowGlobalPromotion('AI');
     expect(() =>
       promoteLearning({
         id: shortName.id,
@@ -117,11 +136,97 @@ describe('Major learning lifecycle', () => {
     expect(promoted.scope).toBe('global');
     expect(promoted.project).toBeUndefined();
     expect(promoted.repoPath).toBeUndefined();
+    expect(promoted.key).toBeUndefined();
     expect(listLearningCandidates(undefined, 'promoted')).toEqual([promoted]);
     const globalPath = join(root, 'learning', 'global.json');
     expect(existsSync(globalPath)).toBe(true);
     const raw = readFileSync(globalPath, 'utf8');
     expect(raw).not.toMatch(/bredge|\/private\/|owner@example\.com/i);
+  });
+
+  it('requires cross-project memory authority before global promotion', () => {
+    const candidate = recurringProjectCandidate();
+    configureProjectPolicy({
+      project: 'bredge',
+      repoPath: '/private/bredge',
+      projectClass: 'client',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    expect(() =>
+      promoteLearning({
+        id: candidate.id,
+        project: 'bredge',
+        scope: 'global',
+        summary: 'Require representative evidence before readiness.',
+        evidence: 'Verified twice with synthetic fixtures.',
+      }),
+    ).toThrow(/forbidden by the project policy/);
+    expect(listLearningCandidates()).toEqual([]);
+  });
+
+  it('deduplicates global lessons by sanitized summary, never by project-local key', () => {
+    for (const project of ['alpha-project', 'beta-project']) {
+      allowGlobalPromotion(project);
+      const candidate = captureLearning({
+        source: 'recurring-failure',
+        key: 'shared-project-key',
+        summary: `Private source lesson for ${project}.`,
+        project,
+      });
+      captureLearning({
+        source: 'recurring-failure',
+        key: 'shared-project-key',
+        summary: `Private source lesson repeated for ${project}.`,
+        project,
+      });
+      promoteLearning({
+        id: candidate.id,
+        project,
+        scope: 'global',
+        summary:
+          project === 'alpha-project'
+            ? 'Verify one immutable runtime before activation.'
+            : 'Require one independent grade before activation.',
+        evidence: 'Verified twice with sanitized synthetic fixtures.',
+      });
+    }
+    const global = listLearningCandidates(undefined, 'promoted');
+    expect(global).toHaveLength(2);
+    expect(global.every((candidate) => candidate.key === undefined)).toBe(true);
+    expect(readFileSync(join(root, 'learning', 'global.json'), 'utf8')).not.toMatch(
+      /shared-project-key|alpha-project|beta-project/,
+    );
+  });
+
+  it('retracts a global record without retaining its content', () => {
+    allowGlobalPromotion('bredge');
+    const candidate = recurringProjectCandidate();
+    const promoted = promoteLearning({
+      id: candidate.id,
+      project: 'bredge',
+      scope: 'global',
+      summary: 'Require representative evidence before readiness.',
+      evidence: 'Verified twice with synthetic fixtures.',
+    });
+    const dismissed = dismissGlobalLearning({
+      id: promoted.id,
+      evidence: 'Operator requested retraction after a privacy review.',
+    });
+    expect(dismissed).toMatchObject({
+      status: 'dismissed',
+      summary: 'Retracted global learning.',
+      occurrences: 0,
+    });
+    expect(dismissed.evidence).toHaveLength(1);
+    expect(dismissed.evidence[0]).toMatch(/^dismissal-reason-sha256:[a-f0-9]{64}$/);
+    expect(listLearningCandidates(undefined, 'promoted')).toEqual([]);
+    expect(listLearningCandidates('bredge', 'promoted')).toContainEqual(
+      expect.objectContaining({ id: candidate.id, summary: candidate.summary }),
+    );
+    expect(readFileSync(join(root, 'learning', 'global.json'), 'utf8')).not.toContain(
+      'Require representative evidence before readiness.',
+    );
   });
 
   it('scopes promotion and dismissal lookup to the current project', () => {
@@ -153,6 +258,7 @@ describe('Major learning lifecycle', () => {
         candidates: [
           {
             id: 'tampered',
+            key: 'private-client-key',
             project: 'private-client',
             source: 'manual',
             summary: 'Contact owner@example.com.',

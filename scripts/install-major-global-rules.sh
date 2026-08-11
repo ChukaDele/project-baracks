@@ -7,6 +7,27 @@ GLOBAL_SKILLS_DEST="$HOME/.major/skills/internal"
 STAGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/major-global-rules.XXXXXX")"
 LEARNING_MIGRATION_LOCK="$HOME/.major/learning/.migration.lock"
 LEARNING_LOCK_HELD=0
+cd "$MAJOR_ROOT"
+
+if [ "${MAJOR_ALLOW_DIRTY_INSTALL:-0}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+  echo "ERROR: refusing to install Major rules from a dirty checkout." >&2
+  exit 1
+fi
+
+INSTALL_SHA="$(git rev-parse HEAD)"
+INSTALL_BRANCH="$(git branch --show-current 2>/dev/null || true)"
+INSTALL_BRANCH="${INSTALL_BRANCH:-detached}"
+if [ "${MAJOR_ALLOW_NON_MAIN_INSTALL:-0}" != "1" ] && [ "$INSTALL_BRANCH" != "main" ]; then
+  echo "ERROR: refusing to install Major rules from branch '$INSTALL_BRANCH'." >&2
+  exit 1
+fi
+if [ "${MAJOR_ALLOW_UNPUSHED_INSTALL:-0}" != "1" ]; then
+  git fetch --quiet origin main
+  if [ "$INSTALL_SHA" != "$(git rev-parse refs/remotes/origin/main)" ]; then
+    echo "ERROR: refusing to install Major rules because local HEAD is not current origin/main." >&2
+    exit 1
+  fi
+fi
 
 cleanup() {
   rm -rf "$STAGE_DIR"

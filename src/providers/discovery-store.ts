@@ -41,13 +41,14 @@ const DEFAULT_BACKOFF_MS: Record<'rate_limited' | 'exhausted', number> = {
   exhausted: 60 * 60 * 1000,
 };
 
-function upsertProvider(db: DbConn, info: ProviderInfo, now: string) {
+function upsertProvider(db: DbConn, info: ProviderInfo, now: string, source: ObservationSource) {
   const existing = db.select().from(agentProviders).where(eq(agentProviders.name, info.name)).get();
   if (existing) {
+    const authoritative = source === 'human' || source === 'probe' || source === 'run_outcome';
     db.update(agentProviders)
       .set({
-        executable: info.executable ?? existing.executable,
-        version: info.version ?? existing.version,
+        executable: authoritative ? (info.executable ?? existing.executable) : existing.executable,
+        version: authoritative ? (info.version ?? existing.version) : existing.version,
         lastDiscoveredAt: now,
       })
       .where(eq(agentProviders.id, existing.id))
@@ -80,7 +81,7 @@ export function persistProviderDiscovery(
   return db.transaction(
     (tx) => {
       const now = (options.now?.() ?? new Date()).toISOString();
-      const providerId = upsertProvider(tx, info, now);
+      const providerId = upsertProvider(tx, info, now, options.source);
       const persisted = [];
       for (const model of info.models) {
         const existing = tx
@@ -95,15 +96,25 @@ export function persistProviderDiscovery(
           (existing.availability === 'rate_limited' || existing.availability === 'exhausted') &&
           existing.nextProbeAt !== null &&
           now < existing.nextProbeAt;
-        const availability = backingOff ? existing.availability : model.availability;
-        const nextProbeAt = backingOff ? existing.nextProbeAt : null;
+        // Registry/doctor discovery is process-free and therefore cannot
+        // revoke a prior human/probe/run observation. It may add an unknown
+        // model, but it cannot turn a routable attested model back into an
+        // unauthenticated unknown merely because it deliberately did not run
+        // the provider CLI.
+        const preserveAuthoritativeState =
+          existing &&
+          (options.source === 'registry' || options.source === 'cli') &&
+          (existing.visible || existing.authenticated || existing.availability !== 'unknown');
+        const availability =
+          backingOff || preserveAuthoritativeState ? existing.availability : model.availability;
+        const nextProbeAt = backingOff || preserveAuthoritativeState ? existing.nextProbeAt : null;
         // Discovery cannot assert billing: keep the authoritatively observed
         // value if one exists, otherwise stay 'unknown' (unroutable).
         const billingMode = existing ? existing.billingMode : 'unknown';
         const state = {
           routingClass: model.routingClass,
-          visible: model.visible,
-          authenticated: model.authenticated,
+          visible: preserveAuthoritativeState ? existing.visible : model.visible,
+          authenticated: preserveAuthoritativeState ? existing.authenticated : model.authenticated,
           availability,
           billingMode,
           prohibited: model.prohibited,
@@ -213,7 +224,7 @@ export function recordModelOutcome(
   input: {
     providerName: string;
     modelRef: string;
-    outcome: Extract<ModelAvailability, 'available' | 'rate_limited' | 'exhausted'>;
+    outcome: Extract<ModelAvailability, 'available' | 'rate_limited' | 'exhausted' | 'unknown'>;
     backoffMs?: number;
     now?: () => Date;
   },
@@ -236,7 +247,7 @@ export function recordModelOutcome(
       if (!model) throw new Error(`model not persisted: ${input.providerName}/${input.modelRef}`);
       const nowMs = (input.now?.() ?? new Date()).getTime();
       const nextProbeAt =
-        input.outcome === 'available'
+        input.outcome === 'available' || input.outcome === 'unknown'
           ? null
           : new Date(nowMs + (input.backoffMs ?? DEFAULT_BACKOFF_MS[input.outcome])).toISOString();
       tx.update(agentModels)

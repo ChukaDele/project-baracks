@@ -31,7 +31,7 @@ import {
   type SupervisorGoal,
   type WorkerHost,
 } from './state.js';
-import { hostAvailable, runWorker } from './worker.js';
+import { hostAvailable, runWorker, type WorkerOutcome } from './worker.js';
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
@@ -100,6 +100,26 @@ export interface WorkerReport {
   status: 'active' | 'blocked' | 'done';
   summary: string;
   ownerGate?: string;
+}
+
+export function modelOutcomeForWorker(
+  outcome: Pick<WorkerOutcome, 'host' | 'status' | 'rateLimited' | 'exhausted' | 'stderr'>,
+): 'available' | 'rate_limited' | 'exhausted' | 'unknown' | undefined {
+  if (outcome.exhausted) return 'exhausted';
+  if (outcome.rateLimited) return 'rate_limited';
+  if (outcome.status === 'succeeded') return 'available';
+  if (/no trusted installation|cannot trust|not an executable regular file/i.test(outcome.stderr)) {
+    return 'unknown';
+  }
+  const providerAuthFailure: Record<WorkerHost, RegExp> = {
+    claude: /(?:invalid api key|not logged in|401 unauthorized|please run \/login)/i,
+    codex: /(?:invalid api key|401 unauthorized|not logged in|run[^\n]*codex login)/i,
+    cursor:
+      /(?:invalid api key|401 unauthorized|not authenticated|login required|cursor(?:-agent| agent) login)/i,
+    antigravity: /(?:antigravity[^\n]*not signed in|launch the cli without arguments to sign in)/i,
+  };
+  if (providerAuthFailure[outcome.host].test(outcome.stderr)) return 'unknown';
+  return undefined;
 }
 
 const WORKER_REPORT_PREFIX = 'MAJOR_RESULT: ';
@@ -261,7 +281,7 @@ MAJOR OPERATING CONTRACT:
 - Speed and MVP are the default. Reduce broad scope to the smallest end-to-end P0 that proves value, then keep expanding only while P0 gaps remain.
 - Do not stop after one PR, migration, fix, test, or subtask. After each result ask: what is now the highest-impact missing piece blocking the goal?
 - ${workerLanguage}
-- Before inventing a process, resolve the smallest relevant Major skill set and load the actual skill bodies from project skills or $HOME/.major/skills/internal.
+- Before inventing a process, run Major's skill resolver and load the exact project or immutable-runtime skill paths it returns.
 - Read project LEARNINGS.md and the Major learning candidates below before acting. Do not repeat a captured correction merely because a fresh worker lacks chat history.
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
 - For substantial UI/website creation, redesign, art-direction changes, or "generic/AI-looking/too safe/too loud" feedback, use design-direction-and-taste first. It is the single Major art-direction/taste authority; do not stack competing generic taste systems.
@@ -413,17 +433,14 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
     timeoutMs: Math.max(1, policy.maxRunMinutes) * 60 * 1000,
     modelRef: selection.modelRef,
   });
-  if (outcome.rateLimited || outcome.exhausted || outcome.status === 'succeeded') {
+  const modelOutcome = modelOutcomeForWorker(outcome);
+  if (modelOutcome) {
     const outcomeState = openDb();
     try {
       recordModelOutcome(outcomeState.db, {
         providerName: selection.provider,
         modelRef: selection.modelRef,
-        outcome: outcome.exhausted
-          ? 'exhausted'
-          : outcome.rateLimited
-            ? 'rate_limited'
-            : 'available',
+        outcome: modelOutcome,
       });
     } finally {
       outcomeState.sqlite.close();
