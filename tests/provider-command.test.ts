@@ -57,4 +57,13 @@ describe('provider command authority', () => {
     );
     expect(requests[0]?.args).not.toContain('--dangerously-bypass-approvals-and-sandbox');
   });
+
+  it('uses the provider default for the stable Codex auto alias', () => {
+    const { gateway, requests } = capturingGateway();
+    const provider = new CodexProvider({ gateway });
+    expect(() => provider.execute({ prompt: 'work', cwd: '/project', modelRef: 'auto' })).toThrow(
+      'captured',
+    );
+    expect(requests[0]?.args).not.toContain('--model');
+  });
 });

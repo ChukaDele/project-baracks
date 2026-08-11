@@ -80,7 +80,9 @@ export class CodexProvider implements ProviderAdapter {
           '--json',
           request.prompt,
         ];
-    if (request.modelRef) args.splice(1, 0, '--model', request.modelRef);
+    if (request.modelRef && request.modelRef !== 'auto') {
+      args.splice(1, 0, '--model', request.modelRef);
+    }
     const spec: Parameters<ExecutionGateway['execute']>[0] = {
       // The gateway resolves this through the trusted-executable registry;
       // an unregistered or shadowed installation is refused at spawn time.

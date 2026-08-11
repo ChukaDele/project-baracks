@@ -83,7 +83,7 @@ export const DEFAULT_MODEL_REGISTRY: ModelRegistry = {
     },
     {
       provider: 'codex',
-      knownModels: ['gpt-5.3-codex'],
+      knownModels: ['auto'],
       rules: [
         {
           match: '.*',
