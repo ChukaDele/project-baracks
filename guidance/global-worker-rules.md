@@ -68,7 +68,7 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Prefer markdown judgment + minimal deterministic code over permanent hard-coded orchestration.
 - If a successful novel procedure is likely to recur, use `skillify` after the real task succeeds.
 - Do not skillify trivial one-offs or pause an active P0 to build tooling.
-- **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it with `major learn capture` and classify it as project-local or global. Do not rely on chat memory alone.
+- **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it project-locally with `major learn capture`. Global promotion is a separate reviewed action that requires sanitized content and evidence. Do not rely on chat memory alone.
 
 ## Remote-first web development
 

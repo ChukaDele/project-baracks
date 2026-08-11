@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { homedir, platform, tmpdir } from 'node:os';
 import { canonicalize } from './paths.js';
 import { TrustedExecutableRegistry } from './trusted-executables.js';
@@ -47,6 +47,12 @@ function canonicalRoots(roots: readonly string[]): string[] {
   return [...new Set(roots.map((root) => canonicalize(root)))];
 }
 
+function fileRule(operation: string, path: string): string {
+  return statSync(path).isDirectory()
+    ? `(${operation} (subpath ${schemeString(path)}))`
+    : `(${operation} (literal ${schemeString(path)}))`;
+}
+
 /**
  * Build a macOS Seatbelt boundary for a single spawn.
  *
@@ -78,14 +84,25 @@ function seatbeltProfile(request: ContainmentRequest): string {
     '(allow process*)',
     '(allow signal)',
     '(allow sysctl-read)',
-    '(allow mach-lookup)',
+    '(allow mach-lookup',
+    '  (global-name "com.apple.SecurityServer")',
+    '  (global-name "com.apple.SystemConfiguration.configd")',
+    '  (global-name "com.apple.cfprefsd.agent")',
+    '  (global-name "com.apple.cfprefsd.daemon")',
+    '  (global-name "com.apple.dnssd.service")',
+    '  (global-name "com.apple.networkd")',
+    '  (global-name "com.apple.nsurlsessiond")',
+    '  (global-name "com.apple.securityd")',
+    '  (global-name "com.apple.system.logger")',
+    '  (global-name "com.apple.system.opendirectoryd.libinfo")',
+    '  (global-name "com.apple.trustd.agent"))',
     '(allow ipc-posix*)',
     '(allow file-read*)',
     ...deniedDataRoots.map((root) => `(deny file-read-data (subpath ${schemeString(root)}))`),
     ...roots.map((root) => `(allow file-read* (subpath ${schemeString(root)}))`),
     ...roots.map((root) => `(allow file-read-data (subpath ${schemeString(root)}))`),
-    ...readOnlyRoots.map((root) => `(allow file-read* (subpath ${schemeString(root)}))`),
-    ...readOnlyRoots.map((root) => `(allow file-read-data (subpath ${schemeString(root)}))`),
+    ...readOnlyRoots.map((root) => fileRule('allow file-read*', root)),
+    ...readOnlyRoots.map((root) => fileRule('allow file-read-data', root)),
     ...exactExecutableRoots.map((path) => `(allow file-read* (literal ${schemeString(path)}))`),
     ...roots.map((root) => `(allow file-write* (subpath ${schemeString(root)}))`),
     `(allow file-write* (literal ${schemeString('/dev/null')}))`,

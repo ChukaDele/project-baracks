@@ -200,7 +200,7 @@ export function recordBillingObservation(
           observedJson: JSON.stringify({
             modelRef: input.modelRef,
             billingMode: input.billingMode,
-            note: input.note ?? null,
+            note: input.note ? redactText(input.note).slice(0, 4_000) : null,
           }),
           source: input.source,
           confidence: CONFIDENCE_BY_SOURCE[input.source],
@@ -287,6 +287,70 @@ export function shouldProbe(
   now: () => Date = () => new Date(),
 ): boolean {
   return model.nextProbeAt === null || now().toISOString() >= model.nextProbeAt;
+}
+
+/** Atomically consume one expired backoff retry. The model becomes unknown
+ * before the worker starts, so a generic failure cannot leave it permanently
+ * retry-eligible and hot-looping through every coordinator cycle. */
+export function consumeModelRetry(
+  db: Db,
+  input: { providerName: string; modelRef: string; now?: () => Date },
+): boolean {
+  return db.transaction(
+    (tx) => {
+      const provider = tx
+        .select()
+        .from(agentProviders)
+        .where(eq(agentProviders.name, input.providerName))
+        .get();
+      if (!provider) return false;
+      const model = tx
+        .select()
+        .from(agentModels)
+        .where(
+          and(eq(agentModels.providerId, provider.id), eq(agentModels.modelRef, input.modelRef)),
+        )
+        .get();
+      const now = (input.now?.() ?? new Date()).toISOString();
+      if (
+        !model ||
+        (model.availability !== 'rate_limited' && model.availability !== 'exhausted') ||
+        model.nextProbeAt === null ||
+        model.nextProbeAt > now
+      ) {
+        return false;
+      }
+      const updated = tx
+        .update(agentModels)
+        .set({ availability: 'unknown', nextProbeAt: null, lastProbedAt: now })
+        .where(
+          and(
+            eq(agentModels.id, model.id),
+            eq(agentModels.availability, model.availability),
+            eq(agentModels.nextProbeAt, model.nextProbeAt),
+          ),
+        )
+        .run();
+      if (updated.changes !== 1) return false;
+      tx.insert(discoveryObservations)
+        .values({
+          id: newId('dobs'),
+          providerId: provider.id,
+          modelId: model.id,
+          observedJson: JSON.stringify({
+            modelRef: model.modelRef,
+            availability: 'unknown',
+            retryStartedAt: now,
+          }),
+          source: 'run_outcome',
+          confidence: 'observed',
+          observedAt: now,
+        })
+        .run();
+      return true;
+    },
+    { behavior: 'immediate' },
+  );
 }
 
 /** Build routing inputs from PERSISTED state, not fresh assertions. */

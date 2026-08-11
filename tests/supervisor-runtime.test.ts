@@ -285,6 +285,23 @@ describe('Major coordinator contract', () => {
     ).toBeUndefined();
   });
 
+  it('accepts and sanitizes a bounded project-local learning candidate', () => {
+    const report = parseWorkerReport(
+      JSON.stringify({
+        type: 'result',
+        result:
+          'MAJOR_RESULT: {"status":"active","summary":"Fix verified.","learning":{"source":"user-correction","summary":"Never store token=sk-this-is-a-secret-value","key":"stable-key","evidence":"project/path token=sk-this-is-a-secret-value"}}',
+      }),
+    );
+
+    expect(report?.learning).toMatchObject({
+      source: 'user-correction',
+      key: 'stable-key',
+    });
+    expect(JSON.stringify(report?.learning)).toContain('[REDACTED]');
+    expect(JSON.stringify(report?.learning)).not.toContain('sk-this-is-a-secret-value');
+  });
+
   it('extracts the final report from Claude, Cursor, and Codex JSON envelopes', () => {
     const report = 'MAJOR_RESULT: {"status":"done","summary":"runtime proof passed"}';
     expect(

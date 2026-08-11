@@ -11,8 +11,12 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { openDb } from '../db/client.js';
-import { listLearningCandidates } from '../learning/candidates.js';
-import { loadPersistedProviderInfos, recordModelOutcome } from '../providers/discovery-store.js';
+import { captureLearning, listLearningCandidates } from '../learning/candidates.js';
+import {
+  consumeModelRetry,
+  loadPersistedProviderInfos,
+  recordModelOutcome,
+} from '../providers/discovery-store.js';
 import type { ProviderInfo } from '../providers/types.js';
 import { route } from '../routing/router.js';
 import { resolveSkills } from '../skills/resolver.js';
@@ -200,7 +204,7 @@ export function coordinatorPrompt(goal: SupervisorGoal): string {
   const workerLanguage =
     policy.maxWorkers <= 1
       ? 'Keep this single-worker unless a genuine blocker requires escalation.'
-      : `Use up to ${policy.maxWorkers} useful workers when work is genuinely independent. Do not spawn redundant workers.`;
+      : `This project's parent coordinator may admit up to ${policy.maxWorkers} independent workers. This leased worker must request additional capacity in its final report rather than nesting workers itself.`;
 
   return `You are the active Major coordinator for project ${goal.project}.
 
@@ -228,7 +232,7 @@ MAJOR OPERATING CONTRACT:
 - For MCP/connectors/plugins, distinguish installed → configured → exposed → authenticated → permissioned → operational → integrated. Use mcp-integration-ops and prove the needed state with a representative real operation.
 - For customer-facing website QA, use website-design-qa. Pair responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js or viewport-motion work. Respect remote-first-web-development for browser preview/acceptance unless the owner explicitly permits a local exception.
 - Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, Skillify rather than growing the permanent supervisor workflow.
-- An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then include the sanitized candidate in your final report so the parent can capture it.
+- An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then add a project-local \`learning\` object to the final MAJOR_RESULT with \`source\`, \`summary\`, optional stable \`key\`, and optional \`evidence\`. The parent validates and captures it.
 - You are the leased worker. Do not start nested workers, browsers, builds, or Major CLI delegation from this sandbox. Request any additional capacity in your final report; the parent owns resource admission and learning capture.
 - Prefer lower-cost/abundant subscription capacity for bounded tasks. Use stronger reasoning for architecture, hard bugs, integration, and adjudication.
 - Concurrent writers must use isolated worktrees. Keep one integration owner.
@@ -329,7 +333,26 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
   const providerState = openDb();
   let selection: CoordinatorSelection;
   try {
-    selection = selectCoordinator(goal, loadPersistedProviderInfos(providerState.db));
+    const providerInfos = loadPersistedProviderInfos(providerState.db);
+    selection = selectCoordinator(goal, providerInfos);
+    if (selection.kind === 'route') {
+      const routedSelection = selection;
+      const selectedModel = providerInfos
+        .find((provider) => provider.name === routedSelection.provider)
+        ?.models.find((model) => model.modelRef === routedSelection.modelRef);
+      if (
+        selectedModel?.retryEligible &&
+        !consumeModelRetry(providerState.db, {
+          providerName: routedSelection.provider,
+          modelRef: routedSelection.modelRef,
+        })
+      ) {
+        selection = {
+          kind: 'checkpoint',
+          reason: `retry for ${routedSelection.provider}/${routedSelection.modelRef} was already consumed`,
+        };
+      }
+    }
   } finally {
     providerState.sqlite.close();
   }
@@ -400,13 +423,26 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
 
   if (outcome.status === 'succeeded') {
     const report = parseWorkerReport(outcome.stdout);
+    let learningWarning = '';
+    if (report?.learning) {
+      try {
+        captureLearning({
+          ...report.learning,
+          project: goal.project,
+          repoPath: goal.repoPath,
+          scope: 'project',
+        });
+      } catch (error) {
+        learningWarning = ` Learning capture failed: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
+      }
+    }
     if (report?.status === 'blocked') {
       updateGoal(goal.id, {
         status: 'blocked',
         consecutiveFailures: 0,
         activePid: undefined,
         lastFinishedAt: new Date().toISOString(),
-        lastSummary: report.summary,
+        lastSummary: `${report.summary}${learningWarning}`,
         ownerGate: report.ownerGate,
         pendingCompletion: undefined,
       });
@@ -419,7 +455,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
         consecutiveFailures: 0,
         activePid: undefined,
         lastFinishedAt: claimedAt,
-        lastSummary: `Worker completion claim awaiting independent validation: ${report.summary}`,
+        lastSummary: `Worker completion claim awaiting independent validation: ${report.summary}${learningWarning}`,
         nextRunAt: undefined,
         pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
       });
@@ -430,9 +466,9 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
       consecutiveFailures: 0,
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
-      lastSummary:
-        report?.summary ??
-        trim(outcome.stdout || 'Coordinator cycle completed without an explicit Major report.'),
+      lastSummary: report?.summary
+        ? `${report.summary}${learningWarning}`
+        : trim(outcome.stdout || 'Coordinator cycle completed without an explicit Major report.'),
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
       pendingCompletion: undefined,
     });
@@ -451,11 +487,15 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
 }
 
 function pidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EPERM') return true;
+    if (code === 'ESRCH') return false;
+    throw error;
   }
 }
 
@@ -463,8 +503,12 @@ function acquireDaemonLock(): number | undefined {
   mkdirSync(majorHome(), { recursive: true });
   const path = join(majorHome(), 'supervisor-daemon.pid');
   if (existsSync(path)) {
-    const prior = Number.parseInt(readFileSync(path, 'utf8').trim(), 10);
-    if (Number.isFinite(prior) && pidAlive(prior)) return undefined;
+    const lockText = readFileSync(path, 'utf8').trim();
+    const lockAgeMs = Date.now() - statSync(path).mtimeMs;
+    if (!lockText && lockAgeMs <= 30_000) return undefined;
+    const prior = Number.parseInt(lockText, 10);
+    if (Number.isInteger(prior) && pidAlive(prior)) return undefined;
+    if (lockAgeMs <= 30_000) return undefined;
     unlinkSync(path);
   }
   const fd = openSync(path, 'wx', 0o600);

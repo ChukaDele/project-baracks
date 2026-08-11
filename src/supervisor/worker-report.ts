@@ -11,6 +11,12 @@ export interface WorkerReport {
   status: 'active' | 'blocked' | 'done';
   summary: string;
   ownerGate?: string;
+  learning?: {
+    source: 'user-correction' | 'recurring-failure' | 'successful-procedure' | 'manual';
+    summary: string;
+    key?: string;
+    evidence?: string;
+  };
 }
 
 function reportLinesFromText(value: unknown): string[] {
@@ -89,10 +95,38 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
     const ownerGate =
       typeof value.ownerGate === 'string' ? redactText(value.ownerGate.trim()).slice(0, 4_000) : '';
     if (value.status === 'blocked' && !ownerGate) return undefined;
+    let learning: WorkerReport['learning'];
+    if (value.learning !== undefined) {
+      if (!value.learning || typeof value.learning !== 'object' || Array.isArray(value.learning)) {
+        return undefined;
+      }
+      const candidate = value.learning as Record<string, unknown>;
+      const sources = [
+        'user-correction',
+        'recurring-failure',
+        'successful-procedure',
+        'manual',
+      ] as const;
+      if (!sources.includes(candidate.source as (typeof sources)[number])) return undefined;
+      if (typeof candidate.summary !== 'string' || candidate.summary.trim().length === 0) {
+        return undefined;
+      }
+      learning = {
+        source: candidate.source as NonNullable<WorkerReport['learning']>['source'],
+        summary: redactText(candidate.summary.trim()).slice(0, 4_000),
+        ...(typeof candidate.key === 'string' && candidate.key.trim()
+          ? { key: redactText(candidate.key.trim()).slice(0, 200) }
+          : {}),
+        ...(typeof candidate.evidence === 'string' && candidate.evidence.trim()
+          ? { evidence: redactText(candidate.evidence.trim()).slice(0, 4_000) }
+          : {}),
+      };
+    }
     return {
       status: value.status as WorkerReport['status'],
       summary,
       ...(ownerGate ? { ownerGate } : {}),
+      ...(learning ? { learning } : {}),
     };
   } catch {
     return undefined;

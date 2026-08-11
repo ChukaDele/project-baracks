@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { agentModels, discoveryObservations, routingCheckpoints } from '../src/db/schema.js';
 import {
+  consumeModelRetry,
   loadPersistedProviderInfos,
   persistProviderDiscovery,
   recordBillingObservation,
@@ -54,6 +55,21 @@ describe('discovery persistence', () => {
       expect(observation.source).toBe('human');
       expect(observation.confidence).toBe('configured');
     }
+  });
+
+  it('redacts billing attestation notes before persistence', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo(), { source: 'cli' });
+    recordBillingObservation(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      billingMode: 'subscription_included',
+      source: 'human',
+      note: 'confirmed with token=sk-this-is-a-secret-value',
+    });
+    const observation = db.select().from(discoveryObservations).all().at(-1)!;
+    expect(observation.observedJson).toContain('[REDACTED]');
+    expect(observation.observedJson).not.toContain('sk-this-is-a-secret-value');
   });
 
   it('routing consumes persisted state, and billing stays unroutable until observed', () => {
@@ -235,6 +251,27 @@ describe('discovery persistence', () => {
       loadPersistedProviderInfos(db, () => new Date('2026-01-01T00:01:00.000Z')),
     );
     expect(decision.kind).toBe('route');
+
+    expect(
+      consumeModelRetry(db, {
+        providerName: 'claude-code',
+        modelRef: 'opus',
+        now: () => new Date('2026-01-01T00:01:00.000Z'),
+      }),
+    ).toBe(true);
+    expect(
+      consumeModelRetry(db, {
+        providerName: 'claude-code',
+        modelRef: 'opus',
+        now: () => new Date('2026-01-01T00:01:00.000Z'),
+      }),
+    ).toBe(false);
+    const consumed = loadPersistedProviderInfos(
+      db,
+      () => new Date('2026-01-01T00:01:00.000Z'),
+    )[0]!.models.find((candidate) => candidate.modelRef === 'opus')!;
+    expect(consumed).toMatchObject({ availability: 'unknown' });
+    expect(consumed.retryEligible).toBeUndefined();
   });
 
   it('an exhausted persisted model is not routed to', () => {

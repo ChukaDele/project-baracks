@@ -8,6 +8,7 @@ import { isCapabilityAvailable } from './capabilities.js';
 import { darwinSeatbeltContainment } from './containment.js';
 import { ExecutionGateway, type ExecutionPolicyDecision } from './gateway.js';
 import { TrustedExecutableRegistry } from './trusted-executables.js';
+import { providerReadOnlyRoots } from './provider-access.js';
 
 export interface MajorGatewayRequest {
   executable: string;
@@ -68,13 +69,21 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
   const runtimeHome = majorHome();
   const executionRoot = join(runtimeHome, 'execution', projectKey);
   const runtimeTmp = join(executionRoot, 'tmp');
-  mkdirSync(runtimeTmp, { recursive: true, mode: 0o700 });
+  const runtimeCache = join(executionRoot, 'cache');
+  const runtimeConfig = join(executionRoot, 'config');
+  const runtimeData = join(executionRoot, 'data');
+  for (const path of [runtimeTmp, runtimeCache, runtimeConfig, runtimeData]) {
+    mkdirSync(path, { recursive: true, mode: 0o700 });
+  }
   const roots = [...new Set([...request.allowedRoots.map((root) => resolve(root)), executionRoot])];
 
   const baseEnv: NodeJS.ProcessEnv = {
     ...process.env,
     MAJOR_HOME: runtimeHome,
     TMPDIR: runtimeTmp,
+    XDG_CACHE_HOME: runtimeCache,
+    XDG_CONFIG_HOME: runtimeConfig,
+    XDG_DATA_HOME: runtimeData,
     ...(request.resourceLeaseId ? { MAJOR_RESOURCE_LEASE_ID: request.resourceLeaseId } : {}),
   };
   const trustedExecutables = isCapabilityAvailable('live-agent-execution')
@@ -85,7 +94,11 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
     : undefined;
   const gateway = new ExecutionGateway({
     allowedRoots: roots,
-    ...(trusted ? { readOnlyRoots: [dirname(trusted.canonicalPath)] } : {}),
+    ...(trusted
+      ? {
+          readOnlyRoots: [dirname(trusted.canonicalPath), ...providerReadOnlyRoots(executable)],
+        }
+      : {}),
     commandPolicy: {
       allowedExecutables: [executable],
       protectedBranches: ['main', 'master'],
