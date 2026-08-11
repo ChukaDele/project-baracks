@@ -20,12 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Major doctrine / skill / legacy validation
-        run: bash scripts/validate-major.sh
-
-      - name: Major stability / learning validation
-        run: bash scripts/validate-major-stability.sh
-
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -35,23 +29,5 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Format check
-        run: pnpm format:check
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Strict type-check
-        run: pnpm typecheck
-
-      - name: Tests
-        run: pnpm test
-
-      - name: Production build
-        run: pnpm build
-
-      - name: Immutable runtime snapshot smoke
-        run: |
-          RUNTIME_TMP="$(mktemp -d)"
-          trap 'rm -rf "$RUNTIME_TMP"' EXIT
-          bash scripts/build-major-runtime-snapshot.sh "$RUNTIME_TMP/runtime"
+      - name: Canonical release validation
+        run: pnpm validate:release

@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -55,6 +55,7 @@
     {"id":"pdf-reporting-qa","source":"major-internal","availability":"all-projects","load":"generated-pdf-reporting"},
     {"id":"cost-control","source":"major-internal","availability":"all-projects","load":"provider-model-browser-infrastructure-cost"},
     {"id":"exploratory-creative-dev","source":"major-internal","availability":"ui-projects","load":"exploratory-awwwards-fwa-heavy-motion-immersive-illustrative"},
+    {"id":"video-generation-routing","source":"major-internal","availability":"all-projects","load":"ai-video-generative-video-cinematic-clip-storyboard-product-ad-social-reel-google-flow-higgsfield"},
 
     {"id":"emil-kowalski-complete","source":"github:emilkowalski/skills","availability":"all-ui-projects","load":"task-relevant","install":"entire-current-bundle"},
 

@@ -108,6 +108,10 @@ def add_file(entries: list[dict[str, str]], source: Path, target: Path) -> None:
     entries.append({"type": "file", "source": str(source), "target": str(target)})
 
 
+def add_absent(entries: list[dict[str, str]], target: Path) -> None:
+    entries.append({"type": "absent", "target": str(target)})
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
@@ -115,6 +119,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--major-bin")
     parser.add_argument("--wrapper")
     parser.add_argument("--record")
+    parser.add_argument("--legacy-plist")
     return parser.parse_args()
 
 
@@ -161,6 +166,7 @@ def main() -> None:
         claude_root(read_text(home / ".claude" / "CLAUDE.md")),
     )
     add_file(entries, claude_root_stage, home / ".claude" / "CLAUDE.md")
+    add_absent(entries, home / ".claude" / "major-communication.md")
 
     codex_stage = write_stage_file(
         stage,
@@ -199,8 +205,8 @@ def main() -> None:
         add_file(entries, zsh_stage, home / ".zshrc")
 
     for label, source_arg, target in (
-        ("wrapper", args.wrapper, Path(args.major_bin) if args.major_bin else None),
         ("record", args.record, home / ".major" / "installed-release.json"),
+        ("wrapper", args.wrapper, Path(args.major_bin) if args.major_bin else None),
     ):
         if not source_arg:
             continue
@@ -212,6 +218,9 @@ def main() -> None:
         staged = stage / "files" / f"release-{label}"
         shutil.copy2(source, staged)
         add_file(entries, staged, target)
+
+    if args.legacy_plist:
+        add_absent(entries, Path(args.legacy_plist).expanduser().resolve())
 
     targets = [entry["target"] for entry in entries]
     if len(targets) != len(set(targets)):

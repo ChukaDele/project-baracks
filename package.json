@@ -20,6 +20,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate:major": "bash scripts/validate-major.sh && bash scripts/validate-major-stability.sh",
+    "validate:install-transaction": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-major-install-transaction.py",
+    "validate:release": "bash scripts/validate-major-release.sh",
     "major": "tsx src/entry.ts",
     "install:runtime": "bash scripts/install-major-runtime.sh",
     "db:generate": "drizzle-kit generate"
