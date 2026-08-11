@@ -241,13 +241,21 @@ export function applyTransition(
     guards.completionProof = evaluateCompletionProof(
       db,
       taskId,
-      parseCompletionCriteria(task.completionCriteriaJson),
+      parseCompletionCriteria(task.completionCriteriaSnapshotJson),
     );
   }
   assertTransition(task.status, to, guards);
+  const patch: Partial<typeof tasks.$inferInsert> = {
+    status: to,
+    version: task.version + 1,
+  };
+  if (to === 'queued' && task.completionCriteriaSnapshotJson === null) {
+    patch.completionCriteriaSnapshotJson = task.completionCriteriaJson ?? '{}';
+    patch.completionCriteriaLockedAt = nowIso();
+  }
   const result = db
     .update(tasks)
-    .set({ status: to, version: task.version + 1 })
+    .set(patch)
     .where(
       and(eq(tasks.id, taskId), eq(tasks.status, task.status), eq(tasks.version, task.version)),
     )

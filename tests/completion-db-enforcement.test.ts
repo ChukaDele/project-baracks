@@ -70,6 +70,71 @@ function harness() {
 }
 
 describe('P1-3 database-enforced completion criteria', () => {
+  it('captures the exact criteria at dispatch and refuses later weakening', () => {
+    const { sqlite, task } = harness();
+    const row = sqlite
+      .prepare(
+        `SELECT completion_criteria_json AS criteria,
+                completion_criteria_snapshot_json AS snapshot,
+                completion_criteria_locked_at AS lockedAt
+         FROM tasks WHERE id = ?`,
+      )
+      .get(task.id) as { criteria: string; snapshot: string; lockedAt: string };
+    expect(row.snapshot).toBe(row.criteria);
+    expect(row.lockedAt).toBeTruthy();
+    expect(() =>
+      sqlite
+        .prepare(
+          `UPDATE tasks SET completion_criteria_json = '{"minPassedVerificationRuns":1}' WHERE id = ?`,
+        )
+        .run(task.id),
+    ).toThrow(/immutable/);
+  });
+
+  it('refuses weakening criteria in the same direct update that dispatches', () => {
+    const { db, sqlite } = openDb(':memory:');
+    const project = seedProject(db);
+    const task = addTask(db, {
+      projectId: project.id,
+      title: 'cannot weaken at dispatch',
+      completionCriteriaJson: JSON.stringify({ minPassedVerificationRuns: 3 }),
+    });
+    transitionTask(db, task.id, 'ready');
+    const weaker = JSON.stringify({ minPassedVerificationRuns: 1 });
+    expect(() =>
+      sqlite
+        .prepare(
+          `UPDATE tasks
+           SET status = 'queued', completion_criteria_json = ?,
+               completion_criteria_snapshot_json = ?, completion_criteria_locked_at = ?
+           WHERE id = ?`,
+        )
+        .run(weaker, weaker, new Date().toISOString(), task.id),
+    ).toThrow(/exact pre-dispatch/);
+  });
+
+  it('refuses a task inserted directly into a dispatched state', () => {
+    const { db, sqlite } = openDb(':memory:');
+    const project = seedProject(db);
+    expect(() =>
+      sqlite
+        .prepare(
+          `INSERT INTO tasks
+           (id, project_id, title, description, status, complexity, version,
+            completion_criteria_json, completion_criteria_snapshot_json,
+            completion_criteria_locked_at, created_at, updated_at)
+           VALUES (?, ?, 'bypass', '', 'queued', 'bounded', 0, '{}', '{}', ?, ?, ?)`,
+        )
+        .run(
+          newId('task'),
+          project.id,
+          new Date().toISOString(),
+          new Date().toISOString(),
+          new Date().toISOString(),
+        ),
+    ).toThrow(/cannot be inserted directly.*dispatched/);
+  });
+
   it('direct SQL cannot complete a task short of its minimum verifications', () => {
     const { forceComplete } = harness();
     expect(() => forceComplete()).toThrow();
@@ -107,6 +172,16 @@ describe('P1-3 database-enforced completion criteria', () => {
 
     addEvidence(db, { taskId: task.id, kind: 'artifact', ref: 'abc1234', summary: 'commit' });
     expect(() => forceComplete()).toThrow();
+
+    const otherProject = seedProject(db, 'other');
+    const wrongProjectDecision = createDecisionRequest(db, {
+      projectId: otherProject.id,
+      taskId: task.id,
+      category: 'merge',
+      question: 'wrong project merge?',
+    });
+    resolveDecision(db, wrongProjectDecision.id, 'approved', 'not sufficient');
+    expect(() => forceComplete()).toThrow(/project- and task-bound/);
 
     const merge = createDecisionRequest(db, {
       projectId: project.id,
