@@ -225,8 +225,7 @@ export class TrustedExecutableRegistry {
     return entry;
   }
 
-  /** Re-stat (and, if stat moved, re-hash) the trusted binary; fail closed on
-   * any identity change. A matching stat short-circuits the hash for speed. */
+  /** Re-resolve and re-hash the trusted binary at every spawn boundary. */
   private assertUnchanged(entry: TrustedExecutable): void {
     let current: ExecutableIdentity;
     try {
@@ -237,13 +236,6 @@ export class TrustedExecutableRegistry {
           `trusted executable ${entry.name} now resolves to ${canonical}, not ${entry.canonicalPath}`,
         );
       }
-      const st = statSync(canonical);
-      const statMatches =
-        st.dev === entry.identity.dev &&
-        st.ino === entry.identity.ino &&
-        st.size === entry.identity.size &&
-        st.mtimeMs === entry.identity.mtimeMs;
-      if (statMatches) return;
       current = captureIdentity(canonical);
     } catch (error) {
       if (error instanceof ExecutableTrustError) throw error;

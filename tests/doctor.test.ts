@@ -68,7 +68,7 @@ describe('major doctor', () => {
     expect(report.capabilities.every((c) => c.available === false)).toBe(true);
   });
 
-  it('reports live agent execution as not ready (no OS filesystem containment)', async () => {
+  it('reports live agent execution as not ready while the reviewed capability gate is closed', async () => {
     const report = await runDoctor({
       providers: [healthyProvider()],
       configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
@@ -77,8 +77,7 @@ describe('major doctor', () => {
       fileExists: () => true,
     });
     expect(report.liveExecutionReady).toBe(false);
-    expect(report.liveExecutionBlockers.join()).toMatch(/containment/i);
-    expect(report.checks.find((c) => c.name === 'descendant-containment')?.status).toBe('warn');
+    expect(report.liveExecutionBlockers.join()).toMatch(/capability.*M1/i);
   });
 
   it('flags missing prerequisites as an inspection-environment issue', async () => {
