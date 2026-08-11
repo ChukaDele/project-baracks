@@ -5,7 +5,7 @@ import { newId } from '../src/domain/ids.js';
 import { appendRunEvent, createRun, setRunStatus } from '../src/domain/run-service.js';
 import { addTask, transitionTask } from '../src/domain/task-service.js';
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
-import { seedProject, testDb } from './helpers.js';
+import { ensureObservedModel, seedProject, testDb } from './helpers.js';
 
 /**
  * Worker-owned downstream mutations are an unavailable capability in this
@@ -24,6 +24,7 @@ function runningTask(db: ReturnType<typeof testDb>) {
   transitionTask(db, task.id, 'running');
   const providerId = newId('aprov');
   db.insert(agentProviders).values({ id: providerId, name: 'mock' }).run();
+  ensureObservedModel(db, providerId);
   return { project, task, providerId };
 }
 

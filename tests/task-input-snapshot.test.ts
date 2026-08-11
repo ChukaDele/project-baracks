@@ -20,7 +20,7 @@ import {
   type NewTaskInput,
 } from '../src/domain/task-service.js';
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
-import { seedProject, testDb } from './helpers.js';
+import { ensureObservedModel, seedProject, testDb } from './helpers.js';
 
 /**
  * Adversarial regression coverage for the single-read input snapshot at the
@@ -283,6 +283,7 @@ describe('createRun single-read snapshot', () => {
     const task = addTask(db, { projectId: project.id, title: 'work' });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'claude-code' }).run();
+    ensureObservedModel(db, providerId);
     return { db, task, providerId };
   }
 

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Db, DbConn } from '../db/client.js';
 import {
   agentModels,
@@ -116,23 +116,21 @@ export function createRun(db: Db, rawInput: NewRunInput) {
           ),
         )
         .get();
-      if (model) {
-        if (model.billingMode === 'unknown') {
-          throw new RunAuthorisationError(
-            `model ${input.modelRef} has no authoritative billing observation: unroutable`,
-          );
-        }
-        if (model.billingMode !== input.billingMode) {
-          throw new RunAuthorisationError(
-            `run billing '${input.billingMode}' does not match the authoritative persisted ` +
-              `billing '${model.billingMode}' of model ${input.modelRef}`,
-          );
-        }
-        if (input.modelId !== undefined && input.modelId !== model.id) {
-          throw new RunAuthorisationError(
-            `modelId ${input.modelId} does not match ${input.modelRef}`,
-          );
-        }
+      if (!model || model.billingMode === 'unknown') {
+        throw new RunAuthorisationError(
+          `model ${input.modelRef} has no authoritative billing observation: unroutable`,
+        );
+      }
+      if (model.billingMode !== input.billingMode) {
+        throw new RunAuthorisationError(
+          `run billing '${input.billingMode}' does not match the authoritative persisted ` +
+            `billing '${model.billingMode}' of model ${input.modelRef}`,
+        );
+      }
+      if (input.modelId !== undefined && input.modelId !== model.id) {
+        throw new RunAuthorisationError(
+          `modelId ${input.modelId} does not match ${input.modelRef}`,
+        );
       }
 
       if (input.claimId !== undefined) {
@@ -166,7 +164,11 @@ export function createRun(db: Db, rawInput: NewRunInput) {
           category: 'paid_usage',
           taskId: input.taskId,
           projectId: task.projectId,
-          scope: { provider: provider?.name ?? '', modelRef: input.modelRef },
+          scope: {
+            provider: provider?.name ?? '',
+            modelRef: input.modelRef,
+            purpose: input.purpose,
+          },
           requireExpiry: true,
           requireUnconsumed: true,
           ...(now ? { now } : {}),
@@ -197,25 +199,18 @@ export function createRun(db: Db, rawInput: NewRunInput) {
       };
       tx.insert(agentRuns).values(row).run();
 
-      // Consume the paid approval EXACTLY ONCE, atomically in this same
-      // transaction. The compare-and-swap on a NULL consumed_by_run_id means a
-      // second run under the same approval finds it consumed and fails; the
-      // insert above already checked unconsumed, so the stamp closes the
-      // window between check and use.
+      // SQLite consumes paid approvals in an AFTER INSERT trigger. Verify the
+      // durable boundary did so; the service never performs its own competing
+      // check-then-stamp implementation.
       if (PAID_BILLING_MODES.includes(input.billingMode) && input.paidUsageDecisionId) {
-        const consumed = tx
-          .update(decisionRequests)
-          .set({ consumedByRunId: row.id })
-          .where(
-            and(
-              eq(decisionRequests.id, input.paidUsageDecisionId),
-              isNull(decisionRequests.consumedByRunId),
-            ),
-          )
-          .run();
-        if (consumed.changes !== 1) {
+        const decision = tx
+          .select({ consumedByRunId: decisionRequests.consumedByRunId })
+          .from(decisionRequests)
+          .where(eq(decisionRequests.id, input.paidUsageDecisionId))
+          .get();
+        if (decision?.consumedByRunId !== row.id) {
           throw new RunAuthorisationError(
-            `paid approval ${input.paidUsageDecisionId} was already consumed by another run`,
+            `paid approval ${input.paidUsageDecisionId} was not consumed by run ${row.id}`,
           );
         }
       }

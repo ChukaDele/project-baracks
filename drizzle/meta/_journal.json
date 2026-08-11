@@ -64,6 +64,13 @@
       "when": 1784800300000,
       "tag": "0008_roadmap_apply_lease",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1784800400000,
+      "tag": "0009_paid_authority_boundary",
+      "breakpoints": true
     }
   ]
 }

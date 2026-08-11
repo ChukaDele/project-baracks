@@ -14,6 +14,7 @@ import { newId } from '../src/domain/ids.js';
 import { createRun, recordVerificationRun } from '../src/domain/run-service.js';
 import { addSuggestion, addTask, transitionTask } from '../src/domain/task-service.js';
 import {
+  ensureObservedModel,
   materialiseApprovedSuggestion,
   recordQualifyingVerification,
   seedProject,
@@ -91,6 +92,7 @@ describe('database-enforced invariants', () => {
     const taskB = addTask(db, { projectId: project.id, title: 'B' });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'mock' }).run();
+    ensureObservedModel(db, providerId);
     const runOnA = createRun(db, {
       taskId: taskA.id,
       providerId,
@@ -315,6 +317,7 @@ describe('database-enforced invariants', () => {
     const task = addTask(db, { projectId: project.id, title: 'work' });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'mock' }).run();
+    ensureObservedModel(db, providerId);
     expect(() =>
       db
         .insert(agentRuns)
