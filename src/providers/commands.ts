@@ -89,6 +89,10 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
       const args: string[] = [
         '--output-format',
         request.outputMode === 'stream' ? 'stream-json' : 'json',
+        '--sandbox',
+        '--disable-slash-commands',
+        '--mode',
+        'accept-edits',
       ];
       if (request.resumeSessionRef) args.push('--conversation', request.resumeSessionRef);
       if (request.modelRef && request.modelRef !== 'auto') args.push('--model', request.modelRef);

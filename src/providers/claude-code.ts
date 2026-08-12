@@ -22,18 +22,18 @@ export class ClaudeCodeProvider implements ProviderAdapter {
 
   constructor(options: ClaudeCodeOptions) {
     this.gateway = options.gateway;
-    // An explicit executable path is retained ONLY for the quarantined execute()
-    // path (milestone M1); discovery never consults it. Environment overrides
+    // The explicit executable is used only by the contained execute path;
+    // discovery never consults it. Environment overrides
     // (MAJOR_CLAUDE_BIN) are ignored entirely.
     this.executable = options.executable ?? CLAUDE_EXECUTABLE;
     this.registry = options.registry ?? loadModelRegistry();
   }
 
   async discover(): Promise<ProviderInfo> {
-    // DISABLED FOUNDATION: discovery is RESOLUTION-ONLY and PROCESS-FREE. The
+    // Discovery is RESOLUTION-ONLY and PROCESS-FREE. The
     // CLI is never executed — no --version, no `which` subprocess, no spawn —
     // so we cannot verify that a resolvable binary is genuine, installed or
-    // runnable; that needs OS-isolated execution (milestone M1). Only the
+    // runnable; that requires a separate OS-isolated execution probe. Only the
     // canonical name is resolved on PATH for reporting; environment overrides
     // are ignored for discovery and never touched.
     const resolved = this.gateway.resolveExecutable(CLAUDE_EXECUTABLE);
@@ -55,8 +55,7 @@ export class ClaudeCodeProvider implements ProviderAdapter {
     return this.discover();
   }
 
-  /** Unreachable in this build: gateway.execute() refuses unconditionally
-   * (live agent execution is an unavailable capability). */
+  /** Execute through the trusted, OS-contained gateway. */
   execute(request: ExecuteRequest): ExecuteHandle {
     const args = providerExecuteArgs('claude', request);
     const spec: Parameters<ExecutionGateway['execute']>[0] = {

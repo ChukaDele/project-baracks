@@ -8,7 +8,8 @@ import {
   taskSuggestions,
 } from '../src/db/schema.js';
 import { newId } from '../src/domain/ids.js';
-import { createRun } from '../src/domain/run-service.js';
+import { StaleClaimError } from '../src/domain/claim-service.js';
+import { createRun, RunAuthorisationError } from '../src/domain/run-service.js';
 import * as taskService from '../src/domain/task-service.js';
 import {
   addSuggestion,
@@ -19,7 +20,6 @@ import {
   transitionTask,
   type NewTaskInput,
 } from '../src/domain/task-service.js';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { ensureObservedModel, seedProject, testDb } from './helpers.js';
 
 /**
@@ -269,10 +269,10 @@ describe('applyTransition single-read of the fence option', () => {
     expect(after.status).toBe('ready');
     expect(reads).toBe(1);
 
-    // And a fence visible to the single read is refused outright.
+    // And a fence visible to the single read must pass the live-claim check.
     expect(() =>
       transitionTask(db, task.id, 'queued', { fence: { claimId: 'tclm_x', workerId: 'w1' } }),
-    ).toThrow(CapabilityUnavailableError);
+    ).toThrow(StaleClaimError);
   });
 });
 
@@ -287,7 +287,7 @@ describe('createRun single-read snapshot', () => {
     return { db, task, providerId };
   }
 
-  it('a stateful billingMode getter cannot persist a paid run past the gate', () => {
+  it('a stateful billingMode getter cannot change the persisted billing mode', () => {
     const { db, task, providerId } = runFixture();
     let reads = 0;
     const input = {
@@ -313,7 +313,8 @@ describe('createRun single-read snapshot', () => {
     expect(reads).toBe(1);
     expect(run.billingMode).toBe('subscription_included');
 
-    // And a paid mode visible to the single read is refused with no row.
+    // A paid mode visible to the single read reaches authoritative billing
+    // validation and cannot masquerade as the observed included mode.
     expect(() =>
       createRun(db, {
         taskId: task.id,
@@ -323,7 +324,7 @@ describe('createRun single-read snapshot', () => {
         billingMode: 'api_billing',
         routingReason: 'paid',
       }),
-    ).toThrow(CapabilityUnavailableError);
+    ).toThrow(RunAuthorisationError);
   });
 
   it('a stateful claimId getter cannot persist a claim-bound run past the gate', () => {

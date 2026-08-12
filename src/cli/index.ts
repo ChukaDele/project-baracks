@@ -148,19 +148,17 @@ program
           `${cap.available ? '✓' : '✗'} capability ${cap.capability}: ${cap.available ? 'available' : `unavailable (${cap.milestone})`}`,
         );
       }
-      // Overnight/autonomous LIVE execution is categorically unavailable in
-      // this foundation; it is never reported as SAFE.
+      // Foreground activation does not grant unattended/background authority.
       console.log(
         `overnight execution: UNAVAILABLE — ${report.overnightExecutionReasons.join('; ')}`,
       );
       console.log(
         report.inspectionEnvironmentOk
-          ? 'inspection environment (dry-run only): OK'
-          : `inspection environment (dry-run only): NEEDS ATTENTION — ${report.inspectionEnvironmentIssues.join('; ')}`,
+          ? 'inspection environment: OK'
+          : `inspection environment: NEEDS ATTENTION — ${report.inspectionEnvironmentIssues.join('; ')}`,
       );
     }
-    // Exit code reflects the SUPPORTED (dry-run/inspection) health, not the
-    // categorically-unavailable overnight execution.
+    // Exit code reflects inspection health, not unattended authority.
     if (!report.inspectionEnvironmentOk) process.exit(EXIT.unsafe);
   });
 
@@ -298,7 +296,7 @@ task
 
 task
   .command('approve <suggestionId>')
-  .description('Approve a suggestion (UNAVAILABLE in this disabled foundation)')
+  .description('Approve a suggestion (UNAVAILABLE: separate owner gate)')
   .option('--note <text>', 'decision note')
   .action((suggestionId: string, opts: { note?: string }) => {
     // Route through the canonical mutation boundary, which refuses before any

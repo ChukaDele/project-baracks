@@ -171,6 +171,7 @@ function spawnStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
 }
 
 /** Internal spawn engine. Security policy and OS wrapping are applied by the gateway. */
+/** @internal Production imports are architecture-gated to ExecutionGateway. */
 export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
   assertCapabilityAvailable('live-agent-execution');
   return spawnStreaming(spec);

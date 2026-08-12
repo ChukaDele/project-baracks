@@ -25,10 +25,22 @@ describe('single execution boundary', () => {
     const root = resolve(import.meta.dirname, '..');
     const importers = sourceFiles(join(root, 'src')).flatMap((path) => {
       const source = readFileSync(path, 'utf8');
-      if (!/from\s+['"][^'"]*providers\/exec\.js['"]/.test(source)) return [];
+      const staticImport = /from\s+['"][^'"]*providers\/exec\.js['"]/.test(source);
+      const dynamicImport = /import\s*\(\s*['"][^'"]*providers\/exec\.js['"]\s*\)/.test(source);
+      if (!staticImport && !dynamicImport) return [];
       return [relative(root, path)];
     });
     expect(importers).toEqual(['src/security/gateway.ts']);
+  });
+
+  it('does not expose internal runtime modules as package entry points', () => {
+    const root = resolve(import.meta.dirname, '..');
+    const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8') as string) as {
+      bin?: Record<string, string>;
+      exports?: unknown;
+    };
+    expect(packageJson.bin).toEqual({ major: './dist/entry.js' });
+    expect(packageJson.exports).toBeUndefined();
   });
 
   it('does not convert PATH discovery into trust or expose the immutable runtime as writable', () => {

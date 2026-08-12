@@ -21,17 +21,9 @@ import type { DiffEntry, RoadmapAdapter, RowChange, UpdateProposal } from './typ
 /**
  * DB-backed proposal lifecycle for roadmap writes.
  *
- * IN THIS BUILD, APPLY IS DISABLED. External roadmap application is an
- * unavailable capability (src/security/capabilities.ts): applyRoadmapUpdate
- * and reconcileRoadmapApplies refuse unconditionally before touching the
- * adapter or the update record, so no external roadmap write can occur
- * through any code path. Proposals and their recorded dry runs remain fully
- * available — proposing stores local records and uses only the adapter's
- * read-side (revision/dryRun).
- *
- * The apply/reconcile protocol below the gates carries exact persisted attempt
- * identity. It remains quarantined until combined independent review and a
- * representative live-adapter test authorize activation.
+ * Apply and reconciliation are active behind the M5 capability boundary. The
+ * protocol requires a recorded dry run, immutable payload identity, evidence
+ * for Done, a separate Done approval, and exact persisted attempt identity.
  *
  * Roadmap permission grants NOTHING else: no merge, deploy, paid-usage or
  * destructive authority is inferred from the ability to propose updates.
@@ -256,8 +248,7 @@ export async function applyRoadmapUpdate(
   updateId: string,
   options: ApplyRoadmapOptions = {},
 ) {
-  // External roadmap application is unavailable in this build: refuse before
-  // reading the update or touching the adapter (milestone M5).
+  // Keep every external roadmap mutation bound to the reviewed M5 code gate.
   assertCapabilityAvailable('external-roadmap-application');
   bindRoadmapRuntimeHost(db);
   const update = getUpdate(db, updateId);
@@ -350,8 +341,7 @@ export async function reconcileRoadmapApplies(
   adapter: RoadmapAdapter,
   options: { now?: () => Date } = {},
 ) {
-  // Part of the quarantined apply protocol: reconciliation can settle updates
-  // to 'applied', so it is gated with apply itself (milestone M5).
+  // Reconciliation can settle updates to applied, so it shares the M5 gate.
   assertCapabilityAvailable('external-roadmap-application');
   bindRoadmapRuntimeHost(db);
   const nowIsoStr = (options.now?.() ?? new Date()).toISOString();

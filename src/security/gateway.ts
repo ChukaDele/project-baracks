@@ -23,25 +23,17 @@ import {
  * Provider adapters never spawn independently: they hold a gateway and ask it
  * to execute or probe.
  *
- * IN THIS BUILD, execute() IS DISABLED. Live agent execution is an
- * unavailable capability (src/security/capabilities.ts): every call records a
- * refusal and throws CapabilityUnavailableError before any validation or
- * spawn, unconditionally — no configuration, environment variable or
- * constructor option can pass the gate.
+ * Live execution is active behind the immutable M1 capability constant. Every
+ * spawn must pass path confinement, executable identity, argv policy,
+ * environment sanitisation and enforced OS containment.
  *
- * Discovery in this foundation is RESOLUTION-ONLY and PROCESS-FREE. The
+ * Discovery remains RESOLUTION-ONLY and PROCESS-FREE. The
  * gateway exposes exactly one discovery operation — resolveExecutable(), a
  * PATH lookup for reporting — and NO method spawns a process: there is no
  * --version probe, no `which` subprocess, no execFile/spawn anywhere in this
  * file. A resolvable path is reported but confers no execution trust and is
- * never evidence a binary is genuine or runnable; verifying that requires the
- * trusted, OS-isolated execution boundary of milestone M1.
- *
- * The validation pipeline below the gate (path canonicalisation, trusted
- * executable binding, argv policy, path-argument confinement, environment
- * sanitisation and OS containment) is implemented and compiled. The build
- * gate remains closed until the combined boundary receives fresh independent
- * review and representative provider validation.
+ * never evidence a binary is genuine or runnable; execution trust is granted
+ * only by the pinned identity and OS-isolated gateway path.
  */
 
 export interface ExecutionPolicyDecision {
@@ -95,8 +87,7 @@ export interface GatewayOptions {
   trustedExecutables: TrustedExecutableRegistry;
   /**
    * Containment mechanism applied to every spawned process tree. execute()
-   * fails closed when this is absent or not enforced — the fail-closed gate
-   * that keeps live agent execution disabled until real containment exists.
+   * fails closed when this is absent or not enforced.
    */
   containment?: Containment;
   /** Base environment (defaults to process.env). */
@@ -265,13 +256,7 @@ export class ExecutionGateway {
     return sanitizeEnv(this.options.baseEnv ?? process.env, sanitizeOptions);
   }
 
-  /**
-   * QUARANTINED — always refuses. Live agent execution is unavailable in this
-   * build: the gate below records the refusal and throws before any spawn can
-   * occur, regardless of how the gateway was configured. The validation and
-   * spawn pipeline after the gate is retained, compiled and type-checked as
-   * the M1 starting point, but is unreachable until that milestone lands.
-   */
+  /** Execute only through the complete M1 trust and containment boundary. */
   execute(request: GatewayExecuteRequest): ExecuteHandle {
     if (!isCapabilityAvailable('live-agent-execution')) {
       const decision: Parameters<typeof this.record>[0] = {
@@ -390,7 +375,7 @@ export class ExecutionGateway {
 
   /**
    * Resolve an executable NAME to a path on PATH, for REPORTING ONLY. This is
-   * the ENTIRE discovery surface of this disabled foundation, and it is
+   * the entire process-free discovery surface, and it is
    * PROCESS-FREE: it performs a supervisor-side PATH lookup (filesystem
    * metadata only) and never runs anything — no --version, no `which`
    * subprocess, no execFile/spawn. A path-qualified argument is rejected: only

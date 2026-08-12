@@ -232,5 +232,6 @@ export {
   CAPABILITY_DEFINITIONS,
   capabilityStatuses,
   type CapabilityStatus,
+  type Capability,
   type UnavailableCapability,
 } from '../security/capabilities.js';

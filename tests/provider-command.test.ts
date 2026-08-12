@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ClaudeCodeProvider } from '../src/providers/claude-code.js';
 import { CodexProvider } from '../src/providers/codex.js';
 import { cursorProvider } from '../src/providers/cursor.js';
+import { antigravityProvider } from '../src/providers/antigravity.js';
 import type { ExecutionGateway, GatewayExecuteRequest } from '../src/security/gateway.js';
 
 function capturingGateway() {
@@ -65,5 +66,16 @@ describe('provider command authority', () => {
       'captured',
     );
     expect(requests[0]?.args).not.toContain('--model');
+  });
+
+  it('routes Antigravity through the same gateway with sandboxing enabled', () => {
+    const { gateway, requests } = capturingGateway();
+    const provider = antigravityProvider({ gateway });
+    expect(() => provider.execute({ prompt: 'work', cwd: '/project' })).toThrow('captured');
+    expect(requests[0]).toMatchObject({ executable: 'agy', cwd: '/project' });
+    expect(requests[0]?.args).toEqual(
+      expect.arrayContaining(['--sandbox', '--disable-slash-commands', '--mode', 'accept-edits']),
+    );
+    expect(requests[0]?.args).not.toContain('--dangerously-skip-permissions');
   });
 });

@@ -2,16 +2,7 @@ import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('../src/security/capabilities.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/security/capabilities.js')>();
-  return {
-    ...actual,
-    isCapabilityAvailable: () => true,
-    assertCapabilityAvailable: () => undefined,
-  };
-});
+import { describe, expect, it } from 'vitest';
 
 import { agentProviders, roadmapItems } from '../src/db/schema.js';
 import { claimNextTask, completeClaim, heartbeatClaim } from '../src/domain/claim-service.js';
@@ -103,7 +94,7 @@ describe.runIf(platform() === 'darwin')('M1 enabled execution path', () => {
   }, 30_000);
 });
 
-describe('enabled v1 capability paths retained until successor proof', () => {
+describe('activated v0.5.1 capability paths', () => {
   it('M2 consumes one exact paid approval while creating the authorised run', () => {
     const db = testDb();
     const project = seedProject(db);

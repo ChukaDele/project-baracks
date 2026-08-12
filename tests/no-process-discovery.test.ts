@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Proof that discovery in this disabled foundation is PROCESS-FREE. Every
+ * Proof that discovery remains PROCESS-FREE. Every
  * process-creating entry point of node:child_process is mocked to throw the
  * moment it is called, so if provider discovery or dry-run routing tried to
  * spawn or execFile a binary — including an environment/PATH-selected override
@@ -116,12 +116,20 @@ describe('discovery is process-free', () => {
     expect(antigravityArgs(request)).toEqual([
       '--output-format',
       'stream-json',
+      '--sandbox',
+      '--disable-slash-commands',
+      '--mode',
+      'accept-edits',
       '-p',
       'review this change',
     ]);
     expect(workerCommand('antigravity', request.prompt).args).toEqual([
       '--output-format',
       'json',
+      '--sandbox',
+      '--disable-slash-commands',
+      '--mode',
+      'accept-edits',
       '-p',
       'review this change',
     ]);

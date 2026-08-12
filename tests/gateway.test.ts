@@ -2,7 +2,6 @@ import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { checkArgv } from '../src/security/commands.js';
 import type { Containment } from '../src/security/containment.js';
 import { BILLING_ENV_NAMES, sanitizeEnv } from '../src/security/env.js';
@@ -21,7 +20,7 @@ function testContainment(): Containment {
     filesystemIsolation: true,
     networkIsolation: true,
     mechanism: 'test-only',
-    detail: 'test-only containment; execution remains capability-gated',
+    detail: 'test-only containment for gateway policy tests',
     wrap: (request) => ({ executable: request.executable, args: [...request.args] }),
   };
 }
@@ -37,11 +36,7 @@ function trustingNode(): TrustedExecutableRegistry {
   return registry;
 }
 
-/**
- * The most permissive gateway this build can construct: allowed roots, a
- * trusted installation, containment configured. Even this must refuse
- * execute() — live agent execution is an unavailable capability.
- */
+/** A fully configured test gateway with a pinned executable and containment. */
 function makeGateway(overrides: Partial<ConstructorParameters<typeof ExecutionGateway>[0]> = {}) {
   const decisions: ExecutionPolicyDecision[] = [];
   const root = overrides.allowedRoots?.[0] ?? tempRoot();
@@ -94,18 +89,17 @@ describe('execution gateway construction', () => {
   });
 });
 
-describe('execute() is disabled in this build (live-agent-execution unavailable)', () => {
-  it('refuses even a maximally configured gateway, before any spawn', () => {
+describe('activated execution gateway', () => {
+  it('executes a trusted command and records the allowed decision', async () => {
     const { gateway, decisions, root } = makeGateway();
-    expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
-      CapabilityUnavailableError,
-    );
+    const handle = gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root });
+    for await (const _event of handle.events) void _event;
+    expect(await handle.outcome).toMatchObject({ status: 'succeeded', exitCode: 0 });
     expect(decisions).toHaveLength(1);
-    expect(decisions[0]).toMatchObject({ kind: 'execute', allowed: false });
-    expect(decisions[0]!.reason).toMatch(/live-agent-execution/);
+    expect(decisions[0]).toMatchObject({ kind: 'execute', allowed: true });
   });
 
-  it('refuses a probe-only gateway the same way and records the refusal', () => {
+  it('keeps a probe-only gateway non-executable and records the refusal', () => {
     const decisions: ExecutionPolicyDecision[] = [];
     const gateway = ExecutionGateway.probeOnly({
       commandPolicy: { allowedExecutables: ['node'] },
@@ -114,14 +108,13 @@ describe('execute() is disabled in this build (live-agent-execution unavailable)
     });
     expect(() =>
       gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: process.cwd() }),
-    ).toThrow(CapabilityUnavailableError);
+    ).toThrow(GatewayViolationError);
     expect(decisions[0]!.allowed).toBe(false);
     expect(gateway.resolveExecutable('node')).toBeDefined();
   });
 
-  it('no gateway option can re-enable execution (there is no such option)', () => {
-    // Deliberately-hostile configuration: even claiming enforced containment
-    // and full filesystem isolation does not open the capability gate.
+  it('does not trust a claimed containment implementation that fails to wrap', () => {
+    let wrapCalled = false;
     const { gateway, root } = makeGateway({
       containment: {
         enforced: true,
@@ -130,13 +123,15 @@ describe('execute() is disabled in this build (live-agent-execution unavailable)
         mechanism: 'claimed-sandbox',
         detail: 'a configuration claim, not enforcement',
         wrap() {
-          throw new Error('claimed containment must never be reached while the gate is closed');
+          wrapCalled = true;
+          throw new Error('claimed containment failed');
         },
       },
     });
     expect(() => gateway.execute({ executable: 'node', args: ['-e', '1'], cwd: root })).toThrow(
-      CapabilityUnavailableError,
+      GatewayViolationError,
     );
+    expect(wrapCalled).toBe(true);
   });
 });
 
@@ -252,7 +247,7 @@ describe('policy decision audit trail', () => {
     expect(JSON.stringify(decisions)).not.toContain('ghp_abcdef');
   });
 
-  it('records refusals to the append-only execution_policy_decisions table', async () => {
+  it('records denied execution and allowed probe decisions in the append-only audit table', async () => {
     const { testDb } = await import('./helpers.js');
     const { dbDecisionRecorder } = await import('../src/security/audit.js');
     const { executionPolicyDecisions } = await import('../src/db/schema.js');
@@ -266,9 +261,9 @@ describe('policy decision audit trail', () => {
       recordDecision: dbDecisionRecorder(db),
       containment: testContainment(),
     });
-    expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
-      CapabilityUnavailableError,
-    );
+    expect(() =>
+      gateway.execute({ executable: NODE, args: ['-e', '1', '/etc/shadow'], cwd: root }),
+    ).toThrow(GatewayViolationError);
     gateway.resolveExecutable('node');
     const rows = db.select().from(executionPolicyDecisions).all();
     expect(rows).toHaveLength(2);

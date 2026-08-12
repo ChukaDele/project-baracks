@@ -11,17 +11,9 @@ import {
   reconcileRoadmapApplies,
 } from '../src/roadmap/proposal-service.js';
 import type { RoadmapAdapter } from '../src/roadmap/types.js';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { seedProject, testDb } from './helpers.js';
 
-/**
- * External roadmap application is an unavailable capability in this build:
- * apply and reconcile refuse unconditionally before touching the adapter, so
- * no external write (or write-settling bookkeeping) can occur through any
- * code path. The crash-consistent apply protocol is deferred to milestone M5
- * (independent review found its reconciliation not exact-attempt-safe).
- * Proposals with recorded dry runs remain available and read-only.
- */
+/** Guarded roadmap application and crash-consistent exact-attempt recovery. */
 
 const CHANGES = [{ stableId: 'RM-1', columns: { Status: 'Done' } }];
 
@@ -74,8 +66,8 @@ function spying(adapter: MockSheetsAdapter) {
   return { wrapped, calls };
 }
 
-describe('roadmap apply is disabled (external-roadmap-application unavailable)', () => {
-  it('refuses a fully proposed, evidence-backed update without touching the adapter', async () => {
+describe('activated roadmap apply lease', () => {
+  it('refuses Done without its separate approval and does not write the adapter', async () => {
     const { db, itemId, proof, adapter } = setup();
     const update = await proposeRoadmapUpdate(db, adapter, {
       roadmapItemId: itemId,
@@ -88,16 +80,16 @@ describe('roadmap apply is disabled (external-roadmap-application unavailable)',
 
     const { wrapped, calls } = spying(adapter);
     await expect(applyRoadmapUpdate(db, wrapped, update.id)).rejects.toThrow(
-      CapabilityUnavailableError,
+      /requires an approved roadmap_done DecisionRequest/,
     );
-    expect(calls).toEqual([]); // the adapter was never consulted
+    expect(calls).toEqual(['revision']);
     // the update record is untouched and the external source unchanged
     const row = db.select().from(roadmapUpdates).where(eq(roadmapUpdates.id, update.id)).get()!;
     expect(row.status).toBe('proposed');
     expect((await adapter.readRow('RM-1'))?.values.Status).toBe('In Progress');
   });
 
-  it('refuses reconciliation the same way, even with a seeded stuck apply', async () => {
+  it('requeues a stale exact attempt that the adapter did not apply', async () => {
     const { db, itemId, proof, adapter } = setup();
     const update = await proposeRoadmapUpdate(db, adapter, {
       roadmapItemId: itemId,
@@ -119,9 +111,11 @@ describe('roadmap apply is disabled (external-roadmap-application unavailable)',
       .run();
 
     const { wrapped, calls } = spying(adapter);
-    await expect(reconcileRoadmapApplies(db, wrapped)).rejects.toThrow(CapabilityUnavailableError);
-    expect(calls).toEqual([]);
+    expect(await reconcileRoadmapApplies(db, wrapped)).toEqual([
+      { updateId: update.id, outcome: 'requeued' },
+    ]);
+    expect(calls).toEqual(['wasApplied']);
     const row = db.select().from(roadmapUpdates).where(eq(roadmapUpdates.id, update.id)).get()!;
-    expect(row.status).toBe('applying'); // nothing was settled or requeued
+    expect(row.status).toBe('proposed');
   });
 });

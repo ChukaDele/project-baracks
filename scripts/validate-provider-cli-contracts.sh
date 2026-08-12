@@ -30,7 +30,7 @@ fi
 
 if [ -x "$BIN_DIR/agy" ]; then
   AGY_HELP="$($BIN_DIR/agy --help 2>&1)"
-  for flag in --output-format --sandbox --conversation --model; do
+  for flag in --output-format --sandbox --disable-slash-commands --mode --conversation --model; do
     grep -Fq -- "$flag" <<<"$AGY_HELP" || { echo "provider CLI contract failed: agy lacks $flag" >&2; exit 1; }
   done
   CHECKED=$((CHECKED + 1))

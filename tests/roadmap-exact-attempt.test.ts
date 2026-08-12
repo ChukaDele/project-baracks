@@ -1,22 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../src/security/capabilities.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/security/capabilities.js')>();
-  return {
-    ...actual,
-    assertCapabilityAvailable(capability: Parameters<typeof actual.assertCapabilityAvailable>[0]) {
-      if (capability === 'external-roadmap-application') return;
-      actual.assertCapabilityAvailable(capability);
-    },
-  };
-});
-
 import { roadmapItems, roadmapUpdates } from '../src/db/schema.js';
 import { newId } from '../src/domain/ids.js';
 import { addTask } from '../src/domain/task-service.js';
 import { MockSheetsAdapter } from '../src/roadmap/mock-sheets.js';
 import {
+  applyRoadmapUpdate,
   bindRoadmapRuntimeHost,
   proposeRoadmapUpdate,
   reconcileRoadmapApplies,
@@ -111,6 +101,42 @@ describe('M5 exact-attempt reconciliation', () => {
     expect(bindRoadmapRuntimeHost(db, 'host-a')).toBe('host-a');
     expect(bindRoadmapRuntimeHost(db, 'host-a')).toBe('host-a');
     expect(() => bindRoadmapRuntimeHost(db, 'host-b')).toThrow(/bound to host host-a/);
+  });
+
+  it('cannot duplicate a source write after a false-negative reconciliation query', async () => {
+    const { db, adapter, update } = await setup();
+    const proposal = {
+      idempotencyKey: update.idempotencyKey,
+      changes: JSON.parse(update.changesJson) as {
+        stableId: string;
+        columns: Record<string, string>;
+      }[],
+      rationale: update.rationale,
+      evidenceRefs: JSON.parse(update.evidenceIdsJson) as string[],
+    };
+    expect((await adapter.apply(proposal)).status).toBe('applied');
+    seedApplying(db, update.id, newId('rapl'));
+
+    let applyCalls = 0;
+    const lagging: RoadmapAdapter = {
+      readRow: (id) => adapter.readRow(id),
+      readAll: () => adapter.readAll(),
+      // Simulate a lagging revision read as well as a false-negative key read.
+      revision: async () => update.sourceRevision!,
+      dryRun: (value) => adapter.dryRun(value),
+      wasApplied: async () => false,
+      apply: async (value, options) => {
+        applyCalls += 1;
+        return adapter.apply(value, options);
+      },
+    };
+
+    expect(await reconcileRoadmapApplies(db, lagging)).toEqual([
+      { updateId: update.id, outcome: 'requeued' },
+    ]);
+    expect((await applyRoadmapUpdate(db, lagging, update.id)).status).toBe('applied');
+    expect(applyCalls).toBe(1);
+    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('Review');
   });
 
   it('rejects one malformed legacy apply row and continues the reconciliation sweep', async () => {

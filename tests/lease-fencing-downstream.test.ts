@@ -14,17 +14,12 @@ import {
   verificationRuns,
 } from '../src/db/schema.js';
 import { newId } from '../src/domain/ids.js';
+import { StaleClaimError } from '../src/domain/claim-service.js';
 import { appendRunEvent, createRun, setRunStatus } from '../src/domain/run-service.js';
 import { addTask, transitionTask } from '../src/domain/task-service.js';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { ensureObservedModel, seedProject, testDb } from './helpers.js';
 
-/**
- * Worker-owned downstream mutations are an unavailable capability in this
- * build: every fence-carrying or claim-bound write refuses unconditionally,
- * BEFORE any fencing logic runs while combined M4 review is pending. The
- * DB-level fencing triggers are verified here with directly seeded rows.
- */
+/** Worker-owned downstream writes must carry the exact live claim fence. */
 
 function runningTask(db: ReturnType<typeof testDb>) {
   const project = seedProject(db);
@@ -55,8 +50,8 @@ function seedClaim(db: ReturnType<typeof testDb>, taskId: string, leaseMs = 60_0
   return row;
 }
 
-describe('claim-bound writes are disabled (worker-owned-downstream-mutations)', () => {
-  it('createRun refuses any claim-bound run, even under a live claim', () => {
+describe('activated claim-bound writes', () => {
+  it('creates a claim-bound run only under the exact live worker fence', () => {
     const db = testDb();
     const { task, providerId } = runningTask(db);
     const claim = seedClaim(db, task.id);
@@ -69,30 +64,67 @@ describe('claim-bound writes are disabled (worker-owned-downstream-mutations)', 
         taskId: task.id,
         providerId,
         claimId: claim.id,
+        claimWorkerId: claim.workerId,
         modelRef: 'sonnet',
         purpose: 'implementation',
         billingMode: 'subscription_included',
-        routingReason: 'live claim, still refused',
+        routingReason: 'live fenced claim',
       }),
-    ).toThrow(CapabilityUnavailableError);
-    expect(db.select().from(agentRuns).all()).toHaveLength(0);
+    ).not.toThrow();
+    expect(db.select().from(agentRuns).all()).toHaveLength(1);
   });
 
-  it('a fence-carrying task transition refuses before any fencing logic runs', () => {
+  it('accepts the exact fence and rejects a forged fence', () => {
     const db = testDb();
     const { task } = runningTask(db);
     const claim = seedClaim(db, task.id);
-    expect(() =>
-      transitionTask(db, task.id, 'verifying', {
-        fence: { claimId: claim.id, workerId: 'w1' },
-      }),
-    ).toThrow(CapabilityUnavailableError);
-    // an invalid fence gets the same refusal — the gate fires first
+    db.update(tasks)
+      .set({ status: 'running', mutationClaimId: claim.id, mutationWorkerId: claim.workerId })
+      .where(eq(tasks.id, task.id))
+      .run();
     expect(() =>
       transitionTask(db, task.id, 'verifying', {
         fence: { claimId: 'tclm_forged', workerId: 'intruder' },
       }),
-    ).toThrow(CapabilityUnavailableError);
+    ).toThrow(StaleClaimError);
+    expect(
+      transitionTask(db, task.id, 'verifying', {
+        fence: { claimId: claim.id, workerId: claim.workerId },
+      }),
+    ).toMatchObject({ status: 'verifying', mutationClaimId: claim.id });
+  });
+
+  it('rejects service writes after the exact claim lease expires', () => {
+    const db = testDb();
+    const { task, providerId } = runningTask(db);
+    const claim = seedClaim(db, task.id, 60_000);
+    db.update(tasks)
+      .set({ status: 'running', mutationClaimId: claim.id, mutationWorkerId: claim.workerId })
+      .where(eq(tasks.id, task.id))
+      .run();
+
+    expect(() =>
+      createRun(db, {
+        taskId: task.id,
+        providerId,
+        claimId: claim.id,
+        claimWorkerId: claim.workerId,
+        modelRef: 'sonnet',
+        purpose: 'implementation',
+        billingMode: 'subscription_included',
+        routingReason: 'expired fence',
+        now: () => new Date(Date.now() + 120_000),
+      }),
+    ).toThrow(StaleClaimError);
+    expect(() =>
+      transitionTask(db, task.id, 'verifying', {
+        fence: {
+          claimId: claim.id,
+          workerId: claim.workerId,
+          now: () => new Date(Date.now() + 120_000),
+        },
+      }),
+    ).toThrow(StaleClaimError);
   });
 
   it('unfenced supervisor transitions remain possible only before a worker claim exists', () => {

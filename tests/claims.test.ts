@@ -8,20 +8,13 @@ import {
   heartbeatClaim,
   recoverExpiredClaims,
   releaseClaim,
+  StaleClaimError,
 } from '../src/domain/claim-service.js';
 import { newId } from '../src/domain/ids.js';
 import { addTask, getTask, transitionTask } from '../src/domain/task-service.js';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { seedProject, testDb } from './helpers.js';
 
-/**
- * Worker-owned downstream mutations are an unavailable capability in this
- * build: nothing can acquire or exercise a work claim. Every worker-facing
- * claim operation refuses unconditionally; only reads and the supervisor-side
- * crash-recovery sweep remain runnable. The claim/lease machinery (unique
- * active claim, immutable attempt history, recovery) is retained at the DB
- * level for milestone M4 and is tested here with directly seeded rows.
- */
+/** Durable worker claims and their DB-level fencing backstops. */
 
 function queuedTask(db: ReturnType<typeof testDb>, projectId: string, title = 'work') {
   const task = addTask(db, { projectId, title });
@@ -60,33 +53,43 @@ function startClaimedTask(
     .run();
 }
 
-describe('worker claim operations are disabled (worker-owned-downstream-mutations)', () => {
-  it('claimNextTask refuses even with a queued task waiting, leaving it untouched', () => {
+describe('activated worker claim operations', () => {
+  it('claims, heartbeats and releases a queued task atomically', () => {
     const db = testDb();
     const project = seedProject(db);
     const task = queuedTask(db, project.id);
-    expect(() => claimNextTask(db, { workerId: 'w1' })).toThrow(CapabilityUnavailableError);
+    const claimed = claimNextTask(db, { workerId: 'w1' });
+    expect(claimed?.task.status).toBe('running');
+    expect(heartbeatClaim(db, claimed!.claim.id, 'w1').status).toBe('active');
+    const released = releaseClaim(db, {
+      claimId: claimed!.claim.id,
+      workerId: 'w1',
+      requeue: true,
+      reason: 'handoff',
+    });
+    expect(released.claim.status).toBe('released');
+    expect(released.task.status).toBe('queued');
     expect(getTask(db, task.id).status).toBe('queued');
-    expect(db.select().from(taskClaims).all()).toHaveLength(0);
   });
 
-  it('heartbeat, complete and release refuse regardless of arguments', () => {
+  it('heartbeat, complete and release reject a missing or stale claim', () => {
     const db = testDb();
-    expect(() => heartbeatClaim(db, 'tclm_any', 'w1')).toThrow(CapabilityUnavailableError);
-    expect(() => completeClaim(db, 'tclm_any', 'w1')).toThrow(CapabilityUnavailableError);
+    expect(() => heartbeatClaim(db, 'tclm_any', 'w1')).toThrow(StaleClaimError);
+    expect(() => completeClaim(db, 'tclm_any', 'w1')).toThrow(StaleClaimError);
     expect(() =>
       releaseClaim(db, { claimId: 'tclm_any', workerId: 'w1', requeue: true, reason: 'x' }),
-    ).toThrow(CapabilityUnavailableError);
+    ).toThrow(StaleClaimError);
   });
 
-  it('a live seeded claim changes nothing: worker operations still refuse', () => {
+  it('heartbeats and completes a live seeded claim for its exact worker', () => {
     const db = testDb();
     const project = seedProject(db);
     const task = queuedTask(db, project.id);
     const claim = seedClaim(db, task.id);
-    expect(() => heartbeatClaim(db, claim.id, claim.workerId)).toThrow(CapabilityUnavailableError);
-    expect(() => completeClaim(db, claim.id, claim.workerId)).toThrow(CapabilityUnavailableError);
-    expect(getClaim(db, claim.id).status).toBe('active');
+    startClaimedTask(db, task.id, claim);
+    expect(heartbeatClaim(db, claim.id, claim.workerId).status).toBe('active');
+    expect(completeClaim(db, claim.id, claim.workerId).status).toBe('completed');
+    expect(getClaim(db, claim.id).status).toBe('completed');
   });
 });
 

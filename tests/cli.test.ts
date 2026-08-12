@@ -223,7 +223,7 @@ describe('major CLI', () => {
     expect(suppressed.stderr).toMatch(/suppressed/);
   });
 
-  it('doctor emits versioned JSON, strict exit codes, and the unavailable capabilities', () => {
+  it('doctor emits versioned JSON, strict exit codes, and the activated capabilities', () => {
     const result = major('doctor', '--json');
     expect([0, 5]).toContain(result.status);
     const parsed = JSON.parse(result.stdout) as {
@@ -240,7 +240,7 @@ describe('major CLI', () => {
       'paid-provider-execution',
       'worker-owned-downstream-mutations',
     ]);
-    expect(parsed.data.capabilities.every((c) => c.available === false)).toBe(true);
+    expect(parsed.data.capabilities.every((c) => c.available === true)).toBe(true);
   }, 90_000);
 
   it('keeps the legacy task-ledger CLI free of execution and downstream-write commands', () => {
@@ -312,7 +312,7 @@ describe('major CLI', () => {
       'try to force it',
     );
     expect(approve.status).toBe(4);
-    expect(approve.stderr).toMatch(/unavailable in this disabled foundation/);
+    expect(approve.stderr).toMatch(/suggestion approval is unavailable/);
 
     // No task was materialised…
     expect(countTasks(isoEnv)).toBe(beforeCount);
@@ -338,11 +338,8 @@ describe('major CLI', () => {
     expect(human.stdout).not.toMatch(/overnight execution: SAFE/);
 
     const json = major('doctor', '--json');
-    const parsed = JSON.parse(json.stdout) as {
-      data: { overnightExecution: string; liveExecutionReady: boolean };
-    };
+    const parsed = JSON.parse(json.stdout) as { data: { overnightExecution: string } };
     expect(parsed.data.overnightExecution).toBe('unavailable');
-    expect(parsed.data.liveExecutionReady).toBe(false);
   });
 
   it('discovery and dry-run create no process, even with a hostile executable override', () => {

@@ -8,11 +8,8 @@ import { recordBillingObservation } from '../src/providers/discovery-store.js';
 import { seedProject, testDb } from './helpers.js';
 
 /**
- * Billing authority for the FREE path (the only path that can create runs in
- * this build): a run's billing must match the model's authoritatively
- * observed billing, and an unobserved ('unknown') model is unroutable.
- * Paid billing modes are refused outright — see billing-authority.test.ts.
- * One-use paid approval consumption is deferred to milestone M2.
+ * A run's billing must match authoritative persisted model state. Paid modes
+ * additionally require exact one-use approval, covered in billing-authority.
  */
 
 function setup() {

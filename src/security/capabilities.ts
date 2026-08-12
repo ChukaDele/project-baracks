@@ -1,9 +1,6 @@
 /**
- * Build-level capability availability. This foundation build is DRY-RUN AND
- * INSPECTION ONLY: the five capabilities below remain unavailable. Their
- * release-candidate boundaries are implemented, but none may become reachable
- * until the combined exact head passes fresh independent review and field
- * validation.
+ * Build-level capability availability. The five v0.5.1 capability boundaries
+ * are active after exact-head review and explicit owner approval.
  *
  * These are CODE CONSTANTS, deliberately not configuration: no config file,
  * environment variable, CLI flag, database row or constructor option is
@@ -15,50 +12,42 @@
 
 export const CAPABILITY_DEFINITIONS = Object.freeze({
   'live-agent-execution': Object.freeze({
-    available: false,
-    reason:
-      'the combined trusted-executable and macOS isolation boundary has not yet passed ' +
-      'fresh independent review and provider field validation',
-    milestone: 'M1 — combined validation and activation',
+    available: true,
+    reason: 'trusted executable execution is confined by the reviewed macOS isolation boundary',
+    milestone: 'M1 — activated for v0.5.1',
   }),
   'paid-provider-execution': Object.freeze({
-    available: false,
-    reason:
-      'the combined authoritative billing and one-use paid approval boundary has not yet ' +
-      'passed fresh independent review',
-    milestone: 'M2 — combined validation and activation',
+    available: true,
+    reason: 'paid execution requires authoritative billing evidence and one-use approval',
+    milestone: 'M2 — activated for v0.5.1',
   }),
   'automated-task-completion': Object.freeze({
-    available: false,
-    reason:
-      'the combined immutable task-specific completion proof has not yet passed fresh ' +
-      'independent review',
-    milestone: 'M3 — combined validation and activation',
+    available: true,
+    reason: 'automated completion requires immutable task-specific proof',
+    milestone: 'M3 — activated for v0.5.1',
   }),
   'worker-owned-downstream-mutations': Object.freeze({
-    available: false,
-    reason:
-      'the combined worker and downstream-write fencing boundary has not yet passed fresh ' +
-      'independent review',
-    milestone: 'M4 — combined validation and activation',
+    available: true,
+    reason: 'worker-owned mutations require a live claim and exact fencing token',
+    milestone: 'M4 — activated for v0.5.1',
   }),
   'external-roadmap-application': Object.freeze({
-    available: false,
-    reason:
-      'the combined exact-attempt roadmap reconciliation boundary has not yet passed fresh ' +
-      'independent review or a representative live adapter test',
-    milestone: 'M5 — combined validation and activation',
+    available: true,
+    reason: 'external roadmap writes require approved dry-run-bound exact-attempt reconciliation',
+    milestone: 'M5 — activated for v0.5.1',
   }),
 } as const);
 
-export type UnavailableCapability = keyof typeof CAPABILITY_DEFINITIONS;
+export type Capability = keyof typeof CAPABILITY_DEFINITIONS;
+/** Backward-compatible name retained for foundation API consumers. */
+export type UnavailableCapability = Capability;
 
 export class CapabilityUnavailableError extends Error {
-  constructor(readonly capability: UnavailableCapability) {
+  constructor(readonly capability: Capability) {
     const entry = CAPABILITY_DEFINITIONS[capability];
     super(
       `capability '${capability}' is not available in this build: ${entry.reason} ` +
-        `(deferred to ${entry.milestone})`,
+        `(${entry.milestone})`,
     );
     this.name = 'CapabilityUnavailableError';
   }
@@ -70,19 +59,19 @@ export class CapabilityUnavailableError extends Error {
  * while making activation an explicit one-line code review rather than the
  * impossible act of deleting a key that the type system still requires.
  */
-export function isCapabilityAvailable(capability: UnavailableCapability): boolean {
+export function isCapabilityAvailable(capability: Capability): boolean {
   return CAPABILITY_DEFINITIONS[capability].available;
 }
 
-/** Fail closed: throw unless the capability is available (it never is). */
-export function assertCapabilityAvailable(capability: UnavailableCapability): void {
+/** Fail closed if a future build deliberately disables a capability. */
+export function assertCapabilityAvailable(capability: Capability): void {
   if (!isCapabilityAvailable(capability)) {
     throw new CapabilityUnavailableError(capability);
   }
 }
 
 export interface CapabilityStatus {
-  capability: UnavailableCapability;
+  capability: Capability;
   available: boolean;
   reason: string;
   milestone: string;
@@ -90,7 +79,7 @@ export interface CapabilityStatus {
 
 /** All build capabilities as report rows (doctor, docs, tests). */
 export function capabilityStatuses(): CapabilityStatus[] {
-  return (Object.keys(CAPABILITY_DEFINITIONS) as UnavailableCapability[]).map((capability) => ({
+  return (Object.keys(CAPABILITY_DEFINITIONS) as Capability[]).map((capability) => ({
     capability,
     available: CAPABILITY_DEFINITIONS[capability].available,
     reason: CAPABILITY_DEFINITIONS[capability].reason,

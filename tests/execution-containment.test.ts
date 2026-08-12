@@ -12,14 +12,17 @@ import { spawnSync } from 'node:child_process';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { darwinSeatbeltContainment, detectContainment } from '../src/security/containment.js';
 import type { Containment } from '../src/security/containment.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
 } from '../src/security/trusted-executables.js';
-import { ExecutionGateway, type ExecutionPolicyDecision } from '../src/security/gateway.js';
+import {
+  ExecutionGateway,
+  GatewayViolationError,
+  type ExecutionPolicyDecision,
+} from '../src/security/gateway.js';
 import { trustedExecutableRegistry } from '../src/security/major-gateway.js';
 import { gatewayAllowedRoots } from '../src/supervisor/worker.js';
 
@@ -266,16 +269,16 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
   }, 30_000);
 });
 
-describe('execution is unreachable through the gateway in this build', () => {
-  it('refuses before containment, trust or path checks could even run', () => {
+describe('activated execution remains fail-closed', () => {
+  it('refuses argv paths outside the allowed roots', () => {
     const { gateway, decisions, root } = makeGateway();
     expect(() =>
       gateway.execute({ executable: NODE, args: ['-e', '1', '/etc/shadow'], cwd: root }),
-    ).toThrow(CapabilityUnavailableError);
+    ).toThrow(GatewayViolationError);
     expect(decisions.at(-1)?.allowed).toBe(false);
   });
 
-  it('refuses identically with no containment configured (still fail-closed)', () => {
+  it('refuses when no containment is configured', () => {
     const root = tempDir();
     const registry = new TrustedExecutableRegistry();
     registry.pin(NODE);
@@ -287,7 +290,7 @@ describe('execution is unreachable through the gateway in this build', () => {
       recordDecision: () => undefined,
     });
     expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
-      CapabilityUnavailableError,
+      GatewayViolationError,
     );
   });
 });

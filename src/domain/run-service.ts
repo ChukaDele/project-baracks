@@ -49,19 +49,15 @@ export interface NewRunInput {
 }
 
 /**
- * Create a run record inside one immediate transaction. In this build a run
- * row is ledger/planning state only — nothing executes it (live agent
- * execution is an unavailable capability, see src/security/capabilities.ts).
+ * Create a run record inside one immediate transaction. Execution remains a
+ * separate gateway action; this service owns durable run authorisation state.
  *
  * Validations that remain live: the task exists, and the billing mode is
  * known (an 'unknown' cost basis is unroutable) and must match the model's
  * authoritatively observed billing.
  *
- * QUARANTINED paths: a PAID billing mode is refused unconditionally (paid
- * provider execution is unavailable — M2), and a claim-bound run is refused
- * unconditionally (worker-owned downstream mutations are unavailable — M4).
- * The validation code below those gates is the combined M2/M4 implementation,
- * but remains unreachable until fresh independent review authorizes activation.
+ * Paid billing requires authoritative model billing plus an exact unexpired,
+ * unconsumed approval. Claim-bound runs require the current live worker fence.
  */
 export function createRun(db: Db, rawInput: NewRunInput) {
   // Single-read snapshot of the caller-owned input (see task-service.ts
