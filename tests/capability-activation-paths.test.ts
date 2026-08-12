@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync, realpathSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -22,7 +23,9 @@ import { MockSheetsAdapter } from '../src/roadmap/mock-sheets.js';
 import { applyRoadmapUpdate, proposeRoadmapUpdate } from '../src/roadmap/proposal-service.js';
 import { darwinSeatbeltContainment } from '../src/security/containment.js';
 import { ExecutionGateway } from '../src/security/gateway.js';
+import { executeMajorCommand } from '../src/security/major-gateway.js';
 import { TrustedExecutableRegistry } from '../src/security/trusted-executables.js';
+import { gatewayAllowedRoots } from '../src/supervisor/worker.js';
 import {
   ensureObservedModel,
   recordQualifyingVerification,
@@ -55,6 +58,49 @@ describe.runIf(platform() === 'darwin')('M1 enabled execution path', () => {
     expect(readFileSync(marker, 'utf8')).toBe('contained');
     expect(decisions.map((decision) => decision.allowed)).toEqual([true]);
   });
+
+  it('runs real Git through the production gateway with isolated HOME and TMPDIR', async () => {
+    const parent = realpathSync(mkdtempSync(join(tmpdir(), 'major-enabled-git-')));
+    const main = join(parent, 'main');
+    const worktree = join(parent, 'worktree');
+    for (const args of [
+      ['init', '--initial-branch=main', main],
+      ['-C', main, 'config', 'user.name', 'Major Test'],
+      ['-C', main, 'config', 'user.email', 'major@example.invalid'],
+    ]) {
+      const result = spawnSync('git', args, { encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+    }
+    writeFileSync(join(main, 'seed.txt'), 'seed\n');
+    for (const args of [
+      ['-C', main, 'add', 'seed.txt'],
+      ['-C', main, 'commit', '-m', 'seed'],
+      ['-C', main, 'worktree', 'add', '-b', 'test-worktree', worktree],
+    ]) {
+      const result = spawnSync('git', args, { encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+    }
+    writeFileSync(join(worktree, 'marker.txt'), 'contained\n');
+    const priorMajorHome = process.env.MAJOR_HOME;
+    process.env.MAJOR_HOME = join(parent, 'major-home');
+    try {
+      const handle = executeMajorCommand({
+        executable: 'git',
+        args: ['add', 'marker.txt'],
+        cwd: worktree,
+        allowedRoots: gatewayAllowedRoots(worktree),
+      });
+      for await (const _event of handle.events) void _event;
+      expect(await handle.outcome).toMatchObject({ status: 'succeeded', exitCode: 0 });
+    } finally {
+      if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+      else process.env.MAJOR_HOME = priorMajorHome;
+    }
+    const status = spawnSync('git', ['-C', worktree, 'status', '--porcelain'], {
+      encoding: 'utf8',
+    });
+    expect(status.stdout).toContain('A  marker.txt');
+  }, 30_000);
 });
 
 describe('enabled v1 capability paths retained until successor proof', () => {

@@ -21,13 +21,13 @@ def owner_is_live(text: str) -> bool:
         return False
 
 
-def acquire(path: Path) -> None:
+def acquire(path: Path, owner_pid: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     for _ in range(2):
         try:
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "w") as handle:
-                handle.write(f"{os.getppid()}\n")
+                handle.write(f"{owner_pid}\n")
             return
         except FileExistsError:
             try:
@@ -62,10 +62,12 @@ def acquire(path: Path) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: acquire-major-learning-migration-lock.py <lock-path>")
+    if len(sys.argv) != 3 or not sys.argv[2].isdigit() or int(sys.argv[2]) <= 0:
+        raise SystemExit(
+            "usage: acquire-major-learning-migration-lock.py <lock-path> <owner-pid>"
+        )
     try:
-        acquire(Path(sys.argv[1]).expanduser().resolve())
+        acquire(Path(sys.argv[1]).expanduser().resolve(), int(sys.argv[2]))
     except OSError as error:
         if error.errno == errno.EEXIST:
             raise SystemExit(

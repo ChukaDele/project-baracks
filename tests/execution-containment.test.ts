@@ -167,7 +167,10 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
     const denied = tempDir();
     const allowedMarker = join(allowed, 'allowed.txt');
     const deniedMarker = join(denied, 'denied.txt');
+    const dataVolumeMarker = `/System/Volumes/Data${deniedMarker}`;
+    const systemConfigMarker = '/etc/hosts';
     writeFileSync(deniedMarker, 'private');
+    expect(existsSync(dataVolumeMarker)).toBe(true);
     const readOnlyMarker = join(readOnly, 'provider-runtime.json');
     writeFileSync(readOnlyMarker, 'read-only');
     const descendantMarker = join(denied, 'descendant.txt');
@@ -181,8 +184,11 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
       `fs.writeFileSync('/dev/null', 'discarded')`,
       `let readDenied=false; try { fs.readFileSync(${JSON.stringify(deniedMarker)}) } catch { readDenied=true }`,
       `let writeDenied=false; try { fs.writeFileSync(${JSON.stringify(deniedMarker)}, 'bad') } catch { writeDenied=true }`,
+      `let systemConfigReadDenied=false; try { fs.readFileSync(${JSON.stringify(systemConfigMarker)}) } catch { systemConfigReadDenied=true }`,
+      `let dataVolumeReadDenied=false; try { fs.readFileSync(${JSON.stringify(dataVolumeMarker)}) } catch { dataVolumeReadDenied=true }`,
+      `const certificateReadable=fs.readFileSync('/etc/ssl/cert.pem').length>0`,
       `const child=cp.spawnSync(process.execPath,['-e',${JSON.stringify(`require('node:fs').writeFileSync(${JSON.stringify(descendantMarker)}, 'bad')`)}])`,
-      'process.stdout.write(JSON.stringify({readOnlyValue,readOnlyWriteDenied,readDenied,writeDenied,childFailed:child.status!==0}))',
+      'process.stdout.write(JSON.stringify({readOnlyValue,readOnlyWriteDenied,readDenied,writeDenied,systemConfigReadDenied,dataVolumeReadDenied,certificateReadable,childFailed:child.status!==0}))',
     ].join(';');
     const wrapped = containment.wrap({
       executable: NODE,
@@ -202,6 +208,9 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
       readOnlyWriteDenied: true,
       readDenied: true,
       writeDenied: true,
+      systemConfigReadDenied: true,
+      dataVolumeReadDenied: true,
+      certificateReadable: true,
       childFailed: true,
     });
     expect(existsSync(allowedMarker)).toBe(true);
@@ -244,6 +253,7 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
       encoding: 'utf8',
       env: {
         HOME: worktree,
+        TMPDIR: worktree,
         PATH: '/usr/bin:/bin',
         GIT_CONFIG_NOSYSTEM: '1',
       },

@@ -184,6 +184,56 @@ describe('Major learning candidates', () => {
     expect(candidate?.evidence).toHaveLength(8);
   }, 30_000);
 
+  it('reclaims one stale store lock before concurrent captures without losing occurrences', async () => {
+    const project = 'stale-lock-project';
+    captureLearning({ project, source: 'manual', key: 'same-lesson', summary: 'The lesson.' });
+    const projectFiles = readdirSync(join(learningRoot(), 'projects'));
+    expect(projectFiles).toHaveLength(1);
+    const projectFile = projectFiles[0]!;
+    const lock = join(learningRoot(), 'projects', `${projectFile}.lock`);
+    writeFileSync(lock, 'invalid-owner\n');
+    const stale = new Date(Date.now() - 31_000);
+    utimesSync(lock, stale, stale);
+
+    const moduleUrl = pathToFileURL(
+      join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
+    );
+    const captures = Array.from({ length: 8 }, (_, index) => {
+      const script = `
+        import { captureLearning } from ${JSON.stringify(moduleUrl.href)};
+        captureLearning({
+          project: ${JSON.stringify(project)},
+          source: 'recurring-failure',
+          key: 'same-lesson',
+          summary: 'The lesson.',
+          evidence: ${JSON.stringify(`stale-process-${index}`)}
+        });
+      `;
+      return new Promise<void>((resolve, reject) => {
+        const child = spawn(
+          process.execPath,
+          ['--import', 'tsx', '--input-type=module', '-e', script],
+          {
+            cwd: join(import.meta.dirname, '..'),
+            env: { ...process.env, MAJOR_LEARNING_ROOT: learningRoot() },
+            stdio: ['ignore', 'ignore', 'pipe'],
+          },
+        );
+        let stderr = '';
+        child.stderr.setEncoding('utf8');
+        child.stderr.on('data', (chunk) => (stderr += String(chunk)));
+        child.once('error', reject);
+        child.once('exit', (code) =>
+          code === 0 ? resolve() : reject(new Error(`capture child exited ${code}: ${stderr}`)),
+        );
+      });
+    });
+    await Promise.all(captures);
+    const [candidate] = listLearningCandidates(project);
+    expect(candidate?.occurrences).toBe(9);
+    expect(candidate?.evidence).toHaveLength(8);
+  }, 30_000);
+
   it('waits for an installation migration lock before writing', async () => {
     const lock = join(learningRoot(), '.migration.lock');
     mkdirSync(learningRoot(), { recursive: true });

@@ -53,6 +53,10 @@ function fileRule(operation: string, path: string): string {
     : `(${operation} (literal ${schemeString(path)}))`;
 }
 
+function existingCanonicalRoots(roots: readonly string[]): string[] {
+  return canonicalRoots(roots.filter((root) => existsSync(root)));
+}
+
 /**
  * Build a macOS Seatbelt boundary for a single spawn.
  *
@@ -64,9 +68,38 @@ function fileRule(operation: string, path: string): string {
 function seatbeltProfile(request: ContainmentRequest): string {
   const roots = canonicalRoots(request.allowedRoots);
   const readOnlyRoots = canonicalRoots(request.readOnlyRoots ?? []);
+  const systemReadRoots = existingCanonicalRoots([
+    '/Library/Apple/usr',
+    '/Library/Developer/CommandLineTools',
+    '/Applications/Xcode.app/Contents',
+    '/private/var/db/timezone/zoneinfo',
+  ]);
+  const systemReadFiles = existingCanonicalRoots([
+    '/etc/ssl/cert.pem',
+    '/Library/Preferences/com.apple.dt.Xcode.plist',
+  ]);
   const deniedDataRoots = [
     ...new Set(
-      ['/Users', '/Volumes', homedir(), '/private/tmp', '/tmp', tmpdir()].flatMap((root) => {
+      [
+        '/Applications',
+        '/Library',
+        '/Network',
+        '/System/Volumes/Data',
+        '/Users',
+        '/Volumes',
+        '/etc',
+        '/home',
+        '/net',
+        '/opt',
+        '/private/etc',
+        '/private/tmp',
+        '/private/var',
+        '/tmp',
+        '/usr/local',
+        '/var',
+        homedir(),
+        tmpdir(),
+      ].flatMap((root) => {
         try {
           return [root, canonicalize(root)];
         } catch {
@@ -97,8 +130,15 @@ function seatbeltProfile(request: ContainmentRequest): string {
     '  (global-name "com.apple.system.opendirectoryd.libinfo")',
     '  (global-name "com.apple.trustd.agent"))',
     '(allow ipc-posix*)',
+    // Signed binaries and the dynamic loader need broad system traversal.
+    // Deny data under every mutable/sensitive top-level host location, then
+    // reopen only the exact project, provider and minimal system runtime roots.
     '(allow file-read*)',
     ...deniedDataRoots.map((root) => `(deny file-read-data (subpath ${schemeString(root)}))`),
+    ...systemReadRoots.map((root) => fileRule('allow file-read*', root)),
+    ...systemReadRoots.map((root) => fileRule('allow file-read-data', root)),
+    ...systemReadFiles.map((root) => fileRule('allow file-read*', root)),
+    ...systemReadFiles.map((root) => fileRule('allow file-read-data', root)),
     ...roots.map((root) => `(allow file-read* (subpath ${schemeString(root)}))`),
     ...roots.map((root) => `(allow file-read-data (subpath ${schemeString(root)}))`),
     ...readOnlyRoots.map((root) => fileRule('allow file-read*', root)),

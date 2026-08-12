@@ -200,7 +200,7 @@ def assert_migration_lock_recovery(temp: Path, env: dict[str, str]) -> None:
     stale = time.time() - 31
     os.utime(lock, (stale, stale))
     live = run(
-        [sys.executable, str(MIGRATION_LOCK_ACQUIRER), str(lock)],
+        [sys.executable, str(MIGRATION_LOCK_ACQUIRER), str(lock), str(os.getpid())],
         env,
         expect_success=False,
     )
@@ -209,7 +209,7 @@ def assert_migration_lock_recovery(temp: Path, env: dict[str, str]) -> None:
 
     write(lock, "invalid-owner\n", 0o600)
     os.utime(lock, (stale, stale))
-    run([sys.executable, str(MIGRATION_LOCK_ACQUIRER), str(lock)], env)
+    run([sys.executable, str(MIGRATION_LOCK_ACQUIRER), str(lock), str(os.getpid())], env)
     assert lock.read_text() == f"{os.getpid()}\n"
     lock.unlink()
 

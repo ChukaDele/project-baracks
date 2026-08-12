@@ -172,7 +172,7 @@ fi
 # Prevent current Major writers from changing learning state between staging
 # and activation. Reclaim only an old lock with no live owning process.
 mkdir -p "$MAJOR_HOME/learning"
-if ! python3 "$ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK"; then
+if ! python3 "$ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK" "$$"; then
   exit 1
 fi
 LEARNING_LOCK_HELD=1

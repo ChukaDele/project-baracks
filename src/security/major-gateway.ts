@@ -79,6 +79,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
 
   const baseEnv: NodeJS.ProcessEnv = {
     ...process.env,
+    ...(executable === 'git' ? { HOME: executionRoot, GIT_CONFIG_NOSYSTEM: '1' } : {}),
     MAJOR_HOME: runtimeHome,
     TMPDIR: runtimeTmp,
     XDG_CACHE_HOME: runtimeCache,
@@ -114,6 +115,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       'XDG_CONFIG_HOME',
       'XDG_DATA_HOME',
       'XDG_CACHE_HOME',
+      'GIT_CONFIG_NOSYSTEM',
     ],
     recordDecision: recordExecution,
   });

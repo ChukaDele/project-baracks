@@ -188,10 +188,20 @@ function withStoreLock<T>(path: string, action: () => T): T {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       try {
+        const before = statSync(lock);
         const lockText = readFileSync(lock, 'utf8').trim();
         const pid = Number.parseInt(lockText, 10);
         const live = learningLockOwnerIsLive(pid);
-        if (!live && Date.now() - statSync(lock).mtimeMs > 30_000) unlinkSync(lock);
+        if (!live && Date.now() - before.mtimeMs > 30_000) {
+          const after = statSync(lock);
+          if (
+            before.dev === after.dev &&
+            before.ino === after.ino &&
+            before.mtimeMs === after.mtimeMs
+          ) {
+            unlinkSync(lock);
+          }
+        }
       } catch (staleError) {
         if ((staleError as NodeJS.ErrnoException).code !== 'ENOENT') throw staleError;
       }

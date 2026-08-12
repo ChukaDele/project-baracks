@@ -59,7 +59,7 @@ path.write_text(
 PY
 
 mkdir -p "$HOME/.major/learning"
-if ! python3 "$MAJOR_ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK"; then
+if ! python3 "$MAJOR_ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK" "$$"; then
   exit 1
 fi
 LEARNING_LOCK_HELD=1
