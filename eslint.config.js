@@ -17,11 +17,17 @@ export default tseslint.config(
     },
   },
   {
-    // Every child process must pass through an execution gateway: only the
-    // legacy gateway, the Major successor gateway and the streaming spawner
-    // they own may reach providers/exec or child_process.
+    // Every child process must pass through an execution boundary: only the
+    // gateways, the streaming spawner they own, and the isolated Lima backend
+    // may reach providers/exec or child_process.
     files: ['src/**/*.ts'],
-    ignores: ['src/security/gateway.ts', 'src/security/major-gateway.ts', 'src/providers/exec.ts'],
+    ignores: [
+      'src/security/gateway.ts',
+      'src/security/major-gateway.ts',
+      'src/providers/exec.ts',
+      'src/execution/lima-backend.ts',
+      'src/execution/cursor-acp-runtime.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

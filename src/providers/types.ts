@@ -59,10 +59,28 @@ export interface ProviderEvent {
 
 export interface ExecuteOutcome {
   status: 'succeeded' | 'failed' | 'timed_out' | 'cancelled';
+  /** Stable backend-owned run identity, when execution left the host process. */
+  runId?: string;
+  /** Machine-readable failure category for recovery and audit. */
+  errorKind?:
+    | 'unavailable'
+    | 'spawn_failed'
+    | 'auth_failed'
+    | 'protocol_invalid'
+    | 'provider_failed'
+    | 'timed_out'
+    | 'cancelled'
+    | 'cleanup_failed';
+  cleanup?: 'complete' | 'failed';
   exitCode: number | null;
   sessionRef?: string;
   /** Raw usage payload captured from the provider's result event, if any. */
   usage?: unknown;
+  /** Runtime-observed support. Absence means the backend did not report the capability. */
+  modelSelection?: 'supported' | 'unsupported';
+  requestedModel?: string;
+  /** Provider-reported or protocol-confirmed model. Never inferred from the request. */
+  actualModel?: string;
   rateLimited: boolean;
   exhausted: boolean;
   /** Redacted tail of stderr for diagnostics. */

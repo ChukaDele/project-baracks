@@ -1,6 +1,11 @@
 import type { ExecutionGateway } from '../security/gateway.js';
 import { loadModelRegistry, registryModels, type ModelRegistry } from './registry.js';
 import type { ExecuteHandle, ExecuteRequest, ProviderAdapter, ProviderInfo } from './types.js';
+import {
+  extractProviderSessionRef,
+  extractProviderUsage,
+  parseProviderEventLine,
+} from './evidence.js';
 import { EXHAUSTION_PATTERN, providerExecuteArgs, RATE_LIMIT_PATTERN } from './commands.js';
 
 /** Canonical executable name resolved for reporting. Environment overrides are
@@ -64,16 +69,19 @@ export class ClaudeCodeProvider implements ProviderAdapter {
       executable: this.executable,
       args,
       cwd: request.cwd,
+      providerRequest: {
+        host: 'claude',
+        prompt: request.prompt,
+        allowGuestMutation: true,
+        approvalAuthority: { approvedCategories: [] },
+        ...(request.modelRef ? { modelRef: request.modelRef } : {}),
+        ...(request.resumeSessionRef ? { resumeSessionRef: request.resumeSessionRef } : {}),
+      },
       detectRateLimit: (text) => RATE_LIMIT_PATTERN.test(text),
       detectExhaustion: (text) => EXHAUSTION_PATTERN.test(text),
-      extractSessionRef: (event) => {
-        const data = event.data as { session_id?: string } | undefined;
-        return data?.session_id;
-      },
-      extractUsage: (event) => {
-        const data = event.data as { type?: string; usage?: unknown } | undefined;
-        return data?.type === 'result' ? data.usage : undefined;
-      },
+      parseLine: parseProviderEventLine,
+      extractSessionRef: (event) => extractProviderSessionRef('claude', event),
+      extractUsage: extractProviderUsage,
     };
     if (request.timeoutMs !== undefined) spec.timeoutMs = request.timeoutMs;
     return this.gateway.execute(spec);

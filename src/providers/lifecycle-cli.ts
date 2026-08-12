@@ -1,6 +1,8 @@
 import { openDb } from '../db/client.js';
 import { BILLING_MODES, type BillingMode } from '../db/schema.js';
 import { trustedExecutableRegistry } from '../security/major-gateway.js';
+import { majorExecutionBackend } from '../security/major-gateway.js';
+import { isCapabilityAvailable } from '../security/capabilities.js';
 import {
   loadPersistedProviderInfos,
   persistProviderDiscovery,
@@ -94,7 +96,15 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     // verifies that the fixed canonical installation exists and is executable;
     // neither PATH nor a user-supplied executable path can confer trust.
     const executableName = ATTESTABLE_PROVIDERS[providerName];
-    const trusted = trustedExecutableRegistry(executableName).verify(executableName);
+    const backendProbe = isCapabilityAvailable('live-agent-execution')
+      ? await majorExecutionBackend().probeProvider(executableName)
+      : undefined;
+    const trusted = backendProbe
+      ? undefined
+      : trustedExecutableRegistry(executableName).verify(executableName);
+    if (backendProbe && (!backendProbe.installed || !backendProbe.authenticated)) {
+      throw new Error(`isolated provider probe failed for ${providerName}: ${backendProbe.detail}`);
+    }
     const classification = classifyModel(loadModelRegistry(), providerName, modelRef);
     if (classification.routingClass === 'unknown') {
       throw new Error(`model ${providerName}/${modelRef} has no routing classification`);
@@ -105,7 +115,7 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
         opened.db,
         {
           name: providerName,
-          executable: trusted.spawnPath,
+          executable: backendProbe?.executable ?? trusted!.spawnPath,
           installed: true,
           authenticated: true,
           models: [

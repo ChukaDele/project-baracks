@@ -3,6 +3,8 @@ import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { executeMajorCommand } from '../security/major-gateway.js';
+import { isCapabilityAvailable } from '../security/capabilities.js';
+import { loadLimaExecutionConfig } from '../execution/lima-config.js';
 import { redactText } from '../security/redact.js';
 import {
   EXHAUSTION_PATTERN,
@@ -19,6 +21,13 @@ import {
 } from './resources.js';
 import { gitCommonDir, type WorkerHost } from './state.js';
 import { AMBIGUOUS_WORKER_REPORT_ENVELOPE, preserveWorkerReportEnvelope } from './worker-report.js';
+import type { ExecuteOutcome, ProviderEvent } from '../providers/types.js';
+import {
+  extractProviderSessionRef,
+  extractProviderUsage,
+  parseProviderEventLine,
+} from '../providers/evidence.js';
+import type { ProviderApprovalAuthority } from '../security/provider-approval-policy.js';
 
 export interface WorkerOutcome {
   host: WorkerHost;
@@ -29,6 +38,14 @@ export interface WorkerOutcome {
   durationMs: number;
   rateLimited: boolean;
   exhausted: boolean;
+  runId?: string;
+  errorKind?: ExecuteOutcome['errorKind'];
+  cleanup?: ExecuteOutcome['cleanup'];
+  sessionRef?: string;
+  usage?: unknown;
+  modelSelection?: ExecuteOutcome['modelSelection'];
+  requestedModel?: string;
+  actualModel?: string;
 }
 
 export interface GatewayCommandOutcome {
@@ -39,6 +56,14 @@ export interface GatewayCommandOutcome {
   durationMs: number;
   rateLimited: boolean;
   exhausted: boolean;
+  runId?: string;
+  errorKind?: ExecuteOutcome['errorKind'];
+  cleanup?: ExecuteOutcome['cleanup'];
+  sessionRef?: string;
+  usage?: unknown;
+  modelSelection?: ExecuteOutcome['modelSelection'];
+  requestedModel?: string;
+  actualModel?: string;
 }
 
 const OUTPUT_LIMIT = 200_000;
@@ -65,6 +90,13 @@ function trustedExecutableInstalled(name: string): boolean {
 
 export function hostAvailable(host: WorkerHost): boolean {
   const executable = workerCommand(host, '').command;
+  if (isCapabilityAvailable('live-agent-execution')) {
+    try {
+      return existsSync(loadLimaExecutionConfig().limactlPath);
+    } catch {
+      return false;
+    }
+  }
   return executable.includes('/') ? existsSync(executable) : trustedExecutableInstalled(executable);
 }
 
@@ -90,6 +122,14 @@ export async function runGatewayCommand(input: {
   timeoutMs?: number;
   extraAllowedRoots?: readonly string[];
   resourceLeaseId?: string;
+  providerRequest?: {
+    host: WorkerHost;
+    prompt: string;
+    allowGuestMutation: boolean;
+    approvalAuthority: ProviderApprovalAuthority;
+    modelRef?: string;
+    resumeSessionRef?: string;
+  };
 }): Promise<GatewayCommandOutcome> {
   const started = Date.now();
   let stdout = '';
@@ -104,9 +144,17 @@ export async function runGatewayCommand(input: {
       allowedRoots: gatewayAllowedRoots(input.cwd, input.extraAllowedRoots),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.resourceLeaseId ? { resourceLeaseId: input.resourceLeaseId } : {}),
-      parseLine: (line) => ({ type: 'stdout', data: line }),
+      ...(input.providerRequest ? { providerRequest: input.providerRequest } : {}),
+      parseLine: parseProviderEventLine,
       detectRateLimit: (value) => RATE_LIMIT_PATTERN.test(value),
       detectExhaustion: (value) => EXHAUSTION_PATTERN.test(value),
+      ...(input.providerRequest
+        ? {
+            extractSessionRef: (event: ProviderEvent) =>
+              extractProviderSessionRef(input.providerRequest!.host, event),
+            extractUsage: extractProviderUsage,
+          }
+        : {}),
     });
 
     const stopWatcher = setInterval(() => {
@@ -146,6 +194,14 @@ export async function runGatewayCommand(input: {
         durationMs: Date.now() - started,
         rateLimited: outcome.rateLimited,
         exhausted: outcome.exhausted,
+        ...(outcome.runId ? { runId: outcome.runId } : {}),
+        ...(outcome.errorKind ? { errorKind: outcome.errorKind } : {}),
+        ...(outcome.cleanup ? { cleanup: outcome.cleanup } : {}),
+        ...(outcome.sessionRef ? { sessionRef: outcome.sessionRef } : {}),
+        ...(outcome.usage !== undefined ? { usage: outcome.usage } : {}),
+        ...(outcome.modelSelection ? { modelSelection: outcome.modelSelection } : {}),
+        ...(outcome.requestedModel ? { requestedModel: outcome.requestedModel } : {}),
+        ...(outcome.actualModel ? { actualModel: outcome.actualModel } : {}),
       };
     } finally {
       clearInterval(stopWatcher);
@@ -207,6 +263,15 @@ export async function runWorker(input: {
       args: spec.args,
       cwd: input.cwd,
       resourceLeaseId: lease.id,
+      providerRequest: {
+        host: input.host,
+        prompt: input.prompt,
+        allowGuestMutation: input.host === 'claude' || input.host === 'cursor',
+        // Batch CLI providers expose no per-tool approval callback. Ordinary
+        // worker runs therefore carry no sensitive-action authority.
+        approvalAuthority: { approvedCategories: [] },
+        ...(input.modelRef ? { modelRef: input.modelRef } : {}),
+      },
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
     });
     return { host: input.host, ...outcome };

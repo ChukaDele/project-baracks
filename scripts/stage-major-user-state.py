@@ -312,6 +312,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--record")
     parser.add_argument("--global-rules-record")
     parser.add_argument("--legacy-plist")
+    parser.add_argument("--execution-config")
     return parser.parse_args()
 
 
@@ -399,6 +400,7 @@ def main() -> None:
         add_file(entries, zsh_stage, home / ".zshrc")
 
     for label, source_arg, target in (
+        ("execution-config", args.execution_config, home / ".major" / "execution.json"),
         ("record", args.record, home / ".major" / "installed-release.json"),
         (
             "global-rules-record",

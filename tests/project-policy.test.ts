@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -60,6 +60,18 @@ function earnAssist(project = 'jss-tool', repoPath = '/tmp/jss-tool') {
 }
 
 describe('Major project trust policy', () => {
+  it('clamps a legacy persisted worker claim to the current runtime ceiling', () => {
+    const legacy = defaultProjectPolicy('legacy', '/tmp/legacy');
+    writeFileSync(
+      process.env.MAJOR_POLICY_PATH!,
+      JSON.stringify({
+        version: 1,
+        projects: [{ ...legacy, trust: 'build', maxWorkers: 6, ownerApprovedBuild: true }],
+      }),
+    );
+    expect(getProjectPolicy('legacy', '/tmp/legacy').maxWorkers).toBe(1);
+  });
+
   it('defaults unknown projects to observe-only with zero delegated workers', () => {
     const policy = defaultProjectPolicy('surface-talent', '/tmp/surface-talent');
     expect(policy.projectClass).toBe('unknown');
@@ -73,7 +85,7 @@ describe('Major project trust policy', () => {
 
   it('supports the evidence-earned assist path', () => {
     const policy = earnAssist();
-    expect(policy.maxWorkers).toBe(3);
+    expect(policy.maxWorkers).toBe(1);
     expect(policy.maxRunMinutes).toBe(30);
     expect(policy.allowBackground).toBe(false);
     expect(policy.allowExternalWrites).toBe(false);
@@ -92,7 +104,7 @@ describe('Major project trust policy', () => {
     });
     expect(policy.trust).toBe('build');
     expect(policy.ownerApprovedBuild).toBe(true);
-    expect(policy.maxWorkers).toBe(6);
+    expect(policy.maxWorkers).toBe(1);
     expect(policy.maxRunMinutes).toBe(120);
     expect(policy.allowBackground).toBe(false);
     expect(policy.allowExternalWrites).toBe(true);
@@ -110,7 +122,7 @@ describe('Major project trust policy', () => {
       allowExternalWrites: true,
     });
     expect(policy.trust).toBe('build');
-    expect(policy.maxWorkers).toBe(6);
+    expect(policy.maxWorkers).toBe(1);
     expect(policy.allowExternalWrites).toBe(true);
     expect(policy.allowCrossProjectMemory).toBe(false);
     expect(policy.allowPaidSpend).toBe(false);
@@ -149,7 +161,7 @@ describe('Major project trust policy', () => {
       projectClass: 'workshop',
       trust: 'unattended',
     });
-    expect(unattended.maxWorkers).toBe(6);
+    expect(unattended.maxWorkers).toBe(1);
     expect(unattended.allowBackground).toBe(true);
   });
 
@@ -180,7 +192,7 @@ describe('Major project trust policy', () => {
       projectClass: 'workshop',
       trust: 'build',
     });
-    expect(built.maxWorkers).toBe(6);
+    expect(built.maxWorkers).toBe(1);
     expect(built.allowBackground).toBe(false);
   });
 

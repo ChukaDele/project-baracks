@@ -66,11 +66,11 @@ Project classes:
 Trust levels:
 
 - `observe` — no delegated execution;
-- `assist` — foreground pilot, maximum 3 useful workers;
-- `build` — validated build mode, maximum 6 useful workers;
-- `unattended` — maximum 6 useful workers and background continuation.
+- `assist` — foreground pilot, one concurrent worker for the shared v0.5.1 Lima runtime;
+- `build` — validated build mode, one concurrent worker for the shared v0.5.1 Lima runtime;
+- `unattended` — one concurrent worker plus background continuation. Unattended authority remains separately gated.
 
-The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. Browser leases also have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
+The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. The shared v0.5.1 Lima runtime has a 1-worker cap. Browser leases have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
 
 Unknown projects default to observe. Client/candidate/PII projects remain isolated until explicitly classified/promoted. Trust promotion beyond assist requires a passing independent grade.
 
@@ -192,7 +192,7 @@ During pilot:
 
 Builder-authored CI is useful but cannot by itself promote trust.
 
-The first representative Major acceptance test is JSS in `workshop/assist`: Major must make useful product progress on the real JSS goal in a visible foreground cycle, respect the 3-worker ceiling, preserve state, avoid owner gates, and leave objective evidence. An independent provider then grades the exact result.
+The first representative Major acceptance test is JSS in `workshop/assist`: Major must make useful product progress on the real JSS goal in a visible foreground cycle, respect the single-worker ceiling, preserve state, avoid owner gates, and leave objective evidence. An independent provider then grades the exact result.
 
 ## 10. Memory and learning
 

@@ -9,8 +9,10 @@ export function cursorProvider(options: {
 }): CliProvider {
   return new CliProvider({
     name: 'cursor',
+    host: 'cursor',
     executable: 'cursor-agent',
     gateway: options.gateway,
+    allowGuestMutation: true,
     ...(options.registry ? { registry: options.registry } : {}),
     args: (request) => providerExecuteArgs('cursor', request),
   });

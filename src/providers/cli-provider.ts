@@ -1,13 +1,20 @@
 import type { ExecutionGateway } from '../security/gateway.js';
 import { loadModelRegistry, registryModels, type ModelRegistry } from './registry.js';
 import type { ExecuteHandle, ExecuteRequest, ProviderAdapter, ProviderInfo } from './types.js';
-import { EXHAUSTION_PATTERN, RATE_LIMIT_PATTERN } from './commands.js';
+import { EXHAUSTION_PATTERN, RATE_LIMIT_PATTERN, type ProviderCommandHost } from './commands.js';
+import {
+  extractProviderSessionRef,
+  extractProviderUsage,
+  parseProviderEventLine,
+} from './evidence.js';
 
 export interface CliProviderOptions {
   name: string;
+  host: ProviderCommandHost;
   executable: string;
   gateway: ExecutionGateway;
   args: (request: ExecuteRequest) => string[];
+  allowGuestMutation?: boolean;
   registry?: ModelRegistry;
 }
 
@@ -16,16 +23,20 @@ export interface CliProviderOptions {
 export class CliProvider implements ProviderAdapter {
   readonly name: string;
   private readonly executable: string;
+  private readonly host: ProviderCommandHost;
   private readonly gateway: ExecutionGateway;
   private readonly args: (request: ExecuteRequest) => string[];
   private readonly registry: ModelRegistry;
+  private readonly allowGuestMutation: boolean;
 
   constructor(options: CliProviderOptions) {
     this.name = options.name;
+    this.host = options.host;
     this.executable = options.executable;
     this.gateway = options.gateway;
     this.args = options.args;
     this.registry = options.registry ?? loadModelRegistry();
+    this.allowGuestMutation = options.allowGuestMutation ?? false;
   }
 
   async discover(): Promise<ProviderInfo> {
@@ -50,8 +61,19 @@ export class CliProvider implements ProviderAdapter {
       executable: this.executable,
       args: this.args(request),
       cwd: request.cwd,
+      providerRequest: {
+        host: this.host,
+        prompt: request.prompt,
+        allowGuestMutation: this.allowGuestMutation,
+        approvalAuthority: { approvedCategories: [] },
+        ...(request.modelRef ? { modelRef: request.modelRef } : {}),
+        ...(request.resumeSessionRef ? { resumeSessionRef: request.resumeSessionRef } : {}),
+      },
       detectRateLimit: (text) => RATE_LIMIT_PATTERN.test(text),
       detectExhaustion: (text) => EXHAUSTION_PATTERN.test(text),
+      parseLine: parseProviderEventLine,
+      extractSessionRef: (event) => extractProviderSessionRef(this.host, event),
+      extractUsage: extractProviderUsage,
     };
     if (request.timeoutMs !== undefined) spec.timeoutMs = request.timeoutMs;
     return this.gateway.execute(spec);

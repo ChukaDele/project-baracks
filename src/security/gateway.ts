@@ -1,6 +1,8 @@
 import { isAbsolute, resolve } from 'node:path';
 import { executeStreaming, type StreamingSpawnSpec } from '../providers/exec.js';
 import type { ExecuteHandle } from '../providers/types.js';
+import type { ExecutionBackend } from '../execution/backend.js';
+import type { BackendProviderRequest } from '../execution/backend.js';
 import { CapabilityUnavailableError, isCapabilityAvailable } from './capabilities.js';
 import { checkArgv, type CommandPolicy } from './commands.js';
 import type { Containment } from './containment.js';
@@ -12,6 +14,7 @@ import {
   PathViolationError,
 } from './paths.js';
 import { redactText } from './redact.js';
+import { validateProviderApprovalAuthority } from './provider-approval-policy.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
@@ -70,6 +73,8 @@ export interface GatewayExecuteRequest {
   detectExhaustion?: StreamingSpawnSpec['detectExhaustion'];
   extractSessionRef?: StreamingSpawnSpec['extractSessionRef'];
   extractUsage?: StreamingSpawnSpec['extractUsage'];
+  resourceLeaseId?: string;
+  providerRequest?: BackendProviderRequest;
 }
 
 export interface GatewayOptions {
@@ -90,6 +95,8 @@ export interface GatewayOptions {
    * fails closed when this is absent or not enforced.
    */
   containment?: Containment;
+  /** Isolated provider backend. Mutually exclusive with host containment. */
+  backend?: ExecutionBackend;
   /** Base environment (defaults to process.env). */
   baseEnv?: NodeJS.ProcessEnv;
   /** Extra non-sensitive env names to pass through. */
@@ -279,9 +286,10 @@ export class ExecutionGateway {
 
     // Fail closed unless a containment mechanism is configured and enforced.
     if (
-      !this.options.containment?.enforced ||
-      !this.options.containment.filesystemIsolation ||
-      !this.options.containment.networkIsolation
+      !this.options.backend &&
+      (!this.options.containment?.enforced ||
+        !this.options.containment.filesystemIsolation ||
+        !this.options.containment.networkIsolation)
     ) {
       this.refuse(
         'execute',
@@ -312,22 +320,73 @@ export class ExecutionGateway {
     // must have a registered binding, and a path-qualified request must
     // realpath-resolve to that exact identity. What actually spawns is the
     // trusted spawn path — never the caller's string.
-    let trusted: TrustedExecutable;
-    try {
-      trusted = this.options.trustedExecutables.verify(request.executable);
-    } catch (error) {
-      const reason =
-        error instanceof ExecutableTrustError ? error.message : 'executable trust check failed';
-      this.refuse('execute', request, reason);
+    let trusted: TrustedExecutable | undefined;
+    if (!this.options.backend) {
+      try {
+        trusted = this.options.trustedExecutables.verify(request.executable);
+      } catch (error) {
+        const reason =
+          error instanceof ExecutableTrustError ? error.message : 'executable trust check failed';
+        this.refuse('execute', request, reason);
+      }
     }
 
     const env = this.buildEnv('execute', request);
 
+    if (this.options.backend) {
+      if (!request.providerRequest) {
+        this.refuse(
+          'execute',
+          request,
+          'isolated provider execution requires a structured Major provider request',
+        );
+      }
+      try {
+        validateProviderApprovalAuthority(
+          request.providerRequest.host,
+          request.providerRequest.approvalAuthority,
+        );
+      } catch (error) {
+        this.refuse(
+          'execute',
+          request,
+          error instanceof Error ? error.message : 'provider approval policy rejected execution',
+        );
+      }
+      this.record({
+        kind: 'execute',
+        allowed: true,
+        executable: request.executable,
+        argv: request.args,
+        cwd: canonicalCwd,
+        reason: `allowed via ${this.options.backend.kind} backend`,
+        strippedEnv: env.stripped,
+        authorizedEnv: env.authorized,
+        ...(this.options.authorizedEnv
+          ? { envDecisionId: this.options.authorizedEnv.decisionId }
+          : {}),
+      });
+      return this.options.backend.execute({
+        executable: request.executable,
+        args: request.args,
+        cwd: canonicalCwd,
+        allowedRoots: this.options.allowedRoots,
+        ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+        ...(request.parseLine ? { parseLine: request.parseLine } : {}),
+        ...(request.detectRateLimit ? { detectRateLimit: request.detectRateLimit } : {}),
+        ...(request.detectExhaustion ? { detectExhaustion: request.detectExhaustion } : {}),
+        ...(request.extractSessionRef ? { extractSessionRef: request.extractSessionRef } : {}),
+        ...(request.extractUsage ? { extractUsage: request.extractUsage } : {}),
+        ...(request.resourceLeaseId ? { resourceLeaseId: request.resourceLeaseId } : {}),
+        ...(request.providerRequest ? { providerRequest: request.providerRequest } : {}),
+      });
+    }
+
     let wrapped: ReturnType<Containment['wrap']>;
     try {
-      wrapped = this.options.containment.wrap({
-        executable: trusted.canonicalPath,
-        canonicalExecutable: trusted.canonicalPath,
+      wrapped = this.options.containment!.wrap({
+        executable: trusted!.canonicalPath,
+        canonicalExecutable: trusted!.canonicalPath,
         args: request.args,
         allowedRoots: this.options.allowedRoots,
         ...(this.options.readOnlyRoots ? { readOnlyRoots: this.options.readOnlyRoots } : {}),
@@ -343,7 +402,7 @@ export class ExecutionGateway {
     this.record({
       kind: 'execute',
       allowed: true,
-      executable: trusted.spawnPath,
+      executable: trusted!.spawnPath,
       argv: request.args,
       cwd: canonicalCwd,
       reason: 'allowed',

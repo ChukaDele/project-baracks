@@ -8,6 +8,7 @@ import {
 } from '../security/capabilities.js';
 import { detectContainment, type ContainmentStatus } from '../security/containment.js';
 import { redactText } from '../security/redact.js';
+import type { BackendStatus } from '../execution/backend.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'missing';
 
@@ -58,6 +59,7 @@ export interface DoctorInputs {
   fileExists?: (path: string) => boolean;
   /** Injectable only for deterministic doctor tests; production uses the real OS detector. */
   detectContainment?: () => ContainmentStatus;
+  inspectExecutionBackend?: () => Promise<BackendStatus>;
 }
 
 export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
@@ -143,7 +145,26 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
 
   // Descendant/process containment and the immutable M1 activation gate are
   // reported separately.
-  const containment = (inputs.detectContainment ?? detectContainment)();
+  const liveExecutionCapabilityAvailable = isCapabilityAvailable('live-agent-execution');
+  const backendStatus =
+    liveExecutionCapabilityAvailable && inputs.inspectExecutionBackend
+      ? await inputs.inspectExecutionBackend()
+      : undefined;
+  const containment = backendStatus
+    ? {
+        platform: 'lima',
+        available: backendStatus.available,
+        enforced: backendStatus.available,
+        filesystemIsolation: backendStatus.filesystemIsolation,
+        networkIsolation: backendStatus.networkIsolation,
+        liveExecutionReady:
+          backendStatus.available &&
+          backendStatus.filesystemIsolation &&
+          backendStatus.networkIsolation &&
+          backendStatus.lifecycleIsolation,
+        detail: backendStatus.detail,
+      }
+    : (inputs.detectContainment ?? detectContainment)();
   checks.push({
     name: 'descendant-containment',
     required: false,
@@ -151,7 +172,6 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     detail: containment.detail,
   });
   const liveExecutionBlockers: string[] = [];
-  const liveExecutionCapabilityAvailable = isCapabilityAvailable('live-agent-execution');
   if (!liveExecutionCapabilityAvailable) {
     liveExecutionBlockers.push(
       'live-agent-execution capability remains disabled pending M1 review',

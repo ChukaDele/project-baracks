@@ -18,7 +18,12 @@ describe('single execution boundary', () => {
       if (!source.includes('node:child_process')) return [];
       return [relative(root, path)];
     });
-    expect(offenders.sort()).toEqual(['src/providers/exec.ts', 'src/security/major-gateway.ts']);
+    expect(offenders.sort()).toEqual([
+      'src/execution/cursor-acp-runtime.ts',
+      'src/execution/lima-backend.ts',
+      'src/providers/exec.ts',
+      'src/security/major-gateway.ts',
+    ]);
   });
 
   it('allows only the canonical gateway to import the spawn engine', () => {

@@ -14,6 +14,7 @@ export function antigravityProvider(options: {
 }): CliProvider {
   return new CliProvider({
     name: 'antigravity',
+    host: 'antigravity',
     executable: 'agy',
     gateway: options.gateway,
     ...(options.registry ? { registry: options.registry } : {}),

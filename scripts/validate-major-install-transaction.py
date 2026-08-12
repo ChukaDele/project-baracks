@@ -61,6 +61,12 @@ def stage(
     record: Path,
 ) -> Path:
     legacy = home / "Library" / "LaunchAgents" / "com.chuka.major-supervisor.plist"
+    execution_config = stage_dir.parent / f"{stage_dir.name}-execution.json"
+    write(
+        execution_config,
+        '{"backend":"lima","instance":"major-worker","limactlPath":"/opt/homebrew/bin/limactl","isolationScope":"shared-workshop","guestRunRoot":"/var/lib/major/runs"}\n',
+        0o600,
+    )
     result = run(
         [
             sys.executable,
@@ -75,6 +81,8 @@ def stage(
             str(wrapper),
             "--record",
             str(record),
+            "--execution-config",
+            str(execution_config),
             "--legacy-plist",
             str(legacy),
         ],
@@ -218,6 +226,7 @@ def seed_home(home: Path, codex_home: Path) -> None:
     write(home / ".major" / "global-worker-rules.md", "old global rules\n")
     write(home / ".major" / "skills" / "internal" / "old-skill" / "SKILL.md", "old\n")
     write(home / ".major" / "installed-release.json", '{"sha":"old"}\n')
+    write(home / ".major" / "execution.json", '{"backend":"legacy"}\n', 0o600)
     write(
         home / ".major" / "learning-candidates.json",
         json.dumps(

@@ -42,7 +42,7 @@ major project show surface-talent
 
 Expected:
 
-- JSS: `workshop/assist`, max workers 3, background false.
+- JSS: `workshop/assist`, max concurrent workers 1, background false.
 - Surface Talent: `client/observe`, max workers 0, background false, cross-project memory false.
 
 ## Emergency stop
@@ -71,7 +71,7 @@ major run jss-tool \
   --foreground
 ```
 
-The first run is intentionally capped at 3 useful workers.
+The v0.5.1 runtime is intentionally capped at one concurrent worker because it uses one shared Lima instance.
 
 ### Pass conditions
 
@@ -81,8 +81,8 @@ At minimum:
 
 1. Major reads the actual current JSS project state rather than restarting completed work.
 2. It chooses one real P0 bottleneck on the source → assess → tailor → apply/record → track → learn loop.
-3. It performs or delegates useful work within the 3-worker ceiling.
-4. Concurrent writers, if any, use isolated worktrees.
+3. It performs or delegates useful work within the single-worker ceiling.
+4. Later multi-instance runtimes must use isolated worktrees for concurrent writers.
 5. It changes strategy rather than repeating materially unchanged failures.
 6. It does not fabricate employer submissions, provider state, credentials or production success.
 7. It stops at a true owner gate rather than a normal reversible engineering step.
@@ -127,7 +127,7 @@ Only after a passing independent grade:
 major project configure jss-tool --class workshop --trust build
 ```
 
-`build` allows up to 6 useful workers but still does not enable login/unattended execution by default.
+`build` retains the single concurrent worker ceiling and does not enable login/unattended execution by default.
 
 Do **not** promote to `unattended` after one pilot. Require another representative build-mode run plus an independent grade before enabling background execution.
 

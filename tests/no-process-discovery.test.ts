@@ -119,7 +119,8 @@ describe('discovery is process-free', () => {
       '--sandbox',
       '--disable-slash-commands',
       '--mode',
-      'accept-edits',
+      'plan',
+      '--new-project',
       '-p',
       'review this change',
     ]);
@@ -129,7 +130,8 @@ describe('discovery is process-free', () => {
       '--sandbox',
       '--disable-slash-commands',
       '--mode',
-      'accept-edits',
+      'plan',
+      '--new-project',
       '-p',
       'review this change',
     ]);
@@ -138,16 +140,15 @@ describe('discovery is process-free', () => {
     );
   });
 
-  it('pins non-bypass modes for Claude, Codex and Cursor workers', () => {
+  it('pins non-bypass modes for Claude and Codex and native ACP for Cursor workers', () => {
     process.env.MAJOR_CLAUDE_PERMISSION_MODE = 'bypassPermissions';
     const claude = workerCommand('claude', 'work').args;
     const codex = workerCommand('codex', 'work').args;
     const cursor = workerCommand('cursor', 'work').args;
     expect(claude).toContain('auto');
     expect(claude).not.toContain('bypassPermissions');
-    expect(codex).toEqual(expect.arrayContaining(['--sandbox', 'workspace-write', '--ephemeral']));
-    expect(cursor).toEqual(expect.arrayContaining(['--auto-review', '--sandbox', 'enabled']));
-    expect(cursor).not.toContain('--force');
+    expect(codex).toEqual(expect.arrayContaining(['--sandbox', 'read-only', '--ephemeral']));
+    expect(cursor).toEqual(['acp']);
   });
 });
 

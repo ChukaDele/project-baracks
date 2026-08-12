@@ -37,6 +37,8 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
         ...(request.outputMode === 'stream' ? ['--verbose'] : ['--max-turns', '80']),
         '--permission-mode',
         'auto',
+        '--tools',
+        'Read,Edit,Glob,Grep',
         '--safe-mode',
         '--no-chrome',
       ];
@@ -50,7 +52,7 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
         ? [
             'exec',
             '--sandbox',
-            'workspace-write',
+            'read-only',
             '--ignore-user-config',
             'resume',
             request.resumeSessionRef,
@@ -60,7 +62,7 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
         : [
             'exec',
             '--sandbox',
-            'workspace-write',
+            'read-only',
             '--ignore-user-config',
             '--ephemeral',
             '--json',
@@ -72,18 +74,10 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
       return args;
     }
     case 'cursor': {
-      const args = [
-        '-p',
-        '--auto-review',
-        '--sandbox',
-        'enabled',
-        '--output-format',
-        request.outputMode === 'stream' ? 'stream-json' : 'json',
-      ];
-      if (request.modelRef && request.modelRef !== 'auto') args.push('--model', request.modelRef);
-      if (request.resumeSessionRef) args.push(`--resume=${request.resumeSessionRef}`);
-      args.push(request.prompt);
-      return args;
+      // Cursor execution is the first-party ACP server. Prompt, model and
+      // resume state travel through typed ACP requests, never duplicate CLI
+      // flags or a second stdout protocol.
+      return ['acp'];
     }
     case 'antigravity': {
       const args: string[] = [
@@ -92,9 +86,10 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
         '--sandbox',
         '--disable-slash-commands',
         '--mode',
-        'accept-edits',
+        'plan',
       ];
       if (request.resumeSessionRef) args.push('--conversation', request.resumeSessionRef);
+      else args.push('--new-project');
       if (request.modelRef && request.modelRef !== 'auto') args.push('--model', request.modelRef);
       args.push('-p', request.prompt);
       return args;

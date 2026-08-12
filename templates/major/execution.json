@@ -1,0 +1,7 @@
+{
+  "backend": "lima",
+  "instance": "major-worker",
+  "limactlPath": "/opt/homebrew/bin/limactl",
+  "isolationScope": "shared-workshop",
+  "guestRunRoot": "/var/lib/major/runs"
+}

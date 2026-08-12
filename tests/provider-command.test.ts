@@ -17,15 +17,17 @@ function capturingGateway() {
 }
 
 describe('provider command authority', () => {
-  it('never asks Cursor to force-approve tools', () => {
+  it('routes Cursor through native ACP with typed provider intent', () => {
     const { gateway, requests } = capturingGateway();
     const provider = cursorProvider({ gateway });
     expect(() => provider.execute({ prompt: 'work', cwd: '/project' })).toThrow('captured');
-    expect(requests[0]?.args).toEqual(
-      expect.arrayContaining(['--auto-review', '--sandbox', 'enabled']),
-    );
-    expect(requests[0]?.args).not.toContain('--force');
-    expect(requests[0]?.args).not.toContain('--yolo');
+    expect(requests[0]?.args).toEqual(['acp']);
+    expect(requests[0]?.providerRequest).toEqual({
+      host: 'cursor',
+      prompt: 'work',
+      allowGuestMutation: true,
+      approvalAuthority: { approvedCategories: [] },
+    });
   });
 
   it('pins Claude auto permissions and disables ambient customizations', () => {
@@ -36,6 +38,8 @@ describe('provider command authority', () => {
       expect.arrayContaining([
         '--permission-mode',
         'auto',
+        '--tools',
+        'Read,Edit,Glob,Grep',
         '--safe-mode',
         '--no-session-persistence',
         '--no-chrome',
@@ -44,17 +48,12 @@ describe('provider command authority', () => {
     expect(requests[0]?.args).not.toContain('bypassPermissions');
   });
 
-  it('pins Codex workspace sandboxing and ignores ambient user execution policy', () => {
+  it('pins Codex read-only sandboxing and ignores ambient user execution policy', () => {
     const { gateway, requests } = capturingGateway();
     const provider = new CodexProvider({ gateway });
     expect(() => provider.execute({ prompt: 'work', cwd: '/project' })).toThrow('captured');
     expect(requests[0]?.args).toEqual(
-      expect.arrayContaining([
-        '--sandbox',
-        'workspace-write',
-        '--ignore-user-config',
-        '--ephemeral',
-      ]),
+      expect.arrayContaining(['--sandbox', 'read-only', '--ignore-user-config', '--ephemeral']),
     );
     expect(requests[0]?.args).not.toContain('--dangerously-bypass-approvals-and-sandbox');
   });
@@ -74,7 +73,13 @@ describe('provider command authority', () => {
     expect(() => provider.execute({ prompt: 'work', cwd: '/project' })).toThrow('captured');
     expect(requests[0]).toMatchObject({ executable: 'agy', cwd: '/project' });
     expect(requests[0]?.args).toEqual(
-      expect.arrayContaining(['--sandbox', '--disable-slash-commands', '--mode', 'accept-edits']),
+      expect.arrayContaining([
+        '--sandbox',
+        '--disable-slash-commands',
+        '--mode',
+        'plan',
+        '--new-project',
+      ]),
     );
     expect(requests[0]?.args).not.toContain('--dangerously-skip-permissions');
   });

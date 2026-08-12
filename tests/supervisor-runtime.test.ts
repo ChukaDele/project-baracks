@@ -231,7 +231,7 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('Speed and MVP are the default');
     expect(prompt).toContain('class: workshop');
     expect(prompt).toContain('trust: assist');
-    expect(prompt).toContain('maximum concurrent workers: 3');
+    expect(prompt).toContain('maximum concurrent workers: 1');
     expect(prompt).toContain('maximum coordinator run: 30 minutes');
     expect(prompt).toContain('Tools-as-Code');
     expect(prompt).toContain('Skillify');

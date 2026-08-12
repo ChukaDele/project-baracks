@@ -69,11 +69,11 @@ function limitsFor(
     case 'observe':
       return { maxWorkers: 0, maxRunMinutes: 0, allowBackground: false };
     case 'assist':
-      return { maxWorkers: 3, maxRunMinutes: 30, allowBackground: false };
+      return { maxWorkers: 1, maxRunMinutes: 30, allowBackground: false };
     case 'build':
-      return { maxWorkers: 6, maxRunMinutes: 120, allowBackground: false };
+      return { maxWorkers: 1, maxRunMinutes: 120, allowBackground: false };
     case 'unattended':
-      return { maxWorkers: 6, maxRunMinutes: 480, allowBackground: true };
+      return { maxWorkers: 1, maxRunMinutes: 480, allowBackground: true };
   }
 }
 
@@ -82,8 +82,12 @@ function emptyStore(): PolicyStore {
 }
 
 function normalizePolicy(policy: ProjectPolicy): ProjectPolicy {
+  const trustLimits = limitsFor(policy.trust);
   const normalized = {
     ...policy,
+    // Persisted policies from earlier releases cannot exceed the active
+    // runtime's truthful concurrency ceiling.
+    maxWorkers: Math.min(policy.maxWorkers ?? trustLimits.maxWorkers, trustLimits.maxWorkers),
     maxRunMinutes: policy.maxRunMinutes ?? limitsFor(policy.trust).maxRunMinutes,
     allowPaidSpend: policy.allowPaidSpend ?? false,
     ownerApprovedBuild: policy.ownerApprovedBuild ?? false,

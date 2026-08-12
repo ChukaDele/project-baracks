@@ -13,6 +13,8 @@ LEGACY_STOPPED=0
 INSTALL_COMMITTED=0
 LEARNING_MIGRATION_LOCK="$MAJOR_HOME/learning/.migration.lock"
 LEARNING_LOCK_HELD=0
+WORKER_CREATED=0
+LIMACTL_PATH=""
 cd "$ROOT"
 
 if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
@@ -37,6 +39,12 @@ cleanup() {
   fi
   if [ "$status" -ne 0 ] && [ "$RELEASE_CREATED" = "1" ]; then
     rm -rf "$RELEASE_DIR"
+  fi
+  if [ "$status" -ne 0 ] && [ "$WORKER_CREATED" = "1" ] && [ -n "$LIMACTL_PATH" ]; then
+    "$LIMACTL_PATH" stop --force major-worker >/dev/null 2>&1 || true
+    if ! "$LIMACTL_PATH" delete --force major-worker >/dev/null 2>&1; then
+      echo "CRITICAL: Major install rollback could not delete the newly created major-worker." >&2
+    fi
   fi
   if [ "$status" -ne 0 ] && [ "$LEGACY_WAS_LOADED" = "1" ] && \
      [ "$LEGACY_STOPPED" = "1" ] && [ "$INSTALL_COMMITTED" = "0" ] && \
@@ -94,6 +102,45 @@ fi
 WRAPPER_TMP="$INSTALL_STAGE/major"
 RECORD_TMP="$INSTALL_STAGE/installed-release.json"
 RULES_RECORD_TMP="$INSTALL_STAGE/installed-global-rules.json"
+EXECUTION_CONFIG_TMP="$INSTALL_STAGE/execution.json"
+
+LIMACTL_PATH="$(command -v limactl || true)"
+if [ -z "$LIMACTL_PATH" ]; then
+  echo "ERROR: Lima 2.2.x is required for Major provider execution." >&2
+  echo "Install Lima, then rerun the Major installer." >&2
+  exit 1
+fi
+LIMACTL_PATH="$(python3 - "$LIMACTL_PATH" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).resolve())
+PY
+)"
+if ! "$LIMACTL_PATH" --version | grep -Eq '(^|[^0-9])2\.2\.[0-9]+'; then
+  echo "ERROR: Major requires Lima >=2.2.0 and <2.3.0." >&2
+  exit 1
+fi
+python3 - "$ROOT/templates/major/execution.json" "$EXECUTION_CONFIG_TMP" "$LIMACTL_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text())
+config["limactlPath"] = sys.argv[3]
+Path(sys.argv[2]).write_text(json.dumps(config, indent=2) + "\n")
+PY
+
+# Provision and verify the isolated worker before changing the active Major
+# wrapper or user state. A newly created failed instance is rolled back; an
+# existing instance is never deleted automatically.
+if ! "$LIMACTL_PATH" list --json | python3 -c '
+import json, sys
+rows = [json.loads(line) for line in sys.stdin if line.strip()]
+raise SystemExit(0 if any(row.get("name") == "major-worker" for row in rows) else 1)
+'; then
+  WORKER_CREATED=1
+fi
+bash "$ROOT/scripts/provision-major-lima-worker.sh" "$LIMACTL_PATH" major-worker
 
 # Build and execute-smoke the same immutable runtime shape used in production.
 if [ ! -d "$RELEASE_DIR" ]; then
@@ -186,12 +233,14 @@ MANIFEST="$(python3 "$ROOT/scripts/stage-major-user-state.py" \
   --major-bin "$BIN_DIR/major" \
   --record "$RECORD_TMP" \
   --global-rules-record "$RULES_RECORD_TMP" \
+  --execution-config "$EXECUTION_CONFIG_TMP" \
   --wrapper "$WRAPPER_TMP" \
   --legacy-plist "$LEGACY_PLIST")"
 
 python3 "$ROOT/scripts/activate-major-user-state.py" --manifest "$MANIFEST"
 RELEASE_CREATED=0
 INSTALL_COMMITTED=1
+WORKER_CREATED=0
 rm -f "$LEARNING_MIGRATION_LOCK"
 LEARNING_LOCK_HELD=0
 
@@ -231,7 +280,7 @@ RUNTIME INTEGRITY:
 NORMAL WORK MODE:
 - Major is present by default across supported agent tools.
 - The owner can explicitly fast-track trusted projects to foreground build mode.
-- build = up to 6 useful workers, 120-minute coordinator ceiling, no repeated shadow/assist ceremony.
+- build = one concurrent worker on the shared v0.5.1 Lima runtime, 120-minute coordinator ceiling, no repeated shadow/assist ceremony.
 - --allow-external-writes authorizes normal project writes such as branches, PRs, previews and already-authorized integrations.
 - client projects remain isolated from cross-project/global memory even in build mode.
 - no new paid spend, destructive production-data changes, credential/ownership/DNS changes, or production security-policy changes without explicit authority.

@@ -29,7 +29,8 @@ export interface ResourceLimits {
 
 export const GLOBAL_RESOURCE_LIMITS: ResourceLimits = {
   total: 6,
-  workers: 6,
+  // v0.5.1 has one shared Lima instance and therefore one safe worker slot.
+  workers: 1,
   browsers: 2,
   builds: 1,
   maxSubagentDepth: 1,

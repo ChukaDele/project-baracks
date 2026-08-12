@@ -28,6 +28,7 @@ import { dbDecisionRecorder } from '../security/audit.js';
 import { ExecutionGateway } from '../security/gateway.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
 import type { RunPurpose } from '../db/schema.js';
+import { majorExecutionBackend } from '../security/major-gateway.js';
 
 /**
  * Exit codes (stable, documented in docs/architecture.md):
@@ -117,6 +118,7 @@ program
         repoPath: p.repoPath,
       })),
       resolve: (name) => gateway.resolveExecutable(name),
+      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
     });
     for (const info of report.providers) {
       persistProviderDiscovery(database, info, { source: 'cli' });
