@@ -3,17 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { executeStreaming } from '../src/providers/exec.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 
-async function collect(handle: ReturnType<typeof executeStreaming>) {
-  const events = [];
-  for await (const event of handle.events) events.push(event);
-  return { events, outcome: await handle.outcome };
-}
-
-describe('activated streaming execution engine', () => {
-  it('streams structured output and reports a successful outcome', async () => {
+describe('streaming execution engine release gate', () => {
+  it('refuses before spawning a structured-output child', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'major-stream-'));
-    const result = await collect(
+    expect(() =>
       executeStreaming({
         executable: process.execPath,
         args: ['-e', 'console.log(JSON.stringify({type:"message",value:"ok"}))'],
@@ -21,17 +16,15 @@ describe('activated streaming execution engine', () => {
         allowedRoots: [cwd],
         env: { PATH: process.env.PATH ?? '' },
       }),
-    );
-    expect(result.outcome).toMatchObject({ status: 'succeeded', exitCode: 0 });
-    expect(result.events).toEqual([{ type: 'message', data: { type: 'message', value: 'ok' } }]);
+    ).toThrow(CapabilityUnavailableError);
   });
 
-  it('passes only the explicit child environment', async () => {
+  it('does not expose a parent secret because no child can start', () => {
     const cwd = mkdtempSync(join(tmpdir(), 'major-stream-env-'));
     const previous = process.env.MAJOR_PARENT_ONLY_SECRET;
     process.env.MAJOR_PARENT_ONLY_SECRET = 'must-not-inherit';
     try {
-      const result = await collect(
+      expect(() =>
         executeStreaming({
           executable: process.execPath,
           args: [
@@ -42,9 +35,7 @@ describe('activated streaming execution engine', () => {
           allowedRoots: [cwd],
           env: { PATH: process.env.PATH ?? '' },
         }),
-      );
-      expect(result.outcome.status).toBe('succeeded');
-      expect(result.events).toEqual([{ type: 'env', data: { type: 'env', value: null } }]);
+      ).toThrow(CapabilityUnavailableError);
     } finally {
       if (previous === undefined) delete process.env.MAJOR_PARENT_ONLY_SECRET;
       else process.env.MAJOR_PARENT_ONLY_SECRET = previous;

@@ -35,21 +35,32 @@ const ALL_FIVE: Capability[] = [
 ];
 
 describe('the v0.5.1 capability gate', () => {
-  it('declares exactly the five reviewed capabilities active and frozen', () => {
+  it('keeps M1 closed while the four implemented downstream capabilities stay frozen', () => {
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual([...ALL_FIVE].sort());
     expect(Object.isFrozen(CAPABILITY_DEFINITIONS)).toBe(true);
     for (const capability of ALL_FIVE) {
       expect(Object.isFrozen(CAPABILITY_DEFINITIONS[capability])).toBe(true);
+    }
+    expect(isCapabilityAvailable('live-agent-execution')).toBe(false);
+    expect(() => assertCapabilityAvailable('live-agent-execution')).toThrow();
+    for (const capability of ALL_FIVE.slice(1)) {
       expect(isCapabilityAvailable(capability)).toBe(true);
       expect(() => assertCapabilityAvailable(capability)).not.toThrow();
     }
   });
 
-  it('reports all five as active with their reviewed milestone', () => {
+  it('reports only M1 as release-recovery pending', () => {
     const statuses = capabilityStatuses();
     expect(statuses.map((status) => status.capability).sort()).toEqual([...ALL_FIVE].sort());
-    expect(statuses.every((status) => status.available)).toBe(true);
-    for (const status of statuses) expect(status.milestone).toMatch(/^M[1-5] — activated/);
+    expect(statuses.find((status) => status.capability === 'live-agent-execution')).toMatchObject({
+      available: false,
+      milestone: 'M1 — release recovery pending',
+    });
+    expect(
+      statuses
+        .filter((status) => status.capability !== 'live-agent-execution')
+        .every((status) => status.available),
+    ).toBe(true);
   });
 
   it('cannot be changed by environment variables', () => {
@@ -62,7 +73,9 @@ describe('the v0.5.1 capability gate', () => {
     const previous = names.map((name) => [name, process.env[name]] as const);
     for (const name of names) process.env[name] = '0';
     try {
-      for (const capability of ALL_FIVE) expect(isCapabilityAvailable(capability)).toBe(true);
+      expect(isCapabilityAvailable('live-agent-execution')).toBe(false);
+      for (const capability of ALL_FIVE.slice(1))
+        expect(isCapabilityAvailable(capability)).toBe(true);
     } finally {
       for (const [name, value] of previous) {
         if (value === undefined) delete process.env[name];
@@ -131,7 +144,9 @@ describe('activation does not expand adjacent authority', () => {
         { name: 'claude-code', installed: true, authenticated: true, models },
       ]).kind,
     ).toBe('checkpoint');
-    for (const capability of ALL_FIVE) expect(isCapabilityAvailable(capability)).toBe(true);
+    expect(isCapabilityAvailable('live-agent-execution')).toBe(false);
+    for (const capability of ALL_FIVE.slice(1))
+      expect(isCapabilityAvailable(capability)).toBe(true);
   });
 
   it('keeps the immutable default registry separate from activation constants', () => {

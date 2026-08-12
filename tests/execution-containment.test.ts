@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { darwinSeatbeltContainment, detectContainment } from '../src/security/containment.js';
 import type { Containment } from '../src/security/containment.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
@@ -269,12 +270,12 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
   }, 30_000);
 });
 
-describe('activated execution remains fail-closed', () => {
+describe('M1-disabled execution remains fail-closed', () => {
   it('refuses argv paths outside the allowed roots', () => {
     const { gateway, decisions, root } = makeGateway();
     expect(() =>
       gateway.execute({ executable: NODE, args: ['-e', '1', '/etc/shadow'], cwd: root }),
-    ).toThrow(GatewayViolationError);
+    ).toThrow(CapabilityUnavailableError);
     expect(decisions.at(-1)?.allowed).toBe(false);
   });
 
@@ -290,7 +291,7 @@ describe('activated execution remains fail-closed', () => {
       recordDecision: () => undefined,
     });
     expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
-      GatewayViolationError,
+      CapabilityUnavailableError,
     );
   });
 });

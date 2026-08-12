@@ -23,7 +23,7 @@ import {
  * Provider adapters never spawn independently: they hold a gateway and ask it
  * to execute or probe.
  *
- * Live execution is active behind the immutable M1 capability constant. Every
+ * Live execution remains behind the immutable M1 capability constant. Every
  * spawn must pass path confinement, executable identity, argv policy,
  * environment sanitisation and enforced OS containment.
  *

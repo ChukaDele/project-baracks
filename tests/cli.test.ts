@@ -223,7 +223,7 @@ describe('major CLI', () => {
     expect(suppressed.stderr).toMatch(/suppressed/);
   });
 
-  it('doctor emits versioned JSON, strict exit codes, and the activated capabilities', () => {
+  it('doctor emits versioned JSON, strict exit codes, and the closed M1 gate', () => {
     const result = major('doctor', '--json');
     expect([0, 5]).toContain(result.status);
     const parsed = JSON.parse(result.stdout) as {
@@ -240,7 +240,14 @@ describe('major CLI', () => {
       'paid-provider-execution',
       'worker-owned-downstream-mutations',
     ]);
-    expect(parsed.data.capabilities.every((c) => c.available === true)).toBe(true);
+    expect(
+      parsed.data.capabilities.find((c) => c.capability === 'live-agent-execution')?.available,
+    ).toBe(false);
+    expect(
+      parsed.data.capabilities
+        .filter((c) => c.capability !== 'live-agent-execution')
+        .every((c) => c.available),
+    ).toBe(true);
   }, 90_000);
 
   it('keeps the legacy task-ledger CLI free of execution and downstream-write commands', () => {

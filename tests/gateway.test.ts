@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { checkArgv } from '../src/security/commands.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import type { Containment } from '../src/security/containment.js';
 import { BILLING_ENV_NAMES, sanitizeEnv } from '../src/security/env.js';
 import {
@@ -89,14 +90,14 @@ describe('execution gateway construction', () => {
   });
 });
 
-describe('activated execution gateway', () => {
-  it('executes a trusted command and records the allowed decision', async () => {
+describe('M1 execution gateway release gate', () => {
+  it('refuses a trusted command before spawn and records the decision', () => {
     const { gateway, decisions, root } = makeGateway();
-    const handle = gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root });
-    for await (const _event of handle.events) void _event;
-    expect(await handle.outcome).toMatchObject({ status: 'succeeded', exitCode: 0 });
+    expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
+      CapabilityUnavailableError,
+    );
     expect(decisions).toHaveLength(1);
-    expect(decisions[0]).toMatchObject({ kind: 'execute', allowed: true });
+    expect(decisions[0]).toMatchObject({ kind: 'execute', allowed: false });
   });
 
   it('keeps a probe-only gateway non-executable and records the refusal', () => {
@@ -108,12 +109,12 @@ describe('activated execution gateway', () => {
     });
     expect(() =>
       gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: process.cwd() }),
-    ).toThrow(GatewayViolationError);
+    ).toThrow(CapabilityUnavailableError);
     expect(decisions[0]!.allowed).toBe(false);
     expect(gateway.resolveExecutable('node')).toBeDefined();
   });
 
-  it('does not trust a claimed containment implementation that fails to wrap', () => {
+  it('does not reach a claimed containment implementation while M1 is closed', () => {
     let wrapCalled = false;
     const { gateway, root } = makeGateway({
       containment: {
@@ -129,9 +130,9 @@ describe('activated execution gateway', () => {
       },
     });
     expect(() => gateway.execute({ executable: 'node', args: ['-e', '1'], cwd: root })).toThrow(
-      GatewayViolationError,
+      CapabilityUnavailableError,
     );
-    expect(wrapCalled).toBe(true);
+    expect(wrapCalled).toBe(false);
   });
 });
 
@@ -263,7 +264,7 @@ describe('policy decision audit trail', () => {
     });
     expect(() =>
       gateway.execute({ executable: NODE, args: ['-e', '1', '/etc/shadow'], cwd: root }),
-    ).toThrow(GatewayViolationError);
+    ).toThrow(CapabilityUnavailableError);
     gateway.resolveExecutable('node');
     const rows = db.select().from(executionPolicyDecisions).all();
     expect(rows).toHaveLength(2);

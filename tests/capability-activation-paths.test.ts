@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,6 +13,7 @@ import { addTask, getTask, transitionTask } from '../src/domain/task-service.js'
 import { MockSheetsAdapter } from '../src/roadmap/mock-sheets.js';
 import { applyRoadmapUpdate, proposeRoadmapUpdate } from '../src/roadmap/proposal-service.js';
 import { darwinSeatbeltContainment } from '../src/security/containment.js';
+import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { ExecutionGateway } from '../src/security/gateway.js';
 import { executeMajorCommand } from '../src/security/major-gateway.js';
 import { TrustedExecutableRegistry } from '../src/security/trusted-executables.js';
@@ -24,8 +25,8 @@ import {
   testDb,
 } from './helpers.js';
 
-describe.runIf(platform() === 'darwin')('M1 enabled execution path', () => {
-  it('executes a trusted binary inside Seatbelt and writes only inside the project root', async () => {
+describe.runIf(platform() === 'darwin')('M1 release recovery gate', () => {
+  it('refuses a trusted binary before it can write inside the project root', () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'major-enabled-exec-')));
     const marker = join(root, 'marker.txt');
     const registry = new TrustedExecutableRegistry();
@@ -39,18 +40,18 @@ describe.runIf(platform() === 'darwin')('M1 enabled execution path', () => {
       baseEnv: { PATH: process.env.PATH ?? '/usr/bin:/bin' },
       recordDecision: (decision) => decisions.push(decision),
     });
-    const handle = gateway.execute({
-      executable: process.execPath,
-      args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'contained')`],
-      cwd: root,
-    });
-    for await (const _event of handle.events) void _event;
-    expect(await handle.outcome).toMatchObject({ status: 'succeeded', exitCode: 0 });
-    expect(readFileSync(marker, 'utf8')).toBe('contained');
-    expect(decisions.map((decision) => decision.allowed)).toEqual([true]);
+    expect(() =>
+      gateway.execute({
+        executable: process.execPath,
+        args: ['-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'contained')`],
+        cwd: root,
+      }),
+    ).toThrow(CapabilityUnavailableError);
+    expect(existsSync(marker)).toBe(false);
+    expect(decisions.map((decision) => decision.allowed)).toEqual([false]);
   });
 
-  it('runs real Git through the production gateway with isolated HOME and TMPDIR', async () => {
+  it('refuses real Git through the production gateway before mutation', () => {
     const parent = realpathSync(mkdtempSync(join(tmpdir(), 'major-enabled-git-')));
     const main = join(parent, 'main');
     const worktree = join(parent, 'worktree');
@@ -75,14 +76,14 @@ describe.runIf(platform() === 'darwin')('M1 enabled execution path', () => {
     const priorMajorHome = process.env.MAJOR_HOME;
     process.env.MAJOR_HOME = join(parent, 'major-home');
     try {
-      const handle = executeMajorCommand({
-        executable: 'git',
-        args: ['add', 'marker.txt'],
-        cwd: worktree,
-        allowedRoots: gatewayAllowedRoots(worktree),
-      });
-      for await (const _event of handle.events) void _event;
-      expect(await handle.outcome).toMatchObject({ status: 'succeeded', exitCode: 0 });
+      expect(() =>
+        executeMajorCommand({
+          executable: 'git',
+          args: ['add', 'marker.txt'],
+          cwd: worktree,
+          allowedRoots: gatewayAllowedRoots(worktree),
+        }),
+      ).toThrow(CapabilityUnavailableError);
     } finally {
       if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
       else process.env.MAJOR_HOME = priorMajorHome;
@@ -90,7 +91,7 @@ describe.runIf(platform() === 'darwin')('M1 enabled execution path', () => {
     const status = spawnSync('git', ['-C', worktree, 'status', '--porcelain'], {
       encoding: 'utf8',
     });
-    expect(status.stdout).toContain('A  marker.txt');
+    expect(status.stdout).toContain('?? marker.txt');
   }, 30_000);
 });
 

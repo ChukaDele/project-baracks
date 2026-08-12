@@ -12,7 +12,7 @@ export interface CliProviderOptions {
 }
 
 /** Shared adapter for provider CLIs whose runtime output can be treated as a
- * streamed line protocol. Discovery remains process-free after M1 activation. */
+ * streamed line protocol. Discovery remains process-free while M1 is closed. */
 export class CliProvider implements ProviderAdapter {
   readonly name: string;
   private readonly executable: string;

@@ -58,7 +58,7 @@ describe('major doctor', () => {
     expect(JSON.stringify(report)).not.toMatch(/"overnightExecution":"(safe|SAFE)"/);
   });
 
-  it('reports the five activated capabilities (diagnostic; enforcement remains in code)', async () => {
+  it('reports M1 closed and M2-M5 implemented (diagnostic; enforcement remains in code)', async () => {
     const report = await runDoctor({
       providers: [healthyProvider()],
       configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
@@ -73,7 +73,14 @@ describe('major doctor', () => {
       'paid-provider-execution',
       'worker-owned-downstream-mutations',
     ]);
-    expect(report.capabilities.every((c) => c.available === true)).toBe(true);
+    expect(
+      report.capabilities.find((c) => c.capability === 'live-agent-execution')?.available,
+    ).toBe(false);
+    expect(
+      report.capabilities
+        .filter((c) => c.capability !== 'live-agent-execution')
+        .every((c) => c.available),
+    ).toBe(true);
   });
 
   it('reports foreground ready only when M1 and containment are both ready', async () => {
@@ -85,8 +92,8 @@ describe('major doctor', () => {
       fileExists: () => true,
       detectContainment: readyContainment,
     });
-    expect(ready.liveExecutionReady).toBe(true);
-    expect(ready.liveExecutionBlockers).toEqual([]);
+    expect(ready.liveExecutionReady).toBe(false);
+    expect(ready.liveExecutionBlockers.join()).toMatch(/capability.*M1/i);
 
     const unavailable = await runDoctor({
       providers: [healthyProvider()],
