@@ -13,9 +13,71 @@ LEGACY_STOPPED=0
 INSTALL_COMMITTED=0
 LEARNING_MIGRATION_LOCK="$MAJOR_HOME/learning/.migration.lock"
 LEARNING_LOCK_HELD=0
+INSTALL_LOCK="$MAJOR_HOME/.install.lock"
+INSTALL_LOCK_HELD=0
 WORKER_CREATED=0
+WORKER_INSTANCE=""
 LIMACTL_PATH=""
+INSTALL_STAGE=""
+RELEASE_CREATED=0
+RELEASE_DIR=""
+BUILD_WORKTREE=""
 cd "$ROOT"
+
+acquire_install_lock() {
+  mkdir -p "$MAJOR_HOME"
+  if mkdir "$INSTALL_LOCK" 2>/dev/null; then
+    printf '%s\n' "$$" > "$INSTALL_LOCK/pid"
+    INSTALL_LOCK_HELD=1
+    return 0
+  fi
+  local owner=""
+  [ ! -r "$INSTALL_LOCK/pid" ] || owner="$(tr -cd '0-9' < "$INSTALL_LOCK/pid")"
+  if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+    rm -f "$INSTALL_LOCK/pid"
+    rmdir "$INSTALL_LOCK" 2>/dev/null || true
+    if mkdir "$INSTALL_LOCK" 2>/dev/null; then
+      printf '%s\n' "$$" > "$INSTALL_LOCK/pid"
+      INSTALL_LOCK_HELD=1
+      return 0
+    fi
+  fi
+  echo "ERROR: another Major installation transaction is active." >&2
+  return 1
+}
+cleanup() {
+  local status=$?
+  [ -z "$INSTALL_STAGE" ] || rm -rf "$INSTALL_STAGE"
+  if [ -n "$BUILD_WORKTREE" ]; then
+    git worktree remove --force "$BUILD_WORKTREE" >/dev/null 2>&1 || true
+  fi
+  if [ "$LEARNING_LOCK_HELD" = "1" ]; then
+    rm -f "$LEARNING_MIGRATION_LOCK"
+  fi
+  if [ "$status" -ne 0 ] && [ "$RELEASE_CREATED" = "1" ]; then
+    rm -rf "$RELEASE_DIR"
+  fi
+  if [ "$status" -ne 0 ] && [ "$WORKER_CREATED" = "1" ] && [ -n "$LIMACTL_PATH" ]; then
+    "$LIMACTL_PATH" stop --force "$WORKER_INSTANCE" >/dev/null 2>&1 || true
+    if ! "$LIMACTL_PATH" delete --force "$WORKER_INSTANCE" >/dev/null 2>&1; then
+      echo "CRITICAL: Major install rollback could not delete the new worker $WORKER_INSTANCE." >&2
+    fi
+  fi
+  if [ "$status" -ne 0 ] && [ "$LEGACY_WAS_LOADED" = "1" ] && \
+     [ "$LEGACY_STOPPED" = "1" ] && [ "$INSTALL_COMMITTED" = "0" ] && \
+     [ -f "$LEGACY_PLIST" ]; then
+    if ! launchctl bootstrap "gui/$UID" "$LEGACY_PLIST" >/dev/null 2>&1; then
+      echo "CRITICAL: Major restored the prior files but could not restart the legacy supervisor." >&2
+      echo "Run: launchctl bootstrap gui/$UID '$LEGACY_PLIST'" >&2
+    fi
+  fi
+  if [ "$INSTALL_LOCK_HELD" = "1" ]; then
+    rm -f "$INSTALL_LOCK/pid"
+    rmdir "$INSTALL_LOCK" 2>/dev/null || \
+      echo "WARNING: could not remove completed Major installer lock." >&2
+  fi
+}
+trap cleanup EXIT
 
 if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   echo "ERROR: refusing to install Major from a dirty checkout." >&2
@@ -28,34 +90,7 @@ INSTALL_BRANCH="$(git branch --show-current 2>/dev/null || true)"
 INSTALL_BRANCH="${INSTALL_BRANCH:-detached}"
 INSTALL_VERSION="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('package.json','utf8')).version)")"
 RELEASE_DIR="$RELEASES_DIR/$INSTALL_SHA"
-INSTALL_STAGE=""
-RELEASE_CREATED=0
-
-cleanup() {
-  local status=$?
-  [ -z "$INSTALL_STAGE" ] || rm -rf "$INSTALL_STAGE"
-  if [ "$LEARNING_LOCK_HELD" = "1" ]; then
-    rm -f "$LEARNING_MIGRATION_LOCK"
-  fi
-  if [ "$status" -ne 0 ] && [ "$RELEASE_CREATED" = "1" ]; then
-    rm -rf "$RELEASE_DIR"
-  fi
-  if [ "$status" -ne 0 ] && [ "$WORKER_CREATED" = "1" ] && [ -n "$LIMACTL_PATH" ]; then
-    "$LIMACTL_PATH" stop --force major-worker >/dev/null 2>&1 || true
-    if ! "$LIMACTL_PATH" delete --force major-worker >/dev/null 2>&1; then
-      echo "CRITICAL: Major install rollback could not delete the newly created major-worker." >&2
-    fi
-  fi
-  if [ "$status" -ne 0 ] && [ "$LEGACY_WAS_LOADED" = "1" ] && \
-     [ "$LEGACY_STOPPED" = "1" ] && [ "$INSTALL_COMMITTED" = "0" ] && \
-     [ -f "$LEGACY_PLIST" ]; then
-    if ! launchctl bootstrap "gui/$UID" "$LEGACY_PLIST" >/dev/null 2>&1; then
-      echo "CRITICAL: Major restored the prior files but could not restart the legacy supervisor." >&2
-      echo "Run: launchctl bootstrap gui/$UID '$LEGACY_PLIST'" >&2
-    fi
-  fi
-}
-trap cleanup EXIT
+WORKER_INSTANCE="major-worker-${INSTALL_SHA:0:12}"
 
 if [ "$INSTALL_BRANCH" != "main" ]; then
   echo "ERROR: refusing to install Major from branch '$INSTALL_BRANCH'." >&2
@@ -72,13 +107,21 @@ if [ "$INSTALL_SHA" != "$REMOTE_MAIN_SHA" ]; then
   echo "Pull the green main release first." >&2
   exit 1
 fi
-
-corepack enable >/dev/null 2>&1 || true
-pnpm install --frozen-lockfile
+acquire_install_lock
 
 echo "Running Major release gate before installation..."
 INSTALL_STAGE="$(mktemp -d "${TMPDIR:-/tmp}/major-runtime-install.XXXXXX")"
-bash scripts/validate-major-release.sh "$INSTALL_STAGE/runtime"
+BUILD_WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/major-runtime-source.XXXXXX")"
+rmdir "$BUILD_WORKTREE"
+git worktree add --detach "$BUILD_WORKTREE" "$INSTALL_SHA" >/dev/null
+(
+  cd "$BUILD_WORKTREE"
+  corepack enable >/dev/null 2>&1 || true
+  pnpm install --frozen-lockfile
+  bash scripts/validate-major-release.sh "$INSTALL_STAGE/runtime"
+)
+git worktree remove --force "$BUILD_WORKTREE"
+BUILD_WORKTREE=""
 
 # Never delete a release directory that an already-installed wrapper may still
 # be using. A same-SHA reinstall reuses a complete existing snapshot; an
@@ -87,7 +130,8 @@ if [ -d "$RELEASE_DIR" ]; then
   if [ ! -f "$RELEASE_DIR/release.json" ] || \
      [ ! -f "$RELEASE_DIR/dist/entry.js" ] || \
      [ ! -d "$RELEASE_DIR/drizzle" ] || \
-     [ ! -d "$RELEASE_DIR/node_modules" ]; then
+     [ ! -d "$RELEASE_DIR/node_modules" ] || \
+     [ ! -f "$RELEASE_DIR/runtime-manifest.json" ]; then
     echo "ERROR: existing Major release snapshot is incomplete: $RELEASE_DIR" >&2
     echo "Do not overwrite it automatically; inspect/remove the corrupt inactive snapshot and reinstall." >&2
     exit 1
@@ -95,6 +139,10 @@ if [ -d "$RELEASE_DIR" ]; then
   EXISTING_SHA="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).sha || '')" "$RELEASE_DIR/release.json")"
   if [ "$EXISTING_SHA" != "$INSTALL_SHA" ]; then
     echo "ERROR: existing release directory SHA mismatch at $RELEASE_DIR" >&2
+    exit 1
+  fi
+  if ! node "$RELEASE_DIR/scripts/major-runtime-manifest.mjs" verify "$RELEASE_DIR"; then
+    echo "ERROR: existing Major release snapshot failed its content manifest: $RELEASE_DIR" >&2
     exit 1
   fi
 fi
@@ -120,27 +168,40 @@ if ! "$LIMACTL_PATH" --version | grep -Eq '(^|[^0-9])2\.2\.[0-9]+'; then
   echo "ERROR: Major requires Lima >=2.2.0 and <2.3.0." >&2
   exit 1
 fi
-python3 - "$ROOT/templates/major/execution.json" "$EXECUTION_CONFIG_TMP" "$LIMACTL_PATH" <<'PY'
+python3 - "$INSTALL_STAGE/runtime/templates/major/execution.json" "$EXECUTION_CONFIG_TMP" "$LIMACTL_PATH" "$WORKER_INSTANCE" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 config = json.loads(Path(sys.argv[1]).read_text())
 config["limactlPath"] = sys.argv[3]
+config["instance"] = sys.argv[4]
 Path(sys.argv[2]).write_text(json.dumps(config, indent=2) + "\n")
 PY
 
-# Provision and verify the isolated worker before changing the active Major
-# wrapper or user state. A newly created failed instance is rolled back; an
-# existing instance is never deleted automatically.
-if ! "$LIMACTL_PATH" list --json | python3 -c '
-import json, sys
-rows = [json.loads(line) for line in sys.stdin if line.strip()]
-raise SystemExit(0 if any(row.get("name") == "major-worker" for row in rows) else 1)
-'; then
-  WORKER_CREATED=1
+# Provision and verify a release-specific isolated worker before changing the
+# active wrapper or user state. The current release's worker is never mutated.
+WORKER_LIST_TMP="$INSTALL_STAGE/worker-list.jsonl"
+if ! "$LIMACTL_PATH" list --json > "$WORKER_LIST_TMP"; then
+  echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
+  exit 1
 fi
-bash "$ROOT/scripts/provision-major-lima-worker.sh" "$LIMACTL_PATH" major-worker
+set +e
+python3 -c '
+import json, sys
+name = sys.argv[1]
+rows = [json.loads(line) for line in sys.stdin if line.strip()]
+raise SystemExit(0 if any(row.get("name") == name for row in rows) else 3)
+' "$WORKER_INSTANCE" < "$WORKER_LIST_TMP"
+worker_inspection=$?
+set -e
+if [[ $worker_inspection -eq 3 ]]; then
+  WORKER_CREATED=1
+elif [[ $worker_inspection -ne 0 ]]; then
+  echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
+  exit 1
+fi
+bash "$INSTALL_STAGE/runtime/scripts/provision-major-lima-worker.sh" "$LIMACTL_PATH" "$WORKER_INSTANCE" "$INSTALL_SHA"
 
 # Build and execute-smoke the same immutable runtime shape used in production.
 if [ ! -d "$RELEASE_DIR" ]; then
@@ -151,10 +212,13 @@ if [ ! -d "$RELEASE_DIR" ]; then
   "branch": "$INSTALL_BRANCH"
 }
 EOF
+  chmod 0644 "$INSTALL_STAGE/runtime/runtime-manifest.json"
+  node "$INSTALL_STAGE/runtime/scripts/major-runtime-manifest.mjs" create "$INSTALL_STAGE/runtime"
   mkdir -p "$BIN_DIR" "$RELEASES_DIR"
   mv "$INSTALL_STAGE/runtime" "$RELEASE_DIR"
   RELEASE_CREATED=1
 fi
+SNAPSHOT_ROOT="$RELEASE_DIR"
 
 cat > "$WRAPPER_TMP" <<EOF
 #!/bin/sh
@@ -214,12 +278,16 @@ if launchctl print "$LEGACY_SERVICE" >/dev/null 2>&1; then
     exit 1
   fi
   LEGACY_STOPPED=1
+  if launchctl print "$LEGACY_SERVICE" >/dev/null 2>&1; then
+    echo "ERROR: refusing to install Major because the legacy supervisor is still loaded." >&2
+    exit 1
+  fi
 fi
 
 # Prevent current Major writers from changing learning state between staging
 # and activation. Reclaim only an old lock with no live owning process.
 mkdir -p "$MAJOR_HOME/learning"
-if ! python3 "$ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK" "$$"; then
+if ! python3 "$SNAPSHOT_ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK" "$$"; then
   exit 1
 fi
 LEARNING_LOCK_HELD=1
@@ -227,8 +295,8 @@ LEARNING_LOCK_HELD=1
 # The user-level installation is one rollback-capable transaction. The old
 # wrapper and every existing rule/settings file remain recoverable until all
 # replacements have completed.
-MANIFEST="$(python3 "$ROOT/scripts/stage-major-user-state.py" \
-  --root "$ROOT" \
+MANIFEST="$(python3 "$SNAPSHOT_ROOT/scripts/stage-major-user-state.py" \
+  --root "$SNAPSHOT_ROOT" \
   --stage "$INSTALL_STAGE/user-state" \
   --major-bin "$BIN_DIR/major" \
   --record "$RECORD_TMP" \
@@ -237,18 +305,17 @@ MANIFEST="$(python3 "$ROOT/scripts/stage-major-user-state.py" \
   --wrapper "$WRAPPER_TMP" \
   --legacy-plist "$LEGACY_PLIST")"
 
-python3 "$ROOT/scripts/activate-major-user-state.py" --manifest "$MANIFEST"
+python3 "$SNAPSHOT_ROOT/scripts/activate-major-user-state.py" --manifest "$MANIFEST"
 RELEASE_CREATED=0
 INSTALL_COMMITTED=1
 WORKER_CREATED=0
-rm -f "$LEARNING_MIGRATION_LOCK"
+rm -f "$LEARNING_MIGRATION_LOCK" || \
+  echo "WARN: remove the completed Major learning migration lock: $LEARNING_MIGRATION_LOCK" >&2
 LEARNING_LOCK_HELD=0
 
 # Pilot posture: no auto-start daemon. Never install or auto-start a global daemon.
-if launchctl print "$LEGACY_SERVICE" >/dev/null 2>&1; then
-  echo "CRITICAL: legacy Major supervisor is still loaded after installation." >&2
-  exit 1
-fi
+# The loaded-service postcondition was verified before activation so no
+# fallible check remains after the user-state transaction commits.
 
 # Ruflo is NOT attached globally. Provider CLIs are separate user tools. Major
 # never installs or authenticates them as an unattended side effect.

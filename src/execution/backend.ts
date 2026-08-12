@@ -1,6 +1,6 @@
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
 import type { ProviderCommandHost } from '../providers/commands.js';
-import type { ProviderApprovalAuthority } from '../security/provider-approval-policy.js';
+import type { VerifiedProviderApprovalAuthority } from '../security/provider-approval-policy.js';
 
 export interface BackendProviderRequest {
   host: ProviderCommandHost;
@@ -8,7 +8,7 @@ export interface BackendProviderRequest {
   /** Set only after Major policy authorises mutation of the quarantined guest copy. */
   allowGuestMutation: boolean;
   /** Major-owned authority. An empty set means no sensitive tool action is approved. */
-  approvalAuthority: ProviderApprovalAuthority;
+  approvalAuthority: VerifiedProviderApprovalAuthority;
   modelRef?: string;
   resumeSessionRef?: string;
 }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionConfigOption } from '@agentclientprotocol/sdk';
-import { cursorModelOption, cursorModelValue } from '../src/execution/cursor-acp-runtime.js';
+import {
+  cursorModelOption,
+  cursorModelValue,
+  decideCursorPermission,
+} from '../src/execution/cursor-acp-runtime.js';
+import { providerActionDigest } from '../src/security/provider-approval-policy.js';
 
 function modelOption(): SessionConfigOption {
   return {
@@ -49,5 +54,23 @@ describe('Cursor ACP model capability', () => {
         'missing',
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('Cursor ACP approval consumption', () => {
+  it('allows an exact approved action once and denies its replay in the same session', () => {
+    const action = { kind: 'execute' as const, rawInput: { command: 'pnpm test' } };
+    const decisions = [
+      {
+        category: 'command_execution' as const,
+        decisionId: 'decision-1',
+        actionDigest: providerActionDigest(action),
+      },
+    ];
+    const authority = { decisions };
+    const remaining = [...decisions];
+    expect(decideCursorPermission(action, authority, remaining).outcome).toBe('automatic');
+    expect(remaining).toHaveLength(0);
+    expect(decideCursorPermission(action, authority, remaining).outcome).toBe('approval_required');
   });
 });

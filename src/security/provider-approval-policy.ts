@@ -1,4 +1,5 @@
 import type { ProviderCommandHost } from '../providers/commands.js';
+import { createHash } from 'node:crypto';
 
 /** Major-owned action classes. Provider labels are evidence, never authority. */
 export type ProviderActionKind =
@@ -29,10 +30,38 @@ export interface ProviderAction {
 }
 
 export interface ProviderApprovalAuthority {
-  /** Categories already authorised by a verified Major DecisionRequest. */
-  approvedCategories: readonly ApprovalCategory[];
+  /** Exact DecisionRequests. The gateway verifies these before execution. */
+  decisions: readonly { category: ApprovalCategory; decisionId: string; actionDigest: string }[];
   /** Explicit evidence that the provider tried to evade the approval protocol. */
   bypassAttempted?: boolean;
+}
+
+declare const verifiedAuthority: unique symbol;
+export type VerifiedProviderApprovalAuthority = ProviderApprovalAuthority & {
+  readonly [verifiedAuthority]: true;
+};
+
+export function verifyProviderApprovalAuthority(
+  host: ProviderCommandHost,
+  authority: ProviderApprovalAuthority,
+  verifyDecision: (category: ApprovalCategory, decisionId: string) => boolean,
+): VerifiedProviderApprovalAuthority {
+  validateProviderApprovalAuthority(host, authority, verifyDecision);
+  return authority as VerifiedProviderApprovalAuthority;
+}
+
+export function validateVerifiedProviderApprovalAuthority(
+  host: ProviderCommandHost,
+  authority: VerifiedProviderApprovalAuthority,
+): void {
+  if (authority.bypassAttempted) {
+    throw new Error('provider attempted to bypass Major approval policy');
+  }
+  if (authority.decisions.length > 0 && !providerSupportsInteractiveApproval(host)) {
+    throw new Error(
+      `${host} does not expose per-tool approval semantics; approval-required work cannot be routed to it`,
+    );
+  }
 }
 
 export type ProviderApprovalDecision =
@@ -80,6 +109,32 @@ export function classifyProviderAction(action: ProviderAction): ProviderActionKi
   return action.kind;
 }
 
+export function providerActionDigest(action: ProviderAction): string {
+  const canonical = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, canonical(item)]),
+      );
+    }
+    return value;
+  };
+  return createHash('sha256')
+    .update(
+      JSON.stringify(
+        canonical({
+          kind: classifyProviderAction(action),
+          name: action.name ?? null,
+          title: action.title ?? null,
+          rawInput: action.rawInput ?? null,
+        }),
+      ),
+    )
+    .digest('hex');
+}
+
 /**
  * The one authoritative provider-action policy path.
  *
@@ -109,7 +164,13 @@ export function decideProviderAction(input: {
         reason: `${input.host} does not expose per-tool approval semantics; '${category}' cannot be routed to it`,
       };
     }
-    if (!input.authority.approvedCategories.includes(category)) {
+    if (
+      !input.authority.decisions.some(
+        (decision) =>
+          decision.category === category &&
+          decision.actionDigest === providerActionDigest(input.action),
+      )
+    ) {
       return {
         outcome: 'approval_required',
         category,
@@ -133,13 +194,26 @@ export function providerSupportsInteractiveApproval(host: ProviderCommandHost): 
 export function validateProviderApprovalAuthority(
   host: ProviderCommandHost,
   authority: ProviderApprovalAuthority,
+  verifyDecision: (category: ApprovalCategory, decisionId: string) => boolean = () => false,
 ): void {
   if (authority.bypassAttempted) {
     throw new Error('provider attempted to bypass Major approval policy');
   }
-  if (authority.approvedCategories.length > 0 && !providerSupportsInteractiveApproval(host)) {
+  if (authority.decisions.length > 0 && !providerSupportsInteractiveApproval(host)) {
     throw new Error(
       `${host} does not expose per-tool approval semantics; approval-required work cannot be routed to it`,
     );
+  }
+  const categories = new Set<ApprovalCategory>();
+  for (const decision of authority.decisions) {
+    if (categories.has(decision.category)) {
+      throw new Error(`duplicate approval authority for '${decision.category}'`);
+    }
+    categories.add(decision.category);
+    if (!verifyDecision(decision.category, decision.decisionId)) {
+      throw new Error(
+        `DecisionRequest ${decision.decisionId} does not authorise '${decision.category}'`,
+      );
+    }
   }
 }

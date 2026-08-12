@@ -1,12 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runSupervisorCli } from '../src/supervisor/cli.js';
+import { decideCursorPermission } from '../src/execution/cursor-acp-runtime.js';
+import { verifyProviderDecision } from '../src/security/major-gateway.js';
 import { writeSupervisorState, type SupervisorGoal } from '../src/supervisor/state.js';
 
 let root: string;
 let priorStatePath: string | undefined;
+let priorDbPath: string | undefined;
 
 function goal(): SupervisorGoal {
   return {
@@ -28,7 +31,14 @@ function goal(): SupervisorGoal {
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-supervisor-cli-'));
   priorStatePath = process.env.MAJOR_STATE_PATH;
+  priorDbPath = process.env.MAJOR_DB_PATH;
   process.env.MAJOR_STATE_PATH = join(root, 'supervisor-state.json');
+  process.env.MAJOR_DB_PATH = join(root, 'major.db');
+  mkdirSync(join(root, '.git'), { recursive: true });
+  writeFileSync(
+    join(root, '.git', 'config'),
+    '[remote "origin"]\n\turl = https://github.com/ChukaDele/project-baracks.git\n',
+  );
   writeSupervisorState({ version: 1, goals: [goal()], sessions: [] });
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
 });
@@ -37,6 +47,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   if (priorStatePath === undefined) delete process.env.MAJOR_STATE_PATH;
   else process.env.MAJOR_STATE_PATH = priorStatePath;
+  if (priorDbPath === undefined) delete process.env.MAJOR_DB_PATH;
+  else process.env.MAJOR_DB_PATH = priorDbPath;
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -70,5 +82,75 @@ describe('supervisor CLI authority', () => {
 
   it('does not claim the read-only route command', async () => {
     await expect(runSupervisorCli(['route', '--task', 'task-1'])).resolves.toBe(false);
+  });
+
+  it('creates and explicitly resolves scoped provider DecisionRequests', async () => {
+    const output: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => output.push(String(value)));
+    await expect(
+      runSupervisorCli([
+        'decision',
+        'request',
+        '--project',
+        'github.com/chukadele/project-baracks',
+        '--provider',
+        'cursor',
+        '--category',
+        'command_execution',
+        '--question',
+        'Allow the controlled field validation command?',
+        '--action-json',
+        JSON.stringify({
+          kind: 'execute',
+          name: 'Shell',
+          title: 'Run tests',
+          rawInput: { command: 'pnpm test', cwd: '/workspace' },
+        }),
+      ]),
+    ).resolves.toBe(true);
+    const requested = JSON.parse(output.at(-1)!) as { id: string; actionDigest: string };
+    const id = requested.id;
+    await expect(
+      runSupervisorCli([
+        'decision',
+        'resolve',
+        '--id',
+        id,
+        '--status',
+        'approved',
+        '--resolution',
+        'owner approved field validation',
+      ]),
+    ).resolves.toBe(true);
+    expect(JSON.parse(output.at(-1)!) as { status: string }).toMatchObject({ status: 'approved' });
+    expect(
+      verifyProviderDecision({
+        cwd: root,
+        provider: 'cursor',
+        category: 'command_execution',
+        decisionId: id,
+        actionDigest: requested.actionDigest,
+        consumerId: 'cli-cursor-e2e',
+      }),
+    ).toBe(true);
+    const decisions = [
+      {
+        category: 'command_execution' as const,
+        decisionId: id,
+        actionDigest: requested.actionDigest,
+      },
+    ];
+    expect(
+      decideCursorPermission(
+        {
+          kind: 'execute',
+          name: 'Shell',
+          title: 'Run tests',
+          rawInput: { command: 'pnpm test', cwd: '/workspace' },
+        },
+        { decisions },
+        [...decisions],
+      ).outcome,
+    ).toBe('automatic');
   });
 });

@@ -17,9 +17,9 @@ Apply these defaults across projects unless a project/user instruction is more s
 ## Trust levels
 
 - `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human/gstack driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
-- `assist`: visible foreground pilot, maximum 3 useful workers and maximum 30 minutes per coordinator run.
-- `build`: normal foreground working mode, maximum 6 useful workers and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
-- `unattended`: maximum 6 useful workers with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
+- `assist`: visible foreground pilot, maximum 1 worker and maximum 30 minutes per coordinator run.
+- `build`: normal foreground working mode, maximum 1 worker and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
+- `unattended`: maximum 1 worker with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
 
 For owner-approved build projects, do not re-introduce shadow runs, repeated permission prompts, or ceremonial review loops that block ordinary reversible engineering.
 
@@ -33,7 +33,7 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Build budget: one production build at a time. Build once per relevant commit. Reviewers inspect the same immutable remote preview.
 - Major admission checks the shared resource ledger and memory availability. Below the memory soft floor, new work queues instead of increasing pressure.
 - Use `major resource status` for lightweight telemetry: workers, browsers, builds, total active, queued and memory availability.
-- QA runs use bounded waves, not swarms: up to 3 reviewers, consolidate and repair, up to 3 second-wave reviewers, then one final verifier.
+- QA runs are serialized through the single v0.5.1 worker: review, consolidate and repair, then run the next reviewer and final verifier.
 
 ## Communication
 

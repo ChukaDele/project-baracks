@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { openDb } from '../db/client.js';
+import { createDecisionRequest } from '../domain/decision-service.js';
 import { executeMajorCommand } from '../security/major-gateway.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
 import { loadLimaExecutionConfig } from '../execution/lima-config.js';
@@ -14,12 +16,13 @@ import {
 } from '../providers/commands.js';
 import { globalStopRequested } from './policy.js';
 import {
+  heartbeatResource,
   releaseResource,
   requestResource,
   waitForResource,
   type ResourceLease,
 } from './resources.js';
-import { gitCommonDir, type WorkerHost } from './state.js';
+import { gitCommonDir, resolveProjectForCwd, type WorkerHost } from './state.js';
 import { AMBIGUOUS_WORKER_REPORT_ENVELOPE, preserveWorkerReportEnvelope } from './worker-report.js';
 import type { ExecuteOutcome, ProviderEvent } from '../providers/types.js';
 import {
@@ -28,6 +31,46 @@ import {
   parseProviderEventLine,
 } from '../providers/evidence.js';
 import type { ProviderApprovalAuthority } from '../security/provider-approval-policy.js';
+import type { ApprovalCategory } from '../security/provider-approval-policy.js';
+
+export function captureProviderApprovalRequest(input: {
+  cwd: string;
+  host: WorkerHost;
+  data: unknown;
+}): unknown {
+  const data = input.data as {
+    outcome?: string;
+    category?: ApprovalCategory;
+    actionDigest?: string;
+  };
+  if (
+    data.outcome !== 'approval_required' ||
+    !data.category ||
+    !/^[a-f0-9]{64}$/.test(data.actionDigest ?? '')
+  ) {
+    return input.data;
+  }
+  const project = resolveProjectForCwd(input.cwd);
+  if (!project) return input.data;
+  const opened = openDb();
+  try {
+    const request = createDecisionRequest(opened.db, {
+      category: data.category,
+      question: `Allow this exact ${data.category} action for ${input.host}?`,
+      contextJson: JSON.stringify({
+        scope: {
+          provider: input.host,
+          purpose: `provider-action:${project.project}`,
+          actionDigest: data.actionDigest,
+        },
+      }),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    });
+    return { ...data, decisionId: request.id };
+  } finally {
+    opened.sqlite.close();
+  }
+}
 
 export interface WorkerOutcome {
   host: WorkerHost;
@@ -122,6 +165,7 @@ export async function runGatewayCommand(input: {
   timeoutMs?: number;
   extraAllowedRoots?: readonly string[];
   resourceLeaseId?: string;
+  resourceLeaseTtlMs?: number;
   providerRequest?: {
     host: WorkerHost;
     prompt: string;
@@ -161,9 +205,30 @@ export async function runGatewayCommand(input: {
       if (globalStopRequested()) handle.cancel();
     }, 1_000);
     stopWatcher.unref();
+    const leaseHeartbeat =
+      input.resourceLeaseId && input.resourceLeaseTtlMs
+        ? setInterval(
+            () => {
+              try {
+                heartbeatResource(input.resourceLeaseId!, input.resourceLeaseTtlMs);
+              } catch {
+                handle.cancel();
+              }
+            },
+            5 * 60 * 1000,
+          )
+        : undefined;
+    leaseHeartbeat?.unref();
 
     try {
       for await (const event of handle.events) {
+        if (event.type === 'approval-decision' && input.providerRequest) {
+          event.data = captureProviderApprovalRequest({
+            cwd: input.cwd,
+            host: input.providerRequest.host,
+            data: event.data,
+          });
+        }
         const raw = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
         const preserved = preserveWorkerReportEnvelope(raw);
         if (preserved) {
@@ -205,6 +270,7 @@ export async function runGatewayCommand(input: {
       };
     } finally {
       clearInterval(stopWatcher);
+      if (leaseHeartbeat) clearInterval(leaseHeartbeat);
     }
   } catch (error) {
     return {
@@ -231,12 +297,16 @@ export async function runWorker(input: {
   cwd: string;
   timeoutMs?: number;
   modelRef?: string;
+  approvalAuthority?: ProviderApprovalAuthority;
 }): Promise<WorkerOutcome> {
   const started = Date.now();
+  const leaseTtlMs = Math.max(input.timeoutMs ?? 0, 30 * 60 * 1000) + 5 * 60 * 1000;
   const request = requestResource({
     kind: 'worker',
     owner: `major:${input.host}:${process.pid}:${randomUUID()}`,
     project: basename(resolve(input.cwd)),
+    pid: process.pid,
+    ttlMs: leaseTtlMs,
   });
   if (request.status === 'rejected') {
     return {
@@ -263,13 +333,14 @@ export async function runWorker(input: {
       args: spec.args,
       cwd: input.cwd,
       resourceLeaseId: lease.id,
+      resourceLeaseTtlMs: leaseTtlMs,
       providerRequest: {
         host: input.host,
         prompt: input.prompt,
         allowGuestMutation: input.host === 'claude' || input.host === 'cursor',
         // Batch CLI providers expose no per-tool approval callback. Ordinary
         // worker runs therefore carry no sensitive-action authority.
-        approvalAuthority: { approvedCategories: [] },
+        approvalAuthority: input.approvalAuthority ?? { decisions: [] },
         ...(input.modelRef ? { modelRef: input.modelRef } : {}),
       },
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),

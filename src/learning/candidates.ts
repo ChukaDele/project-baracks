@@ -12,8 +12,13 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
-import { getProjectPolicy, knownProjectIdentities } from '../supervisor/policy.js';
-import { majorHome } from '../supervisor/state.js';
+import {
+  getProjectPolicy,
+  knownProjectIdentities,
+  projectPolicyBindsLegacyIdentity,
+  projectPolicyRepoPath,
+} from '../supervisor/policy.js';
+import { gitCommonDir, majorHome } from '../supervisor/state.js';
 
 export const LEARNING_SOURCES = [
   'user-correction',
@@ -73,6 +78,53 @@ function emptyStore(): LearningStore {
 function projectStorePath(project: string): string {
   const key = createHash('sha256').update(project).digest('hex').slice(0, 24);
   return join(learningRoot(), 'projects', `${key}.json`);
+}
+
+function migrateLegacyProjectStore(project: string, repoPath: string | undefined): void {
+  if (!repoPath || !project.includes('/')) return;
+  const target = projectStorePath(project);
+  const legacyProject = basename(repoPath);
+  const legacy = projectStorePath(legacyProject);
+  if (!existsSync(legacy)) return;
+  withMigrationLock([legacy, target], () => {
+    if (!existsSync(legacy)) return;
+    const activeCommon = gitCommonDir(resolve(repoPath));
+    const store = readStore(legacy, false);
+    if (!activeCommon || store.candidates.length === 0) return;
+    const policyBound = projectPolicyBindsLegacyIdentity(legacyProject, repoPath);
+    const migrated: LearningCandidate[] = [];
+    const quarantined: LearningCandidate[] = [];
+    for (const candidate of store.candidates) {
+      const candidateCommon = candidate.repoPath
+        ? gitCommonDir(resolve(candidate.repoPath))
+        : undefined;
+      if (candidateCommon === activeCommon || (!candidateCommon && policyBound)) {
+        candidate.project = project;
+        migrated.push(candidate);
+      } else {
+        quarantined.push(candidate);
+      }
+    }
+    if (migrated.length === 0) return;
+    const existing = readStore(target, false);
+    const merged = new Map(existing.candidates.map((candidate) => [candidate.id, candidate]));
+    for (const candidate of migrated) {
+      const prior = merged.get(candidate.id);
+      if (
+        !prior ||
+        candidate.occurrences > prior.occurrences ||
+        candidate.updatedAt > prior.updatedAt
+      ) {
+        merged.set(candidate.id, candidate);
+      }
+    }
+    writeStore(target, { version: 2, candidates: [...merged.values()] });
+    if (quarantined.length > 0) {
+      writeStore(legacy, { version: 2, candidates: quarantined });
+    } else {
+      unlinkSync(legacy);
+    }
+  });
 }
 
 function globalStorePath(): string {
@@ -143,6 +195,60 @@ function waitForMigration(deadline: number): void {
       throw new Error(`timed out waiting for Major learning migration: ${lock}`);
     }
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+  }
+}
+
+function withMigrationLock<T>(stores: string[], action: () => T): T {
+  const lock = migrationLockPath();
+  mkdirSync(dirname(lock), { recursive: true });
+  const deadline = Date.now() + 5_000;
+  let fd: number | undefined;
+  while (fd === undefined) {
+    try {
+      fd = openSync(lock, 'wx', 0o600);
+      writeFileSync(fd, `${process.pid}\n`);
+    } catch (error) {
+      if (fd !== undefined) closeSync(fd);
+      fd = undefined;
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      waitForMigration(deadline);
+    }
+  }
+  try {
+    while (stores.some((path) => existsSync(`${path}.lock`))) {
+      for (const path of stores) {
+        const storeLock = `${path}.lock`;
+        if (!existsSync(storeLock)) continue;
+        try {
+          const before = statSync(storeLock);
+          const pid = Number.parseInt(readFileSync(storeLock, 'utf8').trim(), 10);
+          if (!learningLockOwnerIsLive(pid) && Date.now() - before.mtimeMs > 30_000) {
+            const after = statSync(storeLock);
+            if (
+              before.dev === after.dev &&
+              before.ino === after.ino &&
+              before.mtimeMs === after.mtimeMs
+            ) {
+              unlinkSync(storeLock);
+            }
+          }
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+      }
+      if (Date.now() >= deadline) {
+        throw new Error('timed out waiting for Major learning stores before migration');
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+    return action();
+  } finally {
+    closeSync(fd);
+    try {
+      unlinkSync(lock);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
   }
 }
 
@@ -264,6 +370,7 @@ export function captureLearning(input: LearningCaptureInput): LearningCandidate 
   const summary = redactText(input.summary.trim());
   if (!summary) throw new Error('learning summary must not be empty');
   const identity = requireProject(input);
+  migrateLegacyProjectStore(identity.project, identity.repoPath);
   const key = normalizedKey(input.key);
   const fingerprint = normalizedSummary(summary);
   const path = projectStorePath(identity.project);
@@ -338,10 +445,12 @@ function visibleGlobalCandidates(status?: LearningStatus): LearningCandidate[] {
 export function listLearningCandidates(
   project?: string,
   status?: LearningStatus,
+  repoPath?: string,
 ): LearningCandidate[] {
   const allGlobal = visibleGlobalCandidates();
   const global = allGlobal.filter((candidate) => !status || candidate.status === status);
   if (!project) return global;
+  migrateLegacyProjectStore(project, repoPath);
   const activeGlobalIds = new Set(
     allGlobal
       .filter((candidate) => candidate.status === 'promoted')
@@ -356,7 +465,8 @@ export function listLearningCandidates(
   return [...global, ...local];
 }
 
-export function learningReviewDue(project: string): LearningCandidate[] {
+export function learningReviewDue(project: string, repoPath?: string): LearningCandidate[] {
+  migrateLegacyProjectStore(project, repoPath);
   return readStore(projectStorePath(project)).candidates.filter(
     (candidate) => candidate.status === 'candidate' && candidate.occurrences >= 2,
   );
@@ -413,7 +523,9 @@ export function promoteLearning(input: {
   scope: Exclude<LearningScope, 'undecided'>;
   evidence: string;
   summary?: string | undefined;
+  repoPath?: string | undefined;
 }): LearningCandidate {
+  migrateLegacyProjectStore(input.project, input.repoPath);
   const projectPath = projectStorePath(input.project);
   return withStoreLock(projectPath, () => {
     const projectStore = readStore(projectPath);
@@ -440,7 +552,9 @@ export function promoteLearning(input: {
         'global promotion requires a recurring candidate with at least two occurrences',
       );
     }
-    const policy = getProjectPolicy(input.project, candidate.repoPath ?? input.project);
+    const policyPath = input.repoPath ?? candidate.repoPath ?? projectPolicyRepoPath(input.project);
+    if (!policyPath) throw new Error('global promotion requires the resolved project repository');
+    const policy = getProjectPolicy(input.project, policyPath);
     if (!policy.allowCrossProjectMemory) {
       throw new Error(`global promotion is forbidden by the project policy for ${input.project}`);
     }
@@ -520,9 +634,11 @@ export function dismissLearning(input: {
   id: string;
   project: string;
   evidence: string;
+  repoPath?: string | undefined;
 }): LearningCandidate {
   const evidence = redactText(input.evidence.trim());
   if (!evidence) throw new Error('dismissal evidence/reason is required');
+  migrateLegacyProjectStore(input.project, input.repoPath);
   const path = projectStorePath(input.project);
   return withStoreLock(path, () => {
     const store = readStore(path);

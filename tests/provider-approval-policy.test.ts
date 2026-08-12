@@ -1,12 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import {
   decideProviderAction,
+  providerActionDigest,
   validateProviderApprovalAuthority,
 } from '../src/security/provider-approval-policy.js';
 
-const noApprovals = { approvedCategories: [] as const };
+const noApprovals = { decisions: [] as const };
 
 describe('authoritative provider approval policy', () => {
+  it('binds approval to every field in the complete structured action', () => {
+    const approved = providerActionDigest({
+      kind: 'external_integration',
+      name: 'publish',
+      rawInput: { command: 'tool', url: 'https://safe.invalid', cwd: '/guest' },
+    });
+    expect(
+      providerActionDigest({
+        kind: 'external_integration',
+        name: 'publish',
+        rawInput: { cwd: '/guest', url: 'https://safe.invalid', command: 'tool' },
+      }),
+    ).toBe(approved);
+    expect(
+      providerActionDigest({
+        kind: 'external_integration',
+        name: 'publish',
+        rawInput: { command: 'tool', url: 'https://different.invalid', cwd: '/guest' },
+      }),
+    ).not.toBe(approved);
+    expect(
+      providerActionDigest({
+        kind: 'external_integration',
+        name: 'different-tool',
+        rawInput: { command: 'tool', url: 'https://safe.invalid', cwd: '/guest' },
+      }),
+    ).not.toBe(approved);
+  });
   it('automatically allows ordinary quarantined work', () => {
     expect(
       decideProviderAction({ host: 'cursor', action: { kind: 'edit' }, authority: noApprovals }),
@@ -44,7 +73,7 @@ describe('authoritative provider approval policy', () => {
   });
 
   it('rejects an explicit provider policy bypass', () => {
-    const authority = { approvedCategories: [] as const, bypassAttempted: true };
+    const authority = { decisions: [] as const, bypassAttempted: true };
     expect(
       decideProviderAction({ host: 'cursor', action: { kind: 'edit' }, authority }),
     ).toMatchObject({ outcome: 'forbidden' });
@@ -56,7 +85,15 @@ describe('authoritative provider approval policy', () => {
   it.each(['claude', 'codex', 'antigravity'] as const)(
     'fails closed when %s is asked to perform approval-required work',
     (host) => {
-      const authority = { approvedCategories: ['dependency_install'] as const };
+      const authority = {
+        decisions: [
+          {
+            category: 'dependency_install' as const,
+            decisionId: 'dreq_1',
+            actionDigest: providerActionDigest({ kind: 'dependency_install' }),
+          },
+        ],
+      };
       expect(
         decideProviderAction({
           host,
@@ -75,8 +112,39 @@ describe('authoritative provider approval policy', () => {
       decideProviderAction({
         host: 'cursor',
         action: { kind: 'dependency_install' },
-        authority: { approvedCategories: ['dependency_install'] },
+        authority: {
+          decisions: [
+            {
+              category: 'dependency_install',
+              decisionId: 'dreq_1',
+              actionDigest: providerActionDigest({ kind: 'dependency_install' }),
+            },
+          ],
+        },
       }),
     ).toMatchObject({ outcome: 'automatic' });
+  });
+
+  it('rejects fabricated or unverified DecisionRequest references', () => {
+    const authority = {
+      decisions: [
+        {
+          category: 'command_execution' as const,
+          decisionId: 'dreq_fake',
+          actionDigest: providerActionDigest({ kind: 'execute' }),
+        },
+      ],
+    };
+    expect(() => validateProviderApprovalAuthority('cursor', authority)).toThrow(
+      /does not authorise/,
+    );
+    expect(() =>
+      validateProviderApprovalAuthority(
+        'cursor',
+        authority,
+        (category, decisionId) =>
+          category === 'command_execution' && decisionId === 'dreq_verified',
+      ),
+    ).toThrow(/does not authorise/);
   });
 });

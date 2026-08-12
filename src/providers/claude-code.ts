@@ -73,7 +73,7 @@ export class ClaudeCodeProvider implements ProviderAdapter {
         host: 'claude',
         prompt: request.prompt,
         allowGuestMutation: true,
-        approvalAuthority: { approvedCategories: [] },
+        approvalAuthority: { decisions: [] },
         ...(request.modelRef ? { modelRef: request.modelRef } : {}),
         ...(request.resumeSessionRef ? { resumeSessionRef: request.resumeSessionRef } : {}),
       },

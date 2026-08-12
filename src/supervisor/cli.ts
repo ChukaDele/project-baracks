@@ -17,6 +17,7 @@ import {
 } from './policy.js';
 import {
   applyIndependentCompletionGrade,
+  bindGoalToProject,
   getGoal,
   resolveProject,
   resolveProjectForCwd,
@@ -40,6 +41,14 @@ import {
 } from './resources.js';
 import { assertRemotePreviewUrl } from '../web/remote-preview.js';
 import { redactText } from '../security/redact.js';
+import { openDb } from '../db/client.js';
+import { createDecisionRequest, resolveDecision } from '../domain/decision-service.js';
+import {
+  decideProviderAction,
+  providerActionDigest,
+  type ApprovalCategory,
+  type ProviderAction,
+} from '../security/provider-approval-policy.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -227,8 +236,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
     }
     const goalId = requireFlag(args, '--goal-id');
-    const goal = getGoal(goalId);
-    if (!goal || goal.project !== project.project) {
+    const goal = bindGoalToProject(goalId, project.project, project.repoPath);
+    if (!goal) {
       throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
     }
     const policy = recordShadowGrade({
@@ -252,8 +261,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
     }
     const goalId = requireFlag(args, '--goal-id');
-    const goal = getGoal(goalId);
-    if (!goal || goal.project !== project.project) {
+    const goal = bindGoalToProject(goalId, project.project, project.repoPath);
+    if (!goal) {
       throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
     }
     if (!goal.lastCoordinator) {
@@ -373,6 +382,33 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const policy = getProjectPolicy(project.project, project.repoPath);
     assertExecutionAllowed(policy);
     const prompt = requireFlag(args, '--prompt');
+    const approval = flag(args, '--approval');
+    const modelRef = flag(args, '--model');
+    let approvalAuthority: {
+      decisions: { category: ApprovalCategory; decisionId: string; actionDigest: string }[];
+    } = { decisions: [] };
+    if (approval) {
+      const separator = approval.indexOf('=');
+      const category = approval.slice(0, separator) as ApprovalCategory;
+      const reference = approval.slice(separator + 1);
+      const [decisionId, actionDigest] = reference.split(':');
+      const categories: ApprovalCategory[] = [
+        'command_execution',
+        'dependency_install',
+        'external_integration',
+        'push',
+        'deploy',
+      ];
+      if (
+        separator < 1 ||
+        !categories.includes(category) ||
+        !decisionId ||
+        !/^[a-f0-9]{64}$/.test(actionDigest ?? '')
+      ) {
+        throw new Error('--approval must be <category>=<DecisionRequest id>:<action digest>');
+      }
+      approvalAuthority = { decisions: [{ category, decisionId, actionDigest: actionDigest! }] };
+    }
     const worktree = flag(args, '--worktree');
     let runCwd = cwd;
     if (worktree) {
@@ -404,12 +440,90 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       );
     }
     try {
-      const outcome = await runWorker({ host: provider, cwd: runCwd, prompt });
+      const outcome = await runWorker({
+        host: provider,
+        cwd: runCwd,
+        prompt,
+        approvalAuthority,
+        ...(modelRef ? { modelRef } : {}),
+      });
       process.stdout.write(outcome.stdout);
       if (outcome.stderr) process.stderr.write(outcome.stderr);
       if (outcome.status !== 'succeeded') process.exitCode = 1;
     } finally {
       releaseRepoLock?.();
+    }
+    return true;
+  }
+
+  if (command === 'decision' && args[1] === 'request') {
+    const project = resolveProject(flag(args, '--project') ?? 'current');
+    const provider = validHost(requireFlag(args, '--provider'));
+    const category = requireFlag(args, '--category') as ApprovalCategory;
+    const categories: ApprovalCategory[] = [
+      'command_execution',
+      'dependency_install',
+      'external_integration',
+      'push',
+      'deploy',
+    ];
+    if (!categories.includes(category))
+      throw new Error(`unsupported approval category: ${category}`);
+    const minutes = Number.parseInt(flag(args, '--expires-minutes') ?? '30', 10);
+    let action: ProviderAction;
+    try {
+      action = JSON.parse(requireFlag(args, '--action-json')) as ProviderAction;
+    } catch {
+      throw new Error('--action-json must be the exact JSON action emitted by Major');
+    }
+    if (!action || typeof action !== 'object' || typeof action.kind !== 'string') {
+      throw new Error('--action-json must contain a provider action kind');
+    }
+    const classified = decideProviderAction({
+      host: provider,
+      action,
+      authority: { decisions: [] },
+    });
+    if (classified.outcome !== 'approval_required' || classified.category !== category) {
+      throw new Error(`action JSON does not require approval category '${category}'`);
+    }
+    const actionDigest = providerActionDigest(action);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 120) {
+      throw new Error('--expires-minutes must be between 1 and 120');
+    }
+    const opened = openDb();
+    try {
+      const decision = createDecisionRequest(opened.db, {
+        category,
+        question: requireFlag(args, '--question'),
+        contextJson: JSON.stringify({
+          scope: { provider, purpose: `provider-action:${project.project}`, actionDigest },
+        }),
+        expiresAt: new Date(Date.now() + minutes * 60_000).toISOString(),
+      });
+      console.log(JSON.stringify({ ...decision, actionDigest }, null, 2));
+    } finally {
+      opened.sqlite.close();
+    }
+    return true;
+  }
+
+  if (command === 'decision' && args[1] === 'resolve') {
+    const status = requireFlag(args, '--status');
+    if (status !== 'approved' && status !== 'rejected') {
+      throw new Error('--status must be approved or rejected');
+    }
+    const opened = openDb();
+    try {
+      const decision = resolveDecision(
+        opened.db,
+        requireFlag(args, '--id'),
+        status,
+        flag(args, '--resolution'),
+      );
+      console.log(JSON.stringify(decision, null, 2));
+    } finally {
+      opened.sqlite.close();
     }
     return true;
   }

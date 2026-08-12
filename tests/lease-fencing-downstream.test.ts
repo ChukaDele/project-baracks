@@ -253,7 +253,7 @@ describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
 
   it('requires a live claim-bound run across every downstream write surface', () => {
     const db = testDb();
-    const { task, claim, run, providerId, roadmapItemId } = seededClaimedRun(db, 50);
+    const { task, claim, run, providerId, roadmapItemId } = seededClaimedRun(db, 500);
 
     expect(() =>
       db
@@ -366,7 +366,7 @@ describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
       })
       .run();
 
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 75);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 550);
     db.update(taskClaims)
       .set({ status: 'expired', outcomeReason: 'simulated recovery' })
       .where(eq(taskClaims.id, claim.id))

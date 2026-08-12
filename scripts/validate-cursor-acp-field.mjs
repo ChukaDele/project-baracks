@@ -101,7 +101,7 @@ async function executeCursor({
       host: 'cursor',
       prompt,
       allowGuestMutation: true,
-      approvalAuthority: { approvedCategories: [] },
+      approvalAuthority: { decisions: [] },
       ...(modelRef ? { modelRef } : {}),
       ...(resumeSessionRef ? { resumeSessionRef } : {}),
     },

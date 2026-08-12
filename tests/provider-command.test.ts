@@ -26,7 +26,7 @@ describe('provider command authority', () => {
       host: 'cursor',
       prompt: 'work',
       allowGuestMutation: true,
-      approvalAuthority: { approvedCategories: [] },
+      approvalAuthority: { decisions: [] },
     });
   });
 

@@ -74,11 +74,13 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
 
   if (args[1] === 'list') {
     const projectArg = flag(args, '--project');
-    const project = projectArg ? resolveProject(projectArg).project : undefined;
+    const resolved = projectArg ? resolveProject(projectArg) : undefined;
+    const project = resolved?.project;
     const statusArg = flag(args, '--status');
     const candidates = listLearningCandidates(
       project,
       statusArg ? learningStatus(statusArg) : undefined,
+      resolved?.repoPath,
     );
     if (args.includes('--json')) console.log(JSON.stringify(candidates, null, 2));
     else if (candidates.length === 0) console.log('No Major learning candidates.');
@@ -93,8 +95,9 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
   }
 
   if (args[1] === 'review') {
-    const project = resolveProject(flag(args, '--project') ?? 'current').project;
-    const due = learningReviewDue(project);
+    const resolved = resolveProject(flag(args, '--project') ?? 'current');
+    const project = resolved.project;
+    const due = learningReviewDue(project, resolved.repoPath);
     if (args.includes('--json')) console.log(JSON.stringify(due, null, 2));
     else if (due.length === 0)
       console.log('No Major learning candidates require promotion review.');
@@ -110,12 +113,14 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
 
   if (args[1] === 'promote') {
     const scope = promotionScope(required(args, '--scope'));
-    const project = resolveProject(flag(args, '--project') ?? 'current').project;
+    const resolved = resolveProject(flag(args, '--project') ?? 'current');
+    const project = resolved.project;
     const candidate = promoteLearning({
       id: required(args, '--id'),
       project,
       scope,
       evidence: required(args, '--evidence'),
+      repoPath: resolved.repoPath,
       ...(scope === 'global' ? { summary: required(args, '--summary') } : {}),
     });
     console.log(JSON.stringify(candidate, null, 2));
@@ -131,11 +136,13 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
       console.log(JSON.stringify(candidate, null, 2));
       return true;
     }
-    const project = resolveProject(flag(args, '--project') ?? 'current').project;
+    const resolved = resolveProject(flag(args, '--project') ?? 'current');
+    const project = resolved.project;
     const candidate = dismissLearning({
       id: required(args, '--id'),
       project,
       evidence: required(args, '--evidence'),
+      repoPath: resolved.repoPath,
     });
     console.log(JSON.stringify(candidate, null, 2));
     return true;

@@ -89,7 +89,7 @@ async function runProvider(provider) {
       host: provider.host,
       prompt,
       allowGuestMutation: provider.allowGuestMutation,
-      approvalAuthority: { approvedCategories: [] },
+      approvalAuthority: { decisions: [] },
     },
     parseLine: parseProviderEventLine,
     extractSessionRef: (event) => extractProviderSessionRef(provider.host, event),

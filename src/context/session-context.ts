@@ -28,10 +28,10 @@ function projectLearningFile(repoPath: string): string {
   return text.slice(0, 8_000);
 }
 
-function durableCandidates(project: string): string {
+function durableCandidates(project: string, repoPath: string): string {
   let candidates;
   try {
-    candidates = listLearningCandidates(project);
+    candidates = listLearningCandidates(project, undefined, repoPath);
   } catch {
     return '(Major learning store unavailable: unsafe record withheld from session context.)';
   }
@@ -55,7 +55,7 @@ function durableCandidates(project: string): string {
 }
 
 function resolvedGoalSkills(project: string, repoPath: string): string {
-  const goals = activeGoals(project);
+  const goals = activeGoals(project, repoPath);
   if (goals.length === 0)
     return '(No active goal. Resolve skills against the substantive task when it arrives.)';
   const unique = new Map<string, string>();
@@ -123,7 +123,7 @@ DURABLE PROJECT LEARNINGS
 ${projectLearningFile(project.repoPath)}
 
 ACTIVE MAJOR LEARNINGS
-${durableCandidates(project.project)}
+${durableCandidates(project.project, project.repoPath)}
 
 RESOLVED SKILLS FOR ACTIVE GOALS
 ${resolvedGoalSkills(project.project, project.repoPath)}

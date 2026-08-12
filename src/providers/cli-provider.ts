@@ -65,7 +65,7 @@ export class CliProvider implements ProviderAdapter {
         host: this.host,
         prompt: request.prompt,
         allowGuestMutation: this.allowGuestMutation,
-        approvalAuthority: { approvedCategories: [] },
+        approvalAuthority: { decisions: [] },
         ...(request.modelRef ? { modelRef: request.modelRef } : {}),
         ...(request.resumeSessionRef ? { resumeSessionRef: request.resumeSessionRef } : {}),
       },

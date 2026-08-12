@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -20,19 +21,25 @@ import {
   learningRoot,
   listLearningCandidates,
 } from '../src/learning/candidates.js';
+import { configureProjectPolicy } from '../src/supervisor/policy.js';
 
 let root = '';
 let priorRoot: string | undefined;
+let priorPolicyPath: string | undefined;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-learning-'));
   priorRoot = process.env.MAJOR_LEARNING_ROOT;
+  priorPolicyPath = process.env.MAJOR_POLICY_PATH;
   process.env.MAJOR_LEARNING_ROOT = join(root, 'learning');
+  process.env.MAJOR_POLICY_PATH = join(root, 'policies.json');
 });
 
 afterEach(() => {
   if (priorRoot === undefined) delete process.env.MAJOR_LEARNING_ROOT;
   else process.env.MAJOR_LEARNING_ROOT = priorRoot;
+  if (priorPolicyPath === undefined) delete process.env.MAJOR_POLICY_PATH;
+  else process.env.MAJOR_POLICY_PATH = priorPolicyPath;
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -115,6 +122,122 @@ describe('Major learning candidates', () => {
     expect(unrelated.id).not.toBe(first.id);
     expect(listLearningCandidates('bredge')).toHaveLength(1);
     expect(listLearningCandidates('surface-talent')).toHaveLength(1);
+  });
+
+  it('migrates attributable legacy learning with missing or deleted worktree paths', () => {
+    const primary = join(root, 'primary', 'shared');
+    const common = join(primary, '.git');
+    const deletedGit = join(common, 'worktrees', 'deleted');
+    const deletedWorktree = join(root, 'deleted-worktree');
+    mkdirSync(deletedGit, { recursive: true });
+    mkdirSync(deletedWorktree, { recursive: true });
+    writeFileSync(
+      join(common, 'config'),
+      '[remote "origin"]\n\turl = https://github.com/Owner/shared.git\n',
+    );
+    writeFileSync(join(deletedGit, 'commondir'), '../..\n');
+    writeFileSync(join(deletedWorktree, '.git'), `gitdir: ${deletedGit}\n`);
+    configureProjectPolicy({
+      project: 'shared',
+      repoPath: primary,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    captureLearning({
+      project: 'shared',
+      source: 'manual',
+      scope: 'project',
+      summary: 'Legacy candidate without a path.',
+    });
+    captureLearning({
+      project: 'shared',
+      repoPath: deletedWorktree,
+      source: 'manual',
+      scope: 'project',
+      summary: 'Legacy candidate from a deleted worktree.',
+    });
+    rmSync(deletedWorktree, { recursive: true, force: true });
+
+    const migrated = listLearningCandidates('github.com/owner/shared', undefined, primary);
+    expect(migrated.map((candidate) => candidate.summary)).toEqual(
+      expect.arrayContaining([
+        'Legacy candidate without a path.',
+        'Legacy candidate from a deleted worktree.',
+      ]),
+    );
+    expect(migrated.every((candidate) => candidate.project === 'github.com/owner/shared')).toBe(
+      true,
+    );
+  });
+
+  it('replays an interrupted legacy migration without duplicating candidates', () => {
+    const primary = join(root, 'primary', 'replay');
+    mkdirSync(join(primary, '.git'), { recursive: true });
+    writeFileSync(
+      join(primary, '.git', 'config'),
+      '[remote "origin"]\n\turl = https://github.com/Owner/replay.git\n',
+    );
+    configureProjectPolicy({
+      project: 'replay',
+      repoPath: primary,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const candidate = captureLearning({
+      project: 'replay',
+      repoPath: primary,
+      source: 'manual',
+      scope: 'project',
+      summary: 'Replay-safe migration.',
+    });
+    const projects = join(learningRoot(), 'projects');
+    const legacy = join(
+      projects,
+      `${createHash('sha256').update('replay').digest('hex').slice(0, 24)}.json`,
+    );
+    const target = join(
+      projects,
+      `${createHash('sha256').update('github.com/owner/replay').digest('hex').slice(0, 24)}.json`,
+    );
+    writeFileSync(target, readFileSync(legacy, 'utf8'));
+    const migrated = listLearningCandidates('github.com/owner/replay', undefined, primary);
+    expect(migrated.filter((item) => item.id === candidate.id)).toHaveLength(1);
+  });
+
+  it('reclaims a stale legacy store lock before canonical migration', () => {
+    const primary = join(root, 'primary', 'stale-migration');
+    mkdirSync(join(primary, '.git'), { recursive: true });
+    writeFileSync(
+      join(primary, '.git', 'config'),
+      '[remote "origin"]\n\turl = https://github.com/Owner/stale-migration.git\n',
+    );
+    configureProjectPolicy({
+      project: 'stale-migration',
+      repoPath: primary,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    captureLearning({
+      project: 'stale-migration',
+      repoPath: primary,
+      source: 'manual',
+      summary: 'Recover stale migration locks.',
+    });
+    const legacy = join(
+      learningRoot(),
+      'projects',
+      `${createHash('sha256').update('stale-migration').digest('hex').slice(0, 24)}.json`,
+    );
+    writeFileSync(`${legacy}.lock`, '999999999\n');
+    const stale = new Date(Date.now() - 31_000);
+    utimesSync(`${legacy}.lock`, stale, stale);
+    expect(
+      listLearningCandidates('github.com/owner/stale-migration', undefined, primary),
+    ).toHaveLength(1);
+    expect(existsSync(`${legacy}.lock`)).toBe(false);
   });
 
   it('uses physically separate opaque project stores', () => {

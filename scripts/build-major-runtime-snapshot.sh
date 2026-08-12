@@ -54,6 +54,7 @@ test -x "$DEST/scripts/bootstrap-major-lima-worker.sh"
 test -f "$DEST/scripts/manage-major-provider-state.py"
 test -x "$DEST/scripts/install-major-linux-providers.sh"
 test -x "$DEST/scripts/provision-major-lima-worker.sh"
+test -x "$DEST/scripts/major-runtime-manifest.mjs"
 test -f "$DEST/scripts/validate-cursor-acp-field.mjs"
 test -f "$DEST/scripts/validate-cli-provider-field.mjs"
 test -f "$DEST/node_modules/@agentclientprotocol/sdk/package.json"
@@ -78,4 +79,7 @@ opened.sqlite.close();
 NODE
 
 rm -rf "$SMOKE_HOME"
+
+# Bind every packaged file, mode and symlink target to this snapshot.
+node "$DEST/scripts/major-runtime-manifest.mjs" create "$DEST"
 echo "Major immutable runtime snapshot smoke passed: $DEST"

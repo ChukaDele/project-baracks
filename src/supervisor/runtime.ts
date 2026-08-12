@@ -67,10 +67,10 @@ function readProjectContext(repoPath: string): string {
   return sections.join('\n');
 }
 
-function readLearningContext(project: string): string {
+function readLearningContext(project: string, repoPath: string): string {
   let visible;
   try {
-    visible = listLearningCandidates(project);
+    visible = listLearningCandidates(project, undefined, repoPath);
   } catch {
     return '(Major learning store unavailable: unsafe record withheld from coordinator context.)';
   }
@@ -187,7 +187,7 @@ function trustContract(policy: ProjectPolicy): string {
 
 export function coordinatorPrompt(goal: SupervisorGoal): string {
   const context = readProjectContext(goal.repoPath);
-  const learningContext = readLearningContext(goal.project);
+  const learningContext = readLearningContext(goal.project, goal.repoPath);
   let resolvedSkills: ReturnType<typeof resolveSkills>['skills'] = [];
   let skillResolutionFailed = false;
   try {

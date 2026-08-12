@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
@@ -12,6 +12,10 @@ import { providerReadOnlyRoots } from './provider-access.js';
 import { LimaBackend } from '../execution/lima-backend.js';
 import { loadLimaExecutionConfig } from '../execution/lima-config.js';
 import type { BackendProviderRequest } from '../execution/backend.js';
+import type { ApprovalCategory, ProviderApprovalAuthority } from './provider-approval-policy.js';
+import { openDb } from '../db/client.js';
+import { consumeApprovedDecision, isApprovedDecision } from '../domain/decision-service.js';
+import { resolveProjectForCwd } from '../supervisor/state.js';
 
 export interface MajorGatewayRequest {
   executable: string;
@@ -25,11 +29,41 @@ export interface MajorGatewayRequest {
   extractSessionRef?: (event: ProviderEvent) => string | undefined;
   extractUsage?: (event: ProviderEvent) => unknown;
   resourceLeaseId?: string;
-  providerRequest?: BackendProviderRequest;
+  providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority'> & {
+    approvalAuthority: ProviderApprovalAuthority;
+  };
 }
 
 export function majorExecutionBackend(): LimaBackend {
   return new LimaBackend(loadLimaExecutionConfig());
+}
+
+export function verifyProviderDecision(input: {
+  cwd: string;
+  provider: BackendProviderRequest['host'];
+  category: ApprovalCategory;
+  decisionId: string;
+  actionDigest: string;
+  consumerId: string;
+}): boolean {
+  const project = resolveProjectForCwd(input.cwd);
+  if (!project) return false;
+  const opened = openDb();
+  try {
+    const approved = isApprovedDecision(opened.db, input.decisionId, {
+      category: input.category,
+      scope: {
+        provider: input.provider,
+        purpose: `provider-action:${project.project}`,
+        actionDigest: input.actionDigest,
+      },
+      requireExpiry: true,
+      requireUnconsumed: true,
+    });
+    return approved && consumeApprovedDecision(opened.db, input.decisionId, input.consumerId);
+  } finally {
+    opened.sqlite.close();
+  }
 }
 
 /** Fixed, read-only host probe used by the global admission guard on macOS. */
@@ -111,6 +145,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       ? trustedExecutables.verify(request.executable)
       : undefined;
   const backend = backendEnabled ? majorExecutionBackend() : undefined;
+  const approvalConsumerId = `provider-action-${randomUUID()}`;
   const gateway = new ExecutionGateway({
     allowedRoots: roots,
     ...(trusted
@@ -124,6 +159,22 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
     },
     trustedExecutables,
     ...(backend ? { backend } : { containment: darwinSeatbeltContainment() }),
+    ...(request.providerRequest
+      ? {
+          verifyProviderDecision: (category: ApprovalCategory, decisionId: string) =>
+            verifyProviderDecision({
+              cwd: request.cwd,
+              provider: request.providerRequest!.host,
+              category,
+              decisionId,
+              actionDigest:
+                request.providerRequest!.approvalAuthority.decisions.find(
+                  (decision) => decision.decisionId === decisionId,
+                )?.actionDigest ?? '',
+              consumerId: approvalConsumerId,
+            }),
+        }
+      : {}),
     baseEnv,
     envAllowlist: [
       'MAJOR_HOME',

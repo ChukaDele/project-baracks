@@ -14,7 +14,8 @@ import {
   PathViolationError,
 } from './paths.js';
 import { redactText } from './redact.js';
-import { validateProviderApprovalAuthority } from './provider-approval-policy.js';
+import { verifyProviderApprovalAuthority } from './provider-approval-policy.js';
+import type { ApprovalCategory, ProviderApprovalAuthority } from './provider-approval-policy.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
@@ -74,7 +75,9 @@ export interface GatewayExecuteRequest {
   extractSessionRef?: StreamingSpawnSpec['extractSessionRef'];
   extractUsage?: StreamingSpawnSpec['extractUsage'];
   resourceLeaseId?: string;
-  providerRequest?: BackendProviderRequest;
+  providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority'> & {
+    approvalAuthority: ProviderApprovalAuthority;
+  };
 }
 
 export interface GatewayOptions {
@@ -105,6 +108,8 @@ export interface GatewayOptions {
   authorizedEnv?: { names: readonly string[]; decisionId: string };
   /** Verifies the authorising DecisionRequest is approved. */
   verifyDecision?: (decisionId: string) => boolean;
+  /** Verifies provider action authority against durable, scoped decisions. */
+  verifyProviderDecision?: (category: ApprovalCategory, decisionId: string) => boolean;
   /** Sink for the execution-policy audit trail. Mandatory. */
   recordDecision: DecisionRecorder;
   /** Internal: set only by ExecutionGateway.probeOnly(). */
@@ -341,11 +346,20 @@ export class ExecutionGateway {
           'isolated provider execution requires a structured Major provider request',
         );
       }
+      let verifiedProviderRequest: BackendProviderRequest;
       try {
-        validateProviderApprovalAuthority(
+        if (!this.options.verifyProviderDecision) {
+          this.refuse('execute', request, 'provider decision verifier is unavailable');
+        }
+        const verifiedAuthority = verifyProviderApprovalAuthority(
           request.providerRequest.host,
           request.providerRequest.approvalAuthority,
+          this.options.verifyProviderDecision,
         );
+        verifiedProviderRequest = {
+          ...request.providerRequest,
+          approvalAuthority: verifiedAuthority,
+        };
       } catch (error) {
         this.refuse(
           'execute',
@@ -378,7 +392,7 @@ export class ExecutionGateway {
         ...(request.extractSessionRef ? { extractSessionRef: request.extractSessionRef } : {}),
         ...(request.extractUsage ? { extractUsage: request.extractUsage } : {}),
         ...(request.resourceLeaseId ? { resourceLeaseId: request.resourceLeaseId } : {}),
-        ...(request.providerRequest ? { providerRequest: request.providerRequest } : {}),
+        providerRequest: verifiedProviderRequest,
       });
     }
 

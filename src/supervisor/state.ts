@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
   existsSync,
@@ -148,11 +148,15 @@ export function startGoal(input: {
 }): SupervisorGoal {
   return mutateSupervisorState((state) => {
     const now = new Date().toISOString();
+    const inputCommonDir = gitCommonDir(resolve(input.repoPath));
     for (const existing of state.goals) {
       if (
-        existing.project === input.project &&
+        (existing.project === input.project ||
+          (inputCommonDir !== undefined &&
+            gitCommonDir(resolve(existing.repoPath)) === inputCommonDir)) &&
         ['active', 'running', 'blocked'].includes(existing.status)
       ) {
+        existing.project = input.project;
         existing.goal = input.goal;
         existing.repoPath = resolve(input.repoPath);
         existing.autonomous = input.autonomous;
@@ -237,11 +241,36 @@ export function getGoal(id: string): SupervisorGoal | undefined {
   return readSupervisorState().goals.find((goal) => goal.id === id);
 }
 
-export function activeGoals(project?: string): SupervisorGoal[] {
+export function bindGoalToProject(
+  id: string,
+  project: string,
+  repoPath: string,
+): SupervisorGoal | undefined {
+  return mutateSupervisorState((state) => {
+    const goal = state.goals.find((candidate) => candidate.id === id);
+    if (!goal) return undefined;
+    const commonDir = gitCommonDir(resolve(repoPath));
+    if (
+      goal.project !== project &&
+      (commonDir === undefined || gitCommonDir(resolve(goal.repoPath)) !== commonDir)
+    ) {
+      return undefined;
+    }
+    goal.project = project;
+    goal.repoPath = resolve(repoPath);
+    goal.updatedAt = new Date().toISOString();
+    return goal;
+  });
+}
+
+export function activeGoals(project?: string, repoPath?: string): SupervisorGoal[] {
+  const commonDir = repoPath ? gitCommonDir(resolve(repoPath)) : undefined;
   return readSupervisorState().goals.filter(
     (goal) =>
       ['active', 'running', 'blocked'].includes(goal.status) &&
-      (project === undefined || goal.project === project),
+      (project === undefined ||
+        goal.project === project ||
+        (commonDir !== undefined && gitCommonDir(resolve(goal.repoPath)) === commonDir)),
   );
 }
 
@@ -289,21 +318,30 @@ export function gitCommonDir(repoPath: string): string | undefined {
   }
 }
 
-function readRemoteName(repoPath: string): string | undefined {
+function repositoryIdentity(repoPath: string): string {
   const commonDir = gitCommonDir(repoPath);
-  if (!commonDir) return undefined;
+  if (!commonDir) throw new Error(`not a git repository: ${repoPath}`);
   const config = join(commonDir, 'config');
-  if (!existsSync(config)) return undefined;
-  const text = readFileSync(config, 'utf8');
-  const matches = [...text.matchAll(/^\s*url\s*=\s*(.+)$/gm)];
-  for (const match of matches) {
-    const raw = match[1]?.trim();
-    if (!raw) continue;
-    const cleaned = raw.replace(/\.git$/, '').replace(/\/$/, '');
-    const repo = cleaned.split(/[/:]/).pop();
-    if (repo) return repo;
+  if (existsSync(config)) {
+    const text = readFileSync(config, 'utf8');
+    const origin = /\[remote "origin"\]([\s\S]*?)(?=\n\[|$)/.exec(text)?.[1];
+    const raw = /^\s*url\s*=\s*(.+)$/m.exec(origin ?? '')?.[1]?.trim();
+    if (raw) {
+      const normalized = raw
+        .replace(/^git@([^:]+):/, 'ssh://$1/')
+        .replace(/\.git$/, '')
+        .replace(/\/$/, '');
+      try {
+        const url = new URL(normalized);
+        const hostname = url.hostname.toLowerCase();
+        const pathname = hostname === 'github.com' ? url.pathname.toLowerCase() : url.pathname;
+        return `${hostname}${pathname}`.replace(/\/$/, '');
+      } catch {
+        return `remote:${createHash('sha256').update(normalized).digest('hex').slice(0, 24)}`;
+      }
+    }
   }
-  return undefined;
+  return `local:${createHash('sha256').update(resolve(commonDir)).digest('hex').slice(0, 24)}`;
 }
 
 function gitRootFrom(path: string): string | undefined {
@@ -359,30 +397,82 @@ export function resolveProject(
   const cwdRoot = gitRootFrom(cwd);
   if (cwdRoot) {
     const cwdName = basename(cwdRoot);
-    const remoteName = readRemoteName(cwdRoot);
-    if (project === cwdName || project === remoteName || project === 'current') {
-      return { project: remoteName ?? cwdName, repoPath: cwdRoot };
+    const identity = repositoryIdentity(cwdRoot);
+    const remoteName = identity.split('/').pop();
+    if (
+      project === cwdName ||
+      project === remoteName ||
+      project === identity ||
+      project === 'current'
+    ) {
+      return { project: identity, repoPath: cwdRoot };
     }
   }
 
   const state = readSupervisorState();
-  const priorGoal = [...state.goals].reverse().find((goal) => goal.project === project);
-  const priorGoalPath = validRememberedRepoPath(priorGoal?.repoPath);
-  if (priorGoalPath) return { project, repoPath: priorGoalPath };
-
-  const priorSession = [...state.sessions].reverse().find((session) => session.project === project);
-  const priorSessionPath = validRememberedRepoPath(priorSession?.repoPath);
-  if (priorSessionPath) return { project, repoPath: priorSessionPath };
-
+  const matchesProject = (repoPath: string): { project: string; repoPath: string } | undefined => {
+    const identity = repositoryIdentity(repoPath);
+    const remote = identity.split('/').pop();
+    return project === basename(repoPath) || project === remote || project === identity
+      ? { project: identity, repoPath }
+      : undefined;
+  };
+  const active = state.goals
+    .filter((goal) => ['active', 'running', 'blocked'].includes(goal.status))
+    .flatMap((goal) => {
+      const repoPath = validRememberedRepoPath(goal.repoPath);
+      const match = repoPath ? matchesProject(repoPath) : undefined;
+      return match ? [match] : [];
+    });
+  const activePaths = new Map(active.map((match) => [match.repoPath, match]));
+  if (activePaths.size === 1) return [...activePaths.values()][0]!;
+  if (activePaths.size > 1) {
+    throw new Error(
+      `project '${project}' has multiple active worktrees: ${[...activePaths.keys()].join(', ')}`,
+    );
+  }
+  const sessionMatches = new Map<string, { project: string; repoPath: string }>();
+  for (const session of [...state.sessions].reverse()) {
+    const repoPath = validRememberedRepoPath(session.repoPath);
+    const match = repoPath ? matchesProject(repoPath) : undefined;
+    if (match && !sessionMatches.has(match.project)) sessionMatches.set(match.project, match);
+  }
+  if (sessionMatches.size === 1) return [...sessionMatches.values()][0]!;
+  if (sessionMatches.size > 1) {
+    throw new Error(
+      `project '${project}' is ambiguous; use one canonical identity: ${[...sessionMatches.values()]
+        .map((match) => `${match.project} (${match.repoPath})`)
+        .join(', ')}`,
+    );
+  }
+  const paths: string[] = state.goals.flatMap((goal) => {
+    const repoPath = validRememberedRepoPath(goal.repoPath);
+    return repoPath ? [repoPath] : [];
+  });
   const roots = [join(homedir(), 'Projects'), join(homedir(), 'Documents')];
   for (const root of roots) {
-    for (const repoPath of scanRepos(root, 2)) {
-      const local = basename(repoPath);
-      const remote = readRemoteName(repoPath);
-      if (project === local || project === remote) {
-        return { project: remote ?? local, repoPath };
-      }
+    paths.push(...scanRepos(root, 2));
+  }
+  const matches = new Map<string, { identity: string; repoPath: string }>();
+  for (const repoPath of paths) {
+    const identity = repositoryIdentity(repoPath);
+    const remote = identity.split('/').pop();
+    if (project === basename(repoPath) || project === remote || project === identity) {
+      matches.set(`${identity}\0${repoPath}`, { identity, repoPath });
     }
+  }
+  if (matches.size === 1) {
+    const { identity, repoPath } = [...matches.values()][0]!;
+    return { project: identity, repoPath };
+  }
+  if (matches.size > 1) {
+    throw new Error(
+      `project '${project}' is ambiguous; use an active worktree or canonical identity: ${[
+        ...matches.values(),
+      ]
+        .map(({ identity, repoPath }) => `${identity} (${repoPath})`)
+        .join(', ')}`,
+    );
   }
   throw new Error(
     `cannot resolve project '${project}'. Open a Major-managed session inside the repo once, or bootstrap/register the project.`,
@@ -394,5 +484,5 @@ export function resolveProjectForCwd(
 ): { project: string; repoPath: string } | undefined {
   const root = gitRootFrom(cwd);
   if (!root) return undefined;
-  return { project: readRemoteName(root) ?? basename(root), repoPath: root };
+  return { project: repositoryIdentity(root), repoPath: root };
 }

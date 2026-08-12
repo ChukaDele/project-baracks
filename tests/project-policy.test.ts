@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -110,6 +110,25 @@ describe('Major project trust policy', () => {
     expect(policy.allowExternalWrites).toBe(true);
     expect(policy.allowPaidSpend).toBe(false);
     expect(policy.allowCrossProjectMemory).toBe(true);
+  });
+
+  it('carries a legacy primary-checkout policy into a linked worktree only', () => {
+    const primary = join(root, 'primary');
+    const common = join(primary, '.git');
+    const worktreeGit = join(common, 'worktrees', 'field');
+    const worktree = join(root, 'field-worktree');
+    mkdirSync(worktreeGit, { recursive: true });
+    mkdirSync(worktree, { recursive: true });
+    writeFileSync(join(worktreeGit, 'commondir'), '../..\n');
+    writeFileSync(join(worktree, '.git'), `gitdir: ${worktreeGit}\n`);
+    configureProjectPolicy({
+      project: 'legacy-name',
+      repoPath: primary,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    expect(getProjectPolicy('github.com/owner/repo', worktree).trust).toBe('build');
   });
 
   it('keeps client knowledge isolated even when owner-approved for build work', () => {

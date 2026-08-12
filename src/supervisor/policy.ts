@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
-import { majorHome } from './state.js';
+import { gitCommonDir, majorHome } from './state.js';
 import type { WorkerHost } from './state.js';
 
 export const PROJECT_CLASSES = ['unknown', 'workshop', 'client', 'knowledge'] as const;
@@ -137,10 +137,33 @@ export function defaultProjectPolicy(project: string, repoPath: string): Project
 }
 
 export function getProjectPolicy(project: string, repoPath: string): ProjectPolicy {
-  return (
-    readStore().projects.find((candidate) => candidate.project === project) ??
-    defaultProjectPolicy(project, repoPath)
+  const canonicalPath = resolve(repoPath);
+  const commonDir = gitCommonDir(canonicalPath);
+  const existing = readStore().projects.find(
+    (candidate) =>
+      candidate.project === project ||
+      resolve(candidate.repoPath) === canonicalPath ||
+      (commonDir !== undefined && gitCommonDir(resolve(candidate.repoPath)) === commonDir),
   );
+  return existing
+    ? { ...existing, project, repoPath: canonicalPath }
+    : defaultProjectPolicy(project, repoPath);
+}
+
+/** True only when persisted legacy identity is bound to this Git repository. */
+export function projectPolicyBindsLegacyIdentity(project: string, repoPath: string): boolean {
+  const canonicalPath = resolve(repoPath);
+  const commonDir = gitCommonDir(canonicalPath);
+  return readStore().projects.some(
+    (candidate) =>
+      candidate.project === project &&
+      (resolve(candidate.repoPath) === canonicalPath ||
+        (commonDir !== undefined && gitCommonDir(resolve(candidate.repoPath)) === commonDir)),
+  );
+}
+
+export function projectPolicyRepoPath(project: string): string | undefined {
+  return readStore().projects.find((candidate) => candidate.project === project)?.repoPath;
 }
 
 /** Project identities that must never appear in cross-project learning. */
@@ -164,7 +187,14 @@ export function configureProjectPolicy(input: {
   ownerApprovedBuild?: boolean;
 }): ProjectPolicy {
   const store = readStore();
-  const existing = store.projects.find((candidate) => candidate.project === input.project);
+  const canonicalPath = resolve(input.repoPath);
+  const commonDir = gitCommonDir(canonicalPath);
+  const existing = store.projects.find(
+    (candidate) =>
+      candidate.project === input.project ||
+      resolve(candidate.repoPath) === canonicalPath ||
+      (commonDir !== undefined && gitCommonDir(resolve(candidate.repoPath)) === commonDir),
+  );
   const ownerApprovedBuild = input.ownerApprovedBuild ?? existing?.ownerApprovedBuild ?? false;
 
   if (input.trust === 'assist') {
@@ -216,7 +246,12 @@ export function configureProjectPolicy(input: {
     ...(existing?.lastGrade ? { lastGrade: existing.lastGrade } : {}),
   };
 
-  const index = store.projects.findIndex((candidate) => candidate.project === input.project);
+  const index = store.projects.findIndex(
+    (candidate) =>
+      candidate.project === input.project ||
+      resolve(candidate.repoPath) === canonicalPath ||
+      (commonDir !== undefined && gitCommonDir(resolve(candidate.repoPath)) === commonDir),
+  );
   if (index >= 0) store.projects[index] = policy;
   else store.projects.push(policy);
   writeStore(store);

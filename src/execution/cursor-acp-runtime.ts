@@ -7,12 +7,35 @@ import type { LimaExecutionConfig } from './lima-config.js';
 import { guestProviderProfile } from './provider-profile.js';
 import {
   decideProviderAction,
+  providerActionDigest,
+  type ProviderAction,
+  type ProviderApprovalAuthority,
+  type ProviderApprovalDecision,
   type ProviderActionKind,
 } from '../security/provider-approval-policy.js';
 
 type ChildObserver = (child: ChildProcess | undefined) => void;
 
 type ModelOption = Extract<acp.SessionConfigOption, { type: 'select' }>;
+
+export function decideCursorPermission(
+  action: ProviderAction,
+  authority: ProviderApprovalAuthority,
+  remainingDecisions: ProviderApprovalAuthority['decisions'][number][],
+): ProviderApprovalDecision {
+  const decision = decideProviderAction({
+    host: 'cursor',
+    action,
+    authority: { ...authority, decisions: remainingDecisions },
+  });
+  if (decision.outcome === 'automatic') {
+    const approvedIndex = remainingDecisions.findIndex(
+      (approved) => approved.actionDigest === providerActionDigest(action),
+    );
+    if (approvedIndex >= 0) remainingDecisions.splice(approvedIndex, 1);
+  }
+  return decision;
+}
 
 function selectValues(option: ModelOption): Array<{ value: string; name: string }> {
   return option.options.flatMap((entry) =>
@@ -109,6 +132,7 @@ export class CursorAcpRuntime implements AgentRuntimePort {
     };
     request.abortSignal.addEventListener('abort', abort, { once: true });
     const stream = acp.ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout));
+    const remainingDecisions = [...request.approvalAuthority.decisions];
     try {
       const result = await acp
         .client({ name: 'major' })
@@ -116,21 +140,26 @@ export class CursorAcpRuntime implements AgentRuntimePort {
           if (!request.allowGuestMutation) {
             return { outcome: { outcome: 'cancelled' as const } };
           }
-          const decision = decideProviderAction({
-            host: request.host,
-            action: {
-              kind: (params.toolCall.kind ?? 'unknown') as ProviderActionKind,
-              ...(params.toolCall.name ? { name: params.toolCall.name } : {}),
-              ...(params.toolCall.title ? { title: params.toolCall.title } : {}),
-              ...(params.toolCall.rawInput !== undefined
-                ? { rawInput: params.toolCall.rawInput }
-                : {}),
-            },
-            authority: request.approvalAuthority,
-          });
+          const action = {
+            kind: (params.toolCall.kind ?? 'unknown') as ProviderActionKind,
+            ...(params.toolCall.name ? { name: params.toolCall.name } : {}),
+            ...(params.toolCall.title ? { title: params.toolCall.title } : {}),
+            ...(params.toolCall.rawInput !== undefined
+              ? { rawInput: params.toolCall.rawInput }
+              : {}),
+          };
+          const decision = decideCursorPermission(
+            action,
+            request.approvalAuthority,
+            remainingDecisions,
+          );
           request.emit({
             type: 'approval-decision',
-            data: { toolCallId: params.toolCall.toolCallId, ...decision },
+            data: {
+              toolCallId: params.toolCall.toolCallId,
+              actionDigest: providerActionDigest(action),
+              ...decision,
+            },
           });
           if (decision.outcome !== 'automatic') {
             return { outcome: { outcome: 'cancelled' as const } };

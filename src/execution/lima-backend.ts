@@ -15,7 +15,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from '../providers/types.js';
 import { redactText } from '../security/redact.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
-import { validateProviderApprovalAuthority } from '../security/provider-approval-policy.js';
+import { validateVerifiedProviderApprovalAuthority } from '../security/provider-approval-policy.js';
 import type {
   BackendExecuteRequest,
   BackendProviderStatus,
@@ -633,7 +633,7 @@ export class LimaBackend implements ExecutionBackend {
       if (!providerIntent || providerIntent.host !== profile.host) {
         throw new Error(`${profile.host} requires a structured Major provider request`);
       }
-      validateProviderApprovalAuthority(profile.host, providerIntent.approvalAuthority);
+      validateVerifiedProviderApprovalAuthority(profile.host, providerIntent.approvalAuthority);
       if (profile.host === 'cursor') {
         const intent = providerIntent;
         const abortSignal = this.activeAbort?.signal;

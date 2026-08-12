@@ -73,7 +73,7 @@ export class CodexProvider implements ProviderAdapter {
         host: 'codex',
         prompt: request.prompt,
         allowGuestMutation: false,
-        approvalAuthority: { approvedCategories: [] },
+        approvalAuthority: { decisions: [] },
         ...(request.modelRef ? { modelRef: request.modelRef } : {}),
         ...(request.resumeSessionRef ? { resumeSessionRef: request.resumeSessionRef } : {}),
       },

@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { DbConn } from '../db/client.js';
-import { decisionRequests } from '../db/schema.js';
+import { decisionRequests, providerActionConsumptions } from '../db/schema.js';
 import { newId, nowIso } from './ids.js';
 
 export interface NewDecisionInput {
@@ -57,6 +57,7 @@ export interface DecisionScope {
   provider?: string;
   modelRef?: string;
   purpose?: string;
+  actionDigest?: string;
 }
 
 /**
@@ -112,11 +113,27 @@ export function isApprovedDecision(
     }
     if (!declared || typeof declared !== 'object') return false;
     // Every expected field must be explicitly declared and match exactly.
-    for (const field of ['provider', 'modelRef', 'purpose'] as const) {
+    for (const field of ['provider', 'modelRef', 'purpose', 'actionDigest'] as const) {
       if (expect.scope[field] !== undefined && declared?.[field] !== expect.scope[field]) {
         return false;
       }
     }
   }
   return true;
+}
+
+/** Atomically reserve an approved, scoped decision for exactly one execution. */
+export function consumeApprovedDecision(
+  db: DbConn,
+  decisionId: string,
+  consumerId: string,
+): boolean {
+  try {
+    db.insert(providerActionConsumptions)
+      .values({ id: newId('pac'), decisionId, consumerId })
+      .run();
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -531,6 +531,17 @@ export const decisionRequests = sqliteTable(
   ],
 );
 
+/** Single-use consumption ledger for provider action approvals. */
+export const providerActionConsumptions = sqliteTable('provider_action_consumptions', {
+  id: id(),
+  decisionId: text('decision_id')
+    .notNull()
+    .unique()
+    .references(() => decisionRequests.id),
+  consumerId: text('consumer_id').notNull().unique(),
+  createdAt: createdAt(),
+});
+
 export const EVIDENCE_KINDS = [
   'test_result',
   'verification_run',

@@ -74,7 +74,7 @@ grep -Fq 'PROJECT CONTEXT: REROUTE' src/context/project-integrity.ts || fail "wr
 grep -Fq 'major project guard' skills/internal/project-context-integrity/SKILL.md || fail "project guard command missing from skill"
 grep -Fq 'safe parking protocol' -i skills/internal/workspace-lifecycle-management/SKILL.md || fail "workspace lifecycle safe parking protocol missing"
 grep -Fq 'commondir' src/supervisor/state.ts || fail "project resolution is not Git-worktree aware"
-grep -Fq 'priorSession' src/supervisor/state.ts || fail "project resolution ignores prior attached sessions"
+grep -Fq 'sessionMatches' src/supervisor/state.ts || fail "project resolution ignores prior attached sessions"
 
 grep -Fq 'GLOBAL_SKILLS_DEST' scripts/install-major-global-rules.sh || fail "global internal skill sync missing"
 grep -Fq 'STABILITY_SRC' scripts/install-major-global-rules.sh || fail "stability invariants not installed globally"

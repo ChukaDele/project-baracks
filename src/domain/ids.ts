@@ -22,7 +22,8 @@ export type IdPrefix =
   | 'tclm'
   | 'dobs'
   | 'rchk'
-  | 'xpd';
+  | 'xpd'
+  | 'pac';
 
 /** Stable, globally unique, prefix-typed ID (e.g. `task_5f0c...`). */
 export function newId(prefix: IdPrefix): string {
