@@ -18,6 +18,143 @@ afterEach(() => {
 });
 
 describe('runtime skill resolver', () => {
+  const consolidatedRoutingScenarios: {
+    task: string;
+    includes: string[];
+    excludes: string[];
+  }[] = [
+    {
+      task: 'Build a new dashboard with a material visual direction.',
+      includes: ['craft-web-interfaces'],
+      excludes: ['verify-in-browser'],
+    },
+    {
+      task: 'Fix a small API bug using the established project helper.',
+      includes: [],
+      excludes: ['research-before-build', 'craft-web-interfaces'],
+    },
+    {
+      task: 'Add an interaction-heavy reusable form component with loading and error states.',
+      includes: ['test-components'],
+      excludes: ['research-product-patterns'],
+    },
+    {
+      task: 'Redesign a dense product table after researching production workflow patterns.',
+      includes: ['research-product-patterns', 'craft-web-interfaces'],
+      excludes: [],
+    },
+    {
+      task: 'Create a marketing landing page with three distinct visual directions.',
+      includes: ['craft-web-interfaces'],
+      excludes: ['test-components'],
+    },
+    {
+      task: 'Add a GSAP ScrollTrigger animation with reduced-motion behavior.',
+      includes: ['responsive-motion-systems'],
+      excludes: ['test-components'],
+    },
+    {
+      task: 'Investigate a failing GitHub Actions deployment check.',
+      includes: ['ci-recovery'],
+      excludes: ['craft-web-interfaces'],
+    },
+    {
+      task: 'Add a third-party connector integration after comparing official and maintained options.',
+      includes: ['research-before-build', 'mcp-integration-ops'],
+      excludes: ['craft-web-interfaces'],
+    },
+    {
+      task: 'Build a long-running complex workflow pipeline and compare existing workflow engines.',
+      includes: ['research-before-build', 'lean-graph-engineering'],
+      excludes: ['verify-in-browser'],
+    },
+    {
+      task: 'Execute unfamiliar third-party code in an isolated sandbox after evaluating maintained tools.',
+      includes: ['research-before-build'],
+      excludes: ['craft-web-interfaces'],
+    },
+    {
+      task: 'Research how competitors implement recruiter onboarding in Mobbin.',
+      includes: ['research-product-patterns'],
+      excludes: ['verify-in-browser'],
+    },
+    {
+      task: 'Review a static Markdown document for factual clarity.',
+      includes: [],
+      excludes: ['craft-web-interfaces', 'verify-in-browser', 'test-components'],
+    },
+    {
+      task: 'Change a database schema using the existing migration pattern.',
+      includes: [],
+      excludes: ['research-before-build', 'craft-web-interfaces', 'test-components'],
+    },
+    {
+      task: 'Handle client PII under the existing project-local data policy.',
+      includes: [],
+      excludes: ['research-product-patterns', 'craft-web-interfaces'],
+    },
+    {
+      task: 'Retry a failed external API call in the existing source adapter.',
+      includes: ['root-cause-qa'],
+      excludes: ['craft-web-interfaces'],
+    },
+    {
+      task: 'Wait for human-only approval before the irreversible external action.',
+      includes: ['human-blocker-orchestration'],
+      excludes: ['research-before-build', 'research-product-patterns'],
+    },
+    {
+      task: 'Resume a complex autonomous workflow after interruption and preserve dependencies.',
+      includes: ['lean-graph-engineering'],
+      excludes: ['craft-web-interfaces'],
+    },
+    {
+      task: 'Compare existing maintained libraries before custom implementation.',
+      includes: ['research-before-build'],
+      excludes: ['craft-web-interfaces'],
+    },
+    {
+      task: 'Run visual regression in a real browser at mobile and desktop viewports.',
+      includes: ['verify-in-browser'],
+      excludes: ['research-product-patterns'],
+    },
+    {
+      task: 'Publish a production web change after exact-head review and browser acceptance.',
+      includes: ['exact-head-pr-review', 'verify-in-browser'],
+      excludes: ['craft-web-interfaces'],
+    },
+  ];
+
+  it('routes the 20-scenario consolidated capability matrix', () => {
+    for (const scenario of consolidatedRoutingScenarios) {
+      const resolved = resolveSkills({ task: scenario.task }).skills.map((skill) => skill.id);
+      for (const expected of scenario.includes) {
+        expect(resolved, scenario.task).toContain(expected);
+      }
+      for (const irrelevant of scenario.excludes) {
+        expect(resolved, scenario.task).not.toContain(irrelevant);
+      }
+    }
+  });
+
+  it('routes natural paraphrases without generic research or approval false positives', () => {
+    const browser = resolveSkills({
+      task: 'Run browser QA against the approved design.',
+    }).skills.map((skill) => skill.id);
+    expect(browser).toContain('verify-in-browser');
+
+    const library = resolveSkills({
+      task: 'Research whether we need a maintained auth library before coding.',
+    }).skills.map((skill) => skill.id);
+    expect(library).toContain('research-before-build');
+    expect(library).not.toContain('research-product-patterns');
+
+    const dns = resolveSkills({ task: 'Wait for owner approval on DNS transfer.' }).skills.map(
+      (skill) => skill.id,
+    );
+    expect(dns).toContain('human-blocker-orchestration');
+  });
+
   it('reaches every registered internal skill with no duplicate or orphan ids', () => {
     const audit = auditSkillReachability(process.cwd());
     expect(audit.duplicateIds).toEqual([]);

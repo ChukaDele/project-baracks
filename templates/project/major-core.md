@@ -67,13 +67,17 @@ An explicit user correction, `we already fixed this`, or credible evidence contr
 
 A recurring candidate must not sit indefinitely as an ignored note. Promote it to project guidance/global guidance/tested skill, or record why it is still unstable/project-specific.
 
+## Reuse before build
+
+Before custom implementation of a non-trivial capability, load `research-before-build`, create `.major/adoption-records/<problem>.md` from `templates/project/ADOPTION.md`, and run `major reuse check <record>`. The record must cover repository code, installed skills, current dependencies, official platform capability, maintained upstream options and available services before custom build.
+
 ## Design direction
 
-For substantial UI/website creation, redesign, art-direction changes, or feedback such as `generic AI`, `too safe`, `too loud`, `make it Awwwards-level`, load `design-direction-and-taste` **before** implementation.
+For substantial UI/website creation, redesign, art-direction changes, or feedback such as `generic AI`, `too safe`, `too loud`, `make it Awwwards-level`, load `craft-web-interfaces` **before** implementation.
 
-It is the single Major art-direction/taste authority. Do not stack raw Impeccable/Taste/frontend taste systems and let conflicting defaults compete.
+It is the single Major interface-craft authority. Research targeted product patterns, show conservative, progressive and exploratory visible directions, and wait for owner selection, an approved coherent hybrid or explicit delegation. Persist the result from `templates/project/DESIGN-DIRECTION.md` and pass `major design check <record>` before broad production code.
 
-Use it to settle:
+Use the resulting design contract to settle:
 
 - surface mode: PERSUADE / OPERATE / READ / EXPERIENCE;
 - REFINE / EXTEND / REDESIGN / NEW WORLD;
@@ -99,7 +103,7 @@ For web UI work, load `remote-first-web-development` before implementation. Buil
 - Keep code simple, modular and replaceable: explicit inputs/outputs, stable boundaries, business rules independent of providers/frameworks where practical.
 - Do not add abstraction, infrastructure, tests or documentation without a current reason.
 
-For customer-facing web work, load `website-design-qa`; pair `responsive-motion-systems` for GSAP/ScrollTrigger/sticky/pinned/Three.js or other viewport-motion systems. `exploratory-creative-dev` executes an approved high-craft direction; it does not choose a second competing art direction.
+For rendered web work, load `verify-in-browser`; pair `responsive-motion-systems` for GSAP/ScrollTrigger/sticky/pinned/Three.js or other viewport-motion systems. Use `test-components` selectively when isolated reusable component states justify Storybook or an equivalent harness. `exploratory-creative-dev` executes an approved high-craft direction; it does not choose a second competing art direction.
 
 ## Autonomy and concurrency
 

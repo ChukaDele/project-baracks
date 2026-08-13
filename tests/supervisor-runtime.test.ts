@@ -237,7 +237,7 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('Skillify');
     expect(prompt).toContain('project-context-integrity');
     expect(prompt).toContain('mcp-integration-ops');
-    expect(prompt).toContain('website-design-qa');
+    expect(prompt).toContain('verify-in-browser');
     expect(prompt).toContain('BUILT = implementation exists');
     expect(prompt).toContain("You cannot access or mutate Major's global control state");
     expect(prompt).toContain('the parent owns resource admission and learning capture');

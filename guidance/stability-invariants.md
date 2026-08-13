@@ -54,7 +54,7 @@ Machine-specific workspace targets and disk thresholds live in `memory/verified/
 
 For customer-facing websites:
 
-- load `website-design-qa` for implementation/review/launch work;
+- load `verify-in-browser` for rendered implementation/review/launch evidence;
 - pair `responsive-motion-systems` whenever GSAP, ScrollTrigger, sticky/pinned storytelling, hero video, card stacking, parallax or Three.js is involved;
 - `remote-first-web-development` owns preview/acceptance routing unless the owner explicitly grants a local exception;
 - browser/runtime evidence is required for visual claims;

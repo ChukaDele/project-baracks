@@ -19,4 +19,4 @@ Promoted from the Bredge production incident and subsequent regression work in A
 15. **Whitespace must be intentional.** Large empty fields need a narrative purpose; otherwise inspect min-heights, sticky footprints, pin spacers, empty containers and stale layout state.
 16. **Performance, accessibility, SEO and production routing are part of website craft.** A site is not launch-ready because the visual design looks right in one browser.
 17. **After a costly visual bug, add the cheapest durable invariant/regression guard.** Prefer architecture assertions for structural rules and canonical 100% screenshots for visual baselines.
-18. **Skills compound only when installed into the control layer.** The detailed rules live in Major skills (`website-design-qa` and `responsive-motion-systems`); this memory file records the verified cross-project lessons.
+18. **Skills compound only when installed into the control layer.** The detailed rules live in Major skills (`verify-in-browser` and `responsive-motion-systems`); this memory file records the verified cross-project lessons.

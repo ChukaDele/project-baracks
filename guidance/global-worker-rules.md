@@ -70,6 +70,20 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Do not skillify trivial one-offs or pause an active P0 to build tooling.
 - **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it project-locally with `major learn capture`. Global promotion is a separate reviewed action that requires sanitized content and evidence. Do not rely on chat memory alone.
 
+## Reuse before build
+
+- Before custom implementation of a non-trivial capability, load `research-before-build`.
+- Search the repository, installed skills, current dependencies, official platform features, maintained upstreams and available services in that order.
+- Record the decision in `.major/adoption-records/<problem>.md` and validate it with `major reuse check <record>`.
+- A custom build must identify the unmet requirement and explain why tailoring an existing option costs more or weakens a binding boundary.
+
+## Interface direction and browser evidence
+
+- For a substantial new interface or redesign, load `craft-web-interfaces` before broad production UI code.
+- Present three visible and genuinely distinct directions: conservative, progressive and exploratory.
+- Continue after the owner selects one, approves a coherent hybrid or explicitly delegates the choice.
+- Use `verify-in-browser` for rendered acceptance. Use `test-components` only when isolated reusable component states repay the setup.
+
 ## Remote-first web development
 
 - For every web project, use GitHub plus a Cloudflare preview before any browser preview, visual QA or acceptance testing. Load `remote-first-web-development` before UI work.

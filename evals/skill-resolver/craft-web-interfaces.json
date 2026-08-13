@@ -1,0 +1,19 @@
+{
+  "skill": "craft-web-interfaces",
+  "should_trigger": [
+    "Design a substantial new dashboard and show three distinct visual directions before coding.",
+    "This landing page feels generic and AI-looking; establish a stronger art direction.",
+    "Create conservative, progressive and exploratory moodboards for the redesign.",
+    "Turn the approved references into a design contract and representative interface prototype.",
+    "Redesign a dense operational interface after researching production workflow patterns."
+  ],
+  "should_not_trigger": [
+    "Fix the existing modal close button alignment.",
+    "Run browser QA against the already approved interface.",
+    "Implement the approved design contract without changing its direction.",
+    "Implement this already approved dashboard design.",
+    "Correct a backend database migration.",
+    "Resume a complex autonomous workflow after interruption and preserve dependencies.",
+    "Publish a production web change after exact-head review and browser acceptance."
+  ]
+}

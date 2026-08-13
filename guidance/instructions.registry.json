@@ -62,6 +62,12 @@
       "status": "active"
     },
     {
+      "id": "reuse-before-build",
+      "title": "Mandatory reuse research and adoption-record gate",
+      "path": "guidance/reuse-before-build.md",
+      "status": "active"
+    },
+    {
       "id": "task-scope",
       "title": "Outcome-oriented task-scope rules",
       "path": "guidance/task-scope.md",

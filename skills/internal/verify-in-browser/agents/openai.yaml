@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify in Browser"
+  short_description: "Prove interface behavior in a real browser"
+  default_prompt: "Use $verify-in-browser to verify the deployed interface with functional, responsive, and visual evidence."

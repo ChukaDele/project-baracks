@@ -34,6 +34,8 @@ export interface SkillResolution {
 const STOP_WORDS = new Set([
   'all',
   'and',
+  'after',
+  'before',
   'for',
   'from',
   'into',
@@ -43,6 +45,7 @@ const STOP_WORDS = new Set([
   'project',
   'projects',
   'relevant',
+  'research',
   'start',
   'task',
   'the',
@@ -147,16 +150,33 @@ function scoreEntry(
   if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
     return { score: 0, reason: 'matched a negative trigger example' };
   }
-  for (const example of fixtures?.positive ?? []) {
+  const exampleScore = (example: string): { score: number; overlap: string[] } => {
     const exampleWords = new Set(words(example));
     const overlap = [...exampleWords].filter((word) => taskWords.has(word));
+    if (overlap.length < 2) return { score: 0, overlap };
     const rareOverlap = overlap.filter((word) => word.length >= 8);
-    if (overlap.length < 2 && rareOverlap.length === 0) continue;
-    const exampleScore = overlap.length * 3 + rareOverlap.length * 2;
-    if (exampleScore > score) {
-      score = exampleScore;
-      exampleReason = `matched trigger example: ${overlap.join(', ')}`;
-    }
+    return { score: overlap.length * 3 + rareOverlap.length * 2, overlap };
+  };
+  const strongestNegative = (fixtures?.negative ?? [])
+    .map(exampleScore)
+    .sort((left, right) => right.score - left.score)[0];
+  const strongestPositive = (fixtures?.positive ?? [])
+    .map(exampleScore)
+    .sort((left, right) => right.score - left.score)[0];
+  if (
+    strongestNegative &&
+    strongestNegative.score >= 6 &&
+    strongestNegative.score >= score &&
+    strongestNegative.score >= (strongestPositive?.score ?? 0)
+  ) {
+    return {
+      score: 0,
+      reason: `matched negative intent: ${strongestNegative.overlap.join(', ')}`,
+    };
+  }
+  if (strongestPositive && strongestPositive.score > score) {
+    score = strongestPositive.score;
+    exampleReason = `matched trigger example: ${strongestPositive.overlap.join(', ')}`;
   }
   return {
     score,
