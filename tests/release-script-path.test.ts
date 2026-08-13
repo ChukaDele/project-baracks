@@ -1,6 +1,7 @@
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -48,5 +49,31 @@ describe('clean-install release gate PATH', () => {
     expect(readFileSync('tests/cli.test.ts', 'utf8')).toContain(
       "execFileSync('corepack', ['pnpm', 'build']",
     );
+  });
+
+  it('rejects the account home before deletion when HOME is absent', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-snapshot-home-'));
+    const bin = join(root, 'bin');
+    const simulatedHome = join(root, 'account-home');
+    mkdirSync(bin);
+    mkdirSync(simulatedHome);
+    writeFileSync(join(simulatedHome, 'sentinel'), 'preserve\n');
+    writeFileSync(
+      join(bin, 'python3'),
+      `#!/bin/sh\nif [ "$#" -eq 2 ]; then printf '%s\\n' "$2"; else printf '%s\\n' "${simulatedHome}"; fi\n`,
+    );
+    chmodSync(join(bin, 'python3'), 0o755);
+
+    const result = spawnSync(
+      '/bin/bash',
+      ['scripts/build-major-runtime-snapshot.sh', simulatedHome],
+      {
+        encoding: 'utf8',
+        env: { PATH: `${bin}:/usr/bin:/bin` },
+      },
+    );
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('refusing unsafe runtime snapshot destination');
+    expect(existsSync(join(simulatedHome, 'sentinel'))).toBe(true);
   });
 });
