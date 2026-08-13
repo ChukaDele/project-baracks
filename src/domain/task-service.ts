@@ -25,9 +25,8 @@ export class ConcurrencyError extends Error {
 
 /**
  * Refusal raised by the canonical suggestion-approval boundary. Approving a
- * suggestion materialises it into a live task that feeds the (disabled)
- * execution pipeline; this dry-run / inspection-only foundation does not
- * approve suggestions. Unconditional and self-contained — no configuration,
+ * suggestion materialises it into a live task. This remains a separate owner
+ * gate and was not included in M1-M5 activation. No configuration,
  * environment variable, database value or caller option is consulted — so the
  * only way to re-enable approval is a reviewed code change under a future
  * supervised-approval milestone. Read-only suggestion inspection
@@ -36,8 +35,8 @@ export class ConcurrencyError extends Error {
 export class SuggestionApprovalUnavailableError extends Error {
   constructor() {
     super(
-      'suggestion approval is unavailable in this disabled foundation: approving a suggestion ' +
-        'materialises a live task and is not permitted in this dry-run / inspection-only build',
+      'suggestion approval is unavailable: M1-M5 activation did not grant authority to ' +
+        'materialise a suggestion into a live task',
     );
     this.name = 'SuggestionApprovalUnavailableError';
   }
@@ -221,15 +220,11 @@ export function applyTransition(
   // the capability gate and the live-claim check must see the same value even
   // against a stateful accessor.
   const fence = opts.fence;
-  // Worker-owned downstream mutations are unavailable in this build: a
-  // fence-carrying (worker-attributed) transition is refused outright,
-  // regardless of the fence's validity (milestone M4 — fencing coverage is
-  // incomplete). The live-claim check below is retained for M4.
+  // Worker-attributed transitions remain bound to the reviewed M4 gate and
+  // must present the exact current live claim below.
   if (fence) assertCapabilityAvailable('worker-owned-downstream-mutations');
-  // Automated task completion is unavailable in this build: NO service-layer
-  // path reaches 'completed' (milestone M3 — completion criteria are mutable,
-  // so the proof set cannot yet be trusted as task-specific and immutable).
-  // The proof evaluation below is retained for M3.
+  // Automated completion remains bound to the reviewed M3 gate and immutable
+  // task-specific proof below.
   if (to === 'completed') assertCapabilityAvailable('automated-task-completion');
   if (fence) assertLiveClaim(db, fence, taskId);
   const task = getTask(db, taskId);
@@ -241,13 +236,23 @@ export function applyTransition(
     guards.completionProof = evaluateCompletionProof(
       db,
       taskId,
-      parseCompletionCriteria(task.completionCriteriaJson),
+      parseCompletionCriteria(task.completionCriteriaSnapshotJson),
     );
   }
   assertTransition(task.status, to, guards);
+  const patch: Partial<typeof tasks.$inferInsert> = {
+    status: to,
+    version: task.version + 1,
+    mutationClaimId: fence?.claimId ?? null,
+    mutationWorkerId: fence?.workerId ?? null,
+  };
+  if (to === 'queued' && task.completionCriteriaSnapshotJson === null) {
+    patch.completionCriteriaSnapshotJson = task.completionCriteriaJson ?? '{}';
+    patch.completionCriteriaLockedAt = nowIso();
+  }
   const result = db
     .update(tasks)
-    .set({ status: to, version: task.version + 1 })
+    .set(patch)
     .where(
       and(eq(tasks.id, taskId), eq(tasks.status, task.status), eq(tasks.version, task.version)),
     )
@@ -290,11 +295,13 @@ export function addEvidence(
     summary: string;
     ref?: string;
     dataJson?: string;
+    agentRunId?: string;
   },
 ) {
   const row = {
     id: newId('evid'),
     taskId: input.taskId,
+    agentRunId: input.agentRunId ?? null,
     kind: input.kind,
     summary: input.summary,
     ref: input.ref ?? null,
@@ -432,7 +439,7 @@ export function getSuggestion(db: DbConn, suggestionId: string) {
  */
 export function approveSuggestion(db: Db, suggestionId: string, note?: string) {
   // Fail closed BEFORE opening any transaction or reading/writing a row: the
-  // disabled foundation never materialises a suggestion into a task. This is
+  // The separate approval gate never materialises a suggestion into a task. This is
   // the canonical mutation boundary, so a direct lower-level call refuses here
   // exactly as the CLI does — no argument, environment or database value can
   // enable it. The transaction below is retained (and type-checked) groundwork

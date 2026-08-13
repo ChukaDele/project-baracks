@@ -1,0 +1,17 @@
+{
+  "skill": "research-before-build",
+  "should_trigger": [
+    "Evaluate whether Vercel Workflow should replace our custom durable workflow before we build it.",
+    "Research an existing sandbox or maintained library before adding a custom execution platform.",
+    "Compare the current dependencies, official framework capability and open source connector options.",
+    "Create a build-versus-buy adoption record for this nontrivial gateway integration.",
+    "Implement a durable queue with retries and worker leases.",
+    "Research whether we need a maintained auth library before coding."
+  ],
+  "should_not_trigger": [
+    "Fix the typo in the README.",
+    "Change this button label from Next to Continue.",
+    "Apply the established project formatter to this file.",
+    "Repair the known off-by-one bug using the existing helper."
+  ]
+}

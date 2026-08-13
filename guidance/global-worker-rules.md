@@ -17,9 +17,9 @@ Apply these defaults across projects unless a project/user instruction is more s
 ## Trust levels
 
 - `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human/gstack driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
-- `assist`: visible foreground pilot, maximum 3 useful workers and maximum 30 minutes per coordinator run.
-- `build`: normal foreground working mode, maximum 6 useful workers and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
-- `unattended`: maximum 6 useful workers with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
+- `assist`: visible foreground pilot, maximum 1 worker and maximum 30 minutes per coordinator run.
+- `build`: normal foreground working mode, maximum 1 worker and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
+- `unattended`: maximum 1 worker with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
 
 For owner-approved build projects, do not re-introduce shadow runs, repeated permission prompts, or ceremonial review loops that block ordinary reversible engineering.
 
@@ -33,7 +33,7 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Build budget: one production build at a time. Build once per relevant commit. Reviewers inspect the same immutable remote preview.
 - Major admission checks the shared resource ledger and memory availability. Below the memory soft floor, new work queues instead of increasing pressure.
 - Use `major resource status` for lightweight telemetry: workers, browsers, builds, total active, queued and memory availability.
-- QA runs use bounded waves, not swarms: up to 3 reviewers, consolidate and repair, up to 3 second-wave reviewers, then one final verifier.
+- QA runs are serialized through the single v0.5.1 worker: review, consolidate and repair, then run the next reviewer and final verifier.
 
 ## Communication
 
@@ -68,7 +68,21 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Prefer markdown judgment + minimal deterministic code over permanent hard-coded orchestration.
 - If a successful novel procedure is likely to recur, use `skillify` after the real task succeeds.
 - Do not skillify trivial one-offs or pause an active P0 to build tooling.
-- **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it with `major learn capture` and classify it as project-local or global. Do not rely on chat memory alone.
+- **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it project-locally with `major learn capture`. Global promotion is a separate reviewed action that requires sanitized content and evidence. Do not rely on chat memory alone.
+
+## Reuse before build
+
+- Before custom implementation of a non-trivial capability, load `research-before-build`.
+- Search the repository, installed skills, current dependencies, official platform features, maintained upstreams and available services in that order.
+- Record the decision in `.major/adoption-records/<problem>.md` and validate it with `major reuse check <record>`.
+- A custom build must identify the unmet requirement and explain why tailoring an existing option costs more or weakens a binding boundary.
+
+## Interface direction and browser evidence
+
+- For a substantial new interface or redesign, load `craft-web-interfaces` before broad production UI code.
+- Present three visible and genuinely distinct directions: conservative, progressive and exploratory.
+- Continue after the owner selects one, approves a coherent hybrid or explicitly delegates the choice.
+- Use `verify-in-browser` for rendered acceptance. Use `test-components` only when isolated reusable component states repay the setup.
 
 ## Remote-first web development
 

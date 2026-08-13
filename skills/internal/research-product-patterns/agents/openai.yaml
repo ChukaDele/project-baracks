@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Product Patterns"
+  short_description: "Research production UX patterns with evidence"
+  default_prompt: "Use $research-product-patterns to research relevant product flows before recommending a design pattern."

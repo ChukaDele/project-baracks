@@ -7,9 +7,9 @@ Reviewed 2026-08-10 as upstream design-capability sources for Major.
 - `pbakaus/impeccable` at commit `2ab054d1f400c5ec085133352232ffc2617f0d54` — Apache-2.0.
 - `Leonxlnx/taste-skill` at commit `e988add20dab0fa97d7a76781c48961c8184288e` — MIT. Its default `design-taste-frontend` v2 is explicitly marked experimental upstream.
 
-These sources are **not installed wholesale** into Major. Major already has frontend-design, the full Emil bundle, website-design-qa, responsive-motion-systems, exploratory-creative-dev, nontechnical-ux and competitive-product-audit. Loading all three taste systems concurrently would create contradictory defaults and context bloat.
+These sources are **not installed wholesale** into Major. Major already has frontend-design, the full Emil bundle, craft-web-interfaces, verify-in-browser, responsive-motion-systems, exploratory-creative-dev, nontechnical-ux and research-product-patterns. Loading all three taste systems concurrently would create contradictory defaults and context bloat.
 
-Major instead distilled the non-duplicative judgment into the canonical `design-direction-and-taste` skill.
+Major originally distilled the non-duplicative judgment into `design-direction-and-taste`. Its current successor is the canonical `craft-web-interfaces` skill.
 
 ## What Major adopted
 
@@ -52,12 +52,12 @@ Reason: these are taste opinions or implementation choices that can conflict wit
 
 ## Canonical separation after synthesis
 
-- **Art direction / taste / preserve-vs-redesign / design read:** `design-direction-and-taste`
-- **Reference and competitor learning:** `competitive-product-audit`
+- **Art direction / visual approval / design contract:** `craft-web-interfaces`
+- **Reference and product-pattern learning:** `research-product-patterns`
 - **Implementation technique:** project design system, shadcn, `frontend-design`
 - **Motion craft:** Emil skills
 - **Complex responsive motion engineering:** `responsive-motion-systems`
-- **Browser/responsive/production/launch QA:** `website-design-qa`
+- **Browser/responsive/production/launch QA:** `verify-in-browser`
 - **Operator workflow clarity:** `nontechnical-ux`
 - **Experimental Awwwards/FWA implementation:** `exploratory-creative-dev`, after design direction is settled
 

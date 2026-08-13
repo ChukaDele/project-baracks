@@ -1,6 +1,13 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { hostname } from 'node:os';
 import type { Db } from '../db/client.js';
-import { evidence, roadmapItems, roadmapUpdates, tasks } from '../db/schema.js';
+import {
+  evidence,
+  roadmapItems,
+  roadmapRuntimeHosts,
+  roadmapUpdates,
+  tasks,
+} from '../db/schema.js';
 import { assertCapabilityAvailable } from '../security/capabilities.js';
 import { isApprovedDecision } from '../domain/decision-service.js';
 import { newId, nowIso } from '../domain/ids.js';
@@ -14,18 +21,9 @@ import type { DiffEntry, RoadmapAdapter, RowChange, UpdateProposal } from './typ
 /**
  * DB-backed proposal lifecycle for roadmap writes.
  *
- * IN THIS BUILD, APPLY IS DISABLED. External roadmap application is an
- * unavailable capability (src/security/capabilities.ts): applyRoadmapUpdate
- * and reconcileRoadmapApplies refuse unconditionally before touching the
- * adapter or the update record, so no external roadmap write can occur
- * through any code path. Proposals and their recorded dry runs remain fully
- * available — proposing stores local records and uses only the adapter's
- * read-side (revision/dryRun).
- *
- * The apply/reconcile protocol below the gates is retained as the milestone
- * M5 starting point; independent review found it incomplete (reconciliation
- * does not compare-and-swap against the exact observed attempt), so it must
- * not be presented as a crash-safe boundary until M5 closes that gap.
+ * Apply and reconciliation are active behind the M5 capability boundary. The
+ * protocol requires a recorded dry run, immutable payload identity, evidence
+ * for Done, a separate Done approval, and exact persisted attempt identity.
  *
  * Roadmap permission grants NOTHING else: no merge, deploy, paid-usage or
  * destructive authority is inferred from the ability to propose updates.
@@ -117,6 +115,31 @@ function assertDoneEvidence(db: Db, roadmapItemId: string, evidenceIds: string[]
 }
 
 const DEFAULT_APPLY_LEASE_MS = 5 * 60 * 1000;
+const ROADMAP_HOST_SINGLETON = 'roadmap-mutation-host';
+
+/** Persist and enforce the supported single-host mutation assumption. */
+export function bindRoadmapRuntimeHost(db: Db, hostId = hostname()): string {
+  return db.transaction(
+    (tx) => {
+      const existing = tx
+        .select()
+        .from(roadmapRuntimeHosts)
+        .where(eq(roadmapRuntimeHosts.id, ROADMAP_HOST_SINGLETON))
+        .get();
+      if (!existing) {
+        tx.insert(roadmapRuntimeHosts).values({ id: ROADMAP_HOST_SINGLETON, hostId }).run();
+        return hostId;
+      }
+      if (existing.hostId !== hostId) {
+        throw new Error(
+          `roadmap mutation is bound to host ${existing.hostId}; refusing host ${hostId}`,
+        );
+      }
+      return existing.hostId;
+    },
+    { behavior: 'immediate' },
+  );
+}
 
 export interface ApplyRoadmapOptions {
   /** Required when the proposal marks a row Done. */
@@ -163,7 +186,7 @@ function claimApply(
         .set({
           status: 'applying',
           applyAttemptId: attemptId,
-          applyStartedAt: nowIso(),
+          applyStartedAt: new Date(nowMs).toISOString(),
           applyWorkerId: owner.workerId,
           applyLeaseExpiresAt: new Date(nowMs + owner.leaseMs).toISOString(),
         })
@@ -225,9 +248,9 @@ export async function applyRoadmapUpdate(
   updateId: string,
   options: ApplyRoadmapOptions = {},
 ) {
-  // External roadmap application is unavailable in this build: refuse before
-  // reading the update or touching the adapter (milestone M5).
+  // Keep every external roadmap mutation bound to the reviewed M5 code gate.
   assertCapabilityAvailable('external-roadmap-application');
+  bindRoadmapRuntimeHost(db);
   const update = getUpdate(db, updateId);
   if (update.status === 'applied') return { status: 'already_applied' as const, update };
   if (update.status === 'applying') {
@@ -259,10 +282,14 @@ export async function applyRoadmapUpdate(
       const attemptId = claimApply(db, updateId, owner);
       return { status: 'applied' as const, update: settle(db, updateId, attemptId, 'applied') };
     }
-    db.update(roadmapUpdates)
+    const superseded = db
+      .update(roadmapUpdates)
       .set({ status: 'superseded' })
       .where(and(eq(roadmapUpdates.id, updateId), eq(roadmapUpdates.status, 'proposed')))
       .run();
+    if (superseded.changes !== 1) {
+      throw new Error(`roadmap update ${updateId} changed during revision reconciliation`);
+    }
     return { status: 'superseded' as const, update: getUpdate(db, updateId) };
   }
 
@@ -314,35 +341,62 @@ export async function reconcileRoadmapApplies(
   adapter: RoadmapAdapter,
   options: { now?: () => Date } = {},
 ) {
-  // Part of the quarantined apply protocol: reconciliation can settle updates
-  // to 'applied', so it is gated with apply itself (milestone M5).
+  // Reconciliation can settle updates to applied, so it shares the M5 gate.
   assertCapabilityAvailable('external-roadmap-application');
+  bindRoadmapRuntimeHost(db);
   const nowIsoStr = (options.now?.() ?? new Date()).toISOString();
   const stuck = db.select().from(roadmapUpdates).where(eq(roadmapUpdates.status, 'applying')).all();
-  const resolved: { updateId: string; outcome: 'applied' | 'requeued' }[] = [];
+  const resolved: { updateId: string; outcome: 'applied' | 'requeued' | 'rejected' }[] = [];
   for (const update of stuck) {
-    if (await adapter.wasApplied(update.idempotencyKey)) {
-      db.update(roadmapUpdates)
-        .set({ status: 'applied', appliedAt: nowIso() })
+    if (!update.applyAttemptId || !update.applyWorkerId || !update.applyLeaseExpiresAt) {
+      const rejected = db
+        .update(roadmapUpdates)
+        .set({ status: 'rejected' })
         .where(and(eq(roadmapUpdates.id, update.id), eq(roadmapUpdates.status, 'applying')))
         .run();
-      resolved.push({ updateId: update.id, outcome: 'applied' });
+      if (rejected.changes === 1) resolved.push({ updateId: update.id, outcome: 'rejected' });
+      continue;
+    }
+    if (await adapter.wasApplied(update.idempotencyKey)) {
+      const settled = db
+        .update(roadmapUpdates)
+        .set({ status: 'applied', appliedAt: nowIso() })
+        .where(
+          and(
+            eq(roadmapUpdates.id, update.id),
+            eq(roadmapUpdates.status, 'applying'),
+            eq(roadmapUpdates.applyAttemptId, update.applyAttemptId),
+            eq(roadmapUpdates.applyWorkerId, update.applyWorkerId),
+            eq(roadmapUpdates.applyLeaseExpiresAt, update.applyLeaseExpiresAt),
+          ),
+        )
+        .run();
+      if (settled.changes === 1) resolved.push({ updateId: update.id, outcome: 'applied' });
       continue;
     }
     // Not applied at the source. Leave a still-leased attempt alone.
     if (update.applyLeaseExpiresAt !== null && update.applyLeaseExpiresAt > nowIsoStr) {
       continue;
     }
-    db.update(roadmapUpdates)
+    const requeued = db
+      .update(roadmapUpdates)
       .set({
         status: 'proposed',
         applyAttemptId: null,
         applyWorkerId: null,
         applyLeaseExpiresAt: null,
       })
-      .where(and(eq(roadmapUpdates.id, update.id), eq(roadmapUpdates.status, 'applying')))
+      .where(
+        and(
+          eq(roadmapUpdates.id, update.id),
+          eq(roadmapUpdates.status, 'applying'),
+          eq(roadmapUpdates.applyAttemptId, update.applyAttemptId),
+          eq(roadmapUpdates.applyWorkerId, update.applyWorkerId),
+          eq(roadmapUpdates.applyLeaseExpiresAt, update.applyLeaseExpiresAt),
+        ),
+      )
       .run();
-    resolved.push({ updateId: update.id, outcome: 'requeued' });
+    if (requeued.changes === 1) resolved.push({ updateId: update.id, outcome: 'requeued' });
   }
   return resolved;
 }

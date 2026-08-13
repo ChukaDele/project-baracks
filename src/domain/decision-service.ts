@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { DbConn } from '../db/client.js';
-import { decisionRequests } from '../db/schema.js';
+import { decisionRequests, providerActionConsumptions } from '../db/schema.js';
 import { newId, nowIso } from './ids.js';
 
 export interface NewDecisionInput {
@@ -56,6 +56,8 @@ export function resolveDecision(
 export interface DecisionScope {
   provider?: string;
   modelRef?: string;
+  purpose?: string;
+  actionDigest?: string;
 }
 
 /**
@@ -94,6 +96,13 @@ export function isApprovedDecision(
   if (expect.requireExpiry && !row.expiresAt) return false;
   if (row.expiresAt && row.expiresAt <= (expect.now ?? new Date()).toISOString()) return false;
   if (expect.scope !== undefined) {
+    if (
+      expect.scope.provider === undefined &&
+      expect.scope.modelRef === undefined &&
+      expect.scope.purpose === undefined
+    ) {
+      return false;
+    }
     let declared: DecisionScope | undefined;
     if (row.contextJson) {
       try {
@@ -102,16 +111,29 @@ export function isApprovedDecision(
         return false; // unparseable context cannot prove a matching scope
       }
     }
-    // A scope must be explicitly declared and match exactly; missing scope
-    // authorises nothing.
-    if (
-      declared?.provider === undefined ||
-      declared.provider !== expect.scope.provider ||
-      declared.modelRef === undefined ||
-      declared.modelRef !== expect.scope.modelRef
-    ) {
-      return false;
+    if (!declared || typeof declared !== 'object') return false;
+    // Every expected field must be explicitly declared and match exactly.
+    for (const field of ['provider', 'modelRef', 'purpose', 'actionDigest'] as const) {
+      if (expect.scope[field] !== undefined && declared?.[field] !== expect.scope[field]) {
+        return false;
+      }
     }
   }
   return true;
+}
+
+/** Atomically reserve an approved, scoped decision for exactly one execution. */
+export function consumeApprovedDecision(
+  db: DbConn,
+  decisionId: string,
+  consumerId: string,
+): boolean {
+  try {
+    db.insert(providerActionConsumptions)
+      .values({ id: newId('pac'), decisionId, consumerId })
+      .run();
+    return true;
+  } catch {
+    return false;
+  }
 }

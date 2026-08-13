@@ -17,6 +17,7 @@ import {
   listRunEvents,
   recordUsage,
   recordVerificationRun,
+  RunAuthorisationError,
   setRunStatus,
 } from '../src/domain/run-service.js';
 import {
@@ -33,9 +34,9 @@ import {
   SuggestionApprovalUnavailableError,
   transitionTask,
 } from '../src/domain/task-service.js';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import {
   completeTaskProperly,
+  ensureObservedModel,
   recordQualifyingVerification,
   seedProject,
   testDb,
@@ -55,7 +56,7 @@ describe('suggestions', () => {
     expect(created.outcome).toBe('created');
     expect(db.select().from(tasks).all()).toHaveLength(0);
 
-    // Approval is unavailable in this disabled foundation: it must refuse at the
+    // Approval remains a separate owner gate: it must refuse at the
     // canonical mutation boundary WITHOUT materialising a task or mutating the
     // suggestion. Read-only inspection of the suggestion remains available.
     expect(() => approveSuggestion(db, created.suggestion.id, 'good idea')).toThrow(
@@ -167,7 +168,7 @@ describe('dependency blocking', () => {
   });
 });
 
-describe('completion proof (model preserved; the completed transition is disabled)', () => {
+describe('completion proof and guarded completion transition', () => {
   function taskAtReadyToMerge(db: ReturnType<typeof testDb>) {
     const project = seedProject(db);
     const task = readyTask(db, project.id, 'ship it');
@@ -272,6 +273,7 @@ describe('completion proof (model preserved; the completed transition is disable
 
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'mock-reviewer' }).run();
+    ensureObservedModel(db, providerId, 'codex');
     const run = createRun(db, {
       taskId: task.id,
       providerId,
@@ -344,13 +346,13 @@ describe('completion proof (model preserved; the completed transition is disable
     expect(evaluateCompletionProof(db, task.id, criteria()).ok).toBe(true);
   });
 
-  it('the completed transition itself is disabled: a fully proven task still refuses', () => {
+  it('completes a fully proven task through the guarded service transition', () => {
     const db = testDb();
     const task = taskAtReadyToMerge(db);
     recordQualifyingVerification(db, task.id);
     expect(evaluateCompletionProof(db, task.id, defaultCriteria()).ok).toBe(true);
-    expect(() => transitionTask(db, task.id, 'completed')).toThrow(CapabilityUnavailableError);
-    expect(getTask(db, task.id).status).toBe('ready_to_merge');
+    expect(transitionTask(db, task.id, 'completed').status).toBe('completed');
+    expect(getTask(db, task.id).status).toBe('completed');
   });
 });
 
@@ -374,6 +376,7 @@ describe('agent runs', () => {
     const task = addTask(db, { projectId: project.id, title: 'work' });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'mock' }).run();
+    ensureObservedModel(db, providerId);
     const run = createRun(db, {
       taskId: task.id,
       providerId,
@@ -387,6 +390,7 @@ describe('agent runs', () => {
 
   it('supports many runs per task and records routing metadata', () => {
     const { db, task, providerId, run } = seedRun(testDb());
+    ensureObservedModel(db, providerId, 'opus');
     const second = createRun(db, {
       taskId: task.id,
       providerId,
@@ -415,7 +419,7 @@ describe('agent runs', () => {
     expect(() => db.delete(agentRunEvents).run()).toThrow(/append-only/);
   });
 
-  it('refuses every paid run: paid provider execution is unavailable in this build', () => {
+  it('refuses a paid run without authoritative billing and exact approval', () => {
     const { db, task, providerId } = seedRun(testDb());
     expect(() =>
       createRun(db, {
@@ -426,7 +430,7 @@ describe('agent runs', () => {
         billingMode: 'api_billing',
         routingReason: 'unauthorised paid route',
       }),
-    ).toThrow(CapabilityUnavailableError);
+    ).toThrow(RunAuthorisationError);
   });
 
   it('refuses an unknown-billing run at both the service and DB boundary', () => {
@@ -454,7 +458,7 @@ describe('agent runs', () => {
           routingReason: 'forged direct insert',
         })
         .run(),
-    ).toThrow(/authoritatively known billing mode/);
+    ).toThrow(/authoritatively (known|observed).*billing/);
   });
 
   it('records usage observations', () => {

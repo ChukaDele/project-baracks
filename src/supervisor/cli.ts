@@ -16,7 +16,8 @@ import {
   type TrustLevel,
 } from './policy.js';
 import {
-  attachSession,
+  applyIndependentCompletionGrade,
+  bindGoalToProject,
   getGoal,
   resolveProject,
   resolveProjectForCwd,
@@ -26,7 +27,7 @@ import {
   type GoalStatus,
   type WorkerHost,
 } from './state.js';
-import { runDaemon, runGoalCycle, supervisorSnapshot } from './runtime.js';
+import { runDaemon, runGoalCycle, supervisorSnapshot, tryAcquireRepoCycleLock } from './runtime.js';
 import { runGatewayCommand, runWorker } from './worker.js';
 import {
   RESOURCE_KINDS,
@@ -39,6 +40,15 @@ import {
   type ResourceKind,
 } from './resources.js';
 import { assertRemotePreviewUrl } from '../web/remote-preview.js';
+import { redactText } from '../security/redact.js';
+import { openDb } from '../db/client.js';
+import { createDecisionRequest, resolveDecision } from '../domain/decision-service.js';
+import {
+  decideProviderAction,
+  providerActionDigest,
+  type ApprovalCategory,
+  type ProviderAction,
+} from '../security/provider-approval-policy.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -81,14 +91,6 @@ function validResourceKind(value: string): ResourceKind {
     throw new Error(`unsupported resource kind: ${value}`);
   }
   return value as ResourceKind;
-}
-
-async function readStdin(): Promise<string> {
-  if (process.stdin.isTTY) return '';
-  process.stdin.setEncoding('utf8');
-  let text = '';
-  for await (const chunk of process.stdin) text += String(chunk);
-  return text;
 }
 
 export async function runSupervisorCli(args: string[]): Promise<boolean> {
@@ -234,8 +236,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
     }
     const goalId = requireFlag(args, '--goal-id');
-    const goal = getGoal(goalId);
-    if (!goal || goal.project !== project.project) {
+    const goal = bindGoalToProject(goalId, project.project, project.repoPath);
+    if (!goal) {
       throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
     }
     const policy = recordShadowGrade({
@@ -259,8 +261,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
     }
     const goalId = requireFlag(args, '--goal-id');
-    const goal = getGoal(goalId);
-    if (!goal || goal.project !== project.project) {
+    const goal = bindGoalToProject(goalId, project.project, project.repoPath);
+    if (!goal) {
       throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
     }
     if (!goal.lastCoordinator) {
@@ -273,14 +275,23 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         `independent grade refused: ${provider} was the last coordinator for goal ${goalId}`,
       );
     }
+    const evidence = requireFlag(args, '--evidence');
     const policy = recordIndependentGrade({
       project: project.project,
       repoPath: project.repoPath,
       provider,
       result: resultRaw,
-      evidence: requireFlag(args, '--evidence'),
+      evidence,
       goalId,
     });
+    if (goal.pendingCompletion) {
+      applyIndependentCompletionGrade({
+        goalId,
+        provider,
+        result: resultRaw,
+        evidence,
+      });
+    }
     console.log(JSON.stringify(policy, null, 2));
     return true;
   }
@@ -345,7 +356,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'goal' && args[1] === 'report') {
     const id = requireFlag(args, '--id');
     const statusRaw = requireFlag(args, '--status');
-    const allowed: GoalStatus[] = ['active', 'blocked', 'done', 'failed', 'paused', 'running'];
+    const allowed: GoalStatus[] = ['active', 'blocked', 'failed', 'paused'];
     if (!allowed.includes(statusRaw as GoalStatus)) {
       throw new Error(`invalid goal status: ${statusRaw}`);
     }
@@ -353,46 +364,13 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const ownerGate = flag(args, '--owner-gate');
     const patch: Parameters<typeof updateGoal>[1] = {
       status: statusRaw as GoalStatus,
-      lastSummary: summary,
+      lastSummary: redactText(summary).slice(0, 12_000),
       lastFinishedAt: new Date().toISOString(),
-      ownerGate,
+      ownerGate: ownerGate ? redactText(ownerGate).slice(0, 4_000) : undefined,
+      pendingCompletion: undefined,
     };
     updateGoal(id, patch);
     console.log(`goal ${id}: ${statusRaw}`);
-    return true;
-  }
-
-  if (command === 'session' && (args[1] === 'attach' || args[1] === 'hook')) {
-    const host = flag(args, '--host') ?? 'unknown';
-    let cwd = flag(args, '--cwd') ?? process.cwd();
-    let sessionId = flag(args, '--session-id');
-    if (args[1] === 'hook') {
-      const input = await readStdin();
-      if (input) {
-        try {
-          const parsed = JSON.parse(input) as { cwd?: string; session_id?: string };
-          cwd = parsed.cwd ?? cwd;
-          sessionId = parsed.session_id ?? sessionId;
-        } catch {
-          // Keep defaults; hook context is advisory.
-        }
-      }
-    }
-    const project = resolveProjectForCwd(cwd);
-    attachSession({
-      host,
-      cwd,
-      ...(project ? { project: project.project, repoPath: project.repoPath } : {}),
-      ...(sessionId ? { sessionId } : {}),
-    });
-    const active = project
-      ? supervisorSnapshot(project.project)
-      : 'No git project detected in this session.';
-    const policy = project ? getProjectPolicy(project.project, project.repoPath) : undefined;
-    const resources = formatResourceTelemetry(resourceSnapshot().telemetry);
-    console.log(
-      `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\n${policy ? `policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}\n` : ''}${active}\n\nRESOURCE GUARD\n${resources}\nsubagent depth: 1\nbrowser hard cap: 2\nconcurrent build cap: 1\n\nMajor is the default control plane. Reserve shared capacity before workers, browsers, or builds; queued work must wait. Owner-approved build projects may coordinate normal reversible engineering work immediately; client data remains project-local and destructive/irreversible owner gates still apply.`,
-    );
     return true;
   }
 
@@ -404,6 +382,33 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const policy = getProjectPolicy(project.project, project.repoPath);
     assertExecutionAllowed(policy);
     const prompt = requireFlag(args, '--prompt');
+    const approval = flag(args, '--approval');
+    const modelRef = flag(args, '--model');
+    let approvalAuthority: {
+      decisions: { category: ApprovalCategory; decisionId: string; actionDigest: string }[];
+    } = { decisions: [] };
+    if (approval) {
+      const separator = approval.indexOf('=');
+      const category = approval.slice(0, separator) as ApprovalCategory;
+      const reference = approval.slice(separator + 1);
+      const [decisionId, actionDigest] = reference.split(':');
+      const categories: ApprovalCategory[] = [
+        'command_execution',
+        'dependency_install',
+        'external_integration',
+        'push',
+        'deploy',
+      ];
+      if (
+        separator < 1 ||
+        !categories.includes(category) ||
+        !decisionId ||
+        !/^[a-f0-9]{64}$/.test(actionDigest ?? '')
+      ) {
+        throw new Error('--approval must be <category>=<DecisionRequest id>:<action digest>');
+      }
+      approvalAuthority = { decisions: [{ category, decisionId, actionDigest: actionDigest! }] };
+    }
     const worktree = flag(args, '--worktree');
     let runCwd = cwd;
     if (worktree) {
@@ -428,10 +433,98 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       }
       console.error(`Major worktree: ${runCwd} (${branch})`);
     }
-    const outcome = await runWorker({ host: provider, cwd: runCwd, prompt });
-    process.stdout.write(outcome.stdout);
-    if (outcome.stderr) process.stderr.write(outcome.stderr);
-    if (outcome.status !== 'succeeded') process.exitCode = 1;
+    const releaseRepoLock = worktree ? undefined : tryAcquireRepoCycleLock(project.repoPath);
+    if (!worktree && !releaseRepoLock) {
+      throw new Error(
+        `repository ${project.repoPath} already has an active Major integration owner`,
+      );
+    }
+    try {
+      const outcome = await runWorker({
+        host: provider,
+        cwd: runCwd,
+        prompt,
+        approvalAuthority,
+        ...(modelRef ? { modelRef } : {}),
+      });
+      process.stdout.write(outcome.stdout);
+      if (outcome.stderr) process.stderr.write(outcome.stderr);
+      if (outcome.status !== 'succeeded') process.exitCode = 1;
+    } finally {
+      releaseRepoLock?.();
+    }
+    return true;
+  }
+
+  if (command === 'decision' && args[1] === 'request') {
+    const project = resolveProject(flag(args, '--project') ?? 'current');
+    const provider = validHost(requireFlag(args, '--provider'));
+    const category = requireFlag(args, '--category') as ApprovalCategory;
+    const categories: ApprovalCategory[] = [
+      'command_execution',
+      'dependency_install',
+      'external_integration',
+      'push',
+      'deploy',
+    ];
+    if (!categories.includes(category))
+      throw new Error(`unsupported approval category: ${category}`);
+    const minutes = Number.parseInt(flag(args, '--expires-minutes') ?? '30', 10);
+    let action: ProviderAction;
+    try {
+      action = JSON.parse(requireFlag(args, '--action-json')) as ProviderAction;
+    } catch {
+      throw new Error('--action-json must be the exact JSON action emitted by Major');
+    }
+    if (!action || typeof action !== 'object' || typeof action.kind !== 'string') {
+      throw new Error('--action-json must contain a provider action kind');
+    }
+    const classified = decideProviderAction({
+      host: provider,
+      action,
+      authority: { decisions: [] },
+    });
+    if (classified.outcome !== 'approval_required' || classified.category !== category) {
+      throw new Error(`action JSON does not require approval category '${category}'`);
+    }
+    const actionDigest = providerActionDigest(action);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 120) {
+      throw new Error('--expires-minutes must be between 1 and 120');
+    }
+    const opened = openDb();
+    try {
+      const decision = createDecisionRequest(opened.db, {
+        category,
+        question: requireFlag(args, '--question'),
+        contextJson: JSON.stringify({
+          scope: { provider, purpose: `provider-action:${project.project}`, actionDigest },
+        }),
+        expiresAt: new Date(Date.now() + minutes * 60_000).toISOString(),
+      });
+      console.log(JSON.stringify({ ...decision, actionDigest }, null, 2));
+    } finally {
+      opened.sqlite.close();
+    }
+    return true;
+  }
+
+  if (command === 'decision' && args[1] === 'resolve') {
+    const status = requireFlag(args, '--status');
+    if (status !== 'approved' && status !== 'rejected') {
+      throw new Error('--status must be approved or rejected');
+    }
+    const opened = openDb();
+    try {
+      const decision = resolveDecision(
+        opened.db,
+        requireFlag(args, '--id'),
+        status,
+        flag(args, '--resolution'),
+      );
+      console.log(JSON.stringify(decision, null, 2));
+    } finally {
+      opened.sqlite.close();
+    }
     return true;
   }
 

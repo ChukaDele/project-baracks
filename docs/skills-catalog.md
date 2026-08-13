@@ -20,17 +20,18 @@ These are canonical Major-owned skills.
 | `learning-capture` | Harvest explicit corrections/repeated mistakes after fixing the real task; classify project/global/policy/skill/memory. |
 | `skillify` | Turn a successful reusable procedure into a tested skill pack after the real task works. |
 | `tools-as-code` | Compose repeated deterministic retrieval/filter/dedupe/rank/transform mechanics with short temporary code. |
-| `design-direction-and-taste` | Canonical art-direction layer: design read, surface mode, preserve-vs-redesign, variance/motion/density, anti-default discipline and bounded critique. |
+| `craft-web-interfaces` | Canonical interface direction and craft layer: targeted references, three visible directions, owner approval, design contract and representative prototype. |
 | `remote-first-web-development` | Require GitHub plus a Cloudflare preview for browser work and block local browser targets. |
-| `website-design-qa` | Canonical website/landing-page visual, responsive, browser, launch, SEO, accessibility and production QA doctrine. |
+| `verify-in-browser` | Canonical real-browser evidence contract for functional, responsive, accessibility, console/network and visual acceptance. |
+| `test-components` | Selective isolated-component and interaction-test adoption, including Storybook when its maintenance cost is justified. |
 | `responsive-motion-systems` | Responsive GSAP/ScrollTrigger/sticky/pinned/Three.js geometry, lifecycle, handoff and zoom-robustness doctrine. |
 | `human-blocker-orchestration` | Surface auth/OAuth/2FA/CAPTCHA/payment/irreversible human-only actions and keep independent work moving. |
 | `dev-server-management` | Coordinate an explicitly approved local exception only. |
 | `mcp-integration-ops` | Diagnose and prove MCP/connector/plugin integrations across installed→configured→exposed→authenticated→permissioned→operational→integrated states. |
 | `source-ingestion` | Retrieve named primary sources with the right connector/CLI/browser/local tool before analysis. |
 | `knowledge-work` | Research/strategy/synthesis with minimum credible evidence, independent angles and skeptic review where justified. |
-| `competitive-product-audit` | Learn direct/adjacent product patterns before reinventing workflows. |
-| `open-source-leverage` | Reuse/adapt/wrap maintained systems before commodity rebuilds. |
+| `research-product-patterns` | Targeted and ethical Mobbin/Baymard/product-flow research tied to explicit product decisions. |
+| `research-before-build` | Mandatory repository-to-platform-to-upstream adoption research before non-trivial custom implementation. |
 | `simple-modular-code` | Small replaceable modules; stable contracts; simple code. |
 | `vertical-slice-delivery` | Build the smallest complete user/operational outcome. |
 | `nontechnical-ux` | Plain-language, low-friction workflows for non-technical users. |
@@ -41,7 +42,6 @@ These are canonical Major-owned skills.
 | `lean-quality` | Confidence per minute; risk-proportional testing. |
 | `performance-caching` | Measure real slowness; apply simplest cache/index/lazy-load/batch fix. |
 | `exact-head-pr-review` | Review the exact immutable head/artefact before readiness claims. |
-| `rapid-ui-prototype` | Compare 2–3 interaction options when the UI choice matters. |
 | `data-learning-loop` | Outcome learning without leakage, false causality or uncontrolled rule changes. |
 | `source-adapter-engineering` | Modular APIs/scrapers/feeds with provenance, retries and dedupe. |
 | `pdf-reporting-qa` | Reliable generated PDF reports with visual QA. |
@@ -90,7 +90,7 @@ Major reviewed two external design systems and **did not install either wholesal
 - `pbakaus/impeccable` — useful surface modes, preserve-vs-redesign discipline, design-specificity critique, deterministic detector philosophy and bounded finish passes.
 - `Leonxlnx/taste-skill` — useful brief inference, Design Read, variance/motion/density calibration and anti-default discipline; current v2 is explicitly experimental upstream.
 
-The non-duplicative judgment is distilled into `design-direction-and-taste`, with exact source commits and accepted/rejected ideas recorded in `memory/verified/design-direction-taste-synthesis.md`.
+The non-duplicative judgment is now consolidated into `craft-web-interfaces`, with the earlier source review preserved in `memory/verified/design-direction-taste-synthesis.md`.
 
 Reason: loading Impeccable, Taste Skill, Anthropic frontend-design, Emil, Major website QA and Major motion doctrine as simultaneous generic taste authorities would create contradictory defaults and context bloat. One canonical Major art-direction layer owns taste; specialist skills keep separate responsibilities.
 
@@ -166,11 +166,11 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### `web-ui`
 
-`core` + `design-direction-and-taste` when art direction is material + `remote-first-web-development` + `website-design-qa` + `responsive-motion-systems` when motion applies + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work unless the owner explicitly grants a local exception.
+`core` + `craft-web-interfaces` when direction is material + `research-product-patterns` when workflow evidence is needed + `remote-first-web-development` + `verify-in-browser` + `responsive-motion-systems` when motion applies + `test-components` only for justified component systems + complete Emil bundle + `frontend-design` + `webapp-testing` + `playwright`. GitHub plus a Cloudflare preview must exist before browser work unless the owner explicitly grants a local exception.
 
 ### `exploratory`
 
-`web-ui` + `algorithmic-art` + `exploratory-creative-dev`. Art direction remains owned by `design-direction-and-taste`; `exploratory-creative-dev` executes the chosen world. Add Rive/Three/R3F/Spline/Remotion as runtime dependencies only if the concept needs them.
+`web-ui` + `algorithmic-art` + `exploratory-creative-dev`. Direction remains owned by `craft-web-interfaces`; `exploratory-creative-dev` executes the chosen world. Add Rive/Three/R3F/Spline/Remotion as runtime dependencies only if the concept needs them.
 
 ### Specialist triggers
 
@@ -179,8 +179,11 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 - Project create/clone/locate/move/park/delete/archive/storage-pressure/large-asset/local-vs-cloud decision → `workspace-lifecycle-management`.
 - Major/project-baracks self-change → `major-self-maintenance`.
 - Explicit correction / repeated mistake / "we fixed this before" → `learning-capture` after the real task is fixed.
-- Substantial UI/website creation, redesign, new visual identity, "generic AI", "too safe", "too loud" → `design-direction-and-taste`.
-- Web UI implementation/browser/launch QA → `remote-first-web-development` + `website-design-qa`.
+- Non-trivial capability, dependency, integration or platform work → `research-before-build` and a validated adoption record.
+- Consequential product flow or interaction research → `research-product-patterns`.
+- Substantial UI/website creation, redesign, new visual identity, "generic AI", "too safe", "too loud" → `craft-web-interfaces`.
+- Web UI implementation/browser/launch QA → `remote-first-web-development` + `verify-in-browser`.
+- Reusable interaction-heavy component system → consider `test-components` after the adoption gate.
 - GSAP/ScrollTrigger/sticky/pinned/Three.js/viewport motion → add `responsive-motion-systems`.
 - Explicit owner-approved local exception → `dev-server-management`.
 - MCP/connector/plugin setup/reconnect/tool exposure/auth/permission failure → `mcp-integration-ops`.

@@ -83,11 +83,53 @@ export const DEFAULT_MODEL_REGISTRY: ModelRegistry = {
     },
     {
       provider: 'codex',
-      knownModels: ['gpt-5.3-codex'],
+      knownModels: ['auto'],
       rules: [
         {
           match: '.*',
           routingClass: 'codex',
+          billingMode: 'subscription_included',
+          prohibited: false,
+        },
+      ],
+    },
+    {
+      provider: 'cursor',
+      knownModels: ['auto'],
+      rules: [
+        {
+          match: 'gpt.*codex|composer',
+          routingClass: 'codex',
+          billingMode: 'subscription_included',
+          prohibited: false,
+        },
+        {
+          match: 'opus',
+          routingClass: 'opus',
+          billingMode: 'subscription_included',
+          prohibited: false,
+        },
+        {
+          match: 'sonnet|gemini|auto',
+          routingClass: 'sonnet',
+          billingMode: 'subscription_included',
+          prohibited: false,
+        },
+      ],
+    },
+    {
+      provider: 'antigravity',
+      knownModels: ['auto'],
+      rules: [
+        {
+          match: 'pro|deep',
+          routingClass: 'opus',
+          billingMode: 'subscription_included',
+          prohibited: false,
+        },
+        {
+          match: 'flash|auto',
+          routingClass: 'sonnet',
           billingMode: 'subscription_included',
           prohibited: false,
         },
@@ -187,8 +229,9 @@ export const modelAvailabilitySchema = z.enum(MODEL_AVAILABILITIES);
  */
 export {
   CapabilityUnavailableError,
-  UNAVAILABLE_CAPABILITIES,
-  unavailableCapabilityStatuses,
+  CAPABILITY_DEFINITIONS,
+  capabilityStatuses,
   type CapabilityStatus,
+  type Capability,
   type UnavailableCapability,
 } from '../security/capabilities.js';

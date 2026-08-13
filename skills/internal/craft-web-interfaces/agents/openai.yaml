@@ -1,0 +1,4 @@
+interface:
+  display_name: "Craft Web Interfaces"
+  short_description: "Set visual direction and interaction craft"
+  default_prompt: "Use $craft-web-interfaces to establish an approved visual direction and interface contract before implementation."

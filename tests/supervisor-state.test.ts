@@ -33,7 +33,7 @@ function fakeRepo(name = 'jss-tool'): string {
   mkdirSync(join(repo, '.git'), { recursive: true });
   writeFileSync(
     join(repo, '.git', 'config'),
-    `[remote "origin"]\n\turl = https://github.com/ChukaDele/${name}.git\n`,
+    `[remote "origin"]\n\turl = https://github.com/chukadele/${name}.git\n`,
   );
   return repo;
 }
@@ -70,10 +70,29 @@ describe('Major supervisor state', () => {
     expect(raw.version).toBe(1);
   });
 
+  it('migrates a live legacy goal by git identity instead of duplicating it', () => {
+    const repoPath = fakeRepo('legacy-goal');
+    const first = startGoal({
+      project: 'legacy-goal',
+      repoPath,
+      goal: 'Legacy objective',
+      autonomous: false,
+    });
+    const migrated = startGoal({
+      project: 'github.com/chukadele/legacy-goal',
+      repoPath,
+      goal: 'Canonical objective',
+      autonomous: false,
+    });
+    expect(migrated.id).toBe(first.id);
+    expect(migrated.project).toBe('github.com/chukadele/legacy-goal');
+    expect(readSupervisorState().goals).toHaveLength(1);
+  });
+
   it('attaches sessions to the git project and preserves the host', () => {
     const repoPath = fakeRepo('surface-talent');
     const project = resolveProjectForCwd(repoPath);
-    expect(project).toEqual({ project: 'surface-talent', repoPath });
+    expect(project).toEqual({ project: 'github.com/chukadele/surface-talent', repoPath });
 
     const attachment = attachSession({
       host: 'claude',
@@ -88,7 +107,38 @@ describe('Major supervisor state', () => {
 
   it('resolves current project by remote repository name', () => {
     const repoPath = fakeRepo('jss-tool');
-    expect(resolveProject('jss-tool', repoPath)).toEqual({ project: 'jss-tool', repoPath });
-    expect(resolveProject('current', repoPath)).toEqual({ project: 'jss-tool', repoPath });
+    expect(resolveProject('jss-tool', repoPath)).toEqual({
+      project: 'github.com/chukadele/jss-tool',
+      repoPath,
+    });
+    expect(resolveProject('current', repoPath)).toEqual({
+      project: 'github.com/chukadele/jss-tool',
+      repoPath,
+    });
+  });
+
+  it('keeps unrelated same-basename remotes distinct', () => {
+    const first = fakeRepo('shared-name');
+    const second = join(root, 'fork', 'shared-name');
+    mkdirSync(join(second, '.git'), { recursive: true });
+    writeFileSync(
+      join(second, '.git', 'config'),
+      '[remote "origin"]\n\turl = git@github.com:OtherOwner/shared-name.git\n',
+    );
+    expect(resolveProjectForCwd(first)?.project).toBe('github.com/chukadele/shared-name');
+    expect(resolveProjectForCwd(second)?.project).toBe('github.com/otherowner/shared-name');
+  });
+
+  it('rejects an ambiguous short project name outside either repository', () => {
+    const first = fakeRepo('shared');
+    const second = join(root, 'fork', 'shared');
+    mkdirSync(join(second, '.git'), { recursive: true });
+    writeFileSync(
+      join(second, '.git', 'config'),
+      '[remote "origin"]\n\turl = git@github.com:OtherOwner/shared.git\n',
+    );
+    startGoal({ project: 'shared', repoPath: first, goal: 'First', autonomous: false });
+    startGoal({ project: 'other-shared', repoPath: second, goal: 'Second', autonomous: false });
+    expect(() => resolveProject('shared', root)).toThrow(/multiple active worktrees/);
   });
 });

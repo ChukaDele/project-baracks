@@ -1,0 +1,18 @@
+{
+  "skill": "verify-in-browser",
+  "should_trigger": [
+    "Verify this deployed interface at desktop, mobile and ultra-wide viewports in a real browser.",
+    "Inspect console and network failures on the Cloudflare preview and capture screenshot evidence.",
+    "Run keyboard, focus, reduced-motion and responsive browser acceptance for this form.",
+    "Compare the implementation with the approved design contract using functional assertions.",
+    "Verify production forms, performance, SEO, analytics, routing and caching before public launch.",
+    "Run browser QA against the approved design."
+  ],
+  "should_not_trigger": [
+    "Review this database schema with no rendered behavior.",
+    "Proofread a Markdown document.",
+    "Run only the unit tests for a pure parsing function.",
+    "Research visual directions before any interface exists.",
+    "Implement this already approved dashboard design."
+  ]
+}

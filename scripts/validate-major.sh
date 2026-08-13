@@ -38,6 +38,7 @@ required = {
     'communication-style', 'tool-routing-and-source-ingestion',
     'mvp-speed-and-prioritisation', 'autonomy-and-progress',
     'legacy-cleanup', 'security-and-permissions', 'ui-patterns-and-reuse',
+    'reuse-before-build',
     'task-scope', 'model-routing', 'human-approval', 'roadmap-sync'
 }
 missing = required - set(ids)
@@ -64,7 +65,9 @@ if registered_internal != actual_internal:
 for required_skill in [
     'source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code',
     'learning-capture', 'remote-first-web-development', 'human-blocker-orchestration',
-    'dev-server-management', 'video-generation-routing'
+    'dev-server-management', 'video-generation-routing',
+    'research-before-build', 'research-product-patterns', 'craft-web-interfaces',
+    'test-components', 'verify-in-browser'
 ]:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
@@ -79,6 +82,9 @@ for key in [
     'skillifyReusableProcedures',
     'toolsAsCodeForRepeatedDeterministicWork',
     'captureExplicitCorrections',
+    'reuseBeforeBuildRequired',
+    'visualDirectionApprovalRequired',
+    'browserEvidenceRequired',
 ]:
     if policy.get(key) is not True:
         raise SystemExit(f"required skill policy not enabled: {key}")
@@ -90,6 +96,11 @@ for fixture in [
     'evals/skill-resolver/remote-first-web-development.json',
     'evals/skill-resolver/dev-server-management.json',
     'evals/skill-resolver/video-generation-routing.json',
+    'evals/skill-resolver/research-before-build.json',
+    'evals/skill-resolver/research-product-patterns.json',
+    'evals/skill-resolver/craft-web-interfaces.json',
+    'evals/skill-resolver/test-components.json',
+    'evals/skill-resolver/verify-in-browser.json',
 ]:
     if not Path(fixture).is_file():
         raise SystemExit(f"resolver eval missing: {fixture}")
@@ -138,6 +149,11 @@ grep -Fq "install-major-skills.sh" scripts/bootstrap-major-project.sh || fail "s
 grep -Fq "core|knowledge|web-ui|exploratory|full" scripts/install-major-skills.sh || fail "knowledge profile missing from skill installer"
 grep -Fq "A failed first tool is not a failed task" templates/project/major-core.md || fail "project tool-routing rule missing"
 grep -Fq "Skill-first execution" templates/project/major-core.md || fail "project skill-first rule missing"
+grep -Fq "major reuse check" templates/project/major-core.md || fail "project reuse gate missing"
+grep -Fq "major design check" templates/project/major-core.md || fail "project visual approval gate missing"
+[ -f templates/project/DESIGN-DIRECTION.md ] || fail "durable design direction template missing"
+[ -f src/design/direction.ts ] || fail "design direction validator missing"
+grep -Fq 'runDesignCli' src/entry.ts || fail "design direction CLI is not wired into Major entrypoint"
 grep -Fq "BUILT" templates/project/major-core.md || fail "project readiness language missing"
 
 [ -f guidance/global-worker-rules.md ] || fail "compact global worker rules missing"
@@ -150,6 +166,8 @@ grep -Fq "MAJOR SHADOW PLAN" guidance/global-worker-rules.md || fail "observe-fi
 grep -Fq "Three consecutive passing shadow grades" guidance/global-worker-rules.md || fail "shadow promotion threshold missing"
 grep -Fq "Tools as Code" guidance/global-worker-rules.md || fail "Tools-as-Code rule missing"
 grep -Fq "skillify" guidance/global-worker-rules.md || fail "skillify rule missing"
+grep -Fq "Reuse before build" guidance/global-worker-rules.md || fail "reuse-before-build global rule missing"
+grep -Fq "three visible and genuinely distinct directions" guidance/global-worker-rules.md || fail "visual-direction approval gate missing"
 grep -Fq "major learn capture" guidance/global-worker-rules.md || fail "explicit correction capture rule missing"
 grep -Fq "remote-first-web-development" guidance/global-worker-rules.md || fail "remote-first web rule missing"
 grep -Fq "major web preflight" guidance/global-worker-rules.md || fail "remote browser-target guard missing"
@@ -193,25 +211,29 @@ grep -Fq '"major": "./dist/entry.js"' package.json || fail "package bin must ent
 grep -Fq "supervisor-state.json" src/supervisor/state.ts || fail "durable cross-session goal state missing"
 grep -Fq "project-policies.json" src/supervisor/policy.ts || fail "durable project policy store missing"
 grep -Fq "dev-ports.json" src/dev/ports.ts || fail "durable dev-port registry missing"
-grep -Fq "learning-candidates.json" src/learning/candidates.ts || fail "durable learning candidate registry missing"
+grep -Fq "function projectStorePath" src/learning/candidates.ts || fail "project-local learning store missing"
+grep -Fq "function globalStorePath" src/learning/candidates.ts || fail "sanitized global learning store missing"
 grep -Fq "command === 'dev'" src/supervisor/cli.ts || fail "dev-port CLI path missing"
 grep -Fq "args[1] === 'capture'" src/learning/lifecycle-cli.ts || fail "learning-capture CLI path missing"
 grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts || fail "project classes missing"
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
-grep -Fq "maxWorkers: 3" src/supervisor/policy.ts || fail "assist worker ceiling missing"
+grep -Fq "maxWorkers: 1" src/supervisor/policy.ts || fail "truthful project worker ceiling missing"
 grep -Fq "maxRunMinutes: 30" src/supervisor/policy.ts || fail "assist wall-clock ceiling missing"
-grep -Fq "maxWorkers: 6" src/supervisor/policy.ts || fail "build worker ceiling missing"
-grep -Fq "maxWorkers: 6" src/supervisor/policy.ts || fail "hard worker ceiling missing"
+grep -Fq "workers: 1" src/supervisor/resources.ts || fail "single shared-Lima worker ceiling missing"
 grep -Fq "GLOBAL_RESOURCE_LIMITS" src/supervisor/resources.ts || fail "global resource guard missing"
 grep -Fq "maxSubagentDepth: 1" src/supervisor/resources.ts || fail "subagent depth cap missing"
 grep -Fq "three consecutive independently graded shadow passes" src/supervisor/policy.ts || fail "observe-to-assist shadow gate missing"
 grep -Fq "recordShadowGrade" src/supervisor/cli.ts || fail "shadow grade CLI path missing"
-grep -Fq "major goal report" src/supervisor/runtime.ts || fail "coordinator cannot durably report goal state"
+grep -Fq 'MAJOR_RESULT:' src/supervisor/runtime.ts || fail "coordinator has no parent-owned result channel"
+if grep -Fq "major goal report" src/supervisor/runtime.ts; then
+  fail "sandboxed coordinator must not mutate Major global state directly"
+fi
 grep -Fq "Skillify" src/supervisor/runtime.ts || fail "coordinator is not skill-first"
 grep -Fq "Tools-as-Code" src/supervisor/runtime.ts || fail "coordinator lacks Tools-as-Code guidance"
 for provider in claude codex cursor antigravity; do
-  grep -Fq "case '$provider'" src/supervisor/worker.ts || fail "live worker adapter missing: $provider"
+  grep -Fq "case '$provider'" src/providers/commands.ts || fail "live worker adapter missing: $provider"
 done
+grep -Fq 'providerArgs' src/supervisor/worker.ts || fail "worker bypasses shared provider command builder"
 
 if grep -R -F -n "node:child_process" src/supervisor; then
   fail "supervisor bypasses the execution gateway"
@@ -227,9 +249,23 @@ grep -Fq "startup|resume|clear|compact" scripts/stage-major-user-state.py || fai
 grep -Fq "no auto-start daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
 grep -Fq "Ruflo is NOT attached globally" scripts/install-major-runtime.sh || fail "pilot installer must avoid global Ruflo blast radius"
 grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "optional observe pilot path must remain available"
-if grep -Fq "launchctl bootstrap" scripts/install-major-runtime.sh; then
-  fail "pilot installer must not start a login daemon"
-fi
+python3 - <<'PY'
+import re
+from pathlib import Path
+
+lines = Path('scripts/install-major-runtime.sh').read_text().splitlines()
+commands = [
+    line.strip()
+    for line in lines
+    if re.match(r'^\s*(?:if\s+!\s+)?launchctl\s+bootstrap\b', line)
+]
+expected = ['if ! launchctl bootstrap "gui/$UID" "$LEGACY_PLIST" >/dev/null 2>&1; then']
+if commands != expected:
+    raise SystemExit(
+        'MAJOR VALIDATION FAILED: pilot installer contains an unexpected launchctl bootstrap command: '
+        + repr(commands)
+    )
+PY
 if grep -Fq "claude mcp add ruflo" scripts/install-major-runtime.sh || grep -Fq "codex mcp add ruflo" scripts/install-major-runtime.sh; then
   fail "Ruflo must not be globally attached during pilot"
 fi

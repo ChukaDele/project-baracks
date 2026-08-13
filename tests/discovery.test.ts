@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { discoveryObservations, routingCheckpoints } from '../src/db/schema.js';
+import { agentModels, discoveryObservations, routingCheckpoints } from '../src/db/schema.js';
 import {
+  consumeModelRetry,
   loadPersistedProviderInfos,
   persistProviderDiscovery,
   recordBillingObservation,
@@ -38,6 +39,37 @@ describe('discovery persistence', () => {
       expect(obs.observedAt).toBeTruthy();
       expect(JSON.parse(obs.observedJson)).toHaveProperty('availability');
     }
+  });
+
+  it('redacts human availability evidence before persistence', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo(), {
+      source: 'human',
+      note: 'verified with token=sk-this-is-a-secret-value',
+    });
+    const observations = db.select().from(discoveryObservations).all();
+    expect(observations).toHaveLength(2);
+    for (const observation of observations) {
+      expect(observation.observedJson).not.toContain('sk-this-is-a-secret-value');
+      expect(JSON.parse(observation.observedJson).note).toContain('[REDACTED]');
+      expect(observation.source).toBe('human');
+      expect(observation.confidence).toBe('configured');
+    }
+  });
+
+  it('redacts billing attestation notes before persistence', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo(), { source: 'cli' });
+    recordBillingObservation(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      billingMode: 'subscription_included',
+      source: 'human',
+      note: 'confirmed with token=sk-this-is-a-secret-value',
+    });
+    const observation = db.select().from(discoveryObservations).all().at(-1)!;
+    expect(observation.observedJson).toContain('[REDACTED]');
+    expect(observation.observedJson).not.toContain('sk-this-is-a-secret-value');
   });
 
   it('routing consumes persisted state, and billing stays unroutable until observed', () => {
@@ -85,6 +117,82 @@ describe('discovery persistence', () => {
     expect(sonnet.billingMode).toBe('unknown');
   });
 
+  it('process-free doctor discovery cannot erase human-attested availability', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo({ executable: '/trusted/provider' }), {
+      source: 'human',
+      note: 'operator verified login and model visibility',
+    });
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        executable: '/hostile/path/provider',
+        installed: false,
+        authenticated: false,
+        models: [
+          model({
+            modelRef: 'opus',
+            visible: false,
+            authenticated: false,
+            availability: 'unknown',
+          }),
+        ],
+      }),
+      { source: 'cli' },
+    );
+    const info = loadPersistedProviderInfos(db)[0]!;
+    expect(info.executable).toBe('/trusted/provider');
+    expect(info.models.find((candidate) => candidate.modelRef === 'opus')).toMatchObject({
+      visible: true,
+      authenticated: true,
+      availability: 'available',
+    });
+  });
+
+  it('process-free discovery cannot clear an authoritative model prohibition', () => {
+    const db = testDb();
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        models: [
+          model({
+            modelRef: 'opus',
+            routingClass: 'opus',
+            prohibited: true,
+            prohibitedReason: 'operator prohibition',
+          }),
+        ],
+      }),
+      { source: 'human' },
+    );
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        models: [model({ modelRef: 'opus', routingClass: 'sonnet', prohibited: false })],
+      }),
+      { source: 'cli' },
+    );
+    expect(loadPersistedProviderInfos(db)[0]!.models[0]).toMatchObject({
+      routingClass: 'opus',
+      prohibited: true,
+      prohibitedReason: 'operator prohibition',
+    });
+  });
+
+  it('an observed authentication failure revokes stale availability', () => {
+    const db = testDb();
+    persistProviderDiscovery(db, providerInfo(), { source: 'human' });
+    recordModelOutcome(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      outcome: 'unknown',
+    });
+    expect(
+      loadPersistedProviderInfos(db)[0]!.models.find((candidate) => candidate.modelRef === 'opus')!
+        .availability,
+    ).toBe('unknown');
+  });
+
   it('persists exhaustion with a next-probe time and blocks early re-probing', () => {
     const db = testDb();
     persistProviderDiscovery(db, providerInfo(), { source: 'cli' });
@@ -107,6 +215,63 @@ describe('discovery persistence', () => {
     recordModelOutcome(db, { providerName: 'claude-code', modelRef: 'opus', outcome: 'available' });
     const after = loadPersistedProviderInfos(db)[0]!.models.find((m) => m.modelRef === 'opus')!;
     expect(after.availability).toBe('available');
+  });
+
+  it('keeps the observed state but makes one real retry eligible after backoff expiry', () => {
+    const db = testDb();
+    const observedAt = new Date('2026-01-01T00:00:00.000Z');
+    persistProviderDiscovery(db, providerInfo(), { source: 'human', now: () => observedAt });
+    recordModelOutcome(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      outcome: 'exhausted',
+      backoffMs: 1_000,
+      now: () => observedAt,
+    });
+    recordBillingObservation(db, {
+      providerName: 'claude-code',
+      modelRef: 'opus',
+      billingMode: 'subscription_included',
+      source: 'human',
+    });
+    const deadline = db.select().from(agentModels).get()!.nextProbeAt;
+    persistProviderDiscovery(db, providerInfo({ installed: false, authenticated: false }), {
+      source: 'cli',
+      now: () => new Date('2026-01-01T00:01:00.000Z'),
+    });
+    const persisted = loadPersistedProviderInfos(
+      db,
+      () => new Date('2026-01-01T00:01:00.000Z'),
+    )[0]!.models.find((candidate) => candidate.modelRef === 'opus')!;
+    expect(persisted.availability).toBe('exhausted');
+    expect(persisted.retryEligible).toBe(true);
+    expect(db.select().from(agentModels).get()!.nextProbeAt).toBe(deadline);
+    const decision = route(
+      { purpose: 'implementation', complexity: 'complex' },
+      loadPersistedProviderInfos(db, () => new Date('2026-01-01T00:01:00.000Z')),
+    );
+    expect(decision.kind).toBe('route');
+
+    expect(
+      consumeModelRetry(db, {
+        providerName: 'claude-code',
+        modelRef: 'opus',
+        now: () => new Date('2026-01-01T00:01:00.000Z'),
+      }),
+    ).toBe(true);
+    expect(
+      consumeModelRetry(db, {
+        providerName: 'claude-code',
+        modelRef: 'opus',
+        now: () => new Date('2026-01-01T00:01:00.000Z'),
+      }),
+    ).toBe(false);
+    const consumed = loadPersistedProviderInfos(
+      db,
+      () => new Date('2026-01-01T00:01:00.000Z'),
+    )[0]!.models.find((candidate) => candidate.modelRef === 'opus')!;
+    expect(consumed).toMatchObject({ availability: 'unknown' });
+    expect(consumed.retryEligible).toBeUndefined();
   });
 
   it('an exhausted persisted model is not routed to', () => {

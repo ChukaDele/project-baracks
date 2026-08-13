@@ -152,7 +152,7 @@ describe('billing safety', () => {
     }
   });
 
-  it('never routes to paid capacity, even with an approving DecisionRequest reference', () => {
+  it('carries an explicit paid-approval reference to the transactional run boundary', () => {
     const decision = route(
       {
         purpose: 'implementation',
@@ -161,10 +161,11 @@ describe('billing safety', () => {
       },
       paidOnly,
     );
-    expect(decision.kind).toBe('checkpoint');
-    if (decision.kind === 'checkpoint') {
-      expect(decision.reason).toMatch(/paid provider execution is unavailable/);
-      expect(decision.paidOptionsAvailable.length).toBeGreaterThan(0);
+    expect(decision.kind).toBe('route');
+    if (decision.kind === 'route') {
+      expect(decision.billingMode).toBe('usage_credits');
+      expect(decision.paidUsageDecisionId).toBe('dreq_paid1');
+      expect(decision.reason).toMatch(/approved by dreq_paid1/);
     }
   });
 

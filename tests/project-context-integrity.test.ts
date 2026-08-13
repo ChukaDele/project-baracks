@@ -18,7 +18,7 @@ function makeRepo(name: string): string {
   mkdirSync(join(repo, '.git'), { recursive: true });
   writeFileSync(
     join(repo, '.git', 'config'),
-    `[remote "origin"]\n\turl = https://github.com/ChukaDele/${name}.git\n`,
+    `[remote "origin"]\n\turl = https://github.com/chukadele/${name}.git\n`,
   );
   return repo;
 }
@@ -52,8 +52,8 @@ describe('project context integrity', () => {
     const repo = makeRepo('jss-tool');
     const result = checkProjectContext('jss-tool', repo);
     expect(result.status).toBe('pass');
-    expect(result.targetProject).toBe('jss-tool');
-    expect(result.currentProject).toBe('jss-tool');
+    expect(result.targetProject).toBe('github.com/chukadele/jss-tool');
+    expect(result.currentProject).toBe('github.com/chukadele/jss-tool');
   });
 
   it('reroutes before edits when the task belongs to another known repository', () => {
@@ -68,15 +68,15 @@ describe('project context integrity', () => {
 
     const result = checkProjectContext('surface-talent', current);
     expect(result.status).toBe('reroute');
-    expect(result.currentProject).toBe('jss-tool');
-    expect(result.targetProject).toBe('surface-talent');
+    expect(result.currentProject).toBe('github.com/chukadele/jss-tool');
+    expect(result.targetProject).toBe('github.com/chukadele/surface-talent');
     expect(result.targetRepoPath).toBe(target);
   });
 
   it('keeps canonical project identity inside a Git worktree', () => {
     const worktree = makeWorktree('jss-tool');
     const project = resolveProjectForCwd(worktree);
-    expect(project).toEqual({ project: 'jss-tool', repoPath: worktree });
+    expect(project).toEqual({ project: 'github.com/chukadele/jss-tool', repoPath: worktree });
   });
 
   it('resolves a previously attached project even when it has no active goal', () => {
@@ -84,12 +84,12 @@ describe('project context integrity', () => {
     attachSession({
       host: 'codex',
       cwd: repo,
-      project: 'archived-app',
+      project: 'github.com/chukadele/archived-app',
       repoPath: repo,
     });
 
     expect(resolveProject('archived-app', root)).toEqual({
-      project: 'archived-app',
+      project: 'github.com/chukadele/archived-app',
       repoPath: repo,
     });
   });

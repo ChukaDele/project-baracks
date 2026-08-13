@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +26,9 @@ export function defaultDbPath(): string {
 export function openDb(path: string = defaultDbPath()): { db: Db; sqlite: Database.Database } {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const sqlite = new Database(path);
+  sqlite.function('sha256', { deterministic: true }, (value: string) =>
+    createHash('sha256').update(value).digest('hex'),
+  );
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('busy_timeout = 5000');
   const db = drizzle(sqlite, { schema });

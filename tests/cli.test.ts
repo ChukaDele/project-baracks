@@ -1,5 +1,12 @@
-import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -13,6 +20,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 const ROOT = join(import.meta.dirname, '..');
 const CLI = join(ROOT, 'dist', 'cli', 'index.js');
+const ENTRY = join(ROOT, 'dist', 'entry.js');
 
 interface CliResult {
   status: number;
@@ -90,6 +98,48 @@ beforeAll(() => {
 }, 300_000);
 
 describe('major CLI', () => {
+  it('preserves every concurrent session attachment', async () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'major-session-race-'));
+    const statePath = join(scratch, 'supervisor-state.json');
+    const env = {
+      ...process.env,
+      MAJOR_STATE_PATH: statePath,
+      MAJOR_POLICY_PATH: join(scratch, 'policies.json'),
+      MAJOR_RESOURCE_PATH: join(scratch, 'resources.json'),
+    };
+    const runs = Array.from(
+      { length: 12 },
+      (_, index) =>
+        new Promise<void>((resolveRun, rejectRun) => {
+          const child = spawn(
+            process.execPath,
+            [
+              ENTRY,
+              'session',
+              'attach',
+              '--cwd',
+              repoDir,
+              '--host',
+              'codex',
+              '--session-id',
+              `session-${index}`,
+            ],
+            { cwd: ROOT, env, stdio: 'ignore' },
+          );
+          child.once('error', rejectRun);
+          child.once('close', (code) =>
+            code === 0 ? resolveRun() : rejectRun(new Error(`session attach exited ${code}`)),
+          );
+        }),
+    );
+    await Promise.all(runs);
+    const state = JSON.parse(readFileSync(statePath, 'utf8')) as {
+      sessions: { sessionId?: string }[];
+    };
+    expect(state.sessions).toHaveLength(12);
+    expect(new Set(state.sessions.map((session) => session.sessionId)).size).toBe(12);
+  }, 30_000);
+
   it('project add validates config existence and git-repository shape', () => {
     expect(major('project', 'add', '/nope/missing.json').status).toBe(2);
 
@@ -142,12 +192,12 @@ describe('major CLI', () => {
     expect(parsed.data[0]).toMatchObject({ title: 'first task', status: 'draft' });
   });
 
-  it('refuses live execution with the policy-refusal exit code', () => {
+  it('keeps task routing inspection distinct from the live supervisor run command', () => {
     const list = major('task', 'list', '--project', 'demo', '--json');
     const taskId = (JSON.parse(list.stdout) as { data: { id: string }[] }).data[0]!.id;
-    const result = major('run', '--task', taskId);
-    expect(result.status).toBe(4);
-    expect(result.stderr).toMatch(/live execution is not enabled/);
+    const result = major('route', '--task', taskId, '--json');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ kind: 'route-inspection' });
   });
 
   it('folds duplicate suggestions and suppresses rejected scopes with exit 4', () => {
@@ -173,7 +223,7 @@ describe('major CLI', () => {
     expect(suppressed.stderr).toMatch(/suppressed/);
   });
 
-  it('doctor emits versioned JSON, strict exit codes, and the unavailable capabilities', () => {
+  it('doctor emits versioned JSON, strict exit codes, and the closed M1 gate', () => {
     const result = major('doctor', '--json');
     expect([0, 5]).toContain(result.status);
     const parsed = JSON.parse(result.stdout) as {
@@ -190,22 +240,30 @@ describe('major CLI', () => {
       'paid-provider-execution',
       'worker-owned-downstream-mutations',
     ]);
-    expect(parsed.data.capabilities.every((c) => c.available === false)).toBe(true);
+    expect(
+      parsed.data.capabilities.find((c) => c.capability === 'live-agent-execution')?.available,
+    ).toBe(false);
+    expect(
+      parsed.data.capabilities
+        .filter((c) => c.capability !== 'live-agent-execution')
+        .every((c) => c.available),
+    ).toBe(true);
   }, 90_000);
 
-  it('exposes no command that could complete tasks, claim work or apply roadmap writes', () => {
+  it('keeps the legacy task-ledger CLI free of execution and downstream-write commands', () => {
     const listCommands = (helpText: string) =>
       [...helpText.matchAll(/^ {2}([a-z]\S*)/gm)].map((m) => m[1]);
 
     const help = major('--help');
     expect(help.status).toBe(0);
-    // the full production command surface of this build:
+    // This is the Commander task-ledger surface. The successor supervisor is
+    // routed by src/entry.ts before Commander and has separate contract tests.
     expect(listCommands(help.stdout).sort()).toEqual([
       'doctor',
       'help',
       'project',
       'queue',
-      'run',
+      'route',
       'task',
     ]);
 
@@ -261,7 +319,7 @@ describe('major CLI', () => {
       'try to force it',
     );
     expect(approve.status).toBe(4);
-    expect(approve.stderr).toMatch(/unavailable in this disabled foundation/);
+    expect(approve.stderr).toMatch(/suggestion approval is unavailable/);
 
     // No task was materialised…
     expect(countTasks(isoEnv)).toBe(beforeCount);
@@ -278,7 +336,7 @@ describe('major CLI', () => {
       'approval GATE check',
     );
     expect(dup.stdout).toMatch(/duplicate of pending suggestion/);
-  });
+  }, 30_000);
 
   it('doctor human and JSON output agree that overnight execution is unavailable', () => {
     const human = major('doctor');
@@ -287,11 +345,8 @@ describe('major CLI', () => {
     expect(human.stdout).not.toMatch(/overnight execution: SAFE/);
 
     const json = major('doctor', '--json');
-    const parsed = JSON.parse(json.stdout) as {
-      data: { overnightExecution: string; liveExecutionReady: boolean };
-    };
+    const parsed = JSON.parse(json.stdout) as { data: { overnightExecution: string } };
     expect(parsed.data.overnightExecution).toBe('unavailable');
-    expect(parsed.data.liveExecutionReady).toBe(false);
   });
 
   it('discovery and dry-run create no process, even with a hostile executable override', () => {
@@ -322,8 +377,8 @@ describe('major CLI', () => {
     if (!doctor.stdout.trim()) throw new Error(`doctor produced no output: ${doctor.stderr}`);
     expect(existsSync(sentinel)).toBe(false);
 
-    // run --dry-run performs provider/model discovery + routing
-    const dry = majorEnv(hostileEnv, 'run', '--task', taskId, '--dry-run', '--json');
+    // route performs process-free provider/model discovery + routing
+    const dry = majorEnv(hostileEnv, 'route', '--task', taskId, '--json');
     expect(dry.status).toBe(0);
     expect(existsSync(sentinel)).toBe(false);
 

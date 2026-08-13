@@ -14,8 +14,11 @@ for skill in \
   workspace-lifecycle-management \
   mcp-integration-ops \
   major-self-maintenance \
-  design-direction-and-taste \
-  website-design-qa \
+  research-before-build \
+  research-product-patterns \
+  craft-web-interfaces \
+  test-components \
+  verify-in-browser \
   responsive-motion-systems; do
   [ -f "skills/internal/$skill/SKILL.md" ] || fail "required stability skill missing: $skill"
   grep -Fq "\"id\":\"$skill\"" guidance/skills.registry.json || fail "stability skill not registered: $skill"
@@ -26,6 +29,10 @@ grep -Fq 'projectContextIntegrityRequired' guidance/skills.registry.json || fail
 grep -Fq 'majorMainMustStayGreen' guidance/skills.registry.json || fail "Major main-green policy flag missing"
 grep -Fq 'singleCanonicalDesignDirectionLayer' guidance/skills.registry.json || fail "single canonical design direction policy missing"
 grep -Fq 'workspaceLifecyclePolicy' guidance/skills.registry.json || fail "workspace lifecycle policy flag missing"
+grep -Fq 'reuseBeforeBuildRequired' guidance/skills.registry.json || fail "reuse-before-build policy flag missing"
+grep -Fq 'visualDirectionApprovalRequired' guidance/skills.registry.json || fail "visual direction approval policy missing"
+grep -Fq 'browserEvidenceRequired' guidance/skills.registry.json || fail "browser evidence policy missing"
+grep -Fq '"reuse-before-build"' guidance/instructions.registry.json || fail "reuse-before-build guidance not registered"
 
 grep -Fq 'smallest correct modular implementation' guidance/global-worker-rules.md || fail "global code-simplicity invariant missing"
 grep -Fq 'simple-modular-code' guidance/global-worker-rules.md || fail "global rules do not route modular-code guidance"
@@ -48,17 +55,19 @@ grep -Fq 'LEARNINGS.md' src/supervisor/runtime.ts || fail "coordinator does not 
 grep -Fq 'listLearningCandidates' src/supervisor/runtime.ts || fail "coordinator does not preload Major learning candidates"
 grep -Fq 'project-context-integrity' src/supervisor/runtime.ts || fail "coordinator lacks project context integrity contract"
 grep -Fq 'mcp-integration-ops' src/supervisor/runtime.ts || fail "coordinator lacks MCP integration truth-state contract"
-grep -Fq 'design-direction-and-taste' src/supervisor/runtime.ts || fail "coordinator lacks canonical design direction routing"
-grep -Fq 'website-design-qa' src/supervisor/runtime.ts || fail "coordinator lacks website QA routing"
+grep -Fq 'research-before-build' src/supervisor/runtime.ts || fail "coordinator lacks reuse-before-build routing"
+grep -Fq 'craft-web-interfaces' src/supervisor/runtime.ts || fail "coordinator lacks interface direction routing"
+grep -Fq 'verify-in-browser' src/supervisor/runtime.ts || fail "coordinator lacks browser verification routing"
 
 [ -f src/context/session-context.ts ] || fail "enriched session context loader missing"
 grep -Fq 'runSessionContextCli' src/entry.ts || fail "session context loader is not wired into Major entrypoint"
 grep -Fq 'runLearningLifecycleCli' src/entry.ts || fail "learning lifecycle CLI is not wired into Major entrypoint"
 grep -Fq 'DURABLE PROJECT LEARNINGS' src/context/session-context.ts || fail "session attach does not preload project learnings"
-grep -Fq 'ACTIVE MAJOR LEARNING CANDIDATES' src/context/session-context.ts || fail "session attach does not preload learning candidates"
+grep -Fq 'ACTIVE MAJOR LEARNINGS' src/context/session-context.ts || fail "session attach does not preload active and promoted learnings"
 grep -Fq 'REVIEW-DUE' src/context/session-context.ts || fail "session attach does not flag recurring learning for promotion review"
-grep -Fq 'design-direction-and-taste' src/context/session-context.ts || fail "session attach lacks canonical design direction routing reminder"
-grep -Fq 'website-design-qa' src/context/session-context.ts || fail "session attach lacks website QA routing reminder"
+grep -Fq 'research-before-build' src/context/session-context.ts || fail "session attach lacks reuse-before-build routing reminder"
+grep -Fq 'craft-web-interfaces' src/context/session-context.ts || fail "session attach lacks interface direction routing reminder"
+grep -Fq 'verify-in-browser' src/context/session-context.ts || fail "session attach lacks browser verification routing reminder"
 grep -Fq 'mcp-integration-ops' src/context/session-context.ts || fail "session attach lacks MCP integration routing reminder"
 
 if grep -Fq "command === 'learn'" src/supervisor/cli.ts; then
@@ -74,15 +83,25 @@ grep -Fq 'PROJECT CONTEXT: REROUTE' src/context/project-integrity.ts || fail "wr
 grep -Fq 'major project guard' skills/internal/project-context-integrity/SKILL.md || fail "project guard command missing from skill"
 grep -Fq 'safe parking protocol' -i skills/internal/workspace-lifecycle-management/SKILL.md || fail "workspace lifecycle safe parking protocol missing"
 grep -Fq 'commondir' src/supervisor/state.ts || fail "project resolution is not Git-worktree aware"
-grep -Fq 'priorSession' src/supervisor/state.ts || fail "project resolution ignores prior attached sessions"
+grep -Fq 'sessionMatches' src/supervisor/state.ts || fail "project resolution ignores prior attached sessions"
 
 grep -Fq 'GLOBAL_SKILLS_DEST' scripts/install-major-global-rules.sh || fail "global internal skill sync missing"
 grep -Fq 'STABILITY_SRC' scripts/install-major-global-rules.sh || fail "stability invariants not installed globally"
+grep -Fq 'installed-global-rules.json' scripts/install-major-global-rules.sh || fail "global rules install provenance record missing"
+grep -Fq -- '--global-rules-record "$RULES_RECORD_TMP"' scripts/install-major-runtime.sh || fail "runtime installer does not refresh global rules provenance"
 grep -Fq 'A correct change in the wrong repo is a failed task' templates/project/major-core.md || fail "project template lacks wrong-repo invariant"
 grep -Fq 'major learn list --project current' templates/project/major-core.md || fail "project template lacks learning preload"
 grep -Fq 'mcp-integration-ops' templates/project/major-core.md || fail "project template lacks MCP integration routing"
-grep -Fq 'website-design-qa' templates/project/major-core.md || fail "project template lacks website QA routing"
+grep -Fq 'major reuse check' templates/project/major-core.md || fail "project template lacks adoption-record validation"
+grep -Fq 'major design check' templates/project/major-core.md || fail "project template lacks durable visual approval validation"
+grep -Fq 'craft-web-interfaces' templates/project/major-core.md || fail "project template lacks interface direction routing"
+grep -Fq 'verify-in-browser' templates/project/major-core.md || fail "project template lacks browser verification routing"
 grep -Fq 'workspace-lifecycle-management' skills/internal/project-start/SKILL.md || fail "project-start does not route lifecycle decisions"
+
+for retired in open-source-leverage competitive-product-audit design-direction-and-taste rapid-ui-prototype website-design-qa; do
+  [ ! -f "skills/internal/$retired/SKILL.md" ] || fail "retired duplicate skill remains: $retired"
+  ! grep -Fq "\"id\":\"$retired\"" guidance/skills.registry.json || fail "retired skill remains registered: $retired"
+done
 
 grep -Fq 'At two occurrences' skills/internal/learning-capture/SKILL.md || fail "learning recurrence promotion threshold missing"
 grep -Fq -- '--key' skills/internal/learning-capture/SKILL.md || fail "learning capture does not teach stable recurrence keys"
@@ -95,9 +114,11 @@ grep -Fq 'unopened branch' skills/internal/major-self-maintenance/SKILL.md || fa
 # Runtime installation is a release boundary. A red/partial or mutable checkout
 # must never silently replace/change the active global Major runtime.
 grep -Fq 'refusing to install Major from a dirty checkout' scripts/install-major-runtime.sh || fail "runtime installer does not reject dirty source"
-grep -Fq 'MAJOR_ALLOW_NON_MAIN_INSTALL' scripts/install-major-runtime.sh || fail "runtime installer does not gate non-main installs"
-grep -Fq 'MAJOR_ALLOW_UNPUSHED_INSTALL' scripts/install-major-runtime.sh || fail "runtime installer does not verify origin/main"
+grep -Fq '[ "$INSTALL_BRANCH" != "main" ]' scripts/install-major-runtime.sh || fail "runtime installer does not gate non-main installs"
 grep -Fq 'refs/remotes/origin/main' scripts/install-major-runtime.sh || fail "runtime installer does not compare local and remote main"
+if grep -Eq 'MAJOR_ALLOW_(DIRTY|NON_MAIN|UNPUSHED)_INSTALL' scripts/install-major-runtime.sh scripts/install-major-global-rules.sh; then
+  fail "installer preflight bypass returned"
+fi
 grep -Fq 'validate-major-release.sh' scripts/install-major-runtime.sh || fail "runtime installer skips canonical release gate"
 grep -Fq 'validate-major.sh' scripts/validate-major-release.sh || fail "canonical release gate skips Major doctrine validation"
 grep -Fq 'validate-major-stability.sh' scripts/validate-major-release.sh || fail "canonical release gate skips stability validation"
@@ -116,6 +137,14 @@ grep -Fq 'runtimeImmutableSnapshot' scripts/install-major-runtime.sh || fail "re
 [ -f scripts/validate-major-install-transaction.py ] || fail "install rollback validator missing"
 grep -Fq 'stage-major-user-state.py' scripts/install-major-runtime.sh || fail "runtime installer does not stage complete user state"
 grep -Fq 'activate-major-user-state.py' scripts/install-major-runtime.sh || fail "runtime installer does not activate user state transactionally"
+grep -Fq 'launchctl print "$LEGACY_SERVICE"' scripts/install-major-runtime.sh || fail "installer does not verify legacy daemon absence"
+grep -Fq 'could not restart the legacy supervisor' scripts/install-major-runtime.sh || fail "installer does not restore a stopped legacy service after rollback"
+grep -Fq '.migration.lock' scripts/install-major-runtime.sh || fail "runtime installer does not lock learning migration"
+grep -Fq '.migration.lock' scripts/install-major-global-rules.sh || fail "global rules installer does not lock learning migration"
+[ -f scripts/acquire-major-learning-migration-lock.py ] || fail "learning migration lock recovery helper missing"
+grep -Fq 'STALE_AFTER_SECONDS = 30' scripts/acquire-major-learning-migration-lock.py || fail "learning migration locks have no bounded stale recovery"
+grep -Fq 'rm -f "$LEARNING_MIGRATION_LOCK"' scripts/install-major-runtime.sh || fail "runtime installer does not release the committed learning migration lock"
+grep -Fq 'rm -f "$LEARNING_MIGRATION_LOCK"' scripts/install-major-global-rules.sh || fail "global rules installer does not release the committed learning migration lock"
 grep -Fq 'MAJOR_INSTALL_FAIL_AFTER' scripts/activate-major-user-state.py || fail "transaction activator lacks deterministic failure probe"
 grep -Fq 'did not restore live state exactly' scripts/validate-major-install-transaction.py || fail "transaction validator does not compare restored state"
 
@@ -124,7 +153,10 @@ grep -Fq 'did not restore live state exactly' scripts/validate-major-install-tra
 [ -f scripts/build-major-runtime-snapshot.sh ] || fail "runtime snapshot builder missing"
 grep -Fq 'pnpm install --prod --frozen-lockfile --dir' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot does not install production dependencies"
 grep -Fq 'cp -R "$ROOT/drizzle"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits DB migrations"
-grep -Fq 'major-antigravity-worker.py' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits Antigravity helper"
+grep -Fq 'cp -R "$ROOT/scripts"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits helper scripts"
+grep -Fq 'cp -R "$ROOT/templates"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits project templates"
+grep -Fq "return 'agy'" src/providers/commands.ts || fail "supervisor does not use the official Antigravity CLI"
+! grep -ERq 'google-antigravity|antigravity-venv' src scripts/install-major-runtime.sh scripts/build-major-runtime-snapshot.sh || fail "obsolete Antigravity SDK path returned"
 grep -Fq 'node "$DEST/dist/entry.js" status' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks executable CLI smoke"
 grep -Fq 'MAJOR_DB_PATH=' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks migration smoke"
 grep -Fq 'pnpm validate:release' .github/workflows/ci.yml || fail "CI does not execute the canonical release gate"

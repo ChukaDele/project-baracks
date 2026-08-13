@@ -11,7 +11,6 @@ import {
 } from '../src/roadmap/canonical.js';
 import { MockSheetsAdapter } from '../src/roadmap/mock-sheets.js';
 import { applyRoadmapUpdate, proposeRoadmapUpdate } from '../src/roadmap/proposal-service.js';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import { seedProject, testDb } from './helpers.js';
 
 function setup() {
@@ -60,7 +59,7 @@ describe('canonical payload identity', () => {
   });
 });
 
-describe('proposal lifecycle (propose + dry-run only in this build)', () => {
+describe('proposal and guarded apply lifecycle', () => {
   it('records the dry run, payload hash and source revision at propose time', async () => {
     const { db, itemId, proof, adapter } = setup();
     const update = await proposeRoadmapUpdate(db, adapter, {
@@ -124,7 +123,7 @@ describe('proposal lifecycle (propose + dry-run only in this build)', () => {
     expect((await adapter.readRow('RM-1'))?.values.Status).toBe('In Progress');
   });
 
-  it('apply refuses even with an approved roadmap_done decision (capability gate)', async () => {
+  it('applies Done only with an approved roadmap_done decision', async () => {
     const { db, project, itemId, proof, adapter } = setup();
     const update = await proposeRoadmapUpdate(db, adapter, {
       roadmapItemId: itemId,
@@ -139,10 +138,10 @@ describe('proposal lifecycle (propose + dry-run only in this build)', () => {
       question: 'mark RM-1 Done?',
     });
     resolveDecision(db, decision.id, 'approved', 'confirmed');
-    await expect(
-      applyRoadmapUpdate(db, adapter, update.id, { roadmapDoneDecisionId: decision.id }),
-    ).rejects.toThrow(CapabilityUnavailableError);
-    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('In Progress');
+    expect(
+      await applyRoadmapUpdate(db, adapter, update.id, { roadmapDoneDecisionId: decision.id }),
+    ).toMatchObject({ status: 'applied' });
+    expect((await adapter.readRow('RM-1'))?.values.Status).toBe('Done');
   });
 
   it('the stored proposal payload is immutable at the DB level', async () => {

@@ -18,6 +18,7 @@ fi
 cd "$ROOT"
 bash scripts/validate-major.sh
 bash scripts/validate-major-stability.sh
+bash scripts/validate-provider-cli-contracts.sh
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-major-install-transaction.py
 pnpm format:check
 pnpm lint

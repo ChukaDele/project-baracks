@@ -6,8 +6,9 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { majorHome } from './state.js';
+import { basename, dirname, join, resolve } from 'node:path';
+import { redactText } from '../security/redact.js';
+import { gitCommonDir, majorHome } from './state.js';
 import type { WorkerHost } from './state.js';
 
 export const PROJECT_CLASSES = ['unknown', 'workshop', 'client', 'knowledge'] as const;
@@ -68,11 +69,11 @@ function limitsFor(
     case 'observe':
       return { maxWorkers: 0, maxRunMinutes: 0, allowBackground: false };
     case 'assist':
-      return { maxWorkers: 3, maxRunMinutes: 30, allowBackground: false };
+      return { maxWorkers: 1, maxRunMinutes: 30, allowBackground: false };
     case 'build':
-      return { maxWorkers: 6, maxRunMinutes: 120, allowBackground: false };
+      return { maxWorkers: 1, maxRunMinutes: 120, allowBackground: false };
     case 'unattended':
-      return { maxWorkers: 6, maxRunMinutes: 480, allowBackground: true };
+      return { maxWorkers: 1, maxRunMinutes: 480, allowBackground: true };
   }
 }
 
@@ -81,8 +82,12 @@ function emptyStore(): PolicyStore {
 }
 
 function normalizePolicy(policy: ProjectPolicy): ProjectPolicy {
+  const trustLimits = limitsFor(policy.trust);
   const normalized = {
     ...policy,
+    // Persisted policies from earlier releases cannot exceed the active
+    // runtime's truthful concurrency ceiling.
+    maxWorkers: Math.min(policy.maxWorkers ?? trustLimits.maxWorkers, trustLimits.maxWorkers),
     maxRunMinutes: policy.maxRunMinutes ?? limitsFor(policy.trust).maxRunMinutes,
     allowPaidSpend: policy.allowPaidSpend ?? false,
     ownerApprovedBuild: policy.ownerApprovedBuild ?? false,
@@ -132,10 +137,44 @@ export function defaultProjectPolicy(project: string, repoPath: string): Project
 }
 
 export function getProjectPolicy(project: string, repoPath: string): ProjectPolicy {
-  return (
-    readStore().projects.find((candidate) => candidate.project === project) ??
-    defaultProjectPolicy(project, repoPath)
+  const canonicalPath = resolve(repoPath);
+  const commonDir = gitCommonDir(canonicalPath);
+  const existing = readStore().projects.find(
+    (candidate) =>
+      candidate.project === project ||
+      resolve(candidate.repoPath) === canonicalPath ||
+      (commonDir !== undefined && gitCommonDir(resolve(candidate.repoPath)) === commonDir),
   );
+  return existing
+    ? { ...existing, project, repoPath: canonicalPath }
+    : defaultProjectPolicy(project, repoPath);
+}
+
+/** True only when persisted legacy identity is bound to this Git repository. */
+export function projectPolicyBindsLegacyIdentity(project: string, repoPath: string): boolean {
+  const canonicalPath = resolve(repoPath);
+  const commonDir = gitCommonDir(canonicalPath);
+  return readStore().projects.some(
+    (candidate) =>
+      candidate.project === project &&
+      (resolve(candidate.repoPath) === canonicalPath ||
+        (commonDir !== undefined && gitCommonDir(resolve(candidate.repoPath)) === commonDir)),
+  );
+}
+
+export function projectPolicyRepoPath(project: string): string | undefined {
+  return readStore().projects.find((candidate) => candidate.project === project)?.repoPath;
+}
+
+/** Project identities that must never appear in cross-project learning. */
+export function knownProjectIdentities(): string[] {
+  const identities = new Set<string>();
+  for (const policy of readStore().projects) {
+    identities.add(policy.project);
+    identities.add(policy.repoPath);
+    identities.add(basename(policy.repoPath));
+  }
+  return [...identities].filter(Boolean);
 }
 
 export function configureProjectPolicy(input: {
@@ -148,7 +187,14 @@ export function configureProjectPolicy(input: {
   ownerApprovedBuild?: boolean;
 }): ProjectPolicy {
   const store = readStore();
-  const existing = store.projects.find((candidate) => candidate.project === input.project);
+  const canonicalPath = resolve(input.repoPath);
+  const commonDir = gitCommonDir(canonicalPath);
+  const existing = store.projects.find(
+    (candidate) =>
+      candidate.project === input.project ||
+      resolve(candidate.repoPath) === canonicalPath ||
+      (commonDir !== undefined && gitCommonDir(resolve(candidate.repoPath)) === commonDir),
+  );
   const ownerApprovedBuild = input.ownerApprovedBuild ?? existing?.ownerApprovedBuild ?? false;
 
   if (input.trust === 'assist') {
@@ -200,7 +246,12 @@ export function configureProjectPolicy(input: {
     ...(existing?.lastGrade ? { lastGrade: existing.lastGrade } : {}),
   };
 
-  const index = store.projects.findIndex((candidate) => candidate.project === input.project);
+  const index = store.projects.findIndex(
+    (candidate) =>
+      candidate.project === input.project ||
+      resolve(candidate.repoPath) === canonicalPath ||
+      (commonDir !== undefined && gitCommonDir(resolve(candidate.repoPath)) === commonDir),
+  );
   if (index >= 0) store.projects[index] = policy;
   else store.projects.push(policy);
   writeStore(store);
@@ -223,7 +274,7 @@ function storeGrade(input: {
   const grade: IndependentGrade = {
     provider: input.provider,
     result: input.result,
-    evidence: input.evidence,
+    evidence: redactText(input.evidence).slice(0, 12_000),
     at: new Date().toISOString(),
     kind: input.kind,
     trustAtGrade: current.trust,

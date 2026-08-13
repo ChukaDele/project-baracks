@@ -1,14 +1,25 @@
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
   openSync,
   closeSync,
   readFileSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
-import { listLearningCandidates } from '../learning/candidates.js';
+import { join, resolve } from 'node:path';
+import { openDb } from '../db/client.js';
+import { captureLearning, listLearningCandidates } from '../learning/candidates.js';
+import {
+  consumeModelRetry,
+  loadPersistedProviderInfos,
+  recordModelOutcome,
+} from '../providers/discovery-store.js';
+import type { ProviderInfo } from '../providers/types.js';
+import { route } from '../routing/router.js';
+import { resolveSkills } from '../skills/resolver.js';
 import {
   assertExecutionAllowed,
   getProjectPolicy,
@@ -24,9 +35,10 @@ import {
   type SupervisorGoal,
   type WorkerHost,
 } from './state.js';
-import { hostAvailable, runWorker } from './worker.js';
+import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
+import { parseWorkerReport } from './worker-report.js';
 
-const COORDINATOR_ORDER: WorkerHost[] = ['claude', 'codex', 'cursor', 'antigravity'];
+export { parseWorkerReport } from './worker-report.js';
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
@@ -55,10 +67,17 @@ function readProjectContext(repoPath: string): string {
   return sections.join('\n');
 }
 
-function readLearningContext(project: string): string {
-  const candidates = listLearningCandidates(project)
-    .filter((candidate) => candidate.status === 'candidate')
+function readLearningContext(project: string, repoPath: string): string {
+  let visible;
+  try {
+    visible = listLearningCandidates(project, undefined, repoPath);
+  } catch {
+    return '(Major learning store unavailable: unsafe record withheld from coordinator context.)';
+  }
+  const candidates = visible
+    .filter((candidate) => candidate.status !== 'dismissed')
     .sort((left, right) => {
+      if (left.status !== right.status) return left.status === 'promoted' ? -1 : 1;
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
       return right.updatedAt.localeCompare(left.updatedAt);
     })
@@ -67,17 +86,79 @@ function readLearningContext(project: string): string {
   return candidates
     .map(
       (candidate) =>
-        `- ${candidate.occurrences}x [${candidate.scope}/${candidate.source}] ${candidate.summary}`,
+        `- ${candidate.status.toUpperCase()} ${candidate.occurrences}x [${candidate.scope}/${candidate.source}] ${candidate.summary}`,
     )
     .join('\n');
 }
 
-function coordinatorFor(goal: SupervisorGoal): WorkerHost {
-  const available = COORDINATOR_ORDER.filter(hostAvailable);
-  if (available.length === 0) return goal.preferredCoordinator;
-  const preferredIndex = available.indexOf(goal.preferredCoordinator);
-  const start = preferredIndex >= 0 ? preferredIndex : 0;
-  return available[(start + goal.consecutiveFailures) % available.length] ?? available[0]!;
+const PROVIDER_HOSTS: Record<string, WorkerHost> = {
+  'claude-code': 'claude',
+  codex: 'codex',
+  cursor: 'cursor',
+  antigravity: 'antigravity',
+};
+
+const HOST_PROVIDERS: Record<WorkerHost, string> = {
+  claude: 'claude-code',
+  codex: 'codex',
+  cursor: 'cursor',
+  antigravity: 'antigravity',
+};
+
+export type CoordinatorSelection =
+  | { kind: 'route'; host: WorkerHost; provider: string; modelRef: string; reason: string }
+  | { kind: 'checkpoint'; reason: string };
+
+export function modelOutcomeForWorker(
+  outcome: Pick<WorkerOutcome, 'host' | 'status' | 'rateLimited' | 'exhausted' | 'stderr'>,
+): 'available' | 'rate_limited' | 'exhausted' | 'unknown' | undefined {
+  if (outcome.exhausted) return 'exhausted';
+  if (outcome.rateLimited) return 'rate_limited';
+  if (outcome.status === 'succeeded') return 'available';
+  if (/no trusted installation|cannot trust|not an executable regular file/i.test(outcome.stderr)) {
+    return 'unknown';
+  }
+  const providerAuthFailure: Record<WorkerHost, RegExp> = {
+    claude: /(?:invalid api key|not logged in|please run \/login)/i,
+    codex: /(?:invalid api key|not logged in|run[^\n]*codex login)/i,
+    cursor: /(?:invalid api key|not authenticated|login required|cursor(?:-agent| agent) login)/i,
+    antigravity: /(?:antigravity[^\n]*not signed in|launch the cli without arguments to sign in)/i,
+  };
+  if (providerAuthFailure[outcome.host].test(outcome.stderr)) return 'unknown';
+  return undefined;
+}
+
+export function selectCoordinator(
+  goal: SupervisorGoal,
+  providers: ProviderInfo[],
+): CoordinatorSelection {
+  const preferred = HOST_PROVIDERS[goal.preferredCoordinator];
+  const ordered = [...providers].sort((left, right) => {
+    if (left.name === preferred) return -1;
+    if (right.name === preferred) return 1;
+    return left.name.localeCompare(right.name);
+  });
+  const failedProvider =
+    goal.consecutiveFailures >= 2 && goal.lastCoordinator
+      ? HOST_PROVIDERS[goal.lastCoordinator]
+      : undefined;
+  const alternatives = failedProvider
+    ? ordered.filter((provider) => provider.name !== failedProvider)
+    : ordered;
+  let decision = route({ purpose: 'analysis', complexity: 'architectural' }, alternatives);
+  if (decision.kind === 'checkpoint' && alternatives.length !== ordered.length) {
+    decision = route({ purpose: 'analysis', complexity: 'architectural' }, ordered);
+  }
+  if (decision.kind === 'checkpoint') return decision;
+  const host = PROVIDER_HOSTS[decision.provider];
+  if (!host) return { kind: 'checkpoint', reason: `unsupported provider: ${decision.provider}` };
+  return {
+    kind: 'route',
+    host,
+    provider: decision.provider,
+    modelRef: decision.modelRef,
+    reason: decision.reason,
+  };
 }
 
 function trustContract(policy: ProjectPolicy): string {
@@ -106,12 +187,24 @@ function trustContract(policy: ProjectPolicy): string {
 
 export function coordinatorPrompt(goal: SupervisorGoal): string {
   const context = readProjectContext(goal.repoPath);
-  const learningContext = readLearningContext(goal.project);
+  const learningContext = readLearningContext(goal.project, goal.repoPath);
+  let resolvedSkills: ReturnType<typeof resolveSkills>['skills'] = [];
+  let skillResolutionFailed = false;
+  try {
+    resolvedSkills = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills;
+  } catch {
+    skillResolutionFailed = true;
+  }
+  const skillContext = skillResolutionFailed
+    ? '(Major skill registry unavailable. Continue without skill context and report the degraded resolver.)'
+    : resolvedSkills.length === 0
+      ? '(No installed skill matched deterministically. Inspect the registry before inventing a new workflow.)'
+      : resolvedSkills.map((skill) => `- ${skill.id}: ${skill.path}`).join('\n');
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const workerLanguage =
     policy.maxWorkers <= 1
       ? 'Keep this single-worker unless a genuine blocker requires escalation.'
-      : `Use up to ${policy.maxWorkers} useful workers when work is genuinely independent. Do not spawn redundant workers.`;
+      : `This project's parent coordinator may admit up to ${policy.maxWorkers} independent workers. This leased worker must request additional capacity in its final report rather than nesting workers itself.`;
 
   return `You are the active Major coordinator for project ${goal.project}.
 
@@ -132,16 +225,16 @@ MAJOR OPERATING CONTRACT:
 - Speed and MVP are the default. Reduce broad scope to the smallest end-to-end P0 that proves value, then keep expanding only while P0 gaps remain.
 - Do not stop after one PR, migration, fix, test, or subtask. After each result ask: what is now the highest-impact missing piece blocking the goal?
 - ${workerLanguage}
-- Before inventing a process, resolve the smallest relevant Major skill set and load the actual skill bodies from project skills or $HOME/.major/skills/internal.
+- Before inventing a process, run Major's skill resolver and load the exact project or immutable-runtime skill paths it returns.
 - Read project LEARNINGS.md and the Major learning candidates below before acting. Do not repeat a captured correction merely because a fresh worker lacks chat history.
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
-- For substantial UI/website creation, redesign, art-direction changes, or "generic/AI-looking/too safe/too loud" feedback, use design-direction-and-taste first. It is the single Major art-direction/taste authority; do not stack competing generic taste systems.
+- Before implementing a non-trivial reusable capability, run research-before-build and validate its adoption record with \`major reuse check <record>\`. Do not custom-build before the record identifies an unmet requirement.
+- For substantial interface/website creation, redesign, art-direction changes, or "generic/AI-looking/too safe/too loud" feedback, use craft-web-interfaces first. Present three visible directions, persist owner selection/a coherent hybrid/explicit delegation, and pass \`major design check <record>\` before broad production UI code.
 - For MCP/connectors/plugins, distinguish installed → configured → exposed → authenticated → permissioned → operational → integrated. Use mcp-integration-ops and prove the needed state with a representative real operation.
-- For customer-facing website QA, use website-design-qa. Pair responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js or viewport-motion work. Respect remote-first-web-development for browser preview/acceptance unless the owner explicitly permits a local exception.
+- For rendered web QA, use verify-in-browser. Pair responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js or viewport-motion work. Use test-components selectively for reusable interaction-heavy component systems. Respect remote-first-web-development for browser preview/acceptance unless the owner explicitly permits a local exception.
 - Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, Skillify rather than growing the permanent supervisor workflow.
-- An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then capture it with major learn capture. A candidate recurring twice must be promoted or explicitly classified as unstable/project-specific.
-- Reserve Major capacity before every worker, browser, or build. Queue when capacity or memory pressure blocks admission.
-- Delegate independent work across providers with the Major CLI only within the project trust limit. Delegated workers must not create descendants beyond depth 1.
+- An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then add a project-local \`learning\` object to the final MAJOR_RESULT with \`source\`, \`summary\`, optional stable \`key\`, and optional \`evidence\`. The parent validates and captures it.
+- You are the leased worker. Do not start nested workers, browsers, builds, or Major CLI delegation from this sandbox. Request any additional capacity in your final report; the parent owns resource admission and learning capture.
 - Prefer lower-cost/abundant subscription capacity for bounded tasks. Use stronger reasoning for architecture, hard bugs, integration, and adjudication.
 - Concurrent writers must use isolated worktrees. Keep one integration owner.
 - Validate with objective evidence: browser/runtime behavior, tests, persisted state, exact SHA/PR, provider response, or deployed result.
@@ -159,34 +252,147 @@ READINESS LANGUAGE:
 Never use these terms interchangeably.
 
 DURABLE CONTROL:
-Before ending this coordinator turn, report the goal back to Major with exactly one of:
-  major goal report --id "${goal.id}" --status active --summary "<what now works and next critical path>"
-  major goal report --id "${goal.id}" --status done --summary "<objective completion evidence>"
-  major goal report --id "${goal.id}" --status blocked --summary "<what is complete>" --owner-gate "<exact owner action>"
+You cannot access or mutate Major's global control state. Before ending, emit exactly one final
+single-line result for the parent coordinator to validate and apply:
+  MAJOR_RESULT: {"status":"active","summary":"what now works and next critical path"}
+  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence"}
+  MAJOR_RESULT: {"status":"blocked","summary":"what is complete","ownerGate":"exact owner action"}
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
 
-ACTIVE MAJOR LEARNING CANDIDATES:
+ACTIVE MAJOR LEARNINGS:
 ${learningContext}
+
+RESOLVED MAJOR SKILLS:
+${skillContext}
 
 CURRENT PROJECT CONTEXT:
 ${context || '(No canonical project context files found. Inspect the repository directly.)'}
 `;
 }
 
+/** Acquire the single integration-owner slot for a repository. This prevents
+ * two goals, aliases, manual invocations, or daemon cycles from concurrently
+ * writing the same working tree. Delegated writers still require worktrees. */
+export function tryAcquireRepoCycleLock(repoPath: string): (() => void) | undefined {
+  const dir = join(majorHome(), 'supervisor-repo-locks');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const key = createHash('sha256').update(resolve(repoPath)).digest('hex').slice(0, 32);
+  const path = join(dir, `${key}.pid`);
+  if (existsSync(path)) {
+    const lockText = readFileSync(path, 'utf8').trim();
+    const lockAgeMs = Date.now() - statSync(path).mtimeMs;
+    if (!lockText && lockAgeMs <= 30_000) return undefined;
+    const prior = Number.parseInt(lockText, 10);
+    if (Number.isFinite(prior) && pidAlive(prior)) return undefined;
+    if (lockAgeMs <= 30_000) return undefined;
+    unlinkSync(path);
+  }
+  let fd: number;
+  try {
+    fd = openSync(path, 'wx', 0o600);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
+    throw error;
+  }
+  writeFileSync(fd, `${process.pid}\n`);
+  closeSync(fd);
+  return () => {
+    try {
+      if (existsSync(path) && readFileSync(path, 'utf8').trim() === String(process.pid)) {
+        unlinkSync(path);
+      }
+    } catch {
+      // Best effort. A stale lock is reclaimed after this process exits.
+    }
+  };
+}
+
 export async function runGoalCycle(goalId: string): Promise<void> {
   const goal = getGoal(goalId);
   if (!goal) throw new Error(`goal not found: ${goalId}`);
   if (goal.status === 'done' || goal.status === 'paused') return;
+  if (goal.pendingCompletion) {
+    console.error(`Goal ${goal.id} is awaiting an independent completion grade.`);
+    return;
+  }
+  const releaseRepoLock = tryAcquireRepoCycleLock(goal.repoPath);
+  if (!releaseRepoLock) {
+    console.error(`Repository ${goal.repoPath} already has an active Major integration owner.`);
+    return;
+  }
+  try {
+    await runLockedGoalCycle(goal);
+  } finally {
+    releaseRepoLock();
+  }
+}
+
+async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   assertExecutionAllowed(policy);
 
-  const host = coordinatorFor(goal);
+  const providerState = openDb();
+  let selection: CoordinatorSelection;
+  try {
+    const providerInfos = loadPersistedProviderInfos(providerState.db);
+    selection = selectCoordinator(goal, providerInfos);
+    if (selection.kind === 'route') {
+      const routedSelection = selection;
+      const selectedModel = providerInfos
+        .find((provider) => provider.name === routedSelection.provider)
+        ?.models.find((model) => model.modelRef === routedSelection.modelRef);
+      if (
+        selectedModel?.retryEligible &&
+        !consumeModelRetry(providerState.db, {
+          providerName: routedSelection.provider,
+          modelRef: routedSelection.modelRef,
+        })
+      ) {
+        selection = {
+          kind: 'checkpoint',
+          reason: `retry for ${routedSelection.provider}/${routedSelection.modelRef} was already consumed`,
+        };
+      }
+    }
+  } finally {
+    providerState.sqlite.close();
+  }
+  if (selection.kind === 'checkpoint') {
+    const summary = `Provider routing checkpoint: ${selection.reason}`;
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: summary,
+      nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    console.error(summary);
+    return;
+  }
+  if (!hostAvailable(selection.host)) {
+    const executable = workerCommand(selection.host, '').command;
+    const summary =
+      `Provider routing checkpoint: ${selection.provider}/${selection.modelRef} is persisted as ` +
+      `available but the canonical CLI is missing at ${resolve(majorHome(), '..', '.local', 'bin', executable)}. ` +
+      'Install or link that exact provider CLI, then attest availability again.';
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: summary,
+      nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    console.error(summary);
+    return;
+  }
+  const host = selection.host;
   updateGoal(goal.id, {
     status: 'running',
     cycle: goal.cycle + 1,
     lastStartedAt: new Date().toISOString(),
     activePid: process.pid,
     lastCoordinator: host,
+    pendingCompletion: undefined,
   });
 
   const outcome = await runWorker({
@@ -194,7 +400,21 @@ export async function runGoalCycle(goalId: string): Promise<void> {
     prompt: coordinatorPrompt(goal),
     cwd: goal.repoPath,
     timeoutMs: Math.max(1, policy.maxRunMinutes) * 60 * 1000,
+    modelRef: selection.modelRef,
   });
+  const modelOutcome = modelOutcomeForWorker(outcome);
+  if (modelOutcome) {
+    const outcomeState = openDb();
+    try {
+      recordModelOutcome(outcomeState.db, {
+        providerName: selection.provider,
+        modelRef: selection.modelRef,
+        outcome: modelOutcome,
+      });
+    } finally {
+      outcomeState.sqlite.close();
+    }
+  }
   const after = getGoal(goal.id);
   if (!after) return;
   if (after.status === 'done' || after.status === 'blocked' || after.status === 'paused') {
@@ -203,15 +423,55 @@ export async function runGoalCycle(goalId: string): Promise<void> {
   }
 
   if (outcome.status === 'succeeded') {
+    const report = parseWorkerReport(outcome.stdout);
+    let learningWarning = '';
+    if (report?.learning) {
+      try {
+        captureLearning({
+          ...report.learning,
+          project: goal.project,
+          repoPath: goal.repoPath,
+          scope: 'project',
+        });
+      } catch (error) {
+        learningWarning = ` Learning capture failed: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
+      }
+    }
+    if (report?.status === 'blocked') {
+      updateGoal(goal.id, {
+        status: 'blocked',
+        consecutiveFailures: 0,
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary: `${report.summary}${learningWarning}`,
+        ownerGate: report.ownerGate,
+        pendingCompletion: undefined,
+      });
+      return;
+    }
+    if (report?.status === 'done') {
+      const claimedAt = new Date().toISOString();
+      updateGoal(goal.id, {
+        status: 'active',
+        consecutiveFailures: 0,
+        activePid: undefined,
+        lastFinishedAt: claimedAt,
+        lastSummary: `Worker completion claim awaiting independent validation: ${report.summary}${learningWarning}`,
+        nextRunAt: undefined,
+        pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
+      });
+      return;
+    }
     updateGoal(goal.id, {
       status: 'active',
       consecutiveFailures: 0,
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
-      lastSummary: trim(
-        outcome.stdout || 'Coordinator cycle completed without an explicit Major report.',
-      ),
+      lastSummary: report?.summary
+        ? `${report.summary}${learningWarning}`
+        : trim(outcome.stdout || 'Coordinator cycle completed without an explicit Major report.'),
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      pendingCompletion: undefined,
     });
   } else {
     const failures = after.consecutiveFailures + 1;
@@ -222,16 +482,21 @@ export async function runGoalCycle(goalId: string): Promise<void> {
       lastFinishedAt: new Date().toISOString(),
       lastSummary: trim(outcome.stderr || outcome.stdout || `Coordinator ${host} failed.`),
       nextRunAt: new Date(Date.now() + Math.min(60_000, failures * 10_000)).toISOString(),
+      pendingCompletion: undefined,
     });
   }
 }
 
 function pidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EPERM') return true;
+    if (code === 'ESRCH') return false;
+    throw error;
   }
 }
 
@@ -239,8 +504,12 @@ function acquireDaemonLock(): number | undefined {
   mkdirSync(majorHome(), { recursive: true });
   const path = join(majorHome(), 'supervisor-daemon.pid');
   if (existsSync(path)) {
-    const prior = Number.parseInt(readFileSync(path, 'utf8').trim(), 10);
-    if (Number.isFinite(prior) && pidAlive(prior)) return undefined;
+    const lockText = readFileSync(path, 'utf8').trim();
+    const lockAgeMs = Date.now() - statSync(path).mtimeMs;
+    if (!lockText && lockAgeMs <= 30_000) return undefined;
+    const prior = Number.parseInt(lockText, 10);
+    if (Number.isInteger(prior) && pidAlive(prior)) return undefined;
+    if (lockAgeMs <= 30_000) return undefined;
     unlinkSync(path);
   }
   const fd = openSync(path, 'wx', 0o600);
@@ -279,6 +548,7 @@ export async function runDaemon(): Promise<void> {
       const policy = getProjectPolicy(goal.project, goal.repoPath);
       if (policy.trust !== 'unattended' || !policy.allowBackground) return false;
       if (!goal.autonomous || goal.status === 'blocked') return false;
+      if (goal.pendingCompletion) return false;
       if (goal.activePid && pidAlive(goal.activePid)) return false;
       return !goal.nextRunAt || Date.parse(goal.nextRunAt) <= now;
     });
@@ -301,6 +571,11 @@ export function supervisorSnapshot(project?: string): string {
         `goal=${goal.id} cycle=${goal.cycle} failures=${goal.consecutiveFailures}`,
       ];
       if (goal.lastSummary) lines.push(`last: ${trim(goal.lastSummary, 1_500)}`);
+      if (goal.pendingCompletion) {
+        lines.push(
+          `completion: awaiting independent grade of ${goal.pendingCompletion.coordinator} claim`,
+        );
+      }
       if (goal.ownerGate) lines.push(`OWNER GATE: ${goal.ownerGate}`);
       return lines.join('\n');
     })

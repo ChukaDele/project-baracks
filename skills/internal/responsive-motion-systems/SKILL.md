@@ -187,4 +187,4 @@ The system is broken if any of these occur:
 - a fallback silently removes an approved interaction without a designed capability reason;
 - a user-provided screenshot shows a defect that automated QA declares impossible.
 
-When this skill triggers, pair it with `website-design-qa` for the broader site-quality pass.
+When this skill triggers, pair it with `verify-in-browser` for the broader site-quality pass.

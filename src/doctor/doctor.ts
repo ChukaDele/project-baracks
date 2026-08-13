@@ -1,9 +1,14 @@
 import { existsSync } from 'node:fs';
 import { platform, release } from 'node:os';
 import type { ProviderAdapter, ProviderInfo } from '../providers/types.js';
-import { unavailableCapabilityStatuses, type CapabilityStatus } from '../security/capabilities.js';
-import { detectContainment } from '../security/containment.js';
+import {
+  capabilityStatuses,
+  isCapabilityAvailable,
+  type CapabilityStatus,
+} from '../security/capabilities.js';
+import { detectContainment, type ContainmentStatus } from '../security/containment.js';
 import { redactText } from '../security/redact.js';
+import type { BackendStatus } from '../execution/backend.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'missing';
 
@@ -14,7 +19,7 @@ export interface DoctorCheck {
   required: boolean;
 }
 
-/** Overnight/autonomous LIVE execution status. Never 'safe' in this build. */
+/** Overnight execution remains unavailable without separate unattended authority. */
 export type OvernightExecutionStatus = 'unavailable';
 
 export interface DoctorReport {
@@ -23,23 +28,17 @@ export interface DoctorReport {
   providers: ProviderInfo[];
   configuredProjects: { name: string; repoPath: string }[];
   missingPrerequisites: string[];
-  /** Status of overnight/autonomous LIVE execution. ALWAYS 'unavailable' in
-   * this foundation: live-agent-execution is a hard-disabled capability and no
-   * OS isolation is enforced, so it is never reported as safe. */
+  /** Foreground capability activation does not grant unattended execution. */
   overnightExecution: OvernightExecutionStatus;
   overnightExecutionReasons: string[];
-  /** Separate, truthful signal: is the environment healthy enough for the
-   * SUPPORTED dry-run / inspection use? This is NOT permission to execute
-   * anything — it only reflects inspection prerequisites. */
+  /** Separate signal for inspection prerequisites. */
   inspectionEnvironmentOk: boolean;
   inspectionEnvironmentIssues: string[];
-  /** True only when the OS containment required for live agent execution is
-   * actually enforced. False in this foundation (no filesystem sandbox).
-   * DIAGNOSTIC ONLY: enforcement is the hard-coded capability gate
-   * (src/security/capabilities.ts), never this report or any flag. */
+  /** Diagnostic only. Enforcement remains the immutable capability gate plus
+   * the execution gateway; no caller may authorize work from this report. */
   liveExecutionReady: boolean;
   liveExecutionBlockers: string[];
-  /** Capabilities unavailable in this build (hard-coded, not configurable). */
+  /** Immutable build capability status (hard-coded, not configurable). */
   capabilities: CapabilityStatus[];
 }
 
@@ -58,6 +57,9 @@ export interface DoctorInputs {
   resolve: ExecutableResolver;
   env?: NodeJS.ProcessEnv;
   fileExists?: (path: string) => boolean;
+  /** Injectable only for deterministic doctor tests; production uses the real OS detector. */
+  detectContainment?: () => ContainmentStatus;
+  inspectExecutionBackend?: () => Promise<BackendStatus>;
 }
 
 export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
@@ -102,8 +104,8 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
         ? `${info.version ?? 'installed'}${info.authenticated ? '' : ' (auth not detected)'}`
         : unverified
           ? `${info.executable ? `resolved at ${info.executable}` : 'not found on PATH'}; ` +
-            'UNVERIFIED — execution is disabled, so installation/version/auth cannot be ' +
-            'confirmed until live execution is enabled (M1)'
+            'UNVERIFIED — resolution-only discovery does not execute the provider; use the ' +
+            'contained provider lifecycle probe for installation/version/auth evidence'
           : 'executable not found',
     });
   }
@@ -141,10 +143,28 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
       : `${credsVar} not set (roadmap sync unavailable)`,
   });
 
-  // Descendant/process containment for live agent execution. Reported honestly:
-  // process-tree termination is available on POSIX, but no OS filesystem
-  // sandbox is wired, so live execution readiness is false.
-  const containment = detectContainment();
+  // Descendant/process containment and the immutable M1 activation gate are
+  // reported separately.
+  const liveExecutionCapabilityAvailable = isCapabilityAvailable('live-agent-execution');
+  const backendStatus =
+    liveExecutionCapabilityAvailable && inputs.inspectExecutionBackend
+      ? await inputs.inspectExecutionBackend()
+      : undefined;
+  const containment = backendStatus
+    ? {
+        platform: 'lima',
+        available: backendStatus.available,
+        enforced: backendStatus.available,
+        filesystemIsolation: backendStatus.filesystemIsolation,
+        networkIsolation: backendStatus.networkIsolation,
+        liveExecutionReady:
+          backendStatus.available &&
+          backendStatus.filesystemIsolation &&
+          backendStatus.networkIsolation &&
+          backendStatus.lifecycleIsolation,
+        detail: backendStatus.detail,
+      }
+    : (inputs.detectContainment ?? detectContainment)();
   checks.push({
     name: 'descendant-containment',
     required: false,
@@ -152,6 +172,11 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     detail: containment.detail,
   });
   const liveExecutionBlockers: string[] = [];
+  if (!liveExecutionCapabilityAvailable) {
+    liveExecutionBlockers.push(
+      'live-agent-execution capability remains disabled pending M1 review',
+    );
+  }
   if (!containment.liveExecutionReady) {
     liveExecutionBlockers.push(`descendant containment insufficient: ${containment.detail}`);
   }
@@ -160,11 +185,9 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     .filter((c) => c.required && c.status === 'missing')
     .map((c) => c.name);
 
-  const capabilities = unavailableCapabilityStatuses();
+  const capabilities = capabilityStatuses();
 
-  // Inspection / dry-run health — the SUPPORTED use of this build. Truthful and
-  // independent of execution: it only asks whether the prerequisites for
-  // inspecting projects and planning dry runs are present.
+  // Inspection health is independent of foreground execution readiness.
   const inspectionEnvironmentIssues: string[] = [];
   if (missingPrerequisites.length > 0) {
     inspectionEnvironmentIssues.push(`missing prerequisites: ${missingPrerequisites.join(', ')}`);
@@ -173,24 +196,26 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     inspectionEnvironmentIssues.push('no projects configured');
   }
 
-  // Overnight / autonomous LIVE execution. This is CATEGORICALLY unavailable in
-  // this foundation, so it is never reported as safe. The reasons list the
-  // hard blockers first (the disabled capability and missing OS isolation),
-  // then the environmental factors that would ALSO have to hold once execution
-  // is enabled by a future milestone.
+  // Foreground M1 activation never implies unattended/background authority.
   const liveCap = capabilities.find((c) => c.capability === 'live-agent-execution');
-  const overnightExecutionReasons: string[] = [
-    `live agent execution is unavailable in this build (${liveCap?.milestone ?? 'M1'})`,
-  ];
+  const overnightExecutionReasons: string[] = [];
+  if (!liveCap?.available) {
+    overnightExecutionReasons.push(
+      `live agent execution is unavailable in this build (${liveCap?.milestone ?? 'M1'})`,
+    );
+  }
   overnightExecutionReasons.push(...liveExecutionBlockers);
+  overnightExecutionReasons.push(
+    'background execution requires an unattended project policy and an explicitly started daemon',
+  );
   if (missingPrerequisites.length > 0) {
     overnightExecutionReasons.push(`missing prerequisites: ${missingPrerequisites.join(', ')}`);
   }
   const usableProvider = providerInfos.some((p) => p.installed && p.authenticated);
   if (!usableProvider) {
     overnightExecutionReasons.push(
-      'no verified+authenticated agent provider (providers are unverified while execution ' +
-        'is disabled)',
+      'no verified+authenticated agent provider (resolution-only discovery is not a provider ' +
+        'lifecycle probe)',
     );
   }
   if (inputs.configuredProjects.length === 0) {
@@ -213,7 +238,7 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     overnightExecutionReasons,
     inspectionEnvironmentOk: inspectionEnvironmentIssues.length === 0,
     inspectionEnvironmentIssues,
-    liveExecutionReady: containment.liveExecutionReady,
+    liveExecutionReady: liveExecutionCapabilityAvailable && containment.liveExecutionReady,
     liveExecutionBlockers,
     capabilities,
   };
