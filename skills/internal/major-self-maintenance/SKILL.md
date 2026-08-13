@@ -1,6 +1,6 @@
 ---
 name: major-self-maintenance
-description: Use whenever Major modifies its own repository, skills, resolver, policies, runtime, installers or learning system. Never leave Major main red. Make changes on a branch/PR, keep skill registry/evals/catalog atomic, run the complete gate, use independent review for material behavior changes, and merge only after the exact head is green.
+description: Use whenever Major modifies its own repository, skills, resolver, policies, runtime, installers or learning system. Never leave Major main red. Batch changes on an unopened branch, keep skill registry/evals/catalog atomic, run the complete local gate, use independent review for material behavior changes, and merge only after the exact head is green.
 ---
 
 # Major Self-Maintenance
@@ -18,20 +18,56 @@ Do not push a new skill/runtime/policy directly to `main` and wait for CI to tel
 For every material Major change:
 
 1. Start from current green `main`.
-2. Create a dedicated branch/worktree.
-3. Implement the smallest coherent change.
-4. When adding/updating an internal skill, update in the same branch:
+2. Create a dedicated **unopened branch/worktree**.
+3. Perform the read-only/adversarial audit first and collect the defect list before editing.
+4. Implement the smallest coherent batch on that unopened branch. Do not open a PR after the first tiny fix.
+5. When adding/updating an internal skill, update in the same batch:
    - `skills/internal/<skill>/SKILL.md`;
    - `guidance/skills.registry.json`;
    - resolver eval fixture when the skill is routing-critical;
    - human-readable catalog if present;
    - validator requirements when the capability is a hard invariant.
-5. Run Major validator, format, lint, typecheck, full tests and production build.
-6. Open/update a PR.
-7. For changes to authority, routing, learning, project boundaries or external writes, use a different provider for adversarial review.
-8. Merge only the exact green head.
-9. Verify `main` CI after merge.
-10. If `main` is red, repair Major before adding another self-change.
+6. Run Major validator, format, lint, typecheck, full tests and production build locally when an execution environment is available.
+7. Fix all locally detectable failures **before** opening the PR. GitHub Actions is a release verifier, not the iterative formatter/test runner.
+8. Open the PR only when the batch is coherent. If a deterministic CI defect appears, close the PR before making a repair batch when the workflow triggers on `pull_request` synchronization; reopen only after the complete repair batch is ready.
+9. For changes to authority, routing, learning, project boundaries, installation or external writes, use a different provider for adversarial review.
+10. Merge only the exact green head.
+11. Verify the resulting `main` CI after merge.
+12. If `main` is red, repair Major before adding another self-change.
+
+## CI / Actions budget discipline
+
+- Prefer read-only GitHub inspection while auditing.
+- Branch commits do not need a PR immediately. Keep the branch unopened while batching when the workflow only runs on PRs/main.
+- Before saying `one push`, `no CI`, or `one Actions run`, inspect the workflow trigger **and** live PR state. A plan is not evidence.
+- With `pull_request` CI, assume each push to a branch with an open PR can trigger a new run. Close the PR before further repair commits if the goal is to stop CI consumption.
+- Do not create temporary CI-failing workflow commits just to print formatter output when local tooling can provide it.
+- Re-run failed jobs only when the failure is plausibly transient. Deterministic code/format/type/test failures require a real fix before another run.
+- One final PR validation plus one post-merge `main` validation is the normal target for a coherent release batch.
+
+## Operational truth
+
+Do not describe intended state as observed state.
+
+Before claiming that something is installed, green, merged, attached, deployed, blocked, not triggering CI, or limited to a specific number of writes/runs:
+
+1. identify the observable system state that proves the claim;
+2. read that state after the relevant action;
+3. report what actually happened, including deviations from the plan;
+4. correct the process before repeating the action when the observed state contradicts the plan.
+
+Never hide a process deviation behind wording like `batched`, `done`, or `one push` when the repository/activity history shows otherwise.
+
+## Code simplicity
+
+Major self-changes must follow `simple-modular-code`:
+
+- one clear responsibility per module/function;
+- one canonical code path for a behavior;
+- minimal side effects at explicit boundaries;
+- no abstraction for hypothetical future needs;
+- remove duplicate/shadowed implementations when introducing a replacement;
+- before merge, simplify anything that can lose moving parts without losing correctness, clarity, testability or replaceability.
 
 ## Skill promotion is atomic
 
@@ -46,7 +82,7 @@ A skill directory alone is not a promoted skill. A reusable skill is considered 
 
 ## No self-grading shortcut
 
-Builder-authored tests are necessary but not sufficient for consequential Major changes. Use independent provider review and real-project evidence where the change affects orchestration, safety, routing or learning.
+Builder-authored tests are necessary but not sufficient for consequential Major changes. Use independent provider review and real-project evidence where the change affects orchestration, safety, routing, installation or learning.
 
 ## Resolver examples
 
@@ -56,6 +92,8 @@ Builder-authored tests are necessary but not sufficient for consequential Major 
 - "Change how Major routes projects or tools."
 - "Update Major's learning loop."
 - "Fix Major itself after its CI went red."
+- "Stop burning GitHub Actions on every tiny Major fix."
+- "You said one push but the PR shows multiple failing runs."
 
 ### Should not trigger
 

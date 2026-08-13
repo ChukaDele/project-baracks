@@ -4,7 +4,8 @@ import { listLearningCandidates } from '../learning/candidates.js';
 import { getProjectPolicy } from '../supervisor/policy.js';
 import { formatResourceTelemetry, resourceSnapshot } from '../supervisor/resources.js';
 import { supervisorSnapshot } from '../supervisor/runtime.js';
-import { attachSession, resolveProjectForCwd } from '../supervisor/state.js';
+import { resolveSkills } from '../skills/resolver.js';
+import { activeGoals, attachSession, resolveProjectForCwd } from '../supervisor/state.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -27,21 +28,48 @@ function projectLearningFile(repoPath: string): string {
   return text.slice(0, 8_000);
 }
 
-function durableCandidates(project: string): string {
-  const candidates = listLearningCandidates(project)
-    .filter((candidate) => candidate.status === 'candidate')
+function durableCandidates(project: string, repoPath: string): string {
+  let candidates;
+  try {
+    candidates = listLearningCandidates(project, undefined, repoPath);
+  } catch {
+    return '(Major learning store unavailable: unsafe record withheld from session context.)';
+  }
+  const learnings = candidates
+    .filter((candidate) => candidate.status !== 'dismissed')
     .sort((left, right) => {
+      if (left.status !== right.status) return left.status === 'promoted' ? -1 : 1;
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
       return right.updatedAt.localeCompare(left.updatedAt);
     })
-    .slice(0, 15);
-  if (candidates.length === 0) return '(No active Major learning candidates.)';
-  return candidates
-    .map(
-      (candidate) =>
-        `- ${candidate.occurrences}x [${candidate.scope}/${candidate.source}] ${candidate.summary}`,
-    )
+    .slice(0, 20);
+  if (learnings.length === 0) return '(No active Major learnings.)';
+  return learnings
+    .map((candidate) => {
+      const review =
+        candidate.status === 'candidate' && candidate.occurrences >= 2 ? ' REVIEW-DUE' : '';
+      const key = candidate.key ? ` key=${candidate.key}` : '';
+      return `- ${candidate.status.toUpperCase()} ${candidate.occurrences}x${review} [${candidate.scope}/${candidate.source}]${key} ${candidate.summary}`;
+    })
     .join('\n');
+}
+
+function resolvedGoalSkills(project: string, repoPath: string): string {
+  const goals = activeGoals(project, repoPath);
+  if (goals.length === 0)
+    return '(No active goal. Resolve skills against the substantive task when it arrives.)';
+  const unique = new Map<string, string>();
+  try {
+    for (const goal of goals) {
+      for (const skill of resolveSkills({ task: goal.goal, cwd: repoPath }).skills) {
+        unique.set(skill.id, skill.path);
+      }
+    }
+  } catch {
+    return '(Major skill registry unavailable: skill context withheld without blocking session attach.)';
+  }
+  if (unique.size === 0) return '(No installed skill matched the active goal.)';
+  return [...unique].map(([id, path]) => `- ${id}: ${path}`).join('\n');
 }
 
 export async function runSessionContextCli(args: string[]): Promise<boolean> {
@@ -94,8 +122,11 @@ ${supervisorSnapshot(project.project)}
 DURABLE PROJECT LEARNINGS
 ${projectLearningFile(project.repoPath)}
 
-ACTIVE MAJOR LEARNING CANDIDATES
-${durableCandidates(project.project)}
+ACTIVE MAJOR LEARNINGS
+${durableCandidates(project.project, project.repoPath)}
+
+RESOLVED SKILLS FOR ACTIVE GOALS
+${resolvedGoalSkills(project.project, project.repoPath)}
 
 RESOURCE GUARD
 ${resources}
@@ -106,9 +137,10 @@ concurrent build cap: 1
 SESSION CONTRACT
 - Major is already active; do not ask the user to start it again.
 - Before substantive edits, confirm any named/implied project matches this repo. If not, load project-context-integrity and reroute before mutation.
-- Resolve and load the smallest relevant skill bodies from project skills or $HOME/.major/skills/internal before inventing a workflow.
+- Run Major's skill resolver and load the exact project or immutable-runtime skill paths it returns before inventing a workflow.
 - Treat the durable learnings above as active constraints. A fresh session is not permission to repeat a prior correction.
-- If the user explicitly corrects behavior or says a mistake happened before: fix and verify the real task, then capture the correction with major learn capture without making the user ask.
+- A REVIEW-DUE learning has recurred at least twice. Before closing the task, either promote the proven lesson into guidance/skill or record why it remains unstable/project-specific.
+- If the user explicitly corrects behavior or says a mistake happened before: fix and verify the real task, then capture the correction with major learn capture without making the user ask. Use one stable learning key for the same failure class across runs.
 - For MCP/connectors/plugins, load mcp-integration-ops and prove the actual integration state.
 - For substantial UI/website creation, redesign, or "generic/AI-looking/too safe" feedback, load design-direction-and-taste first. It is the single Major taste authority; do not stack competing generic taste skills.
 - For customer-facing website QA, load website-design-qa; add responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js work.

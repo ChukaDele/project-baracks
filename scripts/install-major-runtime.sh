@@ -4,16 +4,84 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="$HOME/.local/bin"
 MAJOR_HOME="$HOME/.major"
+RELEASES_DIR="$MAJOR_HOME/releases"
 LEGACY_PLIST="$HOME/Library/LaunchAgents/com.chuka.major-supervisor.plist"
 RELEASE_RECORD="$MAJOR_HOME/installed-release.json"
-
-mkdir -p "$BIN_DIR" "$MAJOR_HOME/logs"
-
+LEGACY_SERVICE="gui/$UID/com.chuka.major-supervisor"
+LEGACY_WAS_LOADED=0
+LEGACY_STOPPED=0
+INSTALL_COMMITTED=0
+LEARNING_MIGRATION_LOCK="$MAJOR_HOME/learning/.migration.lock"
+LEARNING_LOCK_HELD=0
+INSTALL_LOCK="$MAJOR_HOME/.install.lock"
+INSTALL_LOCK_HELD=0
+WORKER_CREATED=0
+WORKER_INSTANCE=""
+LIMACTL_PATH=""
+INSTALL_STAGE=""
+RELEASE_CREATED=0
+RELEASE_DIR=""
+BUILD_WORKTREE=""
 cd "$ROOT"
 
-if [ "${MAJOR_ALLOW_DIRTY_INSTALL:-0}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+acquire_install_lock() {
+  mkdir -p "$MAJOR_HOME"
+  if mkdir "$INSTALL_LOCK" 2>/dev/null; then
+    printf '%s\n' "$$" > "$INSTALL_LOCK/pid"
+    INSTALL_LOCK_HELD=1
+    return 0
+  fi
+  local owner=""
+  [ ! -r "$INSTALL_LOCK/pid" ] || owner="$(tr -cd '0-9' < "$INSTALL_LOCK/pid")"
+  if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+    rm -f "$INSTALL_LOCK/pid"
+    rmdir "$INSTALL_LOCK" 2>/dev/null || true
+    if mkdir "$INSTALL_LOCK" 2>/dev/null; then
+      printf '%s\n' "$$" > "$INSTALL_LOCK/pid"
+      INSTALL_LOCK_HELD=1
+      return 0
+    fi
+  fi
+  echo "ERROR: another Major installation transaction is active." >&2
+  return 1
+}
+cleanup() {
+  local status=$?
+  [ -z "$INSTALL_STAGE" ] || rm -rf "$INSTALL_STAGE"
+  if [ -n "$BUILD_WORKTREE" ]; then
+    git worktree remove --force "$BUILD_WORKTREE" >/dev/null 2>&1 || true
+  fi
+  if [ "$LEARNING_LOCK_HELD" = "1" ]; then
+    rm -f "$LEARNING_MIGRATION_LOCK"
+  fi
+  if [ "$status" -ne 0 ] && [ "$RELEASE_CREATED" = "1" ]; then
+    rm -rf "$RELEASE_DIR"
+  fi
+  if [ "$status" -ne 0 ] && [ "$WORKER_CREATED" = "1" ] && [ -n "$LIMACTL_PATH" ]; then
+    "$LIMACTL_PATH" stop --force "$WORKER_INSTANCE" >/dev/null 2>&1 || true
+    if ! "$LIMACTL_PATH" delete --force "$WORKER_INSTANCE" >/dev/null 2>&1; then
+      echo "CRITICAL: Major install rollback could not delete the new worker $WORKER_INSTANCE." >&2
+    fi
+  fi
+  if [ "$status" -ne 0 ] && [ "$LEGACY_WAS_LOADED" = "1" ] && \
+     [ "$LEGACY_STOPPED" = "1" ] && [ "$INSTALL_COMMITTED" = "0" ] && \
+     [ -f "$LEGACY_PLIST" ]; then
+    if ! launchctl bootstrap "gui/$UID" "$LEGACY_PLIST" >/dev/null 2>&1; then
+      echo "CRITICAL: Major restored the prior files but could not restart the legacy supervisor." >&2
+      echo "Run: launchctl bootstrap gui/$UID '$LEGACY_PLIST'" >&2
+    fi
+  fi
+  if [ "$INSTALL_LOCK_HELD" = "1" ]; then
+    rm -f "$INSTALL_LOCK/pid"
+    rmdir "$INSTALL_LOCK" 2>/dev/null || \
+      echo "WARNING: could not remove completed Major installer lock." >&2
+  fi
+}
+trap cleanup EXIT
+
+if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   echo "ERROR: refusing to install Major from a dirty checkout." >&2
-  echo "Commit/stash/remove local changes first, or set MAJOR_ALLOW_DIRTY_INSTALL=1 only for an intentional local pilot." >&2
+  echo "Commit, stash or remove local changes first." >&2
   exit 1
 fi
 
@@ -21,97 +89,145 @@ INSTALL_SHA="$(git rev-parse HEAD)"
 INSTALL_BRANCH="$(git branch --show-current 2>/dev/null || true)"
 INSTALL_BRANCH="${INSTALL_BRANCH:-detached}"
 INSTALL_VERSION="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('package.json','utf8')).version)")"
+RELEASE_DIR="$RELEASES_DIR/$INSTALL_SHA"
+WORKER_INSTANCE="major-worker-${INSTALL_SHA:0:12}"
 
-if [ "${MAJOR_ALLOW_NON_MAIN_INSTALL:-0}" != "1" ] && [ "$INSTALL_BRANCH" != "main" ]; then
+if [ "$INSTALL_BRANCH" != "main" ]; then
   echo "ERROR: refusing to install Major from branch '$INSTALL_BRANCH'." >&2
-  echo "Install releases from main after green CI. Set MAJOR_ALLOW_NON_MAIN_INSTALL=1 only for an intentional field pilot." >&2
+  echo "Install releases from main after green CI." >&2
   exit 1
 fi
 
-corepack enable >/dev/null 2>&1 || true
-pnpm install --frozen-lockfile
+git fetch --quiet origin main
+REMOTE_MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+if [ "$INSTALL_SHA" != "$REMOTE_MAIN_SHA" ]; then
+  echo "ERROR: refusing to install Major because local HEAD is not the current origin/main." >&2
+  echo "local:  $INSTALL_SHA" >&2
+  echo "remote: $REMOTE_MAIN_SHA" >&2
+  echo "Pull the green main release first." >&2
+  exit 1
+fi
+acquire_install_lock
 
 echo "Running Major release gate before installation..."
-bash scripts/validate-major.sh
-if [ -f scripts/validate-major-stability.sh ]; then
-  bash scripts/validate-major-stability.sh
-fi
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+INSTALL_STAGE="$(mktemp -d "${TMPDIR:-/tmp}/major-runtime-install.XXXXXX")"
+BUILD_WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/major-runtime-source.XXXXXX")"
+rmdir "$BUILD_WORKTREE"
+git worktree add --detach "$BUILD_WORKTREE" "$INSTALL_SHA" >/dev/null
+(
+  cd "$BUILD_WORKTREE"
+  corepack enable >/dev/null 2>&1 || true
+  pnpm install --frozen-lockfile
+  bash scripts/validate-major-release.sh "$INSTALL_STAGE/runtime"
+)
+git worktree remove --force "$BUILD_WORKTREE"
+BUILD_WORKTREE=""
 
-# Only replace the active runtime after every release check passes. The wrapper
-# is pinned to the exact validated commit so a later checkout/build cannot
-# silently change the globally active Major implementation.
-cat > "$BIN_DIR/major" <<EOF
-#!/bin/sh
-set -eu
-ROOT="$ROOT"
-EXPECTED_SHA="$INSTALL_SHA"
-CURRENT_SHA="\$(git -C "\$ROOT" rev-parse HEAD 2>/dev/null || true)"
-if [ "\$CURRENT_SHA" != "\$EXPECTED_SHA" ]; then
-  echo "MAJOR RUNTIME REFUSAL: installed release is \$EXPECTED_SHA but source checkout is \${CURRENT_SHA:-unavailable}." >&2
-  echo "Return project-baracks to the installed commit or install a new fully validated main release." >&2
-  exit 78
-fi
-exec node "\$ROOT/dist/entry.js" "\$@"
-EOF
-chmod +x "$BIN_DIR/major"
-
-if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-  if ! grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then
-    printf '\n# Major global CLI\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.zshrc"
+# Never delete a release directory that an already-installed wrapper may still
+# be using. A same-SHA reinstall reuses a complete existing snapshot; an
+# incomplete same-SHA directory is treated as corruption and must be inspected.
+if [ -d "$RELEASE_DIR" ]; then
+  if [ ! -f "$RELEASE_DIR/release.json" ] || \
+     [ ! -f "$RELEASE_DIR/dist/entry.js" ] || \
+     [ ! -d "$RELEASE_DIR/drizzle" ] || \
+     [ ! -d "$RELEASE_DIR/node_modules" ] || \
+     [ ! -f "$RELEASE_DIR/runtime-manifest.json" ]; then
+    echo "ERROR: existing Major release snapshot is incomplete: $RELEASE_DIR" >&2
+    echo "Do not overwrite it automatically; inspect/remove the corrupt inactive snapshot and reinstall." >&2
+    exit 1
   fi
-  export PATH="$BIN_DIR:$PATH"
+  EXISTING_SHA="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).sha || '')" "$RELEASE_DIR/release.json")"
+  if [ "$EXISTING_SHA" != "$INSTALL_SHA" ]; then
+    echo "ERROR: existing release directory SHA mismatch at $RELEASE_DIR" >&2
+    exit 1
+  fi
+  if ! node "$RELEASE_DIR/scripts/major-runtime-manifest.mjs" verify "$RELEASE_DIR"; then
+    echo "ERROR: existing Major release snapshot failed its content manifest: $RELEASE_DIR" >&2
+    exit 1
+  fi
 fi
 
-bash "$ROOT/scripts/install-major-global-rules.sh"
+WRAPPER_TMP="$INSTALL_STAGE/major"
+RECORD_TMP="$INSTALL_STAGE/installed-release.json"
+RULES_RECORD_TMP="$INSTALL_STAGE/installed-global-rules.json"
+EXECUTION_CONFIG_TMP="$INSTALL_STAGE/execution.json"
 
-mkdir -p "$HOME/.claude"
-python3 - "$HOME/.claude/settings.json" "$BIN_DIR/major" <<'PY'
+LIMACTL_PATH="$(command -v limactl || true)"
+if [ -z "$LIMACTL_PATH" ]; then
+  echo "ERROR: Lima 2.2.x is required for Major provider execution." >&2
+  echo "Install Lima, then rerun the Major installer." >&2
+  exit 1
+fi
+LIMACTL_PATH="$(python3 - "$LIMACTL_PATH" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).resolve())
+PY
+)"
+if ! "$LIMACTL_PATH" --version | grep -Eq '(^|[^0-9])2\.2\.[0-9]+'; then
+  echo "ERROR: Major requires Lima >=2.2.0 and <2.3.0." >&2
+  exit 1
+fi
+python3 - "$INSTALL_STAGE/runtime/templates/major/execution.json" "$EXECUTION_CONFIG_TMP" "$LIMACTL_PATH" "$WORKER_INSTANCE" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-path = Path(sys.argv[1])
-major = sys.argv[2]
-try:
-    data = json.loads(path.read_text()) if path.exists() and path.read_text().strip() else {}
-except Exception:
-    data = {}
-hooks = data.setdefault("hooks", {})
-session = hooks.setdefault("SessionStart", [])
-command = f'"{major}" session hook --host claude'
-entry = {"matcher": "startup|resume|clear|compact", "hooks": [{"type": "command", "command": command}]}
-filtered = []
-for item in session:
-    text = json.dumps(item)
-    if ("major" in text and "session" in text and "attach" in text) or "session hook --host claude" in text:
-        continue
-    filtered.append(item)
-filtered.append(entry)
-hooks["SessionStart"] = filtered
-path.write_text(json.dumps(data, indent=2) + "\n")
+config = json.loads(Path(sys.argv[1]).read_text())
+config["limactlPath"] = sys.argv[3]
+config["instance"] = sys.argv[4]
+Path(sys.argv[2]).write_text(json.dumps(config, indent=2) + "\n")
 PY
 
-# Pilot posture: no auto-start daemon. Foreground build mode is the normal active-work posture;
-# unattended/background execution remains a separate explicit trust level.
-launchctl bootout "gui/$UID/com.chuka.major-supervisor" >/dev/null 2>&1 || true
-rm -f "$LEGACY_PLIST"
-
-# Ruflo is NOT attached globally. It remains optional and project-scoped.
-
-if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ] && command -v python3 >/dev/null 2>&1; then
-  if [ ! -x "$MAJOR_HOME/antigravity-venv/bin/python" ]; then
-    python3 -m venv "$MAJOR_HOME/antigravity-venv"
-  fi
-  "$MAJOR_HOME/antigravity-venv/bin/python" -m pip install --quiet --upgrade pip google-antigravity || \
-    echo "WARN: Antigravity SDK install failed; Major will route around this worker until fixed."
+# Provision and verify a release-specific isolated worker before changing the
+# active wrapper or user state. The current release's worker is never mutated.
+WORKER_LIST_TMP="$INSTALL_STAGE/worker-list.jsonl"
+if ! "$LIMACTL_PATH" list --json > "$WORKER_LIST_TMP"; then
+  echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
+  exit 1
 fi
+set +e
+python3 -c '
+import json, sys
+name = sys.argv[1]
+rows = [json.loads(line) for line in sys.stdin if line.strip()]
+raise SystemExit(0 if any(row.get("name") == name for row in rows) else 3)
+' "$WORKER_INSTANCE" < "$WORKER_LIST_TMP"
+worker_inspection=$?
+set -e
+if [[ $worker_inspection -eq 3 ]]; then
+  WORKER_CREATED=1
+elif [[ $worker_inspection -ne 0 ]]; then
+  echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
+  exit 1
+fi
+bash "$INSTALL_STAGE/runtime/scripts/provision-major-lima-worker.sh" "$LIMACTL_PATH" "$WORKER_INSTANCE" "$INSTALL_SHA"
 
-python3 - "$RELEASE_RECORD" "$INSTALL_VERSION" "$INSTALL_SHA" "$INSTALL_BRANCH" <<'PY'
+# Build and execute-smoke the same immutable runtime shape used in production.
+if [ ! -d "$RELEASE_DIR" ]; then
+  cat > "$INSTALL_STAGE/runtime/release.json" <<EOF
+{
+  "version": "$INSTALL_VERSION",
+  "sha": "$INSTALL_SHA",
+  "branch": "$INSTALL_BRANCH"
+}
+EOF
+  chmod 0644 "$INSTALL_STAGE/runtime/runtime-manifest.json"
+  node "$INSTALL_STAGE/runtime/scripts/major-runtime-manifest.mjs" create "$INSTALL_STAGE/runtime"
+  mkdir -p "$BIN_DIR" "$RELEASES_DIR"
+  mv "$INSTALL_STAGE/runtime" "$RELEASE_DIR"
+  RELEASE_CREATED=1
+fi
+SNAPSHOT_ROOT="$RELEASE_DIR"
+
+cat > "$WRAPPER_TMP" <<EOF
+#!/bin/sh
+set -eu
+exec node "$RELEASE_DIR/dist/entry.js" "\$@"
+EOF
+chmod +x "$WRAPPER_TMP"
+
+python3 - "$RECORD_TMP" "$INSTALL_VERSION" "$INSTALL_SHA" "$INSTALL_BRANCH" "$RELEASE_DIR" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
@@ -122,18 +238,97 @@ record = {
     "version": sys.argv[2],
     "sha": sys.argv[3],
     "branch": sys.argv[4],
+    "releaseDir": sys.argv[5],
     "installedAt": datetime.now(timezone.utc).isoformat(),
     "releaseGate": "passed",
-    "runtimePinnedToSha": True,
+    "runtimeImmutableSnapshot": True,
 }
 path.write_text(json.dumps(record, indent=2) + "\n")
 PY
 
+python3 - "$RULES_RECORD_TMP" "$INSTALL_SHA" "$INSTALL_BRANCH" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path(sys.argv[1])
+path.write_text(
+    json.dumps(
+        {
+            "sha": sys.argv[2],
+            "branch": sys.argv[3],
+            "installedAt": datetime.now(timezone.utc).isoformat(),
+            "preflightBypasses": [],
+        },
+        indent=2,
+    )
+    + "\n"
+)
+PY
+
+# A loaded legacy service survives deletion of its plist. Stop the exact
+# service before activation, while the old plist remains available for a
+# rollback restart. Stop it before staging so it cannot mutate legacy learning
+# state after the migration snapshot is taken.
+if launchctl print "$LEGACY_SERVICE" >/dev/null 2>&1; then
+  LEGACY_WAS_LOADED=1
+  if ! launchctl bootout "$LEGACY_SERVICE" >/dev/null 2>&1; then
+    echo "ERROR: refusing to install Major because the legacy supervisor could not be stopped." >&2
+    exit 1
+  fi
+  LEGACY_STOPPED=1
+  if launchctl print "$LEGACY_SERVICE" >/dev/null 2>&1; then
+    echo "ERROR: refusing to install Major because the legacy supervisor is still loaded." >&2
+    exit 1
+  fi
+fi
+
+# Prevent current Major writers from changing learning state between staging
+# and activation. Reclaim only an old lock with no live owning process.
+mkdir -p "$MAJOR_HOME/learning"
+if ! python3 "$SNAPSHOT_ROOT/scripts/acquire-major-learning-migration-lock.py" "$LEARNING_MIGRATION_LOCK" "$$"; then
+  exit 1
+fi
+LEARNING_LOCK_HELD=1
+
+# The user-level installation is one rollback-capable transaction. The old
+# wrapper and every existing rule/settings file remain recoverable until all
+# replacements have completed.
+MANIFEST="$(python3 "$SNAPSHOT_ROOT/scripts/stage-major-user-state.py" \
+  --root "$SNAPSHOT_ROOT" \
+  --stage "$INSTALL_STAGE/user-state" \
+  --major-bin "$BIN_DIR/major" \
+  --record "$RECORD_TMP" \
+  --global-rules-record "$RULES_RECORD_TMP" \
+  --execution-config "$EXECUTION_CONFIG_TMP" \
+  --wrapper "$WRAPPER_TMP" \
+  --legacy-plist "$LEGACY_PLIST")"
+
+python3 "$SNAPSHOT_ROOT/scripts/activate-major-user-state.py" --manifest "$MANIFEST"
+RELEASE_CREATED=0
+INSTALL_COMMITTED=1
+WORKER_CREATED=0
+rm -f "$LEARNING_MIGRATION_LOCK" || \
+  echo "WARN: remove the completed Major learning migration lock: $LEARNING_MIGRATION_LOCK" >&2
+LEARNING_LOCK_HELD=0
+
+# Pilot posture: no auto-start daemon. Never install or auto-start a global daemon.
+# The loaded-service postcondition was verified before activation so no
+# fallible check remains after the user-state transaction commits.
+
+# Ruflo is NOT attached globally. Provider CLIs are separate user tools. Major
+# never installs or authenticates them as an unattended side effect.
+if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ]; then
+  echo "WARN: MAJOR_INSTALL_ANTIGRAVITY is retired. Install the official 'agy' CLI and complete Google OAuth interactively."
+fi
+
 cat <<EOF
-Major v${INSTALL_VERSION} control plane installed from validated source.
+Major v${INSTALL_VERSION} control plane installed from validated main.
 
 CLI:        $BIN_DIR/major
 Release:    $INSTALL_SHA ($INSTALL_BRANCH)
+Runtime:    $RELEASE_DIR
 Record:     $RELEASE_RECORD
 State:      $MAJOR_HOME/supervisor-state.json
 Policies:   $MAJOR_HOME/project-policies.json
@@ -144,14 +339,15 @@ Cursor:     global Major rules installed
 Antigravity:global Major rules installed
 
 RUNTIME INTEGRITY:
-- The active command is pinned to the exact validated SHA above.
-- If project-baracks later moves to another commit, Major fails loudly instead of silently running an unvalidated checkout.
-- Install normal releases from green main only; non-main installation is an explicit pilot override.
+- The active CLI runs from an immutable release snapshot under ~/.major/releases.
+- The exact snapshot builder is smoke-tested, including production dependencies, DB migrations and required runtime helpers.
+- Editing, rebuilding, pulling or switching branches in project-baracks cannot silently change the installed runtime.
+- Normal installs require clean main equal to current origin/main plus the complete local release gate.
 
 NORMAL WORK MODE:
 - Major is present by default across supported agent tools.
 - The owner can explicitly fast-track trusted projects to foreground build mode.
-- build = up to 6 useful workers, 120-minute coordinator ceiling, no repeated shadow/assist ceremony.
+- build = one concurrent worker on the shared v0.5.1 Lima runtime, 120-minute coordinator ceiling, no repeated shadow/assist ceremony.
 - --allow-external-writes authorizes normal project writes such as branches, PRs, previews and already-authorized integrations.
 - client projects remain isolated from cross-project/global memory even in build mode.
 - no new paid spend, destructive production-data changes, credential/ownership/DNS changes, or production security-policy changes without explicit authority.

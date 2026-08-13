@@ -1,10 +1,7 @@
 /**
- * Build-level capability availability. This foundation build is DRY-RUN AND
- * INSPECTION ONLY: the five capabilities below are unavailable because their
- * security boundaries are incomplete (independent review found each one
- * bypassable at its claimed boundary). Each is quarantined behind this module
- * and re-enabled only by its own follow-up milestone
- * (docs/deferred-security-milestones.md) plus a fresh independent review.
+ * Build-level capability availability. The five v0.5.1 capability boundaries
+ * remain immutable code gates. M2-M5 are implemented, but M1 remains closed
+ * until the isolated provider runner passes every release field gate.
  *
  * These are CODE CONSTANTS, deliberately not configuration: no config file,
  * environment variable, CLI flag, database row or constructor option is
@@ -14,82 +11,79 @@
  * paths that call into this module.
  */
 
-export const UNAVAILABLE_CAPABILITIES = Object.freeze({
+export const CAPABILITY_DEFINITIONS = Object.freeze({
   'live-agent-execution': Object.freeze({
-    reason:
-      'executable identity is not content-verified at the spawn boundary and no OS-level ' +
-      'filesystem/network isolation is enforced',
-    milestone: 'M1 — trusted OS-isolated execution',
+    available: false,
+    reason: 'isolated provider runner has not passed all provider and lifecycle field gates',
+    milestone: 'M1 — release recovery pending',
   }),
   'paid-provider-execution': Object.freeze({
-    reason:
-      'billing authority and one-use, purpose-scoped paid approval are not enforced at the ' +
-      'durable boundary',
-    milestone: 'M2 — authoritative provider and billing control',
+    available: true,
+    reason: 'paid execution requires authoritative billing evidence and one-use approval',
+    milestone: 'M2 — activated for v0.5.1',
   }),
   'automated-task-completion': Object.freeze({
-    reason:
-      'task completion criteria are mutable, so the completion proof is not task-specific ' +
-      'and immutable',
-    milestone: 'M3 — immutable database completion proof',
+    available: true,
+    reason: 'automated completion requires immutable task-specific proof',
+    milestone: 'M3 — activated for v0.5.1',
   }),
   'worker-owned-downstream-mutations': Object.freeze({
-    reason:
-      'lease fencing does not cover every owner mutation and downstream write ' +
-      '(evidence, optional fences, review and roadmap-proposal writes)',
-    milestone: 'M4 — complete worker fencing',
+    available: true,
+    reason: 'worker-owned mutations require a live claim and exact fencing token',
+    milestone: 'M4 — activated for v0.5.1',
   }),
   'external-roadmap-application': Object.freeze({
-    reason:
-      'apply reconciliation does not compare-and-swap against the exact observed attempt, ' +
-      'so a delayed reconciler can displace a newer in-flight attempt',
-    milestone: 'M5 — crash-safe external roadmap application',
+    available: true,
+    reason: 'external roadmap writes require approved dry-run-bound exact-attempt reconciliation',
+    milestone: 'M5 — activated for v0.5.1',
   }),
 } as const);
 
-export type UnavailableCapability = keyof typeof UNAVAILABLE_CAPABILITIES;
+export type Capability = keyof typeof CAPABILITY_DEFINITIONS;
+/** Backward-compatible name retained for foundation API consumers. */
+export type UnavailableCapability = Capability;
 
 export class CapabilityUnavailableError extends Error {
-  constructor(readonly capability: UnavailableCapability) {
-    const entry = UNAVAILABLE_CAPABILITIES[capability];
+  constructor(readonly capability: Capability) {
+    const entry = CAPABILITY_DEFINITIONS[capability];
     super(
       `capability '${capability}' is not available in this build: ${entry.reason} ` +
-        `(deferred to ${entry.milestone})`,
+        `(${entry.milestone})`,
     );
     this.name = 'CapabilityUnavailableError';
   }
 }
 
 /**
- * Whether a capability is available in this build. Always false for the five
- * quarantined capabilities — the boolean return type exists so guarded code
- * paths stay compiled and type-checked while remaining unreachable at
- * runtime.
+ * Whether a capability is available in this build. Availability is an
+ * immutable reviewed code constant. This keeps every guarded path compiled
+ * while making activation an explicit one-line code review rather than the
+ * impossible act of deleting a key that the type system still requires.
  */
-export function isCapabilityAvailable(capability: UnavailableCapability): boolean {
-  return !(capability in UNAVAILABLE_CAPABILITIES);
+export function isCapabilityAvailable(capability: Capability): boolean {
+  return CAPABILITY_DEFINITIONS[capability].available;
 }
 
-/** Fail closed: throw unless the capability is available (it never is). */
-export function assertCapabilityAvailable(capability: UnavailableCapability): void {
+/** Fail closed if a future build deliberately disables a capability. */
+export function assertCapabilityAvailable(capability: Capability): void {
   if (!isCapabilityAvailable(capability)) {
     throw new CapabilityUnavailableError(capability);
   }
 }
 
 export interface CapabilityStatus {
-  capability: UnavailableCapability;
-  available: false;
+  capability: Capability;
+  available: boolean;
   reason: string;
   milestone: string;
 }
 
-/** The five unavailable capabilities as report rows (doctor, docs, tests). */
-export function unavailableCapabilityStatuses(): CapabilityStatus[] {
-  return (Object.keys(UNAVAILABLE_CAPABILITIES) as UnavailableCapability[]).map((capability) => ({
+/** All build capabilities as report rows (doctor, docs, tests). */
+export function capabilityStatuses(): CapabilityStatus[] {
+  return (Object.keys(CAPABILITY_DEFINITIONS) as Capability[]).map((capability) => ({
     capability,
-    available: false,
-    reason: UNAVAILABLE_CAPABILITIES[capability].reason,
-    milestone: UNAVAILABLE_CAPABILITIES[capability].milestone,
+    available: CAPABILITY_DEFINITIONS[capability].available,
+    reason: CAPABILITY_DEFINITIONS[capability].reason,
+    milestone: CAPABILITY_DEFINITIONS[capability].milestone,
   }));
 }

@@ -66,11 +66,11 @@ Project classes:
 Trust levels:
 
 - `observe` — no delegated execution;
-- `assist` — foreground pilot, maximum 3 useful workers;
-- `build` — validated build mode, maximum 6 useful workers;
-- `unattended` — maximum 6 useful workers and background continuation.
+- `assist` — foreground pilot, one concurrent worker for the shared v0.5.1 Lima runtime;
+- `build` — validated build mode, one concurrent worker for the shared v0.5.1 Lima runtime;
+- `unattended` — one concurrent worker plus background continuation. Unattended authority remains separately gated.
 
-The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. Browser leases also have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
+The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. The shared v0.5.1 Lima runtime has a 1-worker cap. Browser leases have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
 
 Unknown projects default to observe. Client/candidate/PII projects remain isolated until explicitly classified/promoted. Trust promotion beyond assist requires a passing independent grade.
 
@@ -101,6 +101,8 @@ They define:
 - installed does not mean loaded;
 - the resolver selects the smallest useful skill set;
 - positive/negative trigger examples and reachability/overlap checks are part of the skill lifecycle.
+- `major skill resolve --task "..."` returns paths and metadata only for installed, reachable skills;
+- `major skill audit` detects missing, duplicate and orphan internal skills. The immutable runtime ships the registry, skill bodies and resolver evals used by these commands.
 
 Important recurring meta-skills:
 
@@ -153,6 +155,8 @@ Thin adapters invoke available coding/reasoning environments:
 - Google Antigravity;
 - Cursor Agent CLI.
 
+The executable contracts are `claude`, `codex`, `agy` and `cursor-agent`. Major does not substitute the Cursor editor command for the separate headless CLI and does not substitute an uninstalled Antigravity Python SDK for the official `agy` CLI. Provider installation, OAuth, workspace trust and tool-permission selection remain interactive user setup. Major never adds Antigravity's dangerous permission-bypass flag. A provider is routable only after persisted availability plus authoritative billing observation; executable presence alone grants nothing.
+
 Worker/model choice is dynamic. Prefer subscription-included capacity. Paid API/credit spend remains an explicit authority boundary.
 
 Major should not encode fixed permanent agent factories. The coordinator may create a small dynamic worker graph when the task contains genuinely independent work.
@@ -188,7 +192,7 @@ During pilot:
 
 Builder-authored CI is useful but cannot by itself promote trust.
 
-The first representative Major acceptance test is JSS in `workshop/assist`: Major must make useful product progress on the real JSS goal in a visible foreground cycle, respect the 3-worker ceiling, preserve state, avoid owner gates, and leave objective evidence. An independent provider then grades the exact result.
+The first representative Major acceptance test is JSS in `workshop/assist`: Major must make useful product progress on the real JSS goal in a visible foreground cycle, respect the single-worker ceiling, preserve state, avoid owner gates, and leave objective evidence. An independent provider then grades the exact result.
 
 ## 10. Memory and learning
 
@@ -203,6 +207,8 @@ Learning priority:
 `deterministic rule/tool → tested skill → memory`
 
 Only sanitized transferable lessons cross into global Major learning. Client/candidate/PII material never does.
+
+Project learning candidates are stored in physically separate opaque project files. Direct global capture is forbidden. Global promotion requires a recurring project candidate plus newly supplied sanitized summary and evidence. Global records contain no project identity, repository path or project-local evidence. Promoted project and global lessons are recalled in fresh session and coordinator context; dismissed lessons are not.
 
 ## Communication adapters
 

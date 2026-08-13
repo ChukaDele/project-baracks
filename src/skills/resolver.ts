@@ -1,0 +1,226 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+import { majorHome } from '../supervisor/state.js';
+
+const registryEntrySchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  availability: z.string(),
+  load: z.string(),
+});
+
+const registrySchema = z.object({
+  version: z.number().int().positive(),
+  entries: z.array(registryEntrySchema),
+});
+
+export type SkillRegistryEntry = z.infer<typeof registryEntrySchema>;
+
+export interface ResolvedSkill {
+  id: string;
+  source: string;
+  path: string;
+  score: number;
+  reason: string;
+}
+
+export interface SkillResolution {
+  task: string;
+  skills: ResolvedSkill[];
+}
+
+const STOP_WORDS = new Set([
+  'all',
+  'and',
+  'for',
+  'from',
+  'into',
+  'load',
+  'major',
+  'only',
+  'project',
+  'projects',
+  'relevant',
+  'start',
+  'task',
+  'the',
+  'this',
+  'use',
+  'work',
+]);
+
+function runtimeRoot(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+}
+
+function registryPath(): string {
+  return process.env.MAJOR_SKILLS_REGISTRY
+    ? resolve(process.env.MAJOR_SKILLS_REGISTRY)
+    : join(runtimeRoot(), 'guidance', 'skills.registry.json');
+}
+
+function resolverEvalPath(): string {
+  return join(runtimeRoot(), 'evals', 'skill-resolver');
+}
+
+interface ResolverExamples {
+  positive: string[];
+  negative: string[];
+}
+
+function resolverExamples(): Map<string, ResolverExamples> {
+  const root = resolverEvalPath();
+  const examples = new Map<string, ResolverExamples>();
+  if (!existsSync(root)) return examples;
+  for (const name of readdirSync(root).filter((file) => file.endsWith('.json'))) {
+    const parsed = JSON.parse(readFileSync(join(root, name), 'utf8')) as {
+      skill?: unknown;
+      should_trigger?: unknown;
+      should_not_trigger?: unknown;
+    };
+    if (typeof parsed.skill !== 'string' || !Array.isArray(parsed.should_trigger)) continue;
+    examples.set(parsed.skill, {
+      positive: parsed.should_trigger.filter((item): item is string => typeof item === 'string'),
+      negative: Array.isArray(parsed.should_not_trigger)
+        ? parsed.should_not_trigger.filter((item): item is string => typeof item === 'string')
+        : [],
+    });
+  }
+  return examples;
+}
+
+export function loadSkillRegistry(): SkillRegistryEntry[] {
+  return registrySchema.parse(JSON.parse(readFileSync(registryPath(), 'utf8'))).entries;
+}
+
+function words(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word.length >= 3 && !STOP_WORDS.has(word));
+}
+
+function normalizedText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
+function skillPath(id: string, cwd: string, source: string): string | undefined {
+  const immutable = join(runtimeRoot(), 'skills', 'internal');
+  const mutableGlobal = join(majorHome(), 'skills', 'internal');
+  const roots =
+    source === 'major-internal'
+      ? [immutable, mutableGlobal]
+      : [
+          join(cwd, '.agents', 'skills'),
+          join(cwd, '.claude', 'skills'),
+          join(cwd, '.codex', 'skills'),
+          mutableGlobal,
+          immutable,
+        ];
+  for (const root of roots) {
+    const path = join(root, id, 'SKILL.md');
+    if (existsSync(path)) return path;
+  }
+  return undefined;
+}
+
+function scoreEntry(
+  entry: SkillRegistryEntry,
+  task: string,
+  examples: Map<string, ResolverExamples>,
+): { score: number; reason: string } {
+  const normalized = task.toLowerCase();
+  if (normalized.includes(entry.id.toLowerCase())) {
+    return { score: 100, reason: `explicit skill id: ${entry.id}` };
+  }
+  const taskWords = new Set(words(task));
+  const idMatches = words(entry.id).filter((word) => taskWords.has(word));
+  const triggerMatches = [...new Set(words(entry.load).filter((word) => taskWords.has(word)))];
+  const rareMatches = triggerMatches.filter((word) => word.length >= 8);
+  let score = idMatches.length * 5 + triggerMatches.length * 2 + rareMatches.length;
+  let exampleReason = '';
+  const fixtures = examples.get(entry.id);
+  if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
+    return { score: 0, reason: 'matched a negative trigger example' };
+  }
+  for (const example of fixtures?.positive ?? []) {
+    const exampleWords = new Set(words(example));
+    const overlap = [...exampleWords].filter((word) => taskWords.has(word));
+    const rareOverlap = overlap.filter((word) => word.length >= 8);
+    if (overlap.length < 2 && rareOverlap.length === 0) continue;
+    const exampleScore = overlap.length * 3 + rareOverlap.length * 2;
+    if (exampleScore > score) {
+      score = exampleScore;
+      exampleReason = `matched trigger example: ${overlap.join(', ')}`;
+    }
+  }
+  return {
+    score,
+    reason:
+      exampleReason || `matched: ${[...new Set([...idMatches, ...triggerMatches])].join(', ')}`,
+  };
+}
+
+export function resolveSkills(input: {
+  task: string;
+  cwd?: string;
+  limit?: number;
+}): SkillResolution {
+  const task = input.task.trim();
+  if (!task) throw new Error('skill resolution task must not be empty');
+  const cwd = resolve(input.cwd ?? process.cwd());
+  const examples = resolverExamples();
+  const matches = loadSkillRegistry()
+    .map((entry) => ({ entry, ...scoreEntry(entry, task, examples) }))
+    .filter(({ score }) => score >= 5)
+    .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id));
+
+  const skills: ResolvedSkill[] = [];
+  for (const match of matches) {
+    const path = skillPath(match.entry.id, cwd, match.entry.source);
+    if (!path) continue;
+    skills.push({
+      id: match.entry.id,
+      source: match.entry.source,
+      path,
+      score: match.score,
+      reason: match.reason,
+    });
+    if (skills.length >= (input.limit ?? 6)) break;
+  }
+  return { task, skills };
+}
+
+export interface SkillAudit {
+  internal: { id: string; reachable: boolean; path?: string }[];
+  duplicateIds: string[];
+  orphanInternalSkills: string[];
+}
+
+export function auditSkillReachability(cwd = process.cwd()): SkillAudit {
+  const entries = loadSkillRegistry();
+  const counts = new Map<string, number>();
+  for (const entry of entries) counts.set(entry.id, (counts.get(entry.id) ?? 0) + 1);
+  const internal = entries
+    .filter((entry) => entry.source === 'major-internal')
+    .map((entry) => {
+      const path = skillPath(entry.id, resolve(cwd), entry.source);
+      return { id: entry.id, reachable: Boolean(path), ...(path ? { path } : {}) };
+    });
+  const registered = new Set(internal.map((entry) => entry.id));
+  const internalRoot = join(runtimeRoot(), 'skills', 'internal');
+  const installed = existsSync(internalRoot)
+    ? readdirSync(internalRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && existsSync(join(internalRoot, entry.name, 'SKILL.md')))
+        .map((entry) => entry.name)
+    : [];
+  return {
+    internal,
+    duplicateIds: [...counts].filter(([, count]) => count > 1).map(([id]) => id),
+    orphanInternalSkills: installed.filter((id) => !registered.has(id)).sort(),
+  };
+}

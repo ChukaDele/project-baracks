@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Db, DbConn } from '../db/client.js';
 import {
   agentModels,
@@ -32,6 +32,7 @@ export interface NewRunInput {
   taskId: string;
   providerId: string;
   claimId?: string;
+  claimWorkerId?: string;
   modelId?: string;
   modelRef: string;
   purpose: (typeof agentRuns.$inferInsert)['purpose'];
@@ -48,21 +49,15 @@ export interface NewRunInput {
 }
 
 /**
- * Create a run record inside one immediate transaction. In this build a run
- * row is ledger/planning state only — nothing executes it (live agent
- * execution is an unavailable capability, see src/security/capabilities.ts).
+ * Create a run record inside one immediate transaction. Execution remains a
+ * separate gateway action; this service owns durable run authorisation state.
  *
  * Validations that remain live: the task exists, and the billing mode is
  * known (an 'unknown' cost basis is unroutable) and must match the model's
  * authoritatively observed billing.
  *
- * QUARANTINED paths: a PAID billing mode is refused unconditionally (paid
- * provider execution is unavailable — M2), and a claim-bound run is refused
- * unconditionally (worker-owned downstream mutations are unavailable — M4).
- * The validation code for those paths below the gates is retained as the
- * milestone starting point but is unreachable until then; independent review
- * found it incomplete (approval scoping/consumption, fencing coverage), so it
- * must not be presented as an enforced boundary.
+ * Paid billing requires authoritative model billing plus an exact unexpired,
+ * unconsumed approval. Claim-bound runs require the current live worker fence.
  */
 export function createRun(db: Db, rawInput: NewRunInput) {
   // Single-read snapshot of the caller-owned input (see task-service.ts
@@ -73,6 +68,7 @@ export function createRun(db: Db, rawInput: NewRunInput) {
     taskId: rawInput.taskId,
     providerId: rawInput.providerId,
     claimId: rawInput.claimId,
+    claimWorkerId: rawInput.claimWorkerId,
     modelId: rawInput.modelId,
     modelRef: rawInput.modelRef,
     purpose: rawInput.purpose,
@@ -116,23 +112,21 @@ export function createRun(db: Db, rawInput: NewRunInput) {
           ),
         )
         .get();
-      if (model) {
-        if (model.billingMode === 'unknown') {
-          throw new RunAuthorisationError(
-            `model ${input.modelRef} has no authoritative billing observation: unroutable`,
-          );
-        }
-        if (model.billingMode !== input.billingMode) {
-          throw new RunAuthorisationError(
-            `run billing '${input.billingMode}' does not match the authoritative persisted ` +
-              `billing '${model.billingMode}' of model ${input.modelRef}`,
-          );
-        }
-        if (input.modelId !== undefined && input.modelId !== model.id) {
-          throw new RunAuthorisationError(
-            `modelId ${input.modelId} does not match ${input.modelRef}`,
-          );
-        }
+      if (!model || model.billingMode === 'unknown') {
+        throw new RunAuthorisationError(
+          `model ${input.modelRef} has no authoritative billing observation: unroutable`,
+        );
+      }
+      if (model.billingMode !== input.billingMode) {
+        throw new RunAuthorisationError(
+          `run billing '${input.billingMode}' does not match the authoritative persisted ` +
+            `billing '${model.billingMode}' of model ${input.modelRef}`,
+        );
+      }
+      if (input.modelId !== undefined && input.modelId !== model.id) {
+        throw new RunAuthorisationError(
+          `modelId ${input.modelId} does not match ${input.modelRef}`,
+        );
       }
 
       if (input.claimId !== undefined) {
@@ -142,7 +136,8 @@ export function createRun(db: Db, rawInput: NewRunInput) {
           !claim ||
           claim.taskId !== input.taskId ||
           claim.status !== 'active' ||
-          claim.leaseExpiresAt <= nowIsoStr
+          claim.leaseExpiresAt <= nowIsoStr ||
+          claim.workerId !== input.claimWorkerId
         ) {
           throw new StaleClaimError(
             `claim ${input.claimId} is not the current active, unexpired claim of task ${input.taskId}`,
@@ -166,7 +161,11 @@ export function createRun(db: Db, rawInput: NewRunInput) {
           category: 'paid_usage',
           taskId: input.taskId,
           projectId: task.projectId,
-          scope: { provider: provider?.name ?? '', modelRef: input.modelRef },
+          scope: {
+            provider: provider?.name ?? '',
+            modelRef: input.modelRef,
+            purpose: input.purpose,
+          },
           requireExpiry: true,
           requireUnconsumed: true,
           ...(now ? { now } : {}),
@@ -184,6 +183,7 @@ export function createRun(db: Db, rawInput: NewRunInput) {
         taskId: input.taskId,
         providerId: input.providerId,
         claimId: input.claimId ?? null,
+        claimWorkerId: input.claimWorkerId ?? null,
         modelId: input.modelId ?? null,
         modelRef: input.modelRef,
         purpose: input.purpose,
@@ -197,25 +197,18 @@ export function createRun(db: Db, rawInput: NewRunInput) {
       };
       tx.insert(agentRuns).values(row).run();
 
-      // Consume the paid approval EXACTLY ONCE, atomically in this same
-      // transaction. The compare-and-swap on a NULL consumed_by_run_id means a
-      // second run under the same approval finds it consumed and fails; the
-      // insert above already checked unconsumed, so the stamp closes the
-      // window between check and use.
+      // SQLite consumes paid approvals in an AFTER INSERT trigger. Verify the
+      // durable boundary did so; the service never performs its own competing
+      // check-then-stamp implementation.
       if (PAID_BILLING_MODES.includes(input.billingMode) && input.paidUsageDecisionId) {
-        const consumed = tx
-          .update(decisionRequests)
-          .set({ consumedByRunId: row.id })
-          .where(
-            and(
-              eq(decisionRequests.id, input.paidUsageDecisionId),
-              isNull(decisionRequests.consumedByRunId),
-            ),
-          )
-          .run();
-        if (consumed.changes !== 1) {
+        const decision = tx
+          .select({ consumedByRunId: decisionRequests.consumedByRunId })
+          .from(decisionRequests)
+          .where(eq(decisionRequests.id, input.paidUsageDecisionId))
+          .get();
+        if (decision?.consumedByRunId !== row.id) {
           throw new RunAuthorisationError(
-            `paid approval ${input.paidUsageDecisionId} was already consumed by another run`,
+            `paid approval ${input.paidUsageDecisionId} was not consumed by run ${row.id}`,
           );
         }
       }

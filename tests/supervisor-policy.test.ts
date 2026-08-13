@@ -95,7 +95,7 @@ describe('Major trust ramp', () => {
       projectClass: 'workshop',
       trust: 'assist',
     });
-    expect(assisted.maxWorkers).toBe(3);
+    expect(assisted.maxWorkers).toBe(1);
     expect(assisted.maxRunMinutes).toBe(30);
     expect(assisted.allowBackground).toBe(false);
     expect(assisted.allowPaidSpend).toBe(false);
