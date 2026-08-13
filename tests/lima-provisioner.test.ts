@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -48,6 +48,7 @@ case "$1" in
     fi
     if echo "$*" | grep -q "stat -c %U:%G:%a"; then
       case "$*" in
+        *provider-auth/claude/*) printf 'root:major-claude:440\\n' ;;
         *provider-auth/codex/*) printf 'root:major-codex:440\\n' ;;
         *provider-auth/cursor/*) printf 'root:major-cursor:440\\n' ;;
         *provider-auth/antigravity/*) printf 'root:major-antigravity:440\\n' ;;
@@ -86,8 +87,9 @@ function run(
   extraEnv: Record<string, string> = {},
   instance = 'major-worker',
   releaseSha = 'legacy-v1',
+  script = provisioner,
 ) {
-  return spawnSync('bash', [provisioner, fakeLima(root, instance), instance, releaseSha], {
+  return spawnSync('bash', [script, fakeLima(root, instance), instance, releaseSha], {
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -96,6 +98,30 @@ function run(
       ...extraEnv,
     },
   });
+}
+
+function authorizedProvisioner(root: string): string {
+  const bundle = join(root, 'bundle');
+  const scripts = join(bundle, 'scripts');
+  mkdirSync(join(bundle, 'templates', 'apparmor'), { recursive: true });
+  mkdirSync(join(bundle, 'templates', 'lima'), { recursive: true });
+  const script = join(scripts, 'provision-major-lima-worker.sh');
+  mkdirSync(scripts, { recursive: true });
+  writeFileSync(script, readFileSync(provisioner));
+  for (const name of [
+    'bootstrap-major-lima-worker.sh',
+    'install-major-linux-providers.sh',
+    'configure-major-antigravity-run.py',
+    'manage-major-provider-state.py',
+  ])
+    writeFileSync(join(scripts, name), '# fixture\n');
+  writeFileSync(join(bundle, 'templates', 'apparmor', 'major-cursor-sandbox'), '# fixture\n');
+  writeFileSync(join(bundle, 'templates', 'lima', 'major-worker.yaml'), '# fixture\n');
+  writeFileSync(
+    join(scripts, 'verify-secure-enclave-staged-validation-lease.mjs'),
+    `const args = process.argv.slice(2);\nif (args[3] !== 'credential-handoff' || !['claude','codex','cursor','antigravity'].includes(args[4])) process.exit(1);\n`,
+  );
+  return script;
 }
 
 afterEach(() => {
@@ -182,30 +208,67 @@ describe('clean-install Lima provisioning', () => {
     const root = mkdtempSync(join(tmpdir(), 'major-provision-release-'));
     roots.push(root);
     const instance = 'major-worker-0123456789ab';
-    expect(run(root, {}, instance, '0'.repeat(40)).status).toBe(0);
+    expect(run(root, {}, instance, `0123456789ab${'0'.repeat(28)}`).status).toBe(0);
     expect(readFileSync(join(root, 'log'), 'utf8')).toMatch(
       /create --name major-worker-0123456789ab/,
     );
   });
 
-  it('streams only the exact approved provider credentials between VMs', () => {
+  it('requires signed release authority before streaming provider credentials', () => {
     const root = mkdtempSync(join(tmpdir(), 'major-provision-auth-'));
     roots.push(root);
     const instance = 'major-worker-0123456789ab';
-    const result = run(root, { MAJOR_FAKE_LIMA_AUTH_SOURCE: '1' }, instance, '0'.repeat(40));
+    const result = run(
+      root,
+      { MAJOR_FAKE_LIMA_AUTH_SOURCE: '1' },
+      instance,
+      `0123456789ab${'0'.repeat(28)}`,
+    );
     expect(result.status, result.stderr).toBe(0);
-    expect(readFileSync(`${join(root, 'state')}.auth-migrated`, 'utf8')).toBe('');
+    const log = readFileSync(join(root, 'log'), 'utf8');
+    expect(log).not.toMatch(/provider-auth -cf -/);
+    expect(log).not.toMatch(/\/Users\//);
+  });
+
+  it('binds the exact four provider credential paths to Secure Enclave release authority', () => {
+    const source = readFileSync(provisioner, 'utf8');
+    expect(source).toContain('claude:claude/.claude/.credentials.json');
+    expect(source).toContain('codex:codex/.codex/auth.json');
+    expect(source).toContain('cursor:cursor/.config/cursor/auth.json');
+    expect(source).toContain(
+      'antigravity:antigravity/.gemini/antigravity-cli/antigravity-oauth-token',
+    );
+    expect(source).toContain('verify-secure-enclave-staged-validation-lease.mjs');
+    expect(source).toContain('"$RELEASE_SHA" credential-handoff "$provider"');
+  });
+
+  it('streams all four credentials only through an exact-SHA authorized handoff', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-authorized-auth-'));
+    roots.push(root);
+    const sha = '0'.repeat(40);
+    const instance = 'major-worker-000000000000';
+    const result = run(
+      root,
+      { MAJOR_FAKE_LIMA_AUTH_SOURCE: '1' },
+      instance,
+      sha,
+      authorizedProvisioner(root),
+    );
+    expect(result.status, result.stderr).toBe(0);
     const log = readFileSync(join(root, 'log'), 'utf8');
     expect(
       log.match(/major-worker sudo tar -C \/var\/lib\/major\/provider-auth -cf -/g),
-    ).toHaveLength(3);
-    expect(log).toContain('codex/.codex/auth.json');
-    expect(log).toContain('cursor/.config/cursor/auth.json');
-    expect(log).toContain('antigravity/.gemini/antigravity-cli/antigravity-oauth-token');
-    expect(log).not.toContain('claude/.claude/.credentials.json');
-    expect(log.match(new RegExp(`shell --tty=false ${instance} sudo tar`, 'g'))).toHaveLength(3);
-    expect(log.match(/sudo chmod 0440/g)).toHaveLength(3);
-    expect(log.match(/sudo stat -c %U:%G:%a/g)).toHaveLength(3);
+    ).toHaveLength(4);
+    for (const path of [
+      'claude/.claude/.credentials.json',
+      'codex/.codex/auth.json',
+      'cursor/.config/cursor/auth.json',
+      'antigravity/.gemini/antigravity-cli/antigravity-oauth-token',
+    ])
+      expect(log).toContain(path);
+    expect(log.match(new RegExp(`shell --tty=false ${instance} sudo tar`, 'g'))).toHaveLength(4);
+    expect(log.match(/sudo chmod 0440/g)).toHaveLength(4);
+    expect(log.match(/sudo stat -c %U:%G:%a/g)).toHaveLength(4);
     expect(log).not.toMatch(/\/Users\//);
   });
 
@@ -216,7 +279,8 @@ describe('clean-install Lima provisioning', () => {
       root,
       { MAJOR_FAKE_LIMA_AUTH_SOURCE: '1', MAJOR_FAKE_LIMA_AUTH_MISSING: '1' },
       'major-worker-0123456789ab',
-      '0'.repeat(40),
+      `0123456789ab${'0'.repeat(28)}`,
+      authorizedProvisioner(root),
     );
     expect(result.status).toBe(0);
     expect(readFileSync(join(root, 'log'), 'utf8')).not.toMatch(/provider-auth -cf -/);
@@ -233,7 +297,7 @@ describe('clean-install Lima provisioning', () => {
         MAJOR_FAKE_LIMA_FAIL_SOURCE_STOP: '1',
       },
       'major-worker-0123456789ab',
-      '0'.repeat(40),
+      `0123456789ab${'0'.repeat(28)}`,
     );
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/failed to restore legacy major-worker to Stopped/);

@@ -17,6 +17,20 @@ export interface WorkerReport {
     key?: string;
     evidence?: string;
   };
+  workflow?: {
+    task: string;
+    outcome: string;
+    steps: string[];
+    tools: string[];
+    validations: string[];
+    scope: 'project' | 'global';
+  };
+}
+
+export function completedWorkflow(
+  report: WorkerReport | undefined,
+): WorkerReport['workflow'] | undefined {
+  return report?.status === 'done' ? report.workflow : undefined;
 }
 
 function reportLinesFromText(value: unknown): string[] {
@@ -122,11 +136,46 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
           : {}),
       };
     }
+    let workflow: WorkerReport['workflow'];
+    if (value.workflow !== undefined) {
+      if (!value.workflow || typeof value.workflow !== 'object' || Array.isArray(value.workflow)) {
+        return undefined;
+      }
+      const candidate = value.workflow as Record<string, unknown>;
+      const strings = (name: string, required: boolean): string[] | undefined => {
+        const list = candidate[name];
+        if (!Array.isArray(list) || list.some((item) => typeof item !== 'string')) {
+          return required ? undefined : [];
+        }
+        const sanitized = [
+          ...new Set(
+            list
+              .filter((item): item is string => typeof item === 'string')
+              .map((item) => redactText(item.trim()).slice(0, 1_000))
+              .filter(Boolean),
+          ),
+        ];
+        return required && sanitized.length === 0 ? undefined : sanitized.slice(0, 20);
+      };
+      const task =
+        typeof candidate.task === 'string' ? redactText(candidate.task.trim()).slice(0, 2_000) : '';
+      const outcome =
+        typeof candidate.outcome === 'string'
+          ? redactText(candidate.outcome.trim()).slice(0, 2_000)
+          : '';
+      const steps = strings('steps', true);
+      const tools = strings('tools', false);
+      const validations = strings('validations', true);
+      const scope = candidate.scope === 'global' ? 'global' : 'project';
+      if (!task || !outcome || !steps || !tools || !validations) return undefined;
+      workflow = { task, outcome, steps, tools, validations, scope };
+    }
     return {
       status: value.status as WorkerReport['status'],
       summary,
       ...(ownerGate ? { ownerGate } : {}),
       ...(learning ? { learning } : {}),
+      ...(workflow ? { workflow } : {}),
     };
   } catch {
     return undefined;

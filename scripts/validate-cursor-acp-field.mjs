@@ -9,6 +9,7 @@ import {
   stagedFieldExecutionConfig,
   stagedFieldValidationNonce,
 } from './staged-field-support.mjs';
+import { executeCursorFieldPhase } from './cursor-field-runner.mjs';
 
 const { limactlPath, instance } = stagedFieldExecutionConfig();
 const root = mkdtempSync(join(tmpdir(), 'major-cursor-acp-field-'));
@@ -65,12 +66,13 @@ function assertOnlyChange(workspace, expectedPath) {
   }
 }
 
-async function executeCursor({ phase, modelRef, resumeSessionRef, cancel }) {
-  const handle = executeStagedCursorField({
+async function executeCursor({ phase, modelRef, resumeSessionRef, predecessorLeaseId, cancel }) {
+  const handle = executeCursorFieldPhase(executeStagedCursorField, {
     phase,
     nonce,
     ...(modelRef ? { modelRef } : {}),
     ...(resumeSessionRef ? { resumeSessionRef } : {}),
+    ...(predecessorLeaseId ? { predecessorLeaseId } : {}),
   });
   let acpUpdates = 0;
   let providerResults = 0;
@@ -86,6 +88,7 @@ async function executeCursor({ phase, modelRef, resumeSessionRef, cancel }) {
     if (event.type === 'provider-result') providerResults += 1;
   }
   return {
+    validationLeaseId: handle.validationLeaseId,
     outcome: await handle.outcome,
     acpUpdates,
     providerResults,

@@ -3,6 +3,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { majorHome } from '../supervisor/state.js';
+import {
+  loadActiveGeneratedSkills,
+  skillPerformanceScore,
+  type SkillCandidate,
+} from './lifecycle.js';
 
 const registryEntrySchema = z.object({
   id: z.string(),
@@ -128,6 +133,10 @@ function skillPath(id: string, cwd: string, source: string): string | undefined 
   return undefined;
 }
 
+function generatedSkillPath(entry: SkillCandidate): string | undefined {
+  return entry.path && existsSync(entry.path) ? entry.path : undefined;
+}
+
 function scoreEntry(
   entry: SkillRegistryEntry,
   task: string,
@@ -174,14 +183,36 @@ export function resolveSkills(input: {
   if (!task) throw new Error('skill resolution task must not be empty');
   const cwd = resolve(input.cwd ?? process.cwd());
   const examples = resolverExamples();
-  const matches = loadSkillRegistry()
-    .map((entry) => ({ entry, ...scoreEntry(entry, task, examples) }))
+  const generated = loadActiveGeneratedSkills(cwd);
+  const matches = [
+    ...loadSkillRegistry().map((entry) => ({ entry, generated: undefined })),
+    ...generated.map((generated) => ({
+      entry: {
+        id: generated.skillId,
+        source: 'gbrain-generated',
+        availability: 'project',
+        load: generated.trigger,
+      },
+      generated,
+    })),
+  ]
+    .map(({ entry, generated }) => {
+      const scored = scoreEntry(entry, task, examples);
+      return {
+        entry,
+        generated,
+        ...scored,
+        score: scored.score + (generated ? skillPerformanceScore(generated) : 0),
+      };
+    })
     .filter(({ score }) => score >= 5)
     .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id));
 
   const skills: ResolvedSkill[] = [];
   for (const match of matches) {
-    const path = skillPath(match.entry.id, cwd, match.entry.source);
+    const path = match.generated
+      ? generatedSkillPath(match.generated)
+      : skillPath(match.entry.id, cwd, match.entry.source);
     if (!path) continue;
     skills.push({
       id: match.entry.id,

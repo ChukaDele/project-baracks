@@ -18,18 +18,19 @@ SOURCE_BRANCH="$(git -C "$SOURCE_ROOT" rev-parse --abbrev-ref HEAD)"
 SOURCE_REPOSITORY="$(git -C "$SOURCE_ROOT" config --get remote.origin.url)"
 SOURCE_TREE_OID="$(git -C "$SOURCE_ROOT" rev-parse HEAD^{tree})"
 SOURCE_TREE_HASH="$(printf '%s' "$SOURCE_TREE_OID" | shasum -a 256 | awk '{print $1}')"
-python3 - "$CANDIDATE/release.json" "$SOURCE_SHA" "$SOURCE_BRANCH" "$SOURCE_REPOSITORY" "$SOURCE_TREE_HASH" "$SOURCE_ROOT" <<'PY'
+SOURCE_VERSION="$(node -p "require(process.argv[1]).version" "$SOURCE_ROOT/package.json")"
+python3 - "$CANDIDATE/release.json" "$SOURCE_VERSION" "$SOURCE_SHA" "$SOURCE_BRANCH" "$SOURCE_REPOSITORY" "$SOURCE_TREE_HASH" "$SOURCE_ROOT" <<'PY'
 import json
 from pathlib import Path
 import sys
 release = json.loads(Path(sys.argv[1]).read_text())
 expected = {
-    "version": "0.5.1",
-    "sha": sys.argv[2],
-    "branch": sys.argv[3],
-    "repository": sys.argv[4],
-    "treeHash": sys.argv[5],
-    "sourceCheckout": str(Path(sys.argv[6]).resolve()),
+    "version": sys.argv[2],
+    "sha": sys.argv[3],
+    "branch": sys.argv[4],
+    "repository": sys.argv[5],
+    "treeHash": sys.argv[6],
+    "sourceCheckout": str(Path(sys.argv[7]).resolve()),
 }
 if release != expected:
     raise SystemExit("ERROR: staged candidate release metadata does not match the bound source")

@@ -1,4 +1,13 @@
 import { auditSkillReachability, resolveSkills } from './resolver.js';
+import {
+  deprecateGeneratedSkill,
+  listSkillCandidates,
+  loadActiveGeneratedSkills,
+  promoteSkillCandidate,
+  restoreGeneratedSkill,
+  skillLifecycleMetrics,
+} from './lifecycle.js';
+import { resolveProject } from '../supervisor/state.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -39,6 +48,61 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
     ) {
       throw new Error('Major skill audit failed: unreachable, duplicate or orphan skills found');
     }
+    return true;
+  }
+  if (args[1] === 'candidates') {
+    const resolved = resolveProject(flag(args, '--project') ?? 'current');
+    const candidates = listSkillCandidates(resolved.project);
+    if (args.includes('--json')) console.log(JSON.stringify(candidates, null, 2));
+    else if (candidates.length === 0) console.log('No Major skill candidates.');
+    else {
+      for (const candidate of candidates) {
+        console.log(
+          `${candidate.status}\t${candidate.confidence}\t${candidate.occurrences}x\t${candidate.skillId}\t${candidate.targetSkillId ?? '-'}`,
+        );
+      }
+    }
+    return true;
+  }
+  if (args[1] === 'promote') {
+    const resolved = resolveProject(flag(args, '--project') ?? 'current');
+    const id = flag(args, '--id');
+    if (!id) throw new Error('missing required --id');
+    console.log(
+      JSON.stringify(
+        promoteSkillCandidate({ id, project: resolved.project, repoPath: resolved.repoPath }),
+        null,
+        2,
+      ),
+    );
+    return true;
+  }
+  if (args[1] === 'deprecate') {
+    const resolved = resolveProject(flag(args, '--project') ?? 'current');
+    const id = flag(args, '--id');
+    if (!id) throw new Error('missing required --id');
+    console.log(JSON.stringify(deprecateGeneratedSkill(resolved.project, id), null, 2));
+    return true;
+  }
+  if (args[1] === 'metrics') {
+    const resolved = resolveProject(flag(args, '--project') ?? 'current');
+    console.log(
+      JSON.stringify(
+        {
+          summary: skillLifecycleMetrics(resolved.project),
+          active: loadActiveGeneratedSkills(resolved.repoPath),
+        },
+        null,
+        2,
+      ),
+    );
+    return true;
+  }
+  if (args[1] === 'restore') {
+    const resolved = resolveProject(flag(args, '--project') ?? 'current');
+    const id = flag(args, '--id');
+    if (!id) throw new Error('missing required --id');
+    console.log(JSON.stringify(restoreGeneratedSkill(resolved.project, id), null, 2));
     return true;
   }
   return false;
