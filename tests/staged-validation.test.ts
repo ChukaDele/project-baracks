@@ -520,5 +520,13 @@ describe('staged validation state and fencing', () => {
     expect(readFileSync('scripts/install-major-runtime.sh', 'utf8')).toContain(
       'corepack pnpm install --frozen-lockfile',
     );
+    for (const script of [
+      'scripts/stage-major-release-candidate.sh',
+      'scripts/verify-major-staged-candidate.sh',
+    ]) {
+      const source = readFileSync(script, 'utf8');
+      expect(source).toContain('require(process.argv[1]).version');
+      expect(source).not.toContain('"version": "0.5.1"');
+    }
   });
 });

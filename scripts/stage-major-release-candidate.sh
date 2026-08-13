@@ -17,21 +17,22 @@ TREE_OID="$(git rev-parse HEAD^{tree})"
 TREE_HASH="$(printf '%s' "$TREE_OID" | shasum -a 256 | awk '{print $1}')"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 REPOSITORY="$(git config --get remote.origin.url)"
+VERSION="$(node -p "require(process.argv[1]).version" "$ROOT/package.json")"
 pnpm build
 bash scripts/build-major-runtime-snapshot.sh "$DEST"
 chmod u+w "$DEST/runtime-manifest.json"
-python3 - "$DEST/release.json" "$SHA" "$BRANCH" "$REPOSITORY" "$TREE_HASH" "$ROOT" <<'PY'
+python3 - "$DEST/release.json" "$VERSION" "$SHA" "$BRANCH" "$REPOSITORY" "$TREE_HASH" "$ROOT" <<'PY'
 import json
 from pathlib import Path
 import sys
 path = Path(sys.argv[1])
 path.write_text(json.dumps({
-    "version": "0.5.1",
-    "sha": sys.argv[2],
-    "branch": sys.argv[3],
-    "repository": sys.argv[4],
-    "treeHash": sys.argv[5],
-    "sourceCheckout": sys.argv[6],
+    "version": sys.argv[2],
+    "sha": sys.argv[3],
+    "branch": sys.argv[4],
+    "repository": sys.argv[5],
+    "treeHash": sys.argv[6],
+    "sourceCheckout": sys.argv[7],
 }, indent=2) + "\n")
 path.chmod(0o444)
 PY
