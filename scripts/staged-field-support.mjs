@@ -9,6 +9,8 @@ import { executeMajorCommand } from '../dist/security/major-gateway.js';
 import {
   completeStagedCliProviderField,
   completeStagedCursorField,
+  completeStagedReleaseField,
+  fixedStagedValidationCase,
   issueStagedValidationLease,
   revokeStagedValidationLease,
   stagedValidationRequestDigest,
@@ -91,7 +93,19 @@ function executeStagedFieldCase({
   predecessorLeaseId,
   validationNonce,
 }) {
-  if (!['provider-field', 'clean-install'].includes(caseId)) {
+  if (
+    ![
+      'provider-field',
+      'clean-install',
+      'jss-field',
+      'surface-talent-field',
+      'cross-project-isolation',
+      'failure-recovery',
+      'burn-in-1',
+      'burn-in-2',
+      'burn-in-3',
+    ].includes(caseId)
+  ) {
     throw new Error(`field harness cannot issue staged case: ${caseId}`);
   }
   if (
@@ -189,9 +203,13 @@ function executeStagedFieldCase({
         const evidenceDb = openDb();
         try {
           const evidence = { ...observedEvidence, events: [...capturedEvents] };
-          return kind === 'cursor'
-            ? completeStagedCursorField(evidenceDb.db, authority, evidence)
-            : completeStagedCliProviderField(evidenceDb.db, authority, evidence);
+          if (kind === 'cursor') {
+            return completeStagedCursorField(evidenceDb.db, authority, evidence);
+          }
+          if (kind === 'release') {
+            return completeStagedReleaseField(evidenceDb.db, authority, evidence);
+          }
+          return completeStagedCliProviderField(evidenceDb.db, authority, evidence);
         } finally {
           evidenceDb.sqlite.close();
         }
@@ -210,6 +228,56 @@ function executeStagedFieldCase({
   } finally {
     opened.sqlite.close();
   }
+}
+
+export function executeStagedReleaseField({
+  caseId,
+  nonce,
+  workspace,
+  projectSha,
+  phase = 'recovery',
+  predecessorLeaseId,
+}) {
+  const definition = fixedStagedValidationCase(caseId, nonce, phase);
+  const handle = executeStagedFieldCase({
+    caseId,
+    expectedEvidence: `${caseId}:${definition.token}:${projectSha}:cleanup-complete`,
+    expectedExecutionStatus: 'succeeded',
+    validationNonce: nonce,
+    request: {
+      executable: definition.executable,
+      args: providerArgs(definition.host, { prompt: definition.prompt, outputMode: 'batch' }),
+      cwd: workspace,
+      allowedRoots: [workspace],
+      timeoutMs: caseId === 'jss-field' ? 20 * 60 * 1000 : 5 * 60 * 1000,
+      providerRequest: {
+        host: definition.host,
+        prompt: definition.prompt,
+        allowGuestMutation: definition.allowGuestMutation,
+        approvalAuthority: { decisions: [] },
+      },
+      parseLine: parseProviderEventLine,
+      extractSessionRef: (event) => extractProviderSessionRef(definition.host, event),
+      extractUsage: extractProviderUsage,
+    },
+    ...(predecessorLeaseId ? { predecessorLeaseId } : {}),
+  });
+  return {
+    ...handle,
+    provider: definition.host,
+    token: definition.token,
+    validateEvidence: async () => {
+      const outcome = await handle.outcome;
+      return handle.completeEvidence('release', {
+        caseId,
+        provider: definition.host,
+        workspace,
+        nonce,
+        projectSha,
+        outcome,
+      });
+    },
+  };
 }
 
 export function executeStagedCliProviderField({ provider, nonce }) {

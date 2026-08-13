@@ -68,6 +68,7 @@ export interface ExecuteOutcome {
     | 'auth_failed'
     | 'protocol_invalid'
     | 'provider_failed'
+    | 'interrupted'
     | 'timed_out'
     | 'cancelled'
     | 'cleanup_failed';

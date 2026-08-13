@@ -8,7 +8,7 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -26,6 +26,7 @@ import {
 } from '../src/security/gateway.js';
 import { trustedExecutableRegistry } from '../src/security/major-gateway.js';
 import { gatewayAllowedRoots } from '../src/supervisor/worker.js';
+import { LimaBackend } from '../src/execution/lima-backend.js';
 
 const NODE = process.execPath;
 
@@ -220,6 +221,85 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
     expect(existsSync(allowedMarker)).toBe(true);
     expect(existsSync(descendantMarker)).toBe(false);
     expect(readFileSync(deniedMarker, 'utf8')).toBe('private');
+  });
+
+  it('can deny credential services, outbound network, and signals for untrusted tests', () => {
+    if (platform() !== 'darwin') return;
+    const allowed = tempDir();
+    const victim = spawn('/bin/sleep', ['30']);
+    try {
+      const script = [
+        "const cp=require('node:child_process')",
+        "const net=require('node:net')",
+        `let signalDenied=false; try { process.kill(${victim.pid}, 'SIGTERM') } catch { signalDenied=true }`,
+        "const keychain=cp.spawnSync('/usr/bin/security',['list-keychains'])",
+        "const socket=net.connect({host:'1.1.1.1',port:443})",
+        "socket.once('connect',()=>{process.stdout.write(JSON.stringify({signalDenied,keychainDenied:keychain.status!==0,networkDenied:false}));socket.destroy()})",
+        "socket.once('error',()=>process.stdout.write(JSON.stringify({signalDenied,keychainDenied:keychain.status!==0,networkDenied:true})))",
+      ].join(';');
+      const containment = darwinSeatbeltContainment();
+      const wrapped = containment.wrap({
+        executable: NODE,
+        canonicalExecutable: realpathSync(NODE),
+        args: ['-e', script],
+        allowedRoots: [allowed],
+        allowNetworkOutbound: false,
+        allowCredentialServices: false,
+        allowProcessSignals: false,
+      });
+      const result = spawnSync(wrapped.executable, wrapped.args, {
+        cwd: allowed,
+        encoding: 'utf8',
+        timeout: 5_000,
+        env: { HOME: allowed, PATH: '/usr/bin:/bin' },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({
+        signalDenied: true,
+        keychainDenied: true,
+        networkDenied: true,
+      });
+      expect(victim.exitCode).toBeNull();
+    } finally {
+      victim.kill('SIGKILL');
+    }
+  });
+
+  it('runs npm through one coherently selected contained Node runtime', async () => {
+    if (platform() !== 'darwin') return;
+    const source = tempDir();
+    const runRoot = tempDir();
+    writeFileSync(
+      join(source, 'package.json'),
+      JSON.stringify({
+        name: 'major-contained-test',
+        version: '1.0.0',
+        scripts: { test: "node -e \"require('node:fs').writeFileSync('passed.txt','yes')\"" },
+      }),
+    );
+    writeFileSync(
+      join(source, 'package-lock.json'),
+      JSON.stringify({
+        name: 'major-contained-test',
+        version: '1.0.0',
+        lockfileVersion: 3,
+        requires: true,
+        packages: { '': { name: 'major-contained-test', version: '1.0.0' } },
+      }),
+    );
+    const backend = new LimaBackend({
+      backend: 'lima',
+      instance: 'major-test',
+      limactlPath: '/usr/bin/true',
+      isolationScope: 'shared-workshop',
+      guestRunRoot: '/var/lib/major/runs',
+    }) as unknown as {
+      runContainedJssValidation(source: string, runRoot: string): Promise<void>;
+    };
+    await expect(backend.runContainedJssValidation(source, runRoot)).resolves.toBeUndefined();
+    expect(readFileSync(join(runRoot, 'validation', 'workspace', 'passed.txt'), 'utf8')).toBe(
+      'yes',
+    );
   });
 
   it('allows a linked worktree to update only its external Git common directory', () => {

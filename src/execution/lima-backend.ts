@@ -15,6 +15,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from '../providers/types.js';
 import { openDb } from '../db/client.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
+import { darwinSeatbeltContainment } from '../security/containment.js';
 import { globalStopRequested } from '../supervisor/policy.js';
 import { redactText } from '../security/redact.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
@@ -145,13 +146,14 @@ export class LimaBackend implements ExecutionBackend {
     args: readonly string[],
     onLine?: (line: string) => void,
     cwd?: string,
+    env: NodeJS.ProcessEnv = this.hostEnv(),
   ) {
     return new Promise<CommandResult>((resolvePromise, reject) => {
       let stdout = '';
       let stderr = '';
       let pending = '';
       const child = spawn(executable, [...args], {
-        env: this.hostEnv(),
+        env,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false,
         detached: true,
@@ -179,6 +181,60 @@ export class LimaBackend implements ExecutionBackend {
         resolvePromise({ code, stdout, stderr });
       });
     });
+  }
+
+  private async runContainedJssValidation(source: string, runRoot: string): Promise<void> {
+    const validationRoot = join(runRoot, 'validation');
+    const workspace = join(validationRoot, 'workspace');
+    const syntheticHome = join(validationRoot, 'home');
+    mkdirSync(syntheticHome, { recursive: true, mode: 0o700 });
+    snapshotWorkspace(source, workspace);
+    const runtime = [
+      { node: '/opt/homebrew/bin/node', npm: '/opt/homebrew/bin/npm' },
+      { node: '/usr/local/bin/node', npm: '/usr/local/bin/npm' },
+    ].find((candidate) => existsSync(candidate.node) && existsSync(candidate.npm));
+    if (!runtime) throw new Error('contained JSS Node runtime is unavailable');
+    const node = realpathSync(runtime.node);
+    const npmCli = realpathSync(runtime.npm);
+    const npmRoot = resolve(dirname(npmCli), '..');
+    const containment = darwinSeatbeltContainment();
+    if (!containment.enforced) throw new Error('JSS field validation containment is unavailable');
+    const env = {
+      HOME: syntheticHome,
+      TMPDIR: join(syntheticHome, 'tmp'),
+      npm_config_cache: join(syntheticHome, '.npm'),
+      PATH: `${dirname(node)}:/usr/bin:/bin`,
+      LANG: 'C.UTF-8',
+    };
+    mkdirSync(env.TMPDIR, { recursive: true, mode: 0o700 });
+    const install = containment.wrap({
+      executable: node,
+      canonicalExecutable: node,
+      args: [npmCli, 'ci', '--ignore-scripts'],
+      allowedRoots: [validationRoot],
+      readOnlyRoots: [node, npmRoot],
+      allowNetworkOutbound: true,
+      allowCredentialServices: false,
+      allowProcessSignals: false,
+    });
+    const installed = await this.run(install.executable, install.args, undefined, workspace, env);
+    if (installed.code !== 0) {
+      throw new Error(`contained JSS dependency install failed: ${redactText(installed.stderr)}`);
+    }
+    const test = containment.wrap({
+      executable: node,
+      canonicalExecutable: node,
+      args: [npmCli, 'test'],
+      allowedRoots: [validationRoot],
+      readOnlyRoots: [node, npmRoot],
+      allowNetworkOutbound: false,
+      allowCredentialServices: false,
+      allowProcessSignals: false,
+    });
+    const tested = await this.run(test.executable, test.args, undefined, workspace, env);
+    if (tested.code !== 0) {
+      throw new Error(`contained JSS project tests failed: ${redactText(tested.stderr)}`);
+    }
   }
 
   private async runToFile(
@@ -427,6 +483,7 @@ export class LimaBackend implements ExecutionBackend {
   }
 
   execute(request: BackendExecuteRequest): ExecuteHandle {
+    let stagedCaseId: string | undefined;
     if (request.executionAuthority.kind === 'supervised') {
       if (!isCapabilityAvailable('live-agent-execution')) {
         throw new Error('supervised provider execution is unavailable while M1 is disabled');
@@ -439,6 +496,7 @@ export class LimaBackend implements ExecutionBackend {
       const opened = openDb();
       try {
         const candidate = getStagedValidationLease(opened.db, request.executionAuthority.leaseId);
+        stagedCaseId = candidate.caseId;
         const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
         const release = JSON.parse(readFileSync(join(executingRoot, 'release.json'), 'utf8')) as {
           repository?: string;
@@ -592,8 +650,12 @@ export class LimaBackend implements ExecutionBackend {
           }, 1_000)
         : undefined;
     authorityWatcher?.unref();
-    const outcome = this.executeRun(request, queue, runId, () =>
-      timedOut ? 'timed_out' : this.cancelled ? 'cancelled' : 'failed',
+    const outcome = this.executeRun(
+      request,
+      queue,
+      runId,
+      () => (timedOut ? 'timed_out' : this.cancelled ? 'cancelled' : 'failed'),
+      stagedCaseId,
     )
       .catch((error): ExecuteOutcome => {
         return {
@@ -637,6 +699,7 @@ export class LimaBackend implements ExecutionBackend {
     queue: EventQueue<ProviderEvent>,
     runId: string,
     failureStatus: () => 'failed' | 'timed_out' | 'cancelled',
+    stagedCaseId?: string,
   ) {
     const profile = guestProviderProfile(request.executable);
     const stateRoot = join(majorHome(), 'execution', 'lima');
@@ -900,12 +963,18 @@ export class LimaBackend implements ExecutionBackend {
         throw new Error('Lima execution cancelled');
       }
       if (provider.code !== 0) {
+        let workerInterrupted = false;
+        try {
+          workerInterrupted = (await this.instance()).status === 'Stopped';
+        } catch {
+          // An absent or uninspectable worker is not accepted as forced-stop evidence.
+        }
         await this.stop(true);
         manifest = { ...manifest, result: 'failed' };
         return {
           status: 'failed' as const,
           runId,
-          errorKind: 'provider_failed' as const,
+          errorKind: workerInterrupted ? ('interrupted' as const) : ('provider_failed' as const),
           cleanup: 'complete' as const,
           exitCode: provider.code,
           rateLimited: request.detectRateLimit?.(provider.stderr) ?? false,
@@ -1081,6 +1150,24 @@ export class LimaBackend implements ExecutionBackend {
         ]);
         if (applied.code !== 0)
           throw new Error(`validated delta could not be applied: ${redactText(applied.stderr)}`);
+      }
+      if (stagedCaseId === 'jss-field') {
+        if (diff.code !== 1) throw new Error('JSS field returned no project delta');
+        const patch = readFileSync(patchPath, 'utf8');
+        const paths = [
+          ...patch.matchAll(/^diff --git a\/input\/workspace\/(.+) b\/result\/workspace\/(.+)$/gm),
+        ].map((match) => match[2]!);
+        if (
+          paths.length === 0 ||
+          !paths.some((path) => path.startsWith('src/')) ||
+          !paths.some((path) => /(^|\/)(tests?\/|[^/]+\.test\.[^/]+$)/.test(path)) ||
+          paths.some((path) =>
+            /(^|\/)(\.env|package(?:-lock)?\.json)$|^migrations\/|^docs\//.test(path),
+          )
+        ) {
+          throw new Error('JSS field did not return one bounded code-and-test delta');
+        }
+        await this.runContainedJssValidation(request.cwd, runRoot);
       }
       manifest = { ...manifest, result: 'succeeded' };
       return {

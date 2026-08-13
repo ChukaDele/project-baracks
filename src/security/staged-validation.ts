@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { and, eq, gt, inArray, lt } from 'drizzle-orm';
 import type { Db, DbConn } from '../db/client.js';
 import { validationLeases } from '../db/schema.js';
@@ -10,6 +10,7 @@ import type { BackendExecuteRequest } from '../execution/backend.js';
 import type { ProviderCommandHost } from '../providers/commands.js';
 import { providerArgs } from '../providers/commands.js';
 import type { ExecuteOutcome, ProviderEvent } from '../providers/types.js';
+import { resolveProjectForCwd } from '../supervisor/state.js';
 import type { ProviderApprovalAuthority } from './provider-approval-policy.js';
 import { isCapabilityAvailable } from './capabilities.js';
 import { verifySecureEnclaveStagedValidationAuthority } from './secure-enclave-attestation.js';
@@ -22,6 +23,7 @@ export const STAGED_VALIDATION_CASES = [
   'jss-field',
   'surface-talent-field',
   'cross-project-isolation',
+  'failure-recovery',
   'burn-in-1',
   'burn-in-2',
   'burn-in-3',
@@ -60,18 +62,70 @@ export function stagedValidationEventsDigest(events: readonly ProviderEvent[]): 
 export function stagedValidationWorkspaceDigest(workspace: string): string {
   const root = realpathSync(workspace);
   const hash = createHash('sha256');
-  for (const name of readdirSync(root)
-    .filter((entry) => entry !== '.git')
-    .sort()) {
-    const path = join(root, name);
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.nlink !== 1) {
-      throw new StagedValidationError('field workspace contains a non-regular artifact');
+  const visit = (directory: string) => {
+    for (const name of readdirSync(directory).sort()) {
+      if (name === '.git' || name === 'node_modules') continue;
+      const path = join(directory, name);
+      const rel = relative(root, path);
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) {
+        hash.update(`d\0${rel}\0`);
+        visit(path);
+      } else if (stat.isFile() && stat.nlink === 1) {
+        hash.update(`f\0${rel}\0${stat.mode & 0o777}\0`);
+        hash.update(readFileSync(path));
+      } else {
+        throw new StagedValidationError('field workspace contains an unsafe artifact');
+      }
     }
-    hash.update(`${name}\0${stat.mode & 0o777}\0`);
-    hash.update(readFileSync(path));
-  }
+  };
+  visit(root);
   return hash.digest('hex');
+}
+
+export function fixedStagedValidationCase(
+  caseId: Exclude<StagedValidationCase, 'provider-field' | 'clean-install'>,
+  nonce: string,
+  phase: 'failure' | 'recovery' = 'recovery',
+) {
+  if (!/^[a-f0-9-]{36}$/.test(nonce)) {
+    throw new StagedValidationError('fixed staged case requires its authority nonce');
+  }
+  const token = `MAJOR_${caseId.toUpperCase().replaceAll('-', '_')}_${nonce}`;
+  if (caseId === 'jss-field') {
+    return {
+      host: 'claude' as const,
+      executable: 'claude',
+      workspaceKind: caseId,
+      allowGuestMutation: true,
+      token,
+      prompt:
+        'Advance one small, reversible internal JSS P0 in this isolated repository. Read STATUS.md, GOAL_STATE.md, and the relevant source and tests. Make one coherent code-and-test change under src/ that improves the internal operator loop without external submissions, production data, credentials, network access, shell commands, dependency changes, migrations, or docs-only output. Use only file reading and editing tools. In the final response include exactly this validation token: ' +
+        token,
+    };
+  }
+  if (caseId === 'failure-recovery' && phase === 'failure') {
+    return {
+      host: 'cursor' as const,
+      executable: 'cursor-agent',
+      workspaceKind: 'failure-recovery',
+      allowGuestMutation: false,
+      token,
+      prompt:
+        'Analyze the repository architecture in depth and prepare a long report. Do not modify files or run shell commands.',
+    };
+  }
+  const workspaceKind = caseId;
+  return {
+    host: 'codex' as const,
+    executable: 'codex',
+    workspaceKind,
+    allowGuestMutation: false,
+    token,
+    prompt:
+      `Read package.json and AGENTS.md in this assigned repository, then respond with exactly ${token}. ` +
+      'Do not use shell, network, or file-writing tools and do not read outside the assigned repository.',
+  };
 }
 
 export interface StagedValidationRequestShape {
@@ -201,7 +255,22 @@ export function issueStagedValidationLease(
   if (input.validationNonce !== secureEnclaveAuthority.validationNonce) {
     throw new StagedValidationError('validation nonce does not match Secure Enclave authority');
   }
-  if (input.predecessorLeaseId) {
+  if (input.caseId === 'failure-recovery' && input.provider === 'codex') {
+    if (!input.predecessorLeaseId) {
+      throw new StagedValidationError('recovery requires its failed validation predecessor');
+    }
+    const predecessor = getLease(db, input.predecessorLeaseId);
+    if (
+      !['failed', 'cancelled'].includes(predecessor.status) ||
+      predecessor.provider !== 'cursor' ||
+      predecessor.releaseSha !== input.releaseSha ||
+      predecessor.projectIdentityHash !== input.projectIdentityHash ||
+      predecessor.projectRootHash !== input.projectRootHash ||
+      !/errorKind=interrupted; cleanup=complete/.test(predecessor.outcomeReason ?? '')
+    ) {
+      throw new StagedValidationError('recovery predecessor is not a matching contained failure');
+    }
+  } else if (input.predecessorLeaseId) {
     const predecessor = getLease(db, input.predecessorLeaseId);
     if (
       predecessor.status !== 'succeeded' ||
@@ -299,9 +368,6 @@ export function assertStagedValidationCaseRequest(
   lease: ReturnType<typeof getLease>,
   request: StagedValidationRequestShape,
 ): void {
-  if (lease.caseId !== 'provider-field') {
-    throw new StagedValidationError(`staged validation case is not executable: ${lease.caseId}`);
-  }
   if (request.providerRequest.approvalAuthority.decisions.length !== 0) {
     throw new StagedValidationError('staged validation cannot carry provider approval authority');
   }
@@ -310,7 +376,7 @@ export function assertStagedValidationCaseRequest(
       `^${join(homedir(), '.major', 'staged-validation', 'workspaces').replace(
         /[.*+?^${}()|[\]\\]/g,
         '\\$&',
-      )}/([a-f0-9-]{36})/(claude|codex|antigravity|cursor-success|cursor-cancel)$`,
+      )}/([a-f0-9-]{36})/(claude|codex|antigravity|cursor-success|cursor-cancel|jss-field|surface-talent-field|cross-project-isolation|failure-recovery|burn-in-1|burn-in-2|burn-in-3)$`,
     ),
   );
   if (!match) throw new StagedValidationError('staged validation workspace is not product-owned');
@@ -319,6 +385,59 @@ export function assertStagedValidationCaseRequest(
     throw new StagedValidationError('field request nonce does not match Secure Enclave authority');
   }
   const intent = request.providerRequest;
+  if (lease.caseId !== 'provider-field') {
+    if (lease.caseId === 'clean-install') {
+      throw new StagedValidationError('clean install is not a provider execution case');
+    }
+    if (!STAGED_VALIDATION_CASES.includes(lease.caseId as StagedValidationCase)) {
+      throw new StagedValidationError(`unknown staged validation case: ${lease.caseId}`);
+    }
+    const phase =
+      lease.caseId === 'failure-recovery' && !lease.predecessorLeaseId ? 'failure' : 'recovery';
+    const definition = fixedStagedValidationCase(
+      lease.caseId as Exclude<StagedValidationCase, 'provider-field' | 'clean-install'>,
+      nonce,
+      phase,
+    );
+    const expectedArgs = providerArgs(definition.host, {
+      prompt: definition.prompt,
+      outputMode: 'batch',
+    });
+    const identity = resolveProjectForCwd(request.cwd)?.project;
+    const expectedIdentity =
+      lease.caseId === 'jss-field' || lease.caseId === 'cross-project-isolation'
+        ? 'github.com/chukadele/jss-tool'
+        : lease.caseId === 'surface-talent-field'
+          ? 'github.com/surface-talent/surface-talent'
+          : 'github.com/chukadele/project-baracks';
+    if (
+      workspaceKind !== definition.workspaceKind ||
+      intent.host !== definition.host ||
+      basename(request.executable) !== definition.executable ||
+      intent.prompt !== definition.prompt ||
+      intent.allowGuestMutation !== definition.allowGuestMutation ||
+      intent.modelRef !== undefined ||
+      intent.resumeSessionRef !== undefined ||
+      request.args.length !== expectedArgs.length ||
+      request.args.some((value, index) => value !== expectedArgs[index]) ||
+      identity !== expectedIdentity
+    ) {
+      throw new StagedValidationError('request does not match the fixed release field contract');
+    }
+    if (lease.caseId === 'failure-recovery' && phase === 'recovery') {
+      const predecessor = getLease(db, lease.predecessorLeaseId!);
+      if (
+        !['failed', 'cancelled'].includes(predecessor.status) ||
+        predecessor.releaseSha !== lease.releaseSha ||
+        predecessor.projectIdentityHash !== lease.projectIdentityHash ||
+        predecessor.projectRootHash !== lease.projectRootHash ||
+        !/errorKind=interrupted; cleanup=complete/.test(predecessor.outcomeReason ?? '')
+      ) {
+        throw new StagedValidationError('recovery request lacks its contained failed predecessor');
+      }
+    }
+    return;
+  }
   if (intent.host === 'cursor') {
     const phase =
       workspaceKind === 'cursor-cancel' ? 'cancel' : intent.resumeSessionRef ? 'resume' : 'create';
@@ -664,6 +783,94 @@ function eventText(events: readonly ProviderEvent[]): string {
   return events
     .map((event) => (typeof event.data === 'string' ? event.data : JSON.stringify(event.data)))
     .join('\n');
+}
+
+export function completeStagedReleaseField(
+  db: Db,
+  authority: StagedValidationExecutionAuthority,
+  input: {
+    caseId: Exclude<StagedValidationCase, 'provider-field' | 'clean-install'>;
+    provider: ProviderCommandHost;
+    workspace: string;
+    nonce: string;
+    projectSha: string;
+    events: readonly ProviderEvent[];
+    outcome: ExecuteOutcome;
+  },
+) {
+  const lease = getLease(db, authority.leaseId);
+  assertCompletionIdentity(lease, authority, input.workspace, input.outcome, input.events);
+  const phase =
+    input.caseId === 'failure-recovery' && !lease.predecessorLeaseId ? 'failure' : 'recovery';
+  const definition = fixedStagedValidationCase(input.caseId, input.nonce, phase);
+  if (
+    lease.caseId !== input.caseId ||
+    lease.provider !== input.provider ||
+    input.provider !== definition.host ||
+    input.outcome.status !== 'succeeded' ||
+    input.outcome.modelSelection !== 'supported' ||
+    input.events.length === 0 ||
+    input.nonce !== lease.authorityValidationNonce ||
+    !eventText(input.events).includes(definition.token)
+  ) {
+    throw new StagedValidationError('release field result does not match its fixed case');
+  }
+  if (!/^[a-f0-9]{40}$/.test(input.projectSha)) {
+    throw new StagedValidationError('release field project SHA is invalid');
+  }
+  const detachedHead = readFileSync(
+    join(realpathSync(input.workspace), '.git', 'HEAD'),
+    'utf8',
+  ).trim();
+  if (detachedHead !== input.projectSha) {
+    throw new StagedValidationError('release field workspace is not at its recorded exact SHA');
+  }
+  if (input.caseId === 'failure-recovery') {
+    if (!lease.predecessorLeaseId) {
+      throw new StagedValidationError('recovery evidence lacks its failed predecessor');
+    }
+    const predecessor = getLease(db, lease.predecessorLeaseId);
+    if (
+      !['failed', 'cancelled'].includes(predecessor.status) ||
+      predecessor.releaseSha !== lease.releaseSha ||
+      predecessor.projectIdentityHash !== lease.projectIdentityHash ||
+      predecessor.projectRootHash !== lease.projectRootHash ||
+      !/errorKind=interrupted; cleanup=complete/.test(predecessor.outcomeReason ?? '')
+    ) {
+      throw new StagedValidationError('recovery evidence predecessor is not a contained failure');
+    }
+  }
+  let workspaceEvidence = 'read-only';
+  let caseEvidence = 'bounded-cycle-pass';
+  if (input.caseId === 'jss-field') {
+    workspaceEvidence = 'exact-project-delta';
+    caseEvidence = 'project-tests-pass';
+  } else if (input.caseId === 'surface-talent-field') {
+    caseEvidence = 'observe-project-read';
+  } else if (input.caseId === 'cross-project-isolation') {
+    caseEvidence = 'isolated-project-read';
+  } else if (input.caseId === 'failure-recovery') {
+    caseEvidence = 'recovered-after-observed-worker-stop';
+  }
+  return terminalizeStagedValidationEvidence(
+    db,
+    authority,
+    `${input.caseId}:${definition.token}:${input.projectSha}:cleanup-complete`,
+    {
+      gate: input.caseId,
+      provider: input.provider,
+      status: 'PASS',
+      runId: input.outcome.runId ?? null,
+      cleanup: 'complete',
+      eventCount: input.events.length,
+      sessionEvidence: input.outcome.sessionRef ? 'present' : 'unsupported',
+      workspaceEvidence,
+      caseEvidence,
+      transcriptDigest: lease.resultEventHash,
+      workspaceDigest: lease.resultWorkspaceHash,
+      projectSha: input.projectSha,
+    },
+  );
 }
 
 export function completeStagedCliProviderField(

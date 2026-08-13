@@ -14,6 +14,9 @@ export interface ContainmentRequest {
   args: readonly string[];
   allowedRoots: readonly string[];
   readOnlyRoots?: readonly string[];
+  allowNetworkOutbound?: boolean;
+  allowCredentialServices?: boolean;
+  allowProcessSignals?: boolean;
 }
 
 /** An executable OS boundary, not a descriptive readiness flag. */
@@ -115,20 +118,24 @@ function seatbeltProfile(request: ContainmentRequest): string {
     '(version 1)',
     '(deny default)',
     '(allow process*)',
-    '(allow signal)',
+    ...(request.allowProcessSignals === false ? [] : ['(allow signal)']),
     '(allow sysctl-read)',
     '(allow mach-lookup',
-    '  (global-name "com.apple.SecurityServer")',
+    ...(request.allowCredentialServices === false
+      ? []
+      : ['  (global-name "com.apple.SecurityServer")']),
     '  (global-name "com.apple.SystemConfiguration.configd")',
     '  (global-name "com.apple.cfprefsd.agent")',
     '  (global-name "com.apple.cfprefsd.daemon")',
     '  (global-name "com.apple.dnssd.service")',
     '  (global-name "com.apple.networkd")',
     '  (global-name "com.apple.nsurlsessiond")',
-    '  (global-name "com.apple.securityd")',
+    ...(request.allowCredentialServices === false ? [] : ['  (global-name "com.apple.securityd")']),
     '  (global-name "com.apple.system.logger")',
     '  (global-name "com.apple.system.opendirectoryd.libinfo")',
-    '  (global-name "com.apple.trustd.agent"))',
+    ...(request.allowCredentialServices === false
+      ? [')']
+      : ['  (global-name "com.apple.trustd.agent"))']),
     '(allow ipc-posix*)',
     // Signed binaries and the dynamic loader need broad system traversal.
     // Deny data under every mutable/sensitive top-level host location, then
@@ -146,7 +153,7 @@ function seatbeltProfile(request: ContainmentRequest): string {
     ...exactExecutableRoots.map((path) => `(allow file-read* (literal ${schemeString(path)}))`),
     ...roots.map((root) => `(allow file-write* (subpath ${schemeString(root)}))`),
     `(allow file-write* (literal ${schemeString('/dev/null')}))`,
-    '(allow network-outbound)',
+    ...(request.allowNetworkOutbound === false ? [] : ['(allow network-outbound)']),
   ];
   return forms.join(' ');
 }
