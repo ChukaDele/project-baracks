@@ -36,6 +36,14 @@ cp -R "$ROOT/templates" "$DEST/templates"
 
 pnpm install --prod --frozen-lockfile --dir "$DEST"
 
+# pnpm's package-manager metadata includes a build timestamp, and its generated
+# executable shims embed the absolute installation path. Major imports its
+# production dependencies as modules and never executes these package-manager
+# shims. Exclude both non-runtime surfaces so an atomically relocated snapshot
+# stays functional and deterministic.
+rm -f "$DEST/node_modules/.modules.yaml" "$DEST/node_modules/.pnpm-workspace-state-v1.json"
+find "$DEST/node_modules" -type d -name .bin -prune -exec rm -rf {} +
+
 test -f "$DEST/dist/entry.js"
 test -d "$DEST/drizzle"
 test -f "$DEST/guidance/skills.registry.json"
@@ -66,6 +74,9 @@ test -x "$DEST/scripts/stage-major-release-candidate.sh"
 test -x "$DEST/scripts/verify-major-staged-candidate.sh"
 test -f "$DEST/node_modules/@agentclientprotocol/sdk/package.json"
 test -d "$DEST/node_modules"
+test ! -e "$DEST/node_modules/.modules.yaml"
+test ! -e "$DEST/node_modules/.pnpm-workspace-state-v1.json"
+test -z "$(find "$DEST/node_modules" -type d -name .bin -print -quit)"
 
 # Runtime smoke: execute from the immutable snapshot with isolated Major state.
 SMOKE_HOME="$DEST/.smoke-major-home"
