@@ -15,13 +15,19 @@ import sys
 print(Path(sys.argv[1]).expanduser().resolve())
 PY
 )"
+ACCOUNT_HOME="$(python3 - <<'PY'
+import os
+import pwd
+from pathlib import Path
+print(Path(pwd.getpwuid(os.getuid()).pw_dir).resolve())
+PY
+)"
 
-case "$DEST" in
-  /|"$HOME"|"$ROOT")
-    echo "ERROR: refusing unsafe runtime snapshot destination: $DEST" >&2
-    exit 2
-    ;;
-esac
+if [ "$DEST" = / ] || [ "$DEST" = "$ROOT" ] || [ "$DEST" = "$ACCOUNT_HOME" ] || \
+  { [ -n "${HOME:-}" ] && [ "$DEST" = "$HOME" ]; }; then
+  echo "ERROR: refusing unsafe runtime snapshot destination: $DEST" >&2
+  exit 2
+fi
 
 rm -rf "$DEST"
 mkdir -p "$DEST"
