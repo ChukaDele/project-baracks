@@ -127,10 +127,7 @@ describe('Secure Enclave staged-validation authority policy', () => {
     mkdirSync(scripts);
     mkdirSync(bin);
     const issuer = join(scripts, 'issue-secure-enclave-staged-validation-lease.sh');
-    writeFileSync(
-      issuer,
-      readFileSync('scripts/issue-secure-enclave-staged-validation-lease.sh'),
-    );
+    writeFileSync(issuer, readFileSync('scripts/issue-secure-enclave-staged-validation-lease.sh'));
     writeFileSync(
       join(bin, 'git'),
       `#!/bin/sh
