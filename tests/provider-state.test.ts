@@ -31,6 +31,20 @@ function run(
 }
 
 describe('project-scoped provider state broker', () => {
+  it('persists the first supported in-guest login without a pre-existing auth directory', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-state-first-login-'));
+    const home = join(root, 'runs', 'first-login', 'home');
+    const credential = join(home, authPaths.claude);
+    mkdirSync(join(credential, '..'), { recursive: true, mode: 0o700 });
+    writeFileSync(credential, 'first-login-proof', { mode: 0o600 });
+
+    run(root, 'finalize', 'claude', 'f'.repeat(64), home);
+
+    const persisted = join(root, 'provider-auth', 'claude', authPaths.claude);
+    expect(readFileSync(persisted, 'utf8')).toBe('first-login-proof');
+    expect(statSync(persisted).mode & 0o777).toBe(0o440);
+  });
+
   it.each(Object.entries(authPaths) as [keyof typeof authPaths, string][])(
     '%s preserves only auth across isolated projects and reset',
     (provider, authRelative) => {

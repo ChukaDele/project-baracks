@@ -134,6 +134,7 @@ def finalize(auth_root: pathlib.Path, projects_root: pathlib.Path, provider: str
     if not stat.S_ISREG(refreshed_info.st_mode) or refreshed_info.st_nlink != 1:
         fail("provider authentication refresh is not a regular file")
     auth_destination = auth_root / provider / auth_relative
+    auth_destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     auth_stage = auth_destination.with_name(auth_destination.name + ".next")
     shutil.copyfile(refreshed_auth, auth_stage, follow_symlinks=False)
     os.chown(auth_stage, 0 if os.environ.get("MAJOR_PROVIDER_STATE_TESTING") != "1" else uid, gid)
