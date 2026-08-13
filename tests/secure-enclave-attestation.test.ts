@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -115,6 +115,47 @@ describe('Secure Enclave staged-validation authority policy', () => {
       { encoding: 'utf8' },
     );
     expect(result.status).not.toBe(0);
+  });
+
+  it.each([
+    ['a feature SHA', 'b'.repeat(40), '0'],
+    ['an unrefreshable origin/main', SHA, '1'],
+  ])('refuses to issue authority for %s', (_case, remoteSha, fetchStatus) => {
+    const root = mkdtempSync(join(tmpdir(), 'major-attestation-issuer-'));
+    const scripts = join(root, 'scripts');
+    const bin = join(root, 'bin');
+    mkdirSync(scripts);
+    mkdirSync(bin);
+    const issuer = join(scripts, 'issue-secure-enclave-staged-validation-lease.sh');
+    writeFileSync(
+      issuer,
+      readFileSync('scripts/issue-secure-enclave-staged-validation-lease.sh'),
+    );
+    writeFileSync(
+      join(bin, 'git'),
+      `#!/bin/sh
+case "$*" in
+  *"rev-parse HEAD") printf '%s\\n' "$HEAD_SHA" ;;
+  *"status --porcelain") exit 0 ;;
+  *"fetch --quiet origin main") exit "$FETCH_STATUS" ;;
+  *"rev-parse refs/remotes/origin/main") printf '%s\\n' "$REMOTE_SHA" ;;
+  *) exit 99 ;;
+esac
+`,
+      { mode: 0o755 },
+    );
+    const result = spawnSync('/bin/bash', [issuer, SHA], {
+      encoding: 'utf8',
+      env: {
+        HOME: root,
+        PATH: `${bin}:/usr/bin:/bin`,
+        HEAD_SHA: SHA,
+        REMOTE_SHA: remoteSha,
+        FETCH_STATUS: fetchStatus,
+      },
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/origin\/main/);
   });
 
   it('requires both runtime boundaries and the pinned OpenSSH authority', () => {
