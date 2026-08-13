@@ -25,6 +25,7 @@ const lease = {
     'provider:codex',
     'provider:cursor',
     'provider:antigravity',
+    'credential-handoff',
     'clean-install',
     'fresh-session',
     'project:jss',
@@ -34,6 +35,7 @@ const lease = {
     'burn-in',
   ],
   validationCases: [
+    'credential-handoff',
     'provider-field',
     'clean-install',
     'jss-field',

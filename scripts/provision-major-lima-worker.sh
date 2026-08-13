@@ -17,6 +17,10 @@ if [[ "$INSTANCE" != major-worker && ! "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
   echo "ERROR: release-specific worker requires the full release SHA" >&2
   exit 2
 fi
+if [[ "$INSTANCE" != major-worker && "$INSTANCE" != "major-worker-${RELEASE_SHA:0:12}" ]]; then
+  echo "ERROR: release worker name does not match the full release SHA" >&2
+  exit 2
+fi
 
 status() {
   "$LIMACTL_PATH" list --json | python3 -c '
@@ -57,7 +61,8 @@ if violations: raise SystemExit("unsafe existing Lima instance: " + ", ".join(vi
 
 migrate_existing_auth() {
   [[ "$INSTANCE" == major-worker ]] && return 0
-  local source_status provider relative
+  local source_status provider relative authority_root
+  authority_root="${MAJOR_HOME:-$HOME/.major}/staged-validation/authorities/$RELEASE_SHA"
   source_status="$({ "$LIMACTL_PATH" list --json | python3 -c '
 import json, sys
 status = ""
@@ -76,15 +81,23 @@ print(status)
     "$LIMACTL_PATH" start major-worker
     LEGACY_SOURCE_STARTED=1
   fi
-  # Stream only the three exact provider credentials authorised for migration.
+  # Stream only exact provider credentials covered by the current release's
+  # independently signed, expiring Secure Enclave validation authority.
   # Missing credentials remain a provider-specific post-install step. Opaque
   # bytes are never printed, interpreted, or written to host storage.
   for entry in \
+    'claude:claude/.claude/.credentials.json' \
     'codex:codex/.codex/auth.json' \
     'cursor:cursor/.config/cursor/auth.json' \
     'antigravity:antigravity/.gemini/antigravity-cli/antigravity-oauth-token'; do
     provider="${entry%%:*}"
     relative="${entry#*:}"
+    if ! node "$ROOT/scripts/verify-secure-enclave-staged-validation-lease.mjs" \
+      "$authority_root/major-staged-validation-lease.json" \
+      "$authority_root/major-staged-validation-lease.json.sig" \
+      "$RELEASE_SHA" credential-handoff "$provider" >/dev/null 2>&1; then
+      continue
+    fi
     if ! "$LIMACTL_PATH" shell --tty=false major-worker sudo test \
         -f "/var/lib/major/provider-auth/$relative" || \
       ! "$LIMACTL_PATH" shell --tty=false major-worker sudo test \

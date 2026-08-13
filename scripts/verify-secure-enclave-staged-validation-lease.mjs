@@ -14,6 +14,7 @@ const ALLOWED_SCOPES = [
   'provider:codex',
   'provider:cursor',
   'provider:antigravity',
+  'credential-handoff',
   'clean-install',
   'fresh-session',
   'project:jss',
@@ -23,6 +24,7 @@ const ALLOWED_SCOPES = [
   'burn-in',
 ];
 const VALIDATION_CASES = [
+  'credential-handoff',
   'provider-field',
   'clean-install',
   'jss-field',
