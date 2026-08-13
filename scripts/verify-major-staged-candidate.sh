@@ -41,7 +41,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-pnpm --dir "$SOURCE_ROOT" build >/dev/null
+corepack pnpm --dir "$SOURCE_ROOT" build >/dev/null
 bash "$SOURCE_ROOT/scripts/build-major-runtime-snapshot.sh" "$VERIFY_ROOT/runtime" >/dev/null
 chmod u+w "$VERIFY_ROOT/runtime/runtime-manifest.json"
 cp "$CANDIDATE/release.json" "$VERIFY_ROOT/runtime/release.json"
