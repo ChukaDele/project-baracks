@@ -103,6 +103,10 @@ They define:
 - positive/negative trigger examples and reachability/overlap checks are part of the skill lifecycle.
 - `major skill resolve --task "..."` returns paths and metadata only for installed, reachable skills;
 - `major skill audit` detects missing, duplicate and orphan internal skills. The immutable runtime ships the registry, skill bodies and resolver evals used by these commands.
+- successful workers may emit one bounded workflow observation. GBrain keeps it project-local, detects semantic recurrence, holds overlaps for an existing skill update, and promotes only recurring independently validated procedures;
+- generated skill state extends the existing project learning lifecycle. It is not a second registry. Active records are resolved by the canonical skill resolver;
+- generated `SKILL.md` files follow the Agent Skills format. Usage outcomes update routing confidence. Repeated poor outcomes deprecate a skill without deleting provenance;
+- automatic global generation is forbidden. Cross-project promotion still requires the existing sanitized learning review and project policy.
 
 Important recurring meta-skills:
 

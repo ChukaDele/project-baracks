@@ -7,6 +7,8 @@ description: Use after a novel workflow succeeds or a recurring failure is solve
 
 Use **after the real task works**. Do not pause an active P0 merely to create infrastructure.
 
+Major's GBrain lifecycle may capture a bounded structured workflow from the final worker result. A single observation stays a project-local candidate. Semantically recurring, independently validated procedures may be synthesized and promoted automatically when they do not overlap an existing skill. Project evidence never becomes a global generated skill directly.
+
 ## Decide whether to skillify
 
 Skillify when the lesson is:
@@ -72,6 +74,20 @@ Before promotion to the recurring Major skill library:
 - verify the skill does not duplicate an existing capability.
 
 A successful real procedure can remain a **candidate skill** until these checks pass.
+
+## Automatic lifecycle
+
+1. Emit a bounded `workflow` object only after the procedure succeeds.
+2. Major compares task concepts and action structure with project-local candidates.
+3. One-offs remain candidates. Recurrence and distinct task evidence are mandatory.
+4. If an existing skill fits, hold the candidate for that skill's next version. Do not create a near-duplicate.
+5. Synthesize the smallest Agent Skills compatible `SKILL.md`.
+6. Validate its name, description and operational sections before activation.
+7. Route active project skills through the canonical resolver.
+8. Record success, failure, duration and cost when available.
+9. Repeated poor outcomes deprecate the skill from default routing without deleting provenance.
+
+Automatic promotion is project-local. Global promotion still uses Major's existing sanitized learning review and cross-project policy.
 
 ## Learning priority
 

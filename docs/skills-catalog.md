@@ -64,6 +64,8 @@ Learning priority:
 
 `explicit correction → fix/verify → candidate capture → deterministic rule/tool → tested skill → memory`
 
+GBrain can now accept one bounded successful workflow in the final worker report. One-offs remain project-local candidates. Semantically recurring, distinct tasks may synthesize and promote one Agent Skills compatible pack after deterministic validation. Existing-skill overlap is held for an update instead of creating a duplicate. Active generated skills route through the same resolver, and outcome evidence drives version review or deprecation. Direct automatic global promotion remains forbidden.
+
 Rules prevent. Skills institutionalize. Memory reminds.
 
 ## Workspace lifecycle policy

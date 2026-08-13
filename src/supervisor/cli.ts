@@ -21,12 +21,15 @@ import {
   getGoal,
   resolveProject,
   resolveProjectForCwd,
+  readSupervisorState,
   startGoal,
   updateGoal,
   WORKER_HOSTS,
   type GoalStatus,
   type WorkerHost,
 } from './state.js';
+import { autonomyMetrics } from './autonomy.js';
+import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
 import { runDaemon, runGoalCycle, supervisorSnapshot, tryAcquireRepoCycleLock } from './runtime.js';
 import { runGatewayCommand, runWorker } from './worker.js';
 import {
@@ -107,6 +110,15 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'start') {
     clearGlobalStop();
     console.log('Major global kill switch: CLEARED');
+    return true;
+  }
+
+  if (command === 'autonomy' && args[1] === 'metrics') {
+    const project = flag(args, '--project');
+    const goals = readSupervisorState().goals.filter(
+      (goal) => project === undefined || goal.project === project,
+    );
+    console.log(JSON.stringify(autonomyMetrics(goals), null, 2));
     return true;
   }
 
@@ -289,6 +301,15 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         goalId,
         provider,
         result: resultRaw,
+        evidence,
+      });
+    }
+    if (resultRaw === 'pass' && goal.pendingCompletion) {
+      applyIndependentSkillValidation({
+        project: project.project,
+        repoPath: project.repoPath,
+        goalId,
+        provider,
         evidence,
       });
     }

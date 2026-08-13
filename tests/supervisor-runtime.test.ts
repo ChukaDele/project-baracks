@@ -13,7 +13,10 @@ import {
   tryAcquireRepoCycleLock,
 } from '../src/supervisor/runtime.js';
 import type { SupervisorGoal } from '../src/supervisor/state.js';
-import { preserveWorkerReportEnvelope } from '../src/supervisor/worker-report.js';
+import {
+  completedWorkflow,
+  preserveWorkerReportEnvelope,
+} from '../src/supervisor/worker-report.js';
 import type { ProviderInfo } from '../src/providers/types.js';
 import { model } from './helpers.js';
 
@@ -300,6 +303,35 @@ describe('Major coordinator contract', () => {
     });
     expect(JSON.stringify(report?.learning)).toContain('[REDACTED]');
     expect(JSON.stringify(report?.learning)).not.toContain('sk-this-is-a-secret-value');
+  });
+
+  it('accepts only a complete bounded workflow observation', () => {
+    const report = parseWorkerReport(
+      JSON.stringify({
+        type: 'result',
+        result:
+          'MAJOR_RESULT: {"status":"active","summary":"Fix verified.","workflow":{"task":"Resolve repeated port collisions.","outcome":"Namespace isolation passed.","steps":["Inspect active ports.","Reserve a namespace."],"tools":["service probe"],"validations":["Readiness probe passes."],"scope":"project"}}',
+      }),
+    );
+    expect(report?.workflow).toEqual({
+      task: 'Resolve repeated port collisions.',
+      outcome: 'Namespace isolation passed.',
+      steps: ['Inspect active ports.', 'Reserve a namespace.'],
+      tools: ['service probe'],
+      validations: ['Readiness probe passes.'],
+      scope: 'project',
+    });
+    expect(completedWorkflow(report)).toBeUndefined();
+    expect(completedWorkflow({ ...report!, status: 'done' })).toEqual(report?.workflow);
+    expect(
+      parseWorkerReport(
+        JSON.stringify({
+          type: 'result',
+          result:
+            'MAJOR_RESULT: {"status":"active","summary":"x","workflow":{"task":"x","outcome":"y","steps":[],"validations":[]}}',
+        }),
+      ),
+    ).toBeUndefined();
   });
 
   it('extracts the final report from Claude, Cursor, and Codex JSON envelopes', () => {

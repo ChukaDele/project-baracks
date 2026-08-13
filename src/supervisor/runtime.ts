@@ -20,6 +20,7 @@ import {
 import type { ProviderInfo } from '../providers/types.js';
 import { route } from '../routing/router.js';
 import { resolveSkills } from '../skills/resolver.js';
+import { observeSuccessfulWorkflow, recordSkillOutcome } from '../skills/lifecycle.js';
 import {
   assertExecutionAllowed,
   getProjectPolicy,
@@ -36,7 +37,7 @@ import {
   type WorkerHost,
 } from './state.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
-import { parseWorkerReport } from './worker-report.js';
+import { completedWorkflow, parseWorkerReport } from './worker-report.js';
 
 export { parseWorkerReport } from './worker-report.js';
 
@@ -222,6 +223,7 @@ Before any substantive mutation, verify that the current Git root/remote and the
 ${trustContract(policy)}
 
 MAJOR OPERATING CONTRACT:
+- Treat contained, reversible and observable Workshop actions as autonomous progress. Use project policy for external effects and reserve owner gates for human-only consequential boundaries.
 - Speed and MVP are the default. Reduce broad scope to the smallest end-to-end P0 that proves value, then keep expanding only while P0 gaps remain.
 - Do not stop after one PR, migration, fix, test, or subtask. After each result ask: what is now the highest-impact missing piece blocking the goal?
 - ${workerLanguage}
@@ -233,6 +235,7 @@ MAJOR OPERATING CONTRACT:
 - For customer-facing website QA, use website-design-qa. Pair responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js or viewport-motion work. Respect remote-first-web-development for browser preview/acceptance unless the owner explicitly permits a local exception.
 - Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, Skillify rather than growing the permanent supervisor workflow.
 - An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then add a project-local \`learning\` object to the final MAJOR_RESULT with \`source\`, \`summary\`, optional stable \`key\`, and optional \`evidence\`. The parent validates and captures it.
+- When a non-trivial reusable procedure succeeds, add a \`workflow\` object to MAJOR_RESULT with \`task\`, \`outcome\`, ordered \`steps\`, \`tools\`, objective \`validations\`, and \`scope\`. Major records, deduplicates, validates and promotes it; do not create a skill file directly.
 - You are the leased worker. Do not start nested workers, browsers, builds, or Major CLI delegation from this sandbox. Request any additional capacity in your final report; the parent owns resource admission and learning capture.
 - Prefer lower-cost/abundant subscription capacity for bounded tasks. Use stronger reasoning for architecture, hard bugs, integration, and adjudication.
 - Concurrent writers must use isolated worktrees. Keep one integration owner.
@@ -385,6 +388,15 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
     return;
   }
   const host = selection.host;
+  let routedSkillIds: string[] = [];
+  try {
+    routedSkillIds = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills.map(
+      (skill) => skill.id,
+    );
+  } catch {
+    // The prompt already reports a degraded resolver. Outcome recording must
+    // not turn resolver unavailability into a second execution failure.
+  }
   updateGoal(goal.id, {
     status: 'running',
     cycle: goal.cycle + 1,
@@ -401,6 +413,16 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
     timeoutMs: Math.max(1, policy.maxRunMinutes) * 60 * 1000,
     modelRef: selection.modelRef,
   });
+  try {
+    recordSkillOutcome({
+      project: goal.project,
+      ids: routedSkillIds,
+      success: outcome.status === 'succeeded',
+      durationMs: outcome.durationMs,
+    });
+  } catch {
+    // Skill metrics are evidence, not completion authority.
+  }
   const modelOutcome = modelOutcomeForWorker(outcome);
   if (modelOutcome) {
     const outcomeState = openDb();
@@ -434,6 +456,22 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
         });
       } catch (error) {
         learningWarning = ` Learning capture failed: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
+      }
+    }
+    const completedWorkflowReport = completedWorkflow(report);
+    if (completedWorkflowReport) {
+      try {
+        observeSuccessfulWorkflow({
+          ...completedWorkflowReport,
+          success: true,
+          project: goal.project,
+          repoPath: goal.repoPath,
+          durationMs: outcome.durationMs,
+          goalId: goal.id,
+          resolvedSkillIds: routedSkillIds,
+        });
+      } catch (error) {
+        learningWarning += ` Skillification deferred: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
       }
     }
     if (report?.status === 'blocked') {
