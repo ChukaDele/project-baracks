@@ -27,6 +27,7 @@ export function snapshotWorkspace(source: string, destination: string): void {
   cpSync(canonical, destination, {
     recursive: true,
     dereference: false,
+    verbatimSymlinks: true,
     preserveTimestamps: true,
     filter: (path) => !isExcluded(path, canonical),
   });
