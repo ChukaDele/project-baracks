@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { runDoctor, type ExecutableResolver } from '../src/doctor/doctor.js';
 import { MockProvider } from '../src/providers/mock.js';
+import { detectContainment } from '../src/security/containment.js';
 import { model } from './helpers.js';
 
 // Resolution-only: maps a tool NAME to a resolved path (presence signal). No
@@ -27,7 +28,15 @@ function healthyProvider() {
 }
 
 describe('major doctor', () => {
-  it('never reports overnight execution as safe, even in a healthy environment', async () => {
+  const readyContainment = () => ({
+    processTreeTermination: true,
+    filesystemIsolation: true,
+    networkIsolation: true,
+    liveExecutionReady: true,
+    detail: 'test containment enforced',
+  });
+
+  it('keeps overnight execution unavailable without unattended policy and an explicit daemon', async () => {
     const report = await runDoctor({
       providers: [healthyProvider()],
       configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
@@ -35,11 +44,10 @@ describe('major doctor', () => {
       env: { GOOGLE_APPLICATION_CREDENTIALS: '/tmp/creds.json' },
       fileExists: () => true,
     });
-    // Overnight/live execution is categorically unavailable regardless of a
-    // healthy environment; live-agent-execution is a disabled capability.
+    // Foreground execution readiness does not grant background authority.
     expect(report.overnightExecution).toBe('unavailable');
-    expect(report.overnightExecutionReasons.join()).toMatch(/live agent execution is unavailable/);
-    expect(report.overnightExecutionReasons.join()).toMatch(/M1/);
+    expect(report.overnightExecutionReasons.join()).toMatch(/unattended project policy/);
+    expect(report.overnightExecutionReasons.join()).toMatch(/explicitly started daemon/);
     // The inspection/dry-run environment is separately reported as healthy.
     expect(report.inspectionEnvironmentOk).toBe(true);
     expect(report.inspectionEnvironmentIssues).toEqual([]);
@@ -50,7 +58,7 @@ describe('major doctor', () => {
     expect(JSON.stringify(report)).not.toMatch(/"overnightExecution":"(safe|SAFE)"/);
   });
 
-  it('reports the five unavailable capabilities (diagnostic; enforcement is in code)', async () => {
+  it('reports M1 closed and M2-M5 implemented (diagnostic; enforcement remains in code)', async () => {
     const report = await runDoctor({
       providers: [healthyProvider()],
       configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
@@ -65,20 +73,57 @@ describe('major doctor', () => {
       'paid-provider-execution',
       'worker-owned-downstream-mutations',
     ]);
-    expect(report.capabilities.every((c) => c.available === false)).toBe(true);
+    expect(
+      report.capabilities.find((c) => c.capability === 'live-agent-execution')?.available,
+    ).toBe(false);
+    expect(
+      report.capabilities
+        .filter((c) => c.capability !== 'live-agent-execution')
+        .every((c) => c.available),
+    ).toBe(true);
   });
 
-  it('reports live agent execution as not ready (no OS filesystem containment)', async () => {
-    const report = await runDoctor({
+  it('reports foreground ready only when M1 and containment are both ready', async () => {
+    const ready = await runDoctor({
       providers: [healthyProvider()],
       configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
       resolve: fullToolchain,
       env: { GOOGLE_APPLICATION_CREDENTIALS: '/tmp/creds.json' },
       fileExists: () => true,
+      detectContainment: readyContainment,
     });
-    expect(report.liveExecutionReady).toBe(false);
-    expect(report.liveExecutionBlockers.join()).toMatch(/containment/i);
-    expect(report.checks.find((c) => c.name === 'descendant-containment')?.status).toBe('warn');
+    expect(ready.liveExecutionReady).toBe(false);
+    expect(ready.liveExecutionBlockers.join()).toMatch(/capability.*M1/i);
+
+    const unavailable = await runDoctor({
+      providers: [healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      resolve: fullToolchain,
+      detectContainment: () => ({
+        processTreeTermination: false,
+        filesystemIsolation: false,
+        networkIsolation: false,
+        liveExecutionReady: false,
+        detail: 'no supported OS sandbox',
+      }),
+    });
+    expect(unavailable.liveExecutionReady).toBe(false);
+    expect(unavailable.liveExecutionBlockers.join()).toMatch(
+      /containment.*no supported OS sandbox/i,
+    );
+  });
+
+  it('smoke-reports the real OS containment without rewriting its result', async () => {
+    const real = detectContainment();
+    const report = await runDoctor({
+      providers: [healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      resolve: fullToolchain,
+    });
+    expect(report.checks.find((check) => check.name === 'descendant-containment')).toMatchObject({
+      status: real.liveExecutionReady ? 'ok' : 'warn',
+      detail: real.detail,
+    });
   });
 
   it('flags missing prerequisites as an inspection-environment issue', async () => {

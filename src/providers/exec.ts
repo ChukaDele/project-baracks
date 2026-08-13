@@ -170,23 +170,9 @@ function spawnStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
   };
 }
 
-/**
- * Major v1 compatibility path. It stays fail-closed until the legacy runtime
- * is removed after Major 0.3 proves the successor supervisor on real projects.
- */
+/** Internal spawn engine. Security policy and OS wrapping are applied by the gateway. */
+/** @internal Production imports are architecture-gated to ExecutionGateway. */
 export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
   assertCapabilityAvailable('live-agent-execution');
-  return spawnStreaming(spec);
-}
-
-/**
- * Major 0.3 successor spawn engine. Only security/gateway.ts may import this.
- * The successor gateway performs project-root, command, executable, env and
- * process-tree checks before reaching this function. This intentionally does
- * not require the v1 enterprise filesystem-sandbox milestone: Major's MVP
- * safety boundary is project/worktree confinement at the gateway plus a
- * sanitized environment and whole-process-tree termination.
- */
-export function executeMajorStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
   return spawnStreaming(spec);
 }

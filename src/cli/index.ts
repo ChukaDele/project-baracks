@@ -20,13 +20,15 @@ import { addProject, getProjectByName, listProjects } from '../config/project-se
 import { runDoctor } from '../doctor/doctor.js';
 import { ClaudeCodeProvider } from '../providers/claude-code.js';
 import { CodexProvider } from '../providers/codex.js';
+import { cursorProvider } from '../providers/cursor.js';
+import { antigravityProvider } from '../providers/antigravity.js';
 import { persistProviderDiscovery } from '../providers/discovery-store.js';
 import { route, type RoutingRequest } from '../routing/router.js';
 import { dbDecisionRecorder } from '../security/audit.js';
-import { CapabilityUnavailableError } from '../security/capabilities.js';
 import { ExecutionGateway } from '../security/gateway.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
 import type { RunPurpose } from '../db/schema.js';
+import { majorExecutionBackend } from '../security/major-gateway.js';
 
 /**
  * Exit codes (stable, documented in docs/architecture.md):
@@ -72,6 +74,8 @@ function db(): Db {
 const PROBE_EXECUTABLES = [
   'claude',
   'codex',
+  'cursor-agent',
+  'agy',
   'git',
   'pnpm',
   'gh',
@@ -92,7 +96,12 @@ function probeGateway(database: Db): ExecutionGateway {
 }
 
 function providers(gateway: ExecutionGateway) {
-  return [new ClaudeCodeProvider({ gateway }), new CodexProvider({ gateway })];
+  return [
+    new ClaudeCodeProvider({ gateway }),
+    new CodexProvider({ gateway }),
+    cursorProvider({ gateway }),
+    antigravityProvider({ gateway }),
+  ];
 }
 
 program
@@ -109,6 +118,7 @@ program
         repoPath: p.repoPath,
       })),
       resolve: (name) => gateway.resolveExecutable(name),
+      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
     });
     for (const info of report.providers) {
       persistProviderDiscovery(database, info, { source: 'cli' });
@@ -136,21 +146,21 @@ program
         console.log(`missing prerequisites: ${report.missingPrerequisites.join(', ')}`);
       }
       for (const cap of report.capabilities) {
-        console.log(`✗ capability ${cap.capability}: unavailable (${cap.milestone})`);
+        console.log(
+          `${cap.available ? '✓' : '✗'} capability ${cap.capability}: ${cap.available ? 'available' : `unavailable (${cap.milestone})`}`,
+        );
       }
-      // Overnight/autonomous LIVE execution is categorically unavailable in
-      // this foundation; it is never reported as SAFE.
+      // Foreground activation does not grant unattended/background authority.
       console.log(
         `overnight execution: UNAVAILABLE — ${report.overnightExecutionReasons.join('; ')}`,
       );
       console.log(
         report.inspectionEnvironmentOk
-          ? 'inspection environment (dry-run only): OK'
-          : `inspection environment (dry-run only): NEEDS ATTENTION — ${report.inspectionEnvironmentIssues.join('; ')}`,
+          ? 'inspection environment: OK'
+          : `inspection environment: NEEDS ATTENTION — ${report.inspectionEnvironmentIssues.join('; ')}`,
       );
     }
-    // Exit code reflects the SUPPORTED (dry-run/inspection) health, not the
-    // categorically-unavailable overnight execution.
+    // Exit code reflects inspection health, not unattended authority.
     if (!report.inspectionEnvironmentOk) process.exit(EXIT.unsafe);
   });
 
@@ -288,7 +298,7 @@ task
 
 task
   .command('approve <suggestionId>')
-  .description('Approve a suggestion (UNAVAILABLE in this disabled foundation)')
+  .description('Approve a suggestion (UNAVAILABLE: separate owner gate)')
   .option('--note <text>', 'decision note')
   .action((suggestionId: string, opts: { note?: string }) => {
     // Route through the canonical mutation boundary, which refuses before any
@@ -377,28 +387,16 @@ program
   });
 
 program
-  .command('run')
-  .description('Plan an agent run for a task (dry-run only: live execution is unavailable)')
+  .command('route')
+  .description('Inspect the provider/model routing decision for a task without executing it')
   .requiredOption('--task <taskId>', 'task to run')
   .addOption(
     new Option('--purpose <purpose>', 'run purpose')
       .choices(RUN_PURPOSES)
       .default('implementation'),
   )
-  .option('--dry-run', 'show the routing decision without executing anything')
   .option('--json', 'emit versioned JSON')
-  .action(async (opts: { task: string; purpose: RunPurpose; dryRun?: boolean; json?: boolean }) => {
-    if (!opts.dryRun) {
-      // Fail closed before any routing, run creation or subprocess: live
-      // agent execution is an unavailable capability in this build, and the
-      // same hard-coded gate refuses again at every deeper boundary
-      // (gateway/exec/run-service) even if this check were bypassed.
-      fail(
-        'live execution is not enabled in this foundation build; use --dry-run — ' +
-          new CapabilityUnavailableError('live-agent-execution').message,
-        EXIT.refused,
-      );
-    }
+  .action(async (opts: { task: string; purpose: RunPurpose; json?: boolean }) => {
     const database = db();
     let taskRow;
     try {
@@ -415,13 +413,13 @@ program
     };
     const decision = route(request, infos);
     if (opts.json) {
-      emitJson('run-dry-run', { task: taskRow, decision });
+      emitJson('route-inspection', { task: taskRow, decision });
       return;
     }
     console.log(`task ${taskRow.id} [${taskRow.status}] ${taskRow.title}`);
     if (decision.kind === 'route') {
       console.log(
-        `DRY RUN — would dispatch to ${decision.provider}/${decision.modelRef} ` +
+        `ROUTING PLAN — ${decision.provider}/${decision.modelRef} ` +
           `(${decision.routingClass}, ${decision.billingMode})`,
       );
       console.log(`routing reason: ${decision.reason}`);
@@ -429,7 +427,7 @@ program
         console.log(`independence loss: ${decision.independenceLoss}`);
       }
     } else {
-      console.log(`DRY RUN — checkpoint: ${decision.reason}`);
+      console.log(`ROUTING PLAN — checkpoint: ${decision.reason}`);
     }
   });
 

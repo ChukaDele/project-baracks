@@ -12,8 +12,8 @@ import {
 import { randomUUID } from 'node:crypto';
 import { freemem, totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { readSystemMemoryAvailablePercent } from '../security/major-gateway.js';
 import { majorHome } from './state.js';
+import { readSystemMemoryAvailablePercent } from '../security/system-memory.js';
 
 export const RESOURCE_KINDS = ['worker', 'browser', 'build'] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
@@ -29,7 +29,8 @@ export interface ResourceLimits {
 
 export const GLOBAL_RESOURCE_LIMITS: ResourceLimits = {
   total: 6,
-  workers: 6,
+  // v0.5.1 has one shared Lima instance and therefore one safe worker slot.
+  workers: 1,
   browsers: 2,
   builds: 1,
   maxSubagentDepth: 1,
@@ -345,6 +346,28 @@ export function resourceSnapshot(): {
       queue: [...store.queue],
       telemetry: telemetry(store, memoryAvailable),
     };
+  });
+}
+
+/** Exact active capacity fence used by staged validation admission. */
+export function assertActiveResourceLease(input: {
+  leaseId: string;
+  kind: ResourceKind;
+  owner: string;
+  pid: number;
+}): ResourceLease {
+  return withStoreLock((store) => {
+    prune(store);
+    const lease = store.leases.find((candidate) => candidate.id === input.leaseId);
+    if (
+      !lease ||
+      lease.kind !== input.kind ||
+      lease.owner !== input.owner ||
+      lease.pid !== input.pid
+    ) {
+      throw new Error(`resource lease is not the active ${input.kind} fence: ${input.leaseId}`);
+    }
+    return { ...lease };
   });
 }
 

@@ -11,6 +11,9 @@ export interface ModelState {
   visible: boolean;
   authenticated: boolean;
   availability: ModelAvailability;
+  /** A persisted rate-limit/exhaustion backoff has elapsed, so one real run
+   * may retry the model and record a new authoritative outcome. */
+  retryEligible?: boolean;
   /** Authoritative billing state. 'unknown' (unroutable) until a human
    * attestation or observed run outcome proves it — configuration defaults
    * never populate this field. */
@@ -27,18 +30,15 @@ export interface ModelState {
 
 export interface ProviderInfo {
   name: string;
-  /** Path resolved on PATH for REPORTING ONLY. Not evidence of installation:
-   * in the disabled foundation the binary is never executed, so a resolvable
-   * path is unverified. */
+  /** Path resolved on PATH for reporting only. Resolution is not evidence that
+   * the executable is genuine or runnable. */
   executable?: string;
   version?: string;
   installed: boolean;
   /** Best-effort. Undefined when authentication state is not detectable. */
   authenticated?: boolean;
-  /** True in the disabled foundation: executable availability could not be
-   * verified because verifying it requires executing the binary (deferred to
-   * milestone M1 — trusted OS-isolated execution). Presence on PATH is
-   * reported via `executable`, but is never treated as installed/available. */
+  /** Executable availability has not been verified by a contained provider
+   * probe. Presence on PATH is reported but is not treated as installed. */
   executableUnverified?: boolean;
   models: ModelState[];
 }
@@ -59,10 +59,28 @@ export interface ProviderEvent {
 
 export interface ExecuteOutcome {
   status: 'succeeded' | 'failed' | 'timed_out' | 'cancelled';
+  /** Stable backend-owned run identity, when execution left the host process. */
+  runId?: string;
+  /** Machine-readable failure category for recovery and audit. */
+  errorKind?:
+    | 'unavailable'
+    | 'spawn_failed'
+    | 'auth_failed'
+    | 'protocol_invalid'
+    | 'provider_failed'
+    | 'timed_out'
+    | 'cancelled'
+    | 'cleanup_failed';
+  cleanup?: 'complete' | 'failed';
   exitCode: number | null;
   sessionRef?: string;
   /** Raw usage payload captured from the provider's result event, if any. */
   usage?: unknown;
+  /** Runtime-observed support. Absence means the backend did not report the capability. */
+  modelSelection?: 'supported' | 'unsupported';
+  requestedModel?: string;
+  /** Provider-reported or protocol-confirmed model. Never inferred from the request. */
+  actualModel?: string;
   rateLimited: boolean;
   exhausted: boolean;
   /** Redacted tail of stderr for diagnostics. */

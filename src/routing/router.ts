@@ -86,7 +86,7 @@ function usable(candidate: Candidate): boolean {
     m.visible &&
     m.authenticated &&
     !m.prohibited &&
-    m.availability === 'available' &&
+    (m.availability === 'available' || m.retryEligible === true) &&
     m.billingMode !== 'unknown'
   );
 }
@@ -189,8 +189,8 @@ export function route(
     reason:
       paid.length > 0
         ? `only paid options remain for target=${target} (purpose=${request.purpose}); ` +
-          'paid provider execution is unavailable in this build — checkpointing instead ' +
-          'of creating an unapproved charge'
+          `${isCapabilityAvailable('paid-provider-execution') ? 'an exact paid-usage approval is required' : 'paid provider execution is unavailable in this build'}; ` +
+          'checkpointing instead of creating an unapproved charge'
         : `no usable model for target=${target} (purpose=${request.purpose}); ` +
           'checkpointing until availability recovers',
     paidOptionsAvailable: paid,

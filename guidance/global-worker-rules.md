@@ -17,9 +17,9 @@ Apply these defaults across projects unless a project/user instruction is more s
 ## Trust levels
 
 - `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human/gstack driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
-- `assist`: visible foreground pilot, maximum 3 useful workers and maximum 30 minutes per coordinator run.
-- `build`: normal foreground working mode, maximum 6 useful workers and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
-- `unattended`: maximum 6 useful workers with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
+- `assist`: visible foreground pilot, maximum 1 worker and maximum 30 minutes per coordinator run.
+- `build`: normal foreground working mode, maximum 1 worker and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
+- `unattended`: maximum 1 worker with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
 
 For owner-approved build projects, do not re-introduce shadow runs, repeated permission prompts, or ceremonial review loops that block ordinary reversible engineering.
 
@@ -33,7 +33,7 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Build budget: one production build at a time. Build once per relevant commit. Reviewers inspect the same immutable remote preview.
 - Major admission checks the shared resource ledger and memory availability. Below the memory soft floor, new work queues instead of increasing pressure.
 - Use `major resource status` for lightweight telemetry: workers, browsers, builds, total active, queued and memory availability.
-- QA runs use bounded waves, not swarms: up to 3 reviewers, consolidate and repair, up to 3 second-wave reviewers, then one final verifier.
+- QA runs are serialized through the single v0.5.1 worker: review, consolidate and repair, then run the next reviewer and final verifier.
 
 ## Communication
 
@@ -51,6 +51,16 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - UI may lead backend using clearly labelled, replaceable fixtures/contracts when that accelerates proof.
 - Do not build more harness infrastructure when the current product task can be solved directly.
 
+## Code simplicity
+
+- Default to the **smallest correct modular implementation** that achieves the required outcome.
+- Give each module/function one clear responsibility and keep inputs/outputs explicit.
+- Keep side effects at boundaries; keep business rules independent of UI, database and provider SDKs where practical.
+- Do not add abstraction for hypothetical future needs, a second implementation that does not exist, or ceremony that does not improve the current outcome.
+- Reuse one canonical implementation instead of keeping duplicate code paths that can drift.
+- Before merge, simplify any code that can lose moving parts without losing clarity, correctness, testability or replaceability.
+- Load `simple-modular-code` for architecture and implementation work when more detailed guidance is useful.
+
 ## Skill-first execution
 
 - Resolve the smallest relevant set of installed skills before inventing a new workflow.
@@ -58,7 +68,7 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Prefer markdown judgment + minimal deterministic code over permanent hard-coded orchestration.
 - If a successful novel procedure is likely to recur, use `skillify` after the real task succeeds.
 - Do not skillify trivial one-offs or pause an active P0 to build tooling.
-- **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it with `major learn capture` and classify it as project-local or global. Do not rely on chat memory alone.
+- **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it project-locally with `major learn capture`. Global promotion is a separate reviewed action that requires sanitized content and evidence. Do not rely on chat memory alone.
 
 ## Remote-first web development
 

@@ -1,0 +1,24 @@
+# Adapted from Cursor's official cursor-sandbox-apparmor 0.6.0 profile.
+# The executable rule is narrowed to Major's immutable, root-owned helper.
+profile major_cursor_sandbox /opt/major/providers/v1/cursor/bin/cursorsandbox {
+  file,
+  /** ix,
+
+  capability sys_admin,
+  capability net_admin,
+  capability chown,
+  capability setuid,
+  capability setgid,
+  capability setpcap,
+  network unix,
+  network inet stream,
+  network inet6 stream,
+  network netlink raw,
+  signal (receive) peer=unconfined,
+  userns,
+  mount,
+  remount,
+  umount,
+
+  /opt/major/providers/v1/cursor/bin/cursorsandbox mr,
+}

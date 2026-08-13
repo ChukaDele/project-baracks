@@ -9,13 +9,14 @@ import {
   listRunEvents,
 } from '../src/domain/run-service.js';
 import { addTask } from '../src/domain/task-service.js';
-import { seedProject, tempDbPath, testDb } from './helpers.js';
+import { ensureObservedModel, seedProject, tempDbPath, testDb } from './helpers.js';
 
 function seedRun(db: ReturnType<typeof testDb>) {
   const project = seedProject(db);
   const task = addTask(db, { projectId: project.id, title: 'work' });
   const providerId = newId('aprov');
   db.insert(agentProviders).values({ id: providerId, name: 'mock' }).run();
+  ensureObservedModel(db, providerId);
   return createRun(db, {
     taskId: task.id,
     providerId,

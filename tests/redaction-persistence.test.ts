@@ -5,7 +5,7 @@ import { newId } from '../src/domain/ids.js';
 import { createRun, appendRunEvent, listRunEvents } from '../src/domain/run-service.js';
 import { addTask } from '../src/domain/task-service.js';
 import { isSensitiveKey, redactValue } from '../src/security/redact.js';
-import { seedProject } from './helpers.js';
+import { ensureObservedModel, seedProject } from './helpers.js';
 
 /**
  * P1-5 reproducer: structural redaction must recognise compound / camelCase
@@ -69,6 +69,7 @@ describe('P1-5 compound sensitive-key redaction', () => {
     const task = addTask(db, { projectId: project.id, title: 'redact' });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'p' }).run();
+    ensureObservedModel(db, providerId);
     const run = createRun(db, {
       taskId: task.id,
       providerId,

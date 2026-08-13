@@ -8,17 +8,9 @@ import { applyTransition, ConcurrencyError } from './task-service.js';
 /**
  * Durable queue claims — the worker dispatch/lease model.
  *
- * IN THIS BUILD, WORKER OPERATIONS ARE DISABLED. Worker-owned downstream
- * mutations are an unavailable capability (src/security/capabilities.ts):
- * claimNextTask, heartbeatClaim, completeClaim and releaseClaim refuse
- * unconditionally, so nothing can acquire or exercise a work claim until
- * milestone M4 delivers complete fencing (independent review found the
- * current fencing does not cover every owner mutation and downstream write).
- * Only reads (getClaim) and the supervisor-side crash-recovery sweep
- * (recoverExpiredClaims) remain runnable. The lease/fencing machinery below
- * the gates — BEGIN IMMEDIATE claim transactions, the task_claims_one_active
- * unique index, the ownerFence predicate — is retained, compiled and
- * DB-backed as the M4 starting point.
+ * Worker operations are active behind the M4 capability boundary. BEGIN
+ * IMMEDIATE claim transactions, the one-active-claim index, owner fences and
+ * crash recovery prevent stale or duplicate workers from mutating a task.
  */
 
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
@@ -91,7 +83,12 @@ export function claimNextTask(db: Db, options: ClaimOptions) {
           heartbeatAt: iso(nowMs),
         };
         tx.insert(taskClaims).values(claim).run();
-        const updated = applyTransition(tx, task.id, 'running');
+        const fence = {
+          claimId: claim.id,
+          workerId: claim.workerId,
+          ...(options.now ? { now: options.now } : {}),
+        };
+        const updated = applyTransition(tx, task.id, 'running', { fence });
         return { claim: getClaim(tx, claim.id), task: updated };
       }
       return undefined;

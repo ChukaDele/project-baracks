@@ -63,24 +63,24 @@ function concurrentRequest(owner: string): Promise<string> {
 }
 
 describe('Major global resource guard', () => {
-  it('admits at most 6 of 20 concurrent QA requests and queues the rest', async () => {
+  it('serializes concurrent workers through the one shared Lima slot', async () => {
     const results = await Promise.all(
       Array.from({ length: 20 }, (_, index) => concurrentRequest(`qa-${index}`)),
     );
 
-    expect(results.filter((status) => status === 'active')).toHaveLength(6);
-    expect(results.filter((status) => status === 'queued')).toHaveLength(14);
+    expect(results.filter((status) => status === 'active')).toHaveLength(1);
+    expect(results.filter((status) => status === 'queued')).toHaveLength(19);
     const snapshot = resourceSnapshot();
-    expect(snapshot.leases).toHaveLength(6);
-    expect(snapshot.queue).toHaveLength(14);
+    expect(snapshot.leases).toHaveLength(1);
+    expect(snapshot.queue).toHaveLength(19);
 
     releaseResource(snapshot.leases[0]!.id);
     const promoted = resourceSnapshot();
-    expect(promoted.leases).toHaveLength(6);
-    expect(promoted.queue).toHaveLength(13);
+    expect(promoted.leases).toHaveLength(1);
+    expect(promoted.queue).toHaveLength(18);
   }, 30_000);
 
-  it('rejects recursion beyond one child level', () => {
+  it('queues a child worker while the shared worker slot is occupied', () => {
     const root = requestResource({ kind: 'worker', owner: 'root' });
     expect(root.status).toBe('active');
     if (root.status !== 'active') return;
@@ -89,15 +89,8 @@ describe('Major global resource guard', () => {
       owner: 'child',
       parentLeaseId: root.lease.id,
     });
-    expect(child.status).toBe('active');
-    if (child.status !== 'active') return;
-    const grandchild = requestResource({
-      kind: 'worker',
-      owner: 'grandchild',
-      parentLeaseId: child.lease.id,
-    });
-    expect(grandchild.status).toBe('rejected');
-    if (grandchild.status === 'rejected') expect(grandchild.reason).toMatch(/leaf workers/);
+    expect(child.status).toBe('queued');
+    if (child.status === 'queued') expect(child.request.reason).toMatch(/worker cap 1/);
   });
 
   it('applies browser and build caps inside the shared total budget', () => {
@@ -119,7 +112,7 @@ describe('Major global resource guard', () => {
     requestResource({ kind: 'worker', owner: 'worker' });
     requestResource({ kind: 'browser', owner: 'browser' });
     const formatted = formatResourceTelemetry(resourceSnapshot().telemetry);
-    expect(formatted).toContain('workers: 1/6');
+    expect(formatted).toContain('workers: 1/1');
     expect(formatted).toContain('browsers: 1/2');
     expect(formatted).toContain('builds: 0/1');
     expect(formatted).toContain('total: 2/6');

@@ -1,7 +1,7 @@
 {
   "name": "major",
-  "version": "0.5.0",
-  "description": "Major — thin cross-project control plane with project-context integrity, closed-loop learning, reusable skills, integration truth states and evidence-driven delivery",
+  "version": "0.5.1",
+  "description": "Major — thin cross-project control plane with immutable runtime releases, project-context integrity, closed-loop learning and evidence-driven delivery",
   "type": "module",
   "private": true,
   "bin": {
@@ -20,11 +20,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate:major": "bash scripts/validate-major.sh && bash scripts/validate-major-stability.sh",
+    "validate:install-transaction": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-major-install-transaction.py",
+    "validate:cursor-acp-field": "node scripts/validate-cursor-acp-field.mjs",
+    "validate:lima-provider-field": "node scripts/validate-cli-provider-field.mjs && node scripts/validate-cursor-acp-field.mjs",
+    "validate:release": "bash scripts/validate-major-release.sh",
     "major": "tsx src/entry.ts",
     "install:runtime": "bash scripts/install-major-runtime.sh",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "1.3.0",
     "better-sqlite3": "^12.2.0",
     "commander": "^14.0.0",
     "drizzle-orm": "^0.44.4",

@@ -7,7 +7,8 @@ cd "$ROOT"
 fail() { echo "MAJOR VALIDATION FAILED: $*" >&2; exit 1; }
 
 for script in scripts/*.sh; do bash -n "$script" || fail "shell syntax: $script"; done
-python3 -m py_compile scripts/major-antigravity-worker.py || fail "Antigravity worker Python syntax"
+PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/major-validation-pycache" \
+  python3 -m py_compile scripts/*.py || fail "Python helper syntax"
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -62,7 +63,8 @@ if registered_internal != actual_internal:
     )
 for required_skill in [
     'source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code',
-    'learning-capture', 'remote-first-web-development', 'human-blocker-orchestration', 'dev-server-management'
+    'learning-capture', 'remote-first-web-development', 'human-blocker-orchestration',
+    'dev-server-management'
 ]:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
@@ -183,31 +185,36 @@ grep -Fq "Tool/capability router" docs/architecture.md || fail "tool/capability 
 [ -f src/security/major-gateway.ts ] || fail "Major successor execution gateway missing"
 [ -f src/dev/ports.ts ] || fail "dev-port allocator missing"
 [ -f src/learning/candidates.ts ] || fail "learning candidate queue missing"
+[ -f src/learning/lifecycle-cli.ts ] || fail "canonical learning lifecycle CLI missing"
 [ -f scripts/install-major-runtime.sh ] || fail "runtime installer missing"
 
 grep -Fq '"major": "./dist/entry.js"' package.json || fail "package bin must enter the supervisor runtime"
 grep -Fq "supervisor-state.json" src/supervisor/state.ts || fail "durable cross-session goal state missing"
 grep -Fq "project-policies.json" src/supervisor/policy.ts || fail "durable project policy store missing"
 grep -Fq "dev-ports.json" src/dev/ports.ts || fail "durable dev-port registry missing"
-grep -Fq "learning-candidates.json" src/learning/candidates.ts || fail "durable learning candidate registry missing"
+grep -Fq "function projectStorePath" src/learning/candidates.ts || fail "project-local learning store missing"
+grep -Fq "function globalStorePath" src/learning/candidates.ts || fail "sanitized global learning store missing"
 grep -Fq "command === 'dev'" src/supervisor/cli.ts || fail "dev-port CLI path missing"
-grep -Fq "command === 'learn'" src/supervisor/cli.ts || fail "learning-capture CLI path missing"
+grep -Fq "args[1] === 'capture'" src/learning/lifecycle-cli.ts || fail "learning-capture CLI path missing"
 grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts || fail "project classes missing"
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
-grep -Fq "maxWorkers: 3" src/supervisor/policy.ts || fail "assist worker ceiling missing"
+grep -Fq "maxWorkers: 1" src/supervisor/policy.ts || fail "truthful project worker ceiling missing"
 grep -Fq "maxRunMinutes: 30" src/supervisor/policy.ts || fail "assist wall-clock ceiling missing"
-grep -Fq "maxWorkers: 6" src/supervisor/policy.ts || fail "build worker ceiling missing"
-grep -Fq "maxWorkers: 6" src/supervisor/policy.ts || fail "hard worker ceiling missing"
+grep -Fq "workers: 1" src/supervisor/resources.ts || fail "single shared-Lima worker ceiling missing"
 grep -Fq "GLOBAL_RESOURCE_LIMITS" src/supervisor/resources.ts || fail "global resource guard missing"
 grep -Fq "maxSubagentDepth: 1" src/supervisor/resources.ts || fail "subagent depth cap missing"
 grep -Fq "three consecutive independently graded shadow passes" src/supervisor/policy.ts || fail "observe-to-assist shadow gate missing"
 grep -Fq "recordShadowGrade" src/supervisor/cli.ts || fail "shadow grade CLI path missing"
-grep -Fq "major goal report" src/supervisor/runtime.ts || fail "coordinator cannot durably report goal state"
+grep -Fq 'MAJOR_RESULT:' src/supervisor/runtime.ts || fail "coordinator has no parent-owned result channel"
+if grep -Fq "major goal report" src/supervisor/runtime.ts; then
+  fail "sandboxed coordinator must not mutate Major global state directly"
+fi
 grep -Fq "Skillify" src/supervisor/runtime.ts || fail "coordinator is not skill-first"
 grep -Fq "Tools-as-Code" src/supervisor/runtime.ts || fail "coordinator lacks Tools-as-Code guidance"
 for provider in claude codex cursor antigravity; do
-  grep -Fq "case '$provider'" src/supervisor/worker.ts || fail "live worker adapter missing: $provider"
+  grep -Fq "case '$provider'" src/providers/commands.ts || fail "live worker adapter missing: $provider"
 done
+grep -Fq 'providerArgs' src/supervisor/worker.ts || fail "worker bypasses shared provider command builder"
 
 if grep -R -F -n "node:child_process" src/supervisor; then
   fail "supervisor bypasses the execution gateway"
@@ -218,14 +225,28 @@ grep -Fq "execution-policy.jsonl" src/security/major-gateway.ts || fail "success
 grep -Fq "globalStopRequested" src/supervisor/worker.ts || fail "active workers ignore global kill switch"
 
 # Pilot deployment: Major is globally present, but no global autonomous daemon/swarm is installed.
-grep -Fq "SessionStart" scripts/install-major-runtime.sh || fail "Claude automatic session attach hook missing"
-grep -Fq "startup|resume|clear|compact" scripts/install-major-runtime.sh || fail "Claude attach hook does not cover session lifecycle"
+grep -Fq "SessionStart" scripts/stage-major-user-state.py || fail "Claude automatic session attach hook missing"
+grep -Fq "startup|resume|clear|compact" scripts/stage-major-user-state.py || fail "Claude attach hook does not cover session lifecycle"
 grep -Fq "no auto-start daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
 grep -Fq "Ruflo is NOT attached globally" scripts/install-major-runtime.sh || fail "pilot installer must avoid global Ruflo blast radius"
 grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "optional observe pilot path must remain available"
-if grep -Fq "launchctl bootstrap" scripts/install-major-runtime.sh; then
-  fail "pilot installer must not start a login daemon"
-fi
+python3 - <<'PY'
+import re
+from pathlib import Path
+
+lines = Path('scripts/install-major-runtime.sh').read_text().splitlines()
+commands = [
+    line.strip()
+    for line in lines
+    if re.match(r'^\s*(?:if\s+!\s+)?launchctl\s+bootstrap\b', line)
+]
+expected = ['if ! launchctl bootstrap "gui/$UID" "$LEGACY_PLIST" >/dev/null 2>&1; then']
+if commands != expected:
+    raise SystemExit(
+        'MAJOR VALIDATION FAILED: pilot installer contains an unexpected launchctl bootstrap command: '
+        + repr(commands)
+    )
+PY
 if grep -Fq "claude mcp add ruflo" scripts/install-major-runtime.sh || grep -Fq "codex mcp add ruflo" scripts/install-major-runtime.sh; then
   fail "Ruflo must not be globally attached during pilot"
 fi

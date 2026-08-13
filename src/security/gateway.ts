@@ -1,6 +1,8 @@
 import { isAbsolute, resolve } from 'node:path';
 import { executeStreaming, type StreamingSpawnSpec } from '../providers/exec.js';
 import type { ExecuteHandle } from '../providers/types.js';
+import type { ExecutionBackend } from '../execution/backend.js';
+import type { BackendProviderRequest } from '../execution/backend.js';
 import { CapabilityUnavailableError, isCapabilityAvailable } from './capabilities.js';
 import { checkArgv, type CommandPolicy } from './commands.js';
 import type { Containment } from './containment.js';
@@ -12,6 +14,9 @@ import {
   PathViolationError,
 } from './paths.js';
 import { redactText } from './redact.js';
+import { verifyProviderApprovalAuthority } from './provider-approval-policy.js';
+import type { ApprovalCategory, ProviderApprovalAuthority } from './provider-approval-policy.js';
+import type { BackendExecutionAuthority } from './staged-validation.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
@@ -23,30 +28,17 @@ import {
  * Provider adapters never spawn independently: they hold a gateway and ask it
  * to execute or probe.
  *
- * IN THIS BUILD, execute() IS DISABLED. Live agent execution is an
- * unavailable capability (src/security/capabilities.ts): every call records a
- * refusal and throws CapabilityUnavailableError before any validation or
- * spawn, unconditionally — no configuration, environment variable or
- * constructor option can pass the gate.
+ * Live execution remains behind the immutable M1 capability constant. Every
+ * spawn must pass path confinement, executable identity, argv policy,
+ * environment sanitisation and enforced OS containment.
  *
- * Discovery in this foundation is RESOLUTION-ONLY and PROCESS-FREE. The
+ * Discovery remains RESOLUTION-ONLY and PROCESS-FREE. The
  * gateway exposes exactly one discovery operation — resolveExecutable(), a
  * PATH lookup for reporting — and NO method spawns a process: there is no
  * --version probe, no `which` subprocess, no execFile/spawn anywhere in this
  * file. A resolvable path is reported but confers no execution trust and is
- * never evidence a binary is genuine or runnable; verifying that requires the
- * trusted, OS-isolated execution boundary of milestone M1
- * (docs/deferred-security-milestones.md).
- *
- * The validation pipeline below the gate (path canonicalisation, trusted
- * executable binding, argv policy, path-argument confinement, environment
- * sanitisation, process-group containment) is retained as the starting point
- * for milestone M1 (docs/deferred-security-milestones.md). It is groundwork,
- * not a complete boundary: independent review found the executable identity
- * check skips content hashing when file metadata appears unchanged, and no
- * OS-level filesystem/network isolation is enforced. It must not be presented
- * or relied on as a production execution boundary until M1 closes those gaps
- * and is independently reviewed.
+ * never evidence a binary is genuine or runnable; execution trust is granted
+ * only by the pinned identity and OS-isolated gateway path.
  */
 
 export interface ExecutionPolicyDecision {
@@ -61,6 +53,8 @@ export interface ExecutionPolicyDecision {
   authorizedEnv: string[];
   /** DecisionRequest id authorising sensitive env vars, when present. */
   envDecisionId?: string;
+  stagedValidationLeaseId?: string;
+  stagedValidationReleaseSha?: string;
   at: string;
 }
 
@@ -83,11 +77,18 @@ export interface GatewayExecuteRequest {
   detectExhaustion?: StreamingSpawnSpec['detectExhaustion'];
   extractSessionRef?: StreamingSpawnSpec['extractSessionRef'];
   extractUsage?: StreamingSpawnSpec['extractUsage'];
+  resourceLeaseId?: string;
+  executionAuthority?: BackendExecutionAuthority;
+  providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority'> & {
+    approvalAuthority: ProviderApprovalAuthority;
+  };
 }
 
 export interface GatewayOptions {
   /** Mandatory, non-empty for an executing gateway. Canonicalised per call. */
   allowedRoots: readonly string[];
+  /** Provider/runtime/config roots that may be read but never written. */
+  readOnlyRoots?: readonly string[];
   /** Must carry a non-empty allowedExecutables list. */
   commandPolicy: CommandPolicy;
   /**
@@ -98,10 +99,11 @@ export interface GatewayOptions {
   trustedExecutables: TrustedExecutableRegistry;
   /**
    * Containment mechanism applied to every spawned process tree. execute()
-   * fails closed when this is absent or not enforced — the fail-closed gate
-   * that keeps live agent execution disabled until real containment exists.
+   * fails closed when this is absent or not enforced.
    */
   containment?: Containment;
+  /** Isolated provider backend. Mutually exclusive with host containment. */
+  backend?: ExecutionBackend;
   /** Base environment (defaults to process.env). */
   baseEnv?: NodeJS.ProcessEnv;
   /** Extra non-sensitive env names to pass through. */
@@ -110,6 +112,8 @@ export interface GatewayOptions {
   authorizedEnv?: { names: readonly string[]; decisionId: string };
   /** Verifies the authorising DecisionRequest is approved. */
   verifyDecision?: (decisionId: string) => boolean;
+  /** Verifies provider action authority against durable, scoped decisions. */
+  verifyProviderDecision?: (category: ApprovalCategory, decisionId: string) => boolean;
   /** Sink for the execution-policy audit trail. Mandatory. */
   recordDecision: DecisionRecorder;
   /** Internal: set only by ExecutionGateway.probeOnly(). */
@@ -268,15 +272,14 @@ export class ExecutionGateway {
     return sanitizeEnv(this.options.baseEnv ?? process.env, sanitizeOptions);
   }
 
-  /**
-   * QUARANTINED — always refuses. Live agent execution is unavailable in this
-   * build: the gate below records the refusal and throws before any spawn can
-   * occur, regardless of how the gateway was configured. The validation and
-   * spawn pipeline after the gate is retained, compiled and type-checked as
-   * the M1 starting point, but is unreachable until that milestone lands.
-   */
+  /** Execute only through the complete M1 trust and containment boundary. */
   execute(request: GatewayExecuteRequest): ExecuteHandle {
-    if (!isCapabilityAvailable('live-agent-execution')) {
+    const stagedAuthority =
+      request.executionAuthority?.kind === 'staged_validation'
+        ? request.executionAuthority
+        : undefined;
+    const staged = Boolean(stagedAuthority);
+    if (!isCapabilityAvailable('live-agent-execution') && !staged) {
       const decision: Parameters<typeof this.record>[0] = {
         kind: 'execute',
         allowed: false,
@@ -296,12 +299,16 @@ export class ExecutionGateway {
     }
 
     // Fail closed unless a containment mechanism is configured and enforced.
-    if (!this.options.containment?.enforced) {
+    if (
+      !this.options.backend &&
+      (!this.options.containment?.enforced ||
+        !this.options.containment.filesystemIsolation ||
+        !this.options.containment.networkIsolation)
+    ) {
       this.refuse(
         'execute',
         request,
-        'execution containment is not configured or unavailable on this platform: ' +
-          'live execution is disabled',
+        'trusted filesystem and network isolation is not configured or unavailable on this platform',
       );
     }
 
@@ -327,21 +334,105 @@ export class ExecutionGateway {
     // must have a registered binding, and a path-qualified request must
     // realpath-resolve to that exact identity. What actually spawns is the
     // trusted spawn path — never the caller's string.
-    let trusted: TrustedExecutable;
-    try {
-      trusted = this.options.trustedExecutables.verify(request.executable);
-    } catch (error) {
-      const reason =
-        error instanceof ExecutableTrustError ? error.message : 'executable trust check failed';
-      this.refuse('execute', request, reason);
+    let trusted: TrustedExecutable | undefined;
+    if (!this.options.backend) {
+      try {
+        trusted = this.options.trustedExecutables.verify(request.executable);
+      } catch (error) {
+        const reason =
+          error instanceof ExecutableTrustError ? error.message : 'executable trust check failed';
+        this.refuse('execute', request, reason);
+      }
     }
 
     const env = this.buildEnv('execute', request);
 
+    if (this.options.backend) {
+      if (!request.providerRequest) {
+        this.refuse(
+          'execute',
+          request,
+          'isolated provider execution requires a structured Major provider request',
+        );
+      }
+      let verifiedProviderRequest: BackendProviderRequest;
+      try {
+        if (!this.options.verifyProviderDecision) {
+          this.refuse('execute', request, 'provider decision verifier is unavailable');
+        }
+        const verifiedAuthority = verifyProviderApprovalAuthority(
+          request.providerRequest.host,
+          request.providerRequest.approvalAuthority,
+          this.options.verifyProviderDecision,
+        );
+        verifiedProviderRequest = {
+          ...request.providerRequest,
+          approvalAuthority: verifiedAuthority,
+        };
+      } catch (error) {
+        this.refuse(
+          'execute',
+          request,
+          error instanceof Error ? error.message : 'provider approval policy rejected execution',
+        );
+      }
+      this.record({
+        kind: 'execute',
+        allowed: true,
+        executable: request.executable,
+        argv: request.args,
+        cwd: canonicalCwd,
+        reason: `allowed via ${this.options.backend.kind} backend`,
+        strippedEnv: env.stripped,
+        authorizedEnv: env.authorized,
+        ...(staged
+          ? {
+              stagedValidationLeaseId: stagedAuthority!.leaseId,
+              stagedValidationReleaseSha: stagedAuthority!.releaseSha,
+            }
+          : {}),
+        ...(this.options.authorizedEnv
+          ? { envDecisionId: this.options.authorizedEnv.decisionId }
+          : {}),
+      });
+      return this.options.backend.execute({
+        executionAuthority: request.executionAuthority ?? { kind: 'supervised' },
+        executable: request.executable,
+        args: request.args,
+        cwd: canonicalCwd,
+        allowedRoots: this.options.allowedRoots,
+        ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+        ...(request.parseLine ? { parseLine: request.parseLine } : {}),
+        ...(request.detectRateLimit ? { detectRateLimit: request.detectRateLimit } : {}),
+        ...(request.detectExhaustion ? { detectExhaustion: request.detectExhaustion } : {}),
+        ...(request.extractSessionRef ? { extractSessionRef: request.extractSessionRef } : {}),
+        ...(request.extractUsage ? { extractUsage: request.extractUsage } : {}),
+        ...(request.resourceLeaseId ? { resourceLeaseId: request.resourceLeaseId } : {}),
+        providerRequest: verifiedProviderRequest,
+      });
+    }
+
+    let wrapped: ReturnType<Containment['wrap']>;
+    try {
+      wrapped = this.options.containment!.wrap({
+        executable: trusted!.canonicalPath,
+        canonicalExecutable: trusted!.canonicalPath,
+        args: request.args,
+        allowedRoots: this.options.allowedRoots,
+        ...(this.options.readOnlyRoots ? { readOnlyRoots: this.options.readOnlyRoots } : {}),
+      });
+    } catch (error) {
+      this.refuse(
+        'execute',
+        request,
+        `execution containment could not be applied: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     this.record({
       kind: 'execute',
       allowed: true,
-      executable: trusted.spawnPath,
+      executable: trusted!.spawnPath,
       argv: request.args,
       cwd: canonicalCwd,
       reason: 'allowed',
@@ -353,8 +444,8 @@ export class ExecutionGateway {
     });
 
     const spec: StreamingSpawnSpec = {
-      executable: trusted.spawnPath,
-      args: [...request.args],
+      executable: wrapped.executable,
+      args: wrapped.args,
       cwd: canonicalCwd,
       env: env.env,
       allowedRoots: this.options.allowedRoots,
@@ -373,7 +464,7 @@ export class ExecutionGateway {
 
   /**
    * Resolve an executable NAME to a path on PATH, for REPORTING ONLY. This is
-   * the ENTIRE discovery surface of this disabled foundation, and it is
+   * the entire process-free discovery surface, and it is
    * PROCESS-FREE: it performs a supervisor-side PATH lookup (filesystem
    * metadata only) and never runs anything — no --version, no `which`
    * subprocess, no execFile/spawn. A path-qualified argument is rejected: only

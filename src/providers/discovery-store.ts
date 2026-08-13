@@ -8,6 +8,7 @@ import {
   type ModelAvailability,
 } from '../db/schema.js';
 import { newId } from '../domain/ids.js';
+import { redactText } from '../security/redact.js';
 import type { ModelState, ProviderInfo } from './types.js';
 
 /**
@@ -40,13 +41,14 @@ const DEFAULT_BACKOFF_MS: Record<'rate_limited' | 'exhausted', number> = {
   exhausted: 60 * 60 * 1000,
 };
 
-function upsertProvider(db: DbConn, info: ProviderInfo, now: string) {
+function upsertProvider(db: DbConn, info: ProviderInfo, now: string, source: ObservationSource) {
   const existing = db.select().from(agentProviders).where(eq(agentProviders.name, info.name)).get();
   if (existing) {
+    const authoritative = source === 'human' || source === 'probe' || source === 'run_outcome';
     db.update(agentProviders)
       .set({
-        executable: info.executable ?? existing.executable,
-        version: info.version ?? existing.version,
+        executable: authoritative ? (info.executable ?? existing.executable) : existing.executable,
+        version: authoritative ? (info.version ?? existing.version) : existing.version,
         lastDiscoveredAt: now,
       })
       .where(eq(agentProviders.id, existing.id))
@@ -74,12 +76,12 @@ function upsertProvider(db: DbConn, info: ProviderInfo, now: string) {
 export function persistProviderDiscovery(
   db: Db,
   info: ProviderInfo,
-  options: { source: ObservationSource; now?: () => Date },
+  options: { source: ObservationSource; note?: string; now?: () => Date },
 ) {
   return db.transaction(
     (tx) => {
       const now = (options.now?.() ?? new Date()).toISOString();
-      const providerId = upsertProvider(tx, info, now);
+      const providerId = upsertProvider(tx, info, now, options.source);
       const persisted = [];
       for (const model of info.models) {
         const existing = tx
@@ -94,19 +96,31 @@ export function persistProviderDiscovery(
           (existing.availability === 'rate_limited' || existing.availability === 'exhausted') &&
           existing.nextProbeAt !== null &&
           now < existing.nextProbeAt;
-        const availability = backingOff ? existing.availability : model.availability;
-        const nextProbeAt = backingOff ? existing.nextProbeAt : null;
+        // Registry/doctor discovery is process-free and therefore cannot
+        // revoke a prior human/probe/run observation. It may add an unknown
+        // model, but it cannot turn a routable attested model back into an
+        // unauthenticated unknown merely because it deliberately did not run
+        // the provider CLI.
+        const preserveAuthoritativeState =
+          existing &&
+          (options.source === 'registry' || options.source === 'cli') &&
+          (existing.visible || existing.authenticated || existing.availability !== 'unknown');
+        const availability =
+          backingOff || preserveAuthoritativeState ? existing.availability : model.availability;
+        const nextProbeAt = backingOff || preserveAuthoritativeState ? existing.nextProbeAt : null;
         // Discovery cannot assert billing: keep the authoritatively observed
         // value if one exists, otherwise stay 'unknown' (unroutable).
         const billingMode = existing ? existing.billingMode : 'unknown';
         const state = {
-          routingClass: model.routingClass,
-          visible: model.visible,
-          authenticated: model.authenticated,
+          routingClass: preserveAuthoritativeState ? existing.routingClass : model.routingClass,
+          visible: preserveAuthoritativeState ? existing.visible : model.visible,
+          authenticated: preserveAuthoritativeState ? existing.authenticated : model.authenticated,
           availability,
           billingMode,
-          prohibited: model.prohibited,
-          prohibitedReason: model.prohibitedReason ?? null,
+          prohibited: preserveAuthoritativeState ? existing.prohibited : model.prohibited,
+          prohibitedReason: preserveAuthoritativeState
+            ? existing.prohibitedReason
+            : (model.prohibitedReason ?? null),
           lastProbedAt: now,
           nextProbeAt,
         };
@@ -125,7 +139,11 @@ export function persistProviderDiscovery(
             id: newId('dobs'),
             providerId,
             modelId,
-            observedJson: JSON.stringify({ modelRef: model.modelRef, ...state }),
+            observedJson: JSON.stringify({
+              modelRef: model.modelRef,
+              ...state,
+              ...(options.note ? { note: redactText(options.note).slice(0, 4_000) } : {}),
+            }),
             source: options.source,
             confidence: CONFIDENCE_BY_SOURCE[options.source],
             observedAt: now,
@@ -174,10 +192,6 @@ export function recordBillingObservation(
         .get();
       if (!model) throw new Error(`model not persisted: ${input.providerName}/${input.modelRef}`);
       const now = (input.now?.() ?? new Date()).toISOString();
-      tx.update(agentModels)
-        .set({ billingMode: input.billingMode })
-        .where(eq(agentModels.id, model.id))
-        .run();
       tx.insert(discoveryObservations)
         .values({
           id: newId('dobs'),
@@ -186,12 +200,16 @@ export function recordBillingObservation(
           observedJson: JSON.stringify({
             modelRef: input.modelRef,
             billingMode: input.billingMode,
-            note: input.note ?? null,
+            note: input.note ? redactText(input.note).slice(0, 4_000) : null,
           }),
           source: input.source,
           confidence: CONFIDENCE_BY_SOURCE[input.source],
           observedAt: now,
         })
+        .run();
+      tx.update(agentModels)
+        .set({ billingMode: input.billingMode })
+        .where(eq(agentModels.id, model.id))
         .run();
       return { modelId: model.id, billingMode: input.billingMode };
     },
@@ -208,7 +226,7 @@ export function recordModelOutcome(
   input: {
     providerName: string;
     modelRef: string;
-    outcome: Extract<ModelAvailability, 'available' | 'rate_limited' | 'exhausted'>;
+    outcome: Extract<ModelAvailability, 'available' | 'rate_limited' | 'exhausted' | 'unknown'>;
     backoffMs?: number;
     now?: () => Date;
   },
@@ -231,7 +249,7 @@ export function recordModelOutcome(
       if (!model) throw new Error(`model not persisted: ${input.providerName}/${input.modelRef}`);
       const nowMs = (input.now?.() ?? new Date()).getTime();
       const nextProbeAt =
-        input.outcome === 'available'
+        input.outcome === 'available' || input.outcome === 'unknown'
           ? null
           : new Date(nowMs + (input.backoffMs ?? DEFAULT_BACKOFF_MS[input.outcome])).toISOString();
       tx.update(agentModels)
@@ -271,8 +289,76 @@ export function shouldProbe(
   return model.nextProbeAt === null || now().toISOString() >= model.nextProbeAt;
 }
 
+/** Atomically consume one expired backoff retry. The model becomes unknown
+ * before the worker starts, so a generic failure cannot leave it permanently
+ * retry-eligible and hot-looping through every coordinator cycle. */
+export function consumeModelRetry(
+  db: Db,
+  input: { providerName: string; modelRef: string; now?: () => Date },
+): boolean {
+  return db.transaction(
+    (tx) => {
+      const provider = tx
+        .select()
+        .from(agentProviders)
+        .where(eq(agentProviders.name, input.providerName))
+        .get();
+      if (!provider) return false;
+      const model = tx
+        .select()
+        .from(agentModels)
+        .where(
+          and(eq(agentModels.providerId, provider.id), eq(agentModels.modelRef, input.modelRef)),
+        )
+        .get();
+      const now = (input.now?.() ?? new Date()).toISOString();
+      if (
+        !model ||
+        (model.availability !== 'rate_limited' && model.availability !== 'exhausted') ||
+        model.nextProbeAt === null ||
+        model.nextProbeAt > now
+      ) {
+        return false;
+      }
+      const updated = tx
+        .update(agentModels)
+        .set({ availability: 'unknown', nextProbeAt: null, lastProbedAt: now })
+        .where(
+          and(
+            eq(agentModels.id, model.id),
+            eq(agentModels.availability, model.availability),
+            eq(agentModels.nextProbeAt, model.nextProbeAt),
+          ),
+        )
+        .run();
+      if (updated.changes !== 1) return false;
+      tx.insert(discoveryObservations)
+        .values({
+          id: newId('dobs'),
+          providerId: provider.id,
+          modelId: model.id,
+          observedJson: JSON.stringify({
+            modelRef: model.modelRef,
+            availability: 'unknown',
+            retryStartedAt: now,
+          }),
+          source: 'run_outcome',
+          confidence: 'observed',
+          observedAt: now,
+        })
+        .run();
+      return true;
+    },
+    { behavior: 'immediate' },
+  );
+}
+
 /** Build routing inputs from PERSISTED state, not fresh assertions. */
-export function loadPersistedProviderInfos(db: DbConn): ProviderInfo[] {
+export function loadPersistedProviderInfos(
+  db: DbConn,
+  now: () => Date = () => new Date(),
+): ProviderInfo[] {
+  const currentTime = now().toISOString();
   const providers = db.select().from(agentProviders).all();
   return providers.map((provider) => {
     const models = db
@@ -291,6 +377,13 @@ export function loadPersistedProviderInfos(db: DbConn): ProviderInfo[] {
         prohibited: m.prohibited,
         source: 'persisted',
       };
+      if (
+        (m.availability === 'rate_limited' || m.availability === 'exhausted') &&
+        m.nextProbeAt !== null &&
+        currentTime >= m.nextProbeAt
+      ) {
+        state.retryEligible = true;
+      }
       if (m.prohibitedReason !== null) state.prohibitedReason = m.prohibitedReason;
       return state;
     });
