@@ -508,6 +508,9 @@ describe('staged validation state and fencing', () => {
     expect(staged).toContain('nonce !== lease.authorityValidationNonce');
     expect(staged).toContain("input.outcome.modelSelection !== 'supported'");
     expect(staged).toContain('input.outcome.requestedModel !== input.expectedModel');
+    const cursorField = readFileSync('scripts/validate-cursor-acp-field.mjs', 'utf8');
+    expect(cursorField).toContain('validationLeaseId: handle.validationLeaseId');
+    expect(cursorField).toContain('predecessorLeaseId: created.validationLeaseId');
   });
 
   it('keeps staged candidate verification independent of the interactive pnpm path', () => {

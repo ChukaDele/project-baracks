@@ -86,6 +86,7 @@ async function executeCursor({ phase, modelRef, resumeSessionRef, cancel }) {
     if (event.type === 'provider-result') providerResults += 1;
   }
   return {
+    validationLeaseId: handle.validationLeaseId,
     outcome: await handle.outcome,
     acpUpdates,
     providerResults,
