@@ -86,7 +86,11 @@ function freshProjectDb(): { dbPath: string; taskId: string } {
 
 beforeAll(() => {
   // Build the production artifact so these tests exercise the compiled CLI.
-  execFileSync('pnpm', ['build'], { cwd: ROOT, stdio: 'ignore', timeout: 300_000 });
+  execFileSync('corepack', ['pnpm', 'build'], {
+    cwd: ROOT,
+    stdio: 'ignore',
+    timeout: 300_000,
+  });
   if (!existsSync(CLI)) throw new Error(`compiled CLI not found after build: ${CLI}`);
 
   const scratch = mkdtempSync(join(tmpdir(), 'major-cli-'));
