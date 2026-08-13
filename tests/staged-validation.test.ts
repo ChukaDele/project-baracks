@@ -483,7 +483,7 @@ describe('staged validation state and fencing', () => {
     expect(currentActivationState(db)).not.toBe('unattended');
   });
 
-  it('routes shipped provider fields through staged support rather than direct LimaBackend access', () => {
+  it('routes shipped provider fields through staged support rather than direct LimaBackend access', async () => {
     for (const script of [
       'scripts/validate-cli-provider-field.mjs',
       'scripts/validate-cursor-acp-field.mjs',
@@ -511,6 +511,28 @@ describe('staged validation state and fencing', () => {
     const cursorField = readFileSync('scripts/validate-cursor-acp-field.mjs', 'utf8');
     expect(cursorField).toContain('validationLeaseId: handle.validationLeaseId');
     expect(cursorField).toContain('predecessorLeaseId: created.validationLeaseId');
+    const helperPath = '../scripts/cursor-field-runner.mjs';
+    const { executeCursorFieldPhase } = await import(helperPath);
+    let observed: Record<string, unknown> | undefined;
+    executeCursorFieldPhase(
+      (input: Record<string, unknown>) => {
+        observed = input;
+        return input;
+      },
+      {
+        phase: 'resume',
+        nonce: '00000000-0000-4000-8000-000000000000',
+        resumeSessionRef: 'cursor-session',
+        modelRef: 'cursor/model',
+        predecessorLeaseId: 'lease-created',
+      },
+    );
+    expect(observed).toMatchObject({
+      phase: 'resume',
+      predecessorLeaseId: 'lease-created',
+      resumeSessionRef: 'cursor-session',
+      modelRef: 'cursor/model',
+    });
   });
 
   it('keeps staged candidate verification independent of the interactive pnpm path', () => {
