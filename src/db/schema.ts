@@ -709,3 +709,100 @@ export const executionPolicyDecisions = sqliteTable('execution_policy_decisions'
   at: text('at').notNull(),
   createdAt: createdAt(),
 });
+
+export const VALIDATION_LEASE_STATUSES = [
+  'issued',
+  'admitted',
+  'running',
+  'validating',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'expired',
+] as const;
+export type ValidationLeaseStatus = (typeof VALIDATION_LEASE_STATUSES)[number];
+
+/**
+ * One-use release-validation authority. This is deliberately separate from
+ * task claims and resource leases: those fence task mutations and capacity,
+ * while this row admits one immutable validation request while M1 is closed.
+ */
+export const validationLeases = sqliteTable(
+  'validation_leases',
+  {
+    id: id(),
+    activationSlot: integer('activation_slot').notNull().default(1),
+    tokenHash: text('token_hash').notNull(),
+    authorityLeaseId: text('authority_lease_id').notNull(),
+    authorityArtifactDigest: text('authority_artifact_digest').notNull(),
+    authorityValidationNonce: text('authority_validation_nonce').notNull(),
+    authorityExpiresAt: text('authority_expires_at').notNull(),
+    releaseRepository: text('release_repository').notNull(),
+    releaseSourceCheckout: text('release_source_checkout').notNull(),
+    releaseRoot: text('release_root').notNull(),
+    releaseBranch: text('release_branch').notNull(),
+    releaseSha: text('release_sha').notNull(),
+    releaseTreeHash: text('release_tree_hash').notNull(),
+    releaseManifestHash: text('release_manifest_hash').notNull(),
+    provider: text('provider').notNull(),
+    projectIdentityHash: text('project_identity_hash').notNull(),
+    projectRootHash: text('project_root_hash').notNull(),
+    caseId: text('case_id').notNull(),
+    requestDigest: text('request_digest').notNull(),
+    expectedEvidenceHash: text('expected_evidence_hash').notNull(),
+    expectedExecutionStatus: text('expected_execution_status', {
+      enum: ['succeeded', 'cancelled'],
+    }).notNull(),
+    workerId: text('worker_id').notNull(),
+    processNonce: text('process_nonce').notNull(),
+    resourceLeaseId: text('resource_lease_id'),
+    predecessorLeaseId: text('predecessor_lease_id'),
+    status: text('status', { enum: VALIDATION_LEASE_STATUSES }).notNull().default('issued'),
+    expiresAt: text('expires_at').notNull(),
+    admittedAt: text('admitted_at'),
+    terminalAt: text('terminal_at'),
+    runId: text('run_id'),
+    outcomeReason: text('outcome_reason'),
+    evidenceHash: text('evidence_hash'),
+    evidenceJson: text('evidence_json'),
+    resultSessionRefHash: text('result_session_ref_hash'),
+    resultModel: text('result_model'),
+    resultEventHash: text('result_event_hash'),
+    resultEventCount: integer('result_event_count'),
+    resultWorkspaceHash: text('result_workspace_hash'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('validation_leases_token_hash').on(t.tokenHash),
+    uniqueIndex('validation_leases_authority_request').on(
+      t.authorityArtifactDigest,
+      t.requestDigest,
+    ),
+    uniqueIndex('validation_leases_one_active')
+      .on(t.activationSlot)
+      .where(sql`status IN ('issued', 'admitted', 'running', 'validating')`),
+    index('validation_leases_release_sha').on(t.releaseSha),
+    index('validation_leases_status').on(t.status),
+    enumCheck('validation_leases_status_valid', 'status', VALIDATION_LEASE_STATUSES),
+    check(
+      'validation_leases_sha_valid',
+      sql`length(release_sha) = 40 AND release_sha NOT GLOB '*[^0-9a-f]*'`,
+    ),
+    check('validation_leases_activation_slot', sql`activation_slot = 1`),
+    check(
+      'validation_leases_digest_valid',
+      sql`
+      length(token_hash) = 64 AND token_hash NOT GLOB '*[^0-9a-f]*'
+      AND length(authority_artifact_digest) = 64 AND authority_artifact_digest NOT GLOB '*[^0-9a-f]*'
+      AND length(authority_validation_nonce) = 36 AND authority_validation_nonce NOT GLOB '*[^0-9a-f-]*'
+      AND length(release_manifest_hash) = 64 AND release_manifest_hash NOT GLOB '*[^0-9a-f]*'
+      AND length(release_tree_hash) = 64 AND release_tree_hash NOT GLOB '*[^0-9a-f]*'
+      AND length(project_identity_hash) = 64 AND project_identity_hash NOT GLOB '*[^0-9a-f]*'
+      AND length(project_root_hash) = 64 AND project_root_hash NOT GLOB '*[^0-9a-f]*'
+      AND length(request_digest) = 64 AND request_digest NOT GLOB '*[^0-9a-f]*'
+      AND length(expected_evidence_hash) = 64 AND expected_evidence_hash NOT GLOB '*[^0-9a-f]*'
+    `,
+    ),
+  ],
+);

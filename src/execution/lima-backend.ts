@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
@@ -13,9 +13,20 @@ import {
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from '../providers/types.js';
+import { openDb } from '../db/client.js';
+import { isCapabilityAvailable } from '../security/capabilities.js';
+import { globalStopRequested } from '../supervisor/policy.js';
 import { redactText } from '../security/redact.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
 import { validateVerifiedProviderApprovalAuthority } from '../security/provider-approval-policy.js';
+import {
+  assertStagedValidationCaseRequest,
+  consumeStagedValidationExecution,
+  getStagedValidationLease,
+  stagedValidationRequestDigest,
+} from '../security/staged-validation.js';
+import { verifyGithubStagedValidationAuthority } from '../security/github-attestation.js';
+import { assertActiveResourceLease } from '../supervisor/resources.js';
 import type {
   BackendExecuteRequest,
   BackendProviderStatus,
@@ -251,6 +262,14 @@ export class LimaBackend implements ExecutionBackend {
   }
 
   async probeProvider(executable: string): Promise<BackendProviderStatus> {
+    if (!isCapabilityAvailable('live-agent-execution')) {
+      return {
+        executable,
+        installed: false,
+        authenticated: false,
+        detail: 'provider probing is disabled while live-agent-execution is unavailable',
+      };
+    }
     const profile = guestProviderProfile(executable);
     const stateRoot = join(majorHome(), 'execution', 'lima');
     const lock = join(stateRoot, 'backend.lock');
@@ -408,6 +427,133 @@ export class LimaBackend implements ExecutionBackend {
   }
 
   execute(request: BackendExecuteRequest): ExecuteHandle {
+    if (request.executionAuthority.kind === 'supervised') {
+      if (!isCapabilityAvailable('live-agent-execution')) {
+        throw new Error('supervised provider execution is unavailable while M1 is disabled');
+      }
+    } else {
+      if (globalStopRequested()) throw new Error('Major global kill switch is active');
+      if (!request.providerRequest) {
+        throw new Error('staged validation requires a structured provider request');
+      }
+      const opened = openDb();
+      try {
+        const candidate = getStagedValidationLease(opened.db, request.executionAuthority.leaseId);
+        const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
+        const release = JSON.parse(readFileSync(join(executingRoot, 'release.json'), 'utf8')) as {
+          repository?: string;
+          branch?: string;
+          sha?: string;
+          treeHash?: string;
+          sourceCheckout?: string;
+        };
+        execFileSync(
+          process.execPath,
+          [join(executingRoot, 'scripts', 'major-runtime-manifest.mjs'), 'verify', executingRoot],
+          { cwd: executingRoot, encoding: 'utf8', env: {} },
+        );
+        const manifestHash = createHash('sha256')
+          .update(readFileSync(join(executingRoot, 'runtime-manifest.json')))
+          .digest('hex');
+        const sourceSha = execFileSync(
+          '/usr/bin/git',
+          ['-C', candidate.releaseSourceCheckout, 'rev-parse', 'HEAD'],
+          { encoding: 'utf8', env: {} },
+        ).trim();
+        const sourceBranch = execFileSync(
+          '/usr/bin/git',
+          ['-C', candidate.releaseSourceCheckout, 'rev-parse', '--abbrev-ref', 'HEAD'],
+          { encoding: 'utf8', env: {} },
+        ).trim();
+        const sourceTree = execFileSync(
+          '/usr/bin/git',
+          ['-C', candidate.releaseSourceCheckout, 'rev-parse', 'HEAD^{tree}'],
+          { encoding: 'utf8', env: {} },
+        ).trim();
+        const sourceStatus = execFileSync(
+          '/usr/bin/git',
+          ['-C', candidate.releaseSourceCheckout, 'status', '--porcelain', '--untracked-files=all'],
+          { encoding: 'utf8', env: {} },
+        ).trim();
+        if (
+          executingRoot !== realpathSync(candidate.releaseRoot) ||
+          release.repository !== candidate.releaseRepository ||
+          release.branch !== candidate.releaseBranch ||
+          release.sha !== candidate.releaseSha ||
+          release.treeHash !== candidate.releaseTreeHash ||
+          realpathSync(release.sourceCheckout ?? '') !== candidate.releaseSourceCheckout ||
+          manifestHash !== candidate.releaseManifestHash ||
+          sourceSha !== candidate.releaseSha ||
+          sourceBranch !== candidate.releaseBranch ||
+          createHash('sha256').update(sourceTree).digest('hex') !== candidate.releaseTreeHash ||
+          sourceStatus !== '' ||
+          this.config.instance !== `major-worker-${candidate.releaseSha.slice(0, 12)}` ||
+          this.config.limactlPath !== '/opt/homebrew/bin/limactl' ||
+          this.config.guestRunRoot !== '/var/lib/major/runs' ||
+          this.config.isolationScope !== 'shared-workshop'
+        ) {
+          throw new Error('staged validation backend release binding is invalid');
+        }
+        execFileSync(
+          '/bin/bash',
+          [
+            join(candidate.releaseSourceCheckout, 'scripts', 'verify-major-staged-candidate.sh'),
+            executingRoot,
+          ],
+          {
+            encoding: 'utf8',
+            env: { PATH: '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' },
+            timeout: 10 * 60 * 1000,
+          },
+        );
+        const githubAuthority = verifyGithubStagedValidationAuthority({
+          releaseSha: candidate.releaseSha,
+          caseId: candidate.caseId as Parameters<
+            typeof verifyGithubStagedValidationAuthority
+          >[0]['caseId'],
+          provider: candidate.provider as BackendExecuteRequest['providerRequest'] extends {
+            host: infer Host;
+          }
+            ? Host
+            : never,
+        });
+        if (
+          githubAuthority.leaseId !== candidate.authorityLeaseId ||
+          githubAuthority.artifactDigest !== candidate.authorityArtifactDigest ||
+          githubAuthority.validationNonce !== candidate.authorityValidationNonce ||
+          githubAuthority.expiresAt !== candidate.authorityExpiresAt
+        ) {
+          throw new Error('staged validation backend authority does not match GitHub');
+        }
+        assertStagedValidationCaseRequest(opened.db, candidate, {
+          executable: request.executable,
+          args: request.args,
+          cwd: request.cwd,
+          providerRequest: request.providerRequest,
+        });
+        const lease = consumeStagedValidationExecution(
+          opened.db,
+          request.executionAuthority,
+          stagedValidationRequestDigest({
+            executable: request.executable,
+            args: request.args,
+            cwd: request.cwd,
+            providerRequest: request.providerRequest,
+          }),
+        );
+        if (!lease.resourceLeaseId) {
+          throw new Error('staged validation backend is missing its worker resource lease');
+        }
+        assertActiveResourceLease({
+          leaseId: lease.resourceLeaseId,
+          kind: 'worker',
+          owner: lease.workerId,
+          pid: process.pid,
+        });
+      } finally {
+        opened.sqlite.close();
+      }
+    }
     const queue = new EventQueue<ProviderEvent>();
     const runId = randomUUID();
     this.cancelled = false;
@@ -422,6 +568,30 @@ export class LimaBackend implements ExecutionBackend {
       request.timeoutMs ?? 30 * 60 * 1000,
     );
     timeout.unref();
+    const authorityWatcher =
+      request.executionAuthority.kind === 'staged_validation'
+        ? setInterval(() => {
+            if (globalStopRequested()) {
+              this.cancel();
+              return;
+            }
+            const opened = openDb();
+            try {
+              const lease = getStagedValidationLease(
+                opened.db,
+                request.executionAuthority.kind === 'staged_validation'
+                  ? request.executionAuthority.leaseId
+                  : '',
+              );
+              if (!['running', 'validating'].includes(lease.status)) this.cancel();
+            } catch {
+              this.cancel();
+            } finally {
+              opened.sqlite.close();
+            }
+          }, 1_000)
+        : undefined;
+    authorityWatcher?.unref();
     const outcome = this.executeRun(request, queue, runId, () =>
       timedOut ? 'timed_out' : this.cancelled ? 'cancelled' : 'failed',
     )
@@ -441,6 +611,7 @@ export class LimaBackend implements ExecutionBackend {
       })
       .finally(() => {
         clearTimeout(timeout);
+        if (authorityWatcher) clearInterval(authorityWatcher);
         this.activeAbort = undefined;
         queue.close();
       });
@@ -502,6 +673,19 @@ export class LimaBackend implements ExecutionBackend {
       snapshotWorkspace(request.cwd, inputWorkspace);
       const baselineHash = hashWorkspaceTree(inputWorkspace);
       const instance = await this.start();
+      if (request.executionAuthority.kind === 'staged_validation') {
+        const marker = await this.lima([
+          'shell',
+          '--tty=false',
+          this.config.instance,
+          'test',
+          '-r',
+          `/opt/major/releases/${request.executionAuthority.releaseSha}`,
+        ]);
+        if (marker.code !== 0) {
+          throw new Error('staged validation guest release marker is absent');
+        }
+      }
       const prepared = await this.lima([
         'shell',
         '--tty=false',

@@ -1,0 +1,65 @@
+import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
+import type { ProviderCommandHost } from '../providers/commands.js';
+import type { StagedValidationCase } from './staged-validation.js';
+
+export interface VerifiedGithubStagedValidationAuthority {
+  authority: 'github_actions';
+  leaseId: string;
+  sha: string;
+  sourceRef: string;
+  caseId: StagedValidationCase;
+  provider: ProviderCommandHost;
+  expiresAt: string;
+  artifactDigest: string;
+  validationNonce: string;
+}
+
+/** The only adapter from Major to the standard GitHub/Sigstore verifier. */
+export function verifyGithubStagedValidationAuthority(input: {
+  releaseSha: string;
+  caseId: StagedValidationCase;
+  provider: ProviderCommandHost;
+}): VerifiedGithubStagedValidationAuthority {
+  if (!/^[0-9a-f]{40}$/.test(input.releaseSha)) {
+    throw new Error('GitHub staged-validation release SHA is invalid');
+  }
+  const majorHome = process.env.MAJOR_HOME
+    ? realpathSync(process.env.MAJOR_HOME)
+    : join(homedir(), '.major');
+  const authorityRoot = join(majorHome, 'staged-validation', 'authorities', input.releaseSha);
+  const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
+  const output = execFileSync(
+    process.execPath,
+    [
+      join(executingRoot, 'scripts', 'verify-github-staged-validation-lease.mjs'),
+      join(authorityRoot, 'major-staged-validation-lease.json'),
+      join(authorityRoot, 'major-staged-validation-attestation.json'),
+      input.releaseSha,
+      input.caseId,
+      input.provider,
+    ],
+    {
+      encoding: 'utf8',
+      env: { HOME: homedir(), PATH: '/opt/homebrew/bin:/usr/bin:/bin' },
+      timeout: 60_000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  const receipt = JSON.parse(output) as VerifiedGithubStagedValidationAuthority;
+  if (
+    receipt.authority !== 'github_actions' ||
+    receipt.sha !== input.releaseSha ||
+    receipt.caseId !== input.caseId ||
+    receipt.provider !== input.provider ||
+    !/^github-\d+-\d+$/.test(receipt.leaseId) ||
+    !/^[0-9a-f]{64}$/.test(receipt.artifactDigest) ||
+    !/^[a-f0-9-]{36}$/.test(receipt.validationNonce) ||
+    Date.parse(receipt.expiresAt) <= Date.now()
+  ) {
+    throw new Error('GitHub staged-validation verification receipt is invalid');
+  }
+  return receipt;
+}

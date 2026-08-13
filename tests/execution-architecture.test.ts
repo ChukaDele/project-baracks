@@ -22,7 +22,9 @@ describe('single execution boundary', () => {
       'src/execution/cursor-acp-runtime.ts',
       'src/execution/lima-backend.ts',
       'src/providers/exec.ts',
+      'src/security/github-attestation.ts',
       'src/security/major-gateway.ts',
+      'src/security/system-memory.ts',
     ]);
   });
 

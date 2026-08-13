@@ -1,25 +1,19 @@
 #!/usr/bin/env node
 
-import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { LimaBackend } from '../dist/execution/lima-backend.js';
-import { providerArgs } from '../dist/providers/commands.js';
 import {
-  extractProviderSessionRef,
-  extractProviderUsage,
-  parseProviderEventLine,
-} from '../dist/providers/evidence.js';
+  executeStagedCliProviderField,
+  stagedFieldExecutionConfig,
+  stagedFieldValidationNonce,
+} from './staged-field-support.mjs';
 
-const limactlPath = resolve(process.env.MAJOR_LIMACTL_PATH ?? '/opt/homebrew/bin/limactl');
-const instance = process.env.MAJOR_LIMA_INSTANCE ?? 'major-worker';
+const { limactlPath, instance } = stagedFieldExecutionConfig();
 const root = mkdtempSync(join(tmpdir(), 'major-cli-provider-field-'));
-const nonce = randomUUID();
+const nonce = stagedFieldValidationNonce();
 let passed = false;
-
-process.env.MAJOR_HOME = join(root, 'major-home');
 
 const providers = [
   { host: 'claude', executable: 'claude', allowGuestMutation: true },
@@ -58,43 +52,14 @@ function assertStopped() {
   if (worker.status !== 'Stopped') fail(`Lima instance is not stopped: ${worker.status}`);
 }
 
-function backend() {
-  return new LimaBackend({
-    backend: 'lima',
-    instance,
-    limactlPath,
-    isolationScope: 'shared-workshop',
-    guestRunRoot: '/var/lib/major/runs',
-  });
-}
-
 async function runProvider(provider) {
-  const workspace = join(root, `${provider.host}-workspace`);
   const filename = `MAJOR_${provider.host.toUpperCase()}_FIELD.txt`;
   const expected = `MAJOR_${provider.host.toUpperCase()}_FIELD_${nonce}\n`;
-  mkdirSync(workspace, { recursive: true, mode: 0o700 });
-  command('/usr/bin/git', ['-C', workspace, 'init', '--initial-branch=field']);
-  const prompt = provider.allowGuestMutation
-    ? `Create ${filename} containing exactly ${expected.trim()} followed by one newline. ` +
-      'Use only file reading and editing tools. Do not run a shell command. Do not modify any other file.'
-    : `Read the empty repository and respond with exactly ${expected.trim()}. Do not use shell, network, ` +
-      'or file-writing tools.';
-  const handle = backend().execute({
-    executable: provider.executable,
-    args: providerArgs(provider.host, { prompt, outputMode: 'batch' }),
-    cwd: workspace,
-    allowedRoots: [workspace],
-    timeoutMs: 300_000,
-    providerRequest: {
-      host: provider.host,
-      prompt,
-      allowGuestMutation: provider.allowGuestMutation,
-      approvalAuthority: { decisions: [] },
-    },
-    parseLine: parseProviderEventLine,
-    extractSessionRef: (event) => extractProviderSessionRef(provider.host, event),
-    extractUsage: extractProviderUsage,
+  const handle = executeStagedCliProviderField({
+    provider: provider.host,
+    nonce,
   });
+  const workspace = handle.workspace;
   let events = 0;
   let evidence = '';
   for await (const event of handle.events) {
@@ -136,6 +101,7 @@ async function runProvider(provider) {
   if ((provider.host === 'claude' || provider.host === 'codex') && !outcome.sessionRef) {
     fail(`${provider.host} did not preserve a session reference`);
   }
+  await handle.validateEvidence();
   return {
     provider: provider.host,
     runId: outcome.runId,

@@ -1,6 +1,7 @@
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
 import type { ProviderCommandHost } from '../providers/commands.js';
 import type { VerifiedProviderApprovalAuthority } from '../security/provider-approval-policy.js';
+import type { BackendExecutionAuthority } from '../security/staged-validation.js';
 
 export interface BackendProviderRequest {
   host: ProviderCommandHost;
@@ -14,6 +15,8 @@ export interface BackendProviderRequest {
 }
 
 export interface BackendExecuteRequest {
+  /** M1-supervised authority or a one-use admitted staged-validation lease. */
+  executionAuthority: BackendExecutionAuthority;
   executable: string;
   args: readonly string[];
   cwd: string;

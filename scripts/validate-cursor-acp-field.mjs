@@ -1,24 +1,21 @@
 #!/usr/bin/env node
 
-import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { LimaBackend } from '../dist/execution/lima-backend.js';
+import {
+  executeStagedCursorField,
+  stagedFieldExecutionConfig,
+  stagedFieldValidationNonce,
+} from './staged-field-support.mjs';
 
-const limactlPath = resolve(process.env.MAJOR_LIMACTL_PATH ?? '/opt/homebrew/bin/limactl');
-const instance = process.env.MAJOR_LIMA_INSTANCE ?? 'major-worker';
+const { limactlPath, instance } = stagedFieldExecutionConfig();
 const root = mkdtempSync(join(tmpdir(), 'major-cursor-acp-field-'));
-const majorHome = join(root, 'major-home');
-const successWorkspace = join(root, 'success-workspace');
-const cancelWorkspace = join(root, 'cancel-workspace');
-const nonce = randomUUID();
+const nonce = stagedFieldValidationNonce();
 const expected = `MAJOR_CURSOR_ACP_FIELD_${nonce}\n`;
 const resumed = `MAJOR_CURSOR_ACP_RESUME_${nonce}\n`;
 let passed = false;
-
-process.env.MAJOR_HOME = majorHome;
 
 function fail(message) {
   throw new Error(message);
@@ -39,21 +36,6 @@ function command(executable, args) {
     fail(`${executable} ${args.join(' ')} failed: ${(result.stderr || result.stdout).trim()}`);
   }
   return result.stdout;
-}
-
-function initWorkspace(path) {
-  mkdirSync(path, { recursive: true, mode: 0o700 });
-  command('/usr/bin/git', ['-C', path, 'init', '--initial-branch=field']);
-}
-
-function backend() {
-  return new LimaBackend({
-    backend: 'lima',
-    instance,
-    limactlPath,
-    isolationScope: 'shared-workshop',
-    guestRunRoot: '/var/lib/major/runs',
-  });
 }
 
 function assertStopped() {
@@ -83,28 +65,12 @@ function assertOnlyChange(workspace, expectedPath) {
   }
 }
 
-async function executeCursor({
-  workspace,
-  prompt,
-  modelRef,
-  resumeSessionRef,
-  timeoutMs = 240_000,
-  cancel,
-}) {
-  const handle = backend().execute({
-    executable: 'cursor-agent',
-    args: ['acp'],
-    cwd: workspace,
-    allowedRoots: [workspace],
-    timeoutMs,
-    providerRequest: {
-      host: 'cursor',
-      prompt,
-      allowGuestMutation: true,
-      approvalAuthority: { decisions: [] },
-      ...(modelRef ? { modelRef } : {}),
-      ...(resumeSessionRef ? { resumeSessionRef } : {}),
-    },
+async function executeCursor({ phase, modelRef, resumeSessionRef, cancel }) {
+  const handle = executeStagedCursorField({
+    phase,
+    nonce,
+    ...(modelRef ? { modelRef } : {}),
+    ...(resumeSessionRef ? { resumeSessionRef } : {}),
   });
   let acpUpdates = 0;
   let providerResults = 0;
@@ -119,20 +85,23 @@ async function executeCursor({
     }
     if (event.type === 'provider-result') providerResults += 1;
   }
-  return { outcome: await handle.outcome, acpUpdates, providerResults, cancelScheduled };
+  return {
+    outcome: await handle.outcome,
+    acpUpdates,
+    providerResults,
+    cancelScheduled,
+    validateEvidence: handle.validateEvidence,
+    workspace: handle.workspace,
+  };
 }
 
 try {
   if (!existsSync(limactlPath)) fail(`limactl is absent: ${limactlPath}`);
   assertStopped();
-  initWorkspace(successWorkspace);
-
   const created = await executeCursor({
-    workspace: successWorkspace,
-    prompt:
-      `Create CURSOR_ACP_FIELD.txt containing exactly ${expected.trim()} followed by one newline. ` +
-      'Do not modify any other file.',
+    phase: 'create',
   });
+  const successWorkspace = created.workspace;
   if (created.outcome.status !== 'succeeded' || created.outcome.cleanup !== 'complete') {
     fail(`Cursor ACP create failed: ${JSON.stringify(created.outcome)}`);
   }
@@ -148,15 +117,14 @@ try {
   }
   assertOnlyChange(successWorkspace, 'CURSOR_ACP_FIELD.txt');
   assertStopped();
+  await created.validateEvidence();
 
   command('/usr/bin/git', ['-C', successWorkspace, 'add', 'CURSOR_ACP_FIELD.txt']);
   const continued = await executeCursor({
-    workspace: successWorkspace,
+    phase: 'resume',
     resumeSessionRef: created.outcome.sessionRef,
     modelRef: created.outcome.actualModel,
-    prompt:
-      `Continue this session. Create CURSOR_ACP_RESUME.txt containing exactly ${resumed.trim()} ` +
-      'followed by one newline. Do not modify any other file.',
+    predecessorLeaseId: created.validationLeaseId,
   });
   if (continued.outcome.status !== 'succeeded' || continued.outcome.cleanup !== 'complete') {
     fail(`Cursor ACP resume failed: ${JSON.stringify(continued.outcome)}`);
@@ -187,15 +155,13 @@ try {
     fail(`unexpected resumed workspace delta: ${resumeStatus}`);
   }
   assertStopped();
+  await continued.validateEvidence();
 
-  initWorkspace(cancelWorkspace);
   const cancelled = await executeCursor({
-    workspace: cancelWorkspace,
-    prompt:
-      'Analyze the repository in depth and prepare a long architecture report. Do not modify files or run shell commands.',
-    timeoutMs: 120_000,
+    phase: 'cancel',
     cancel: true,
   });
+  const cancelWorkspace = cancelled.workspace;
   if (!cancelled.cancelScheduled)
     fail('Cursor ACP cancellation was not triggered by a real update');
   if (cancelled.outcome.status !== 'cancelled' || cancelled.outcome.cleanup !== 'complete') {
@@ -213,6 +179,7 @@ try {
   ]).trim();
   if (cancelStatus) fail(`cancelled Cursor ACP run changed the host workspace: ${cancelStatus}`);
   assertStopped();
+  await cancelled.validateEvidence();
 
   passed = true;
   process.stdout.write(

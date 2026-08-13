@@ -16,6 +16,7 @@ import {
 import { redactText } from './redact.js';
 import { verifyProviderApprovalAuthority } from './provider-approval-policy.js';
 import type { ApprovalCategory, ProviderApprovalAuthority } from './provider-approval-policy.js';
+import type { BackendExecutionAuthority } from './staged-validation.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
@@ -52,6 +53,8 @@ export interface ExecutionPolicyDecision {
   authorizedEnv: string[];
   /** DecisionRequest id authorising sensitive env vars, when present. */
   envDecisionId?: string;
+  stagedValidationLeaseId?: string;
+  stagedValidationReleaseSha?: string;
   at: string;
 }
 
@@ -75,6 +78,7 @@ export interface GatewayExecuteRequest {
   extractSessionRef?: StreamingSpawnSpec['extractSessionRef'];
   extractUsage?: StreamingSpawnSpec['extractUsage'];
   resourceLeaseId?: string;
+  executionAuthority?: BackendExecutionAuthority;
   providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority'> & {
     approvalAuthority: ProviderApprovalAuthority;
   };
@@ -270,7 +274,12 @@ export class ExecutionGateway {
 
   /** Execute only through the complete M1 trust and containment boundary. */
   execute(request: GatewayExecuteRequest): ExecuteHandle {
-    if (!isCapabilityAvailable('live-agent-execution')) {
+    const stagedAuthority =
+      request.executionAuthority?.kind === 'staged_validation'
+        ? request.executionAuthority
+        : undefined;
+    const staged = Boolean(stagedAuthority);
+    if (!isCapabilityAvailable('live-agent-execution') && !staged) {
       const decision: Parameters<typeof this.record>[0] = {
         kind: 'execute',
         allowed: false,
@@ -376,11 +385,18 @@ export class ExecutionGateway {
         reason: `allowed via ${this.options.backend.kind} backend`,
         strippedEnv: env.stripped,
         authorizedEnv: env.authorized,
+        ...(staged
+          ? {
+              stagedValidationLeaseId: stagedAuthority!.leaseId,
+              stagedValidationReleaseSha: stagedAuthority!.releaseSha,
+            }
+          : {}),
         ...(this.options.authorizedEnv
           ? { envDecisionId: this.options.authorizedEnv.decisionId }
           : {}),
       });
       return this.options.backend.execute({
+        executionAuthority: request.executionAuthority ?? { kind: 'supervised' },
         executable: request.executable,
         args: request.args,
         cwd: canonicalCwd,
