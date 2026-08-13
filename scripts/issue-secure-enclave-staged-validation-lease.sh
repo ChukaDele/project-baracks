@@ -21,7 +21,7 @@ if ! git -C "$ROOT" fetch --quiet origin main; then
   echo "ERROR: authority issuance could not refresh origin/main" >&2
   exit 1
 fi
-REMOTE_MAIN_SHA="$(git -C "$ROOT" rev-parse refs/remotes/origin/main)"
+REMOTE_MAIN_SHA="$(git -C "$ROOT" rev-parse FETCH_HEAD)"
 if [ "$SHA" != "$REMOTE_MAIN_SHA" ]; then
   echo "ERROR: authority issuance requires the exact current origin/main SHA" >&2
   exit 1

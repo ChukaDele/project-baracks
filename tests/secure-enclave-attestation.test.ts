@@ -120,7 +120,7 @@ describe('Secure Enclave staged-validation authority policy', () => {
   it.each([
     ['a feature SHA', 'b'.repeat(40), '0'],
     ['an unrefreshable origin/main', SHA, '1'],
-  ])('refuses to issue authority for %s', (_case, remoteSha, fetchStatus) => {
+  ])('refuses to issue authority for %s', (_case, fetchedSha, fetchStatus) => {
     const root = mkdtempSync(join(tmpdir(), 'major-attestation-issuer-'));
     const scripts = join(root, 'scripts');
     const bin = join(root, 'bin');
@@ -138,7 +138,7 @@ case "$*" in
   *"rev-parse HEAD") printf '%s\\n' "$HEAD_SHA" ;;
   *"status --porcelain") exit 0 ;;
   *"fetch --quiet origin main") exit "$FETCH_STATUS" ;;
-  *"rev-parse refs/remotes/origin/main") printf '%s\\n' "$REMOTE_SHA" ;;
+  *"rev-parse FETCH_HEAD") printf '%s\\n' "$FETCHED_SHA" ;;
   *) exit 99 ;;
 esac
 `,
@@ -150,12 +150,18 @@ esac
         HOME: root,
         PATH: `${bin}:/usr/bin:/bin`,
         HEAD_SHA: SHA,
-        REMOTE_SHA: remoteSha,
+        FETCHED_SHA: fetchedSha,
         FETCH_STATUS: fetchStatus,
       },
     });
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/origin\/main/);
+  });
+
+  it('binds authority to FETCH_HEAD instead of a stale tracking ref', () => {
+    const issuer = String(readFileSync('scripts/issue-secure-enclave-staged-validation-lease.sh'));
+    expect(issuer).toContain('rev-parse FETCH_HEAD');
+    expect(issuer).not.toContain('rev-parse refs/remotes/origin/main');
   });
 
   it('requires both runtime boundaries and the pinned OpenSSH authority', () => {
