@@ -395,6 +395,47 @@ describe('staged validation state and fencing', () => {
     expect(currentActivationState(db)).toBe('disabled');
   });
 
+  it('accepts a clean Cursor cancellation before model selection completes', () => {
+    const db = testDb();
+    const nonce = '11111111-1111-4111-8111-111111111111';
+    const cancelled = issue(db, {
+      provider: 'cursor',
+      expectedEvidenceHash: hex(`cursor:cancel:${nonce}:cleanup-complete`),
+      expectedExecutionStatus: 'cancelled',
+    });
+    const events = [{ type: 'acp-session-update', data: { available_commands_update: {} } }];
+    admitStagedValidationLease(db, cancelled.authority);
+    consumeStagedValidationExecution(db, cancelled.authority, cancelled.authority.requestDigest);
+    settleStagedValidationLease(db, {
+      authority: cancelled.authority,
+      status: 'validating',
+      outcomeReason: 'cancelled; cleanup=complete',
+      evidenceHash: hex('runtime cancellation evidence'),
+      runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      resultEventHash: stagedValidationEventsDigest(events),
+      resultEventCount: events.length,
+      resultWorkspaceHash: stagedValidationWorkspaceDigest(cancelled.shaped.cwd),
+    });
+
+    const terminal = completeStagedCursorField(db, cancelled.authority, {
+      phase: 'cancel',
+      workspace: cancelled.shaped.cwd,
+      nonce,
+      events,
+      outcome: {
+        status: 'cancelled',
+        runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        cleanup: 'complete',
+        exitCode: null,
+        rateLimited: false,
+        exhausted: false,
+      },
+    });
+
+    expect(terminal.status).toBe('succeeded');
+    expect(currentActivationState(db)).toBe('disabled');
+  });
+
   it('binds Cursor resume issuance to one successful create lease for the same release and worktree', () => {
     const db = testDb();
     const nonce = '22222222-2222-2222-2222-222222222222';
@@ -506,7 +547,9 @@ describe('staged validation state and fencing', () => {
     );
     const staged = readFileSync('src/security/staged-validation.ts', 'utf8');
     expect(staged).toContain('nonce !== lease.authorityValidationNonce');
-    expect(staged).toContain("input.outcome.modelSelection !== 'supported'");
+    expect(staged).toContain(
+      "input.phase !== 'cancel' && input.outcome.modelSelection !== 'supported'",
+    );
     expect(staged).toContain('input.outcome.requestedModel !== input.expectedModel');
     const cursorField = readFileSync('scripts/validate-cursor-acp-field.mjs', 'utf8');
     expect(cursorField).toContain('validationLeaseId: handle.validationLeaseId');

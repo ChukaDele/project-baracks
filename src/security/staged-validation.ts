@@ -765,7 +765,7 @@ export function completeStagedCursorField(
     lease.caseId !== 'provider-field' ||
     lease.provider !== 'cursor' ||
     input.outcome.status !== expectedStatus ||
-    input.outcome.modelSelection !== 'supported' ||
+    (input.phase !== 'cancel' && input.outcome.modelSelection !== 'supported') ||
     input.events.length === 0 ||
     !/^[a-f0-9-]{36}$/.test(input.nonce) ||
     JSON.stringify(visible) !== JSON.stringify(expectedVisible) ||
