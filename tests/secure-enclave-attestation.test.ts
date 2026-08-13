@@ -17,7 +17,7 @@ function lease() {
     signingNamespace: 'major-staged-validation',
     repository: 'ChukaDele/project-baracks',
     exactCommitSha: SHA,
-    sourceRef: 'refs/heads/codex/major-v051-release-candidate',
+    sourceRef: 'refs/heads/main',
     leaseId: 'secure-enclave-12345678-1234-4234-8234-123456789abc',
     issuedAt: '2026-08-13T00:00:00.000Z',
     expiresAt: '2026-08-13T06:00:00.000Z',
