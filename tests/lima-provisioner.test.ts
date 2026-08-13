@@ -18,6 +18,9 @@ log="$MAJOR_FAKE_LIMA_LOG"
 printf '%s\\n' "$*" >> "$log"
 case "$1" in
   list) if [ -f "$state" ]; then
+    if [ "\${MAJOR_FAKE_LIMA_LARGE_LIST:-0}" = 1 ]; then
+      i=0; while [ "$i" -lt 5000 ]; do printf '{"name":"filler-%s","status":"Stopped"}\n' "$i"; i=$((i + 1)); done
+    fi
     mounts='[]'; [ "\${MAJOR_FAKE_LIMA_UNSAFE:-0}" = 1 ] && mounts='[{"location":"/Users"}]'
     printf '{"name":"${instance}","status":"%s","vmType":"vz","arch":"aarch64","sshAddress":"127.0.0.1","config":{"plain":true,"mounts":%s,"portForwards":[],"networks":[],"propagateProxyEnv":false,"containerd":{"system":false,"user":false},"ssh":{"forwardAgent":false,"forwardX11":false,"forwardX11Trusted":false,"loadDotSSHPubKeys":false}}}\\n' "$(cat "$state")" "$mounts"
     if [ "\${MAJOR_FAKE_LIMA_AUTH_SOURCE:-0}" = 1 ]; then
@@ -111,6 +114,12 @@ describe('clean-install Lima provisioning', () => {
     expect(log.match(/^create /gm)).toHaveLength(1);
     expect(log.match(/install-major-linux-providers\.sh/g)).toHaveLength(1);
     expect(log.match(/bootstrap-major-lima-worker\.sh/g)).toHaveLength(1);
+  });
+
+  it('consumes a large Lima list without SIGPIPE under pipefail', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-large-list-'));
+    roots.push(root);
+    expect(run(root, { MAJOR_FAKE_LIMA_LARGE_LIST: '1' }).status).toBe(0);
   });
 
   it('pins official Linux arm64 artifacts and never executes a remote installer', () => {

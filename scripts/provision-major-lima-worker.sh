@@ -22,12 +22,13 @@ status() {
   "$LIMACTL_PATH" list --json | python3 -c '
 import json, sys
 name = sys.argv[1]
+status = ""
 for line in sys.stdin:
     if not line.strip(): continue
     row = json.loads(line)
     if row.get("name") == name:
-        print(row.get("status", ""))
-        break
+        status = row.get("status", "")
+print(status)
 ' "$INSTANCE"
 }
 
@@ -59,10 +60,12 @@ migrate_existing_auth() {
   local source_status provider relative
   source_status="$({ "$LIMACTL_PATH" list --json | python3 -c '
 import json, sys
+status = ""
 for line in sys.stdin:
     if not line.strip(): continue
     row = json.loads(line)
-    if row.get("name") == "major-worker": print(row.get("status", "")); break
+    if row.get("name") == "major-worker": status = row.get("status", "")
+print(status)
 '; } || true)"
   [[ -z "$source_status" ]] && return 0
   if [[ "$source_status" == Broken ]]; then
