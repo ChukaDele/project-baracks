@@ -34,7 +34,7 @@ cp -R "$ROOT/evals" "$DEST/evals"
 cp -R "$ROOT/scripts" "$DEST/scripts"
 cp -R "$ROOT/templates" "$DEST/templates"
 
-pnpm install --prod --frozen-lockfile --dir "$DEST"
+corepack pnpm install --prod --frozen-lockfile --dir "$DEST"
 
 # pnpm's package-manager metadata includes a build timestamp, and its generated
 # executable shims embed the absolute installation path. Major imports its

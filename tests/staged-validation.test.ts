@@ -509,4 +509,13 @@ describe('staged validation state and fencing', () => {
     expect(staged).toContain("input.outcome.modelSelection !== 'supported'");
     expect(staged).toContain('input.outcome.requestedModel !== input.expectedModel');
   });
+
+  it('keeps staged candidate verification independent of the interactive pnpm path', () => {
+    expect(readFileSync('scripts/verify-major-staged-candidate.sh', 'utf8')).toContain(
+      'corepack pnpm --dir "$SOURCE_ROOT" build',
+    );
+    expect(readFileSync('scripts/build-major-runtime-snapshot.sh', 'utf8')).toContain(
+      'corepack pnpm install --prod --frozen-lockfile --dir "$DEST"',
+    );
+  });
 });
