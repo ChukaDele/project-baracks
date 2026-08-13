@@ -73,7 +73,7 @@ export function stagedFieldValidationNonce() {
   );
   const nonce = JSON.parse(readFileSync(leasePath, 'utf8')).validationNonce;
   if (!/^[a-f0-9-]{36}$/.test(nonce ?? '')) {
-    throw new Error('GitHub staged-validation authority has no valid field nonce');
+    throw new Error('Secure Enclave staged-validation authority has no valid field nonce');
   }
   return nonce;
 }

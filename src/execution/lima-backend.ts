@@ -25,7 +25,7 @@ import {
   getStagedValidationLease,
   stagedValidationRequestDigest,
 } from '../security/staged-validation.js';
-import { verifyGithubStagedValidationAuthority } from '../security/github-attestation.js';
+import { verifySecureEnclaveStagedValidationAuthority } from '../security/secure-enclave-attestation.js';
 import { assertActiveResourceLease } from '../supervisor/resources.js';
 import type {
   BackendExecuteRequest,
@@ -506,10 +506,10 @@ export class LimaBackend implements ExecutionBackend {
             timeout: 10 * 60 * 1000,
           },
         );
-        const githubAuthority = verifyGithubStagedValidationAuthority({
+        const secureEnclaveAuthority = verifySecureEnclaveStagedValidationAuthority({
           releaseSha: candidate.releaseSha,
           caseId: candidate.caseId as Parameters<
-            typeof verifyGithubStagedValidationAuthority
+            typeof verifySecureEnclaveStagedValidationAuthority
           >[0]['caseId'],
           provider: candidate.provider as BackendExecuteRequest['providerRequest'] extends {
             host: infer Host;
@@ -518,12 +518,12 @@ export class LimaBackend implements ExecutionBackend {
             : never,
         });
         if (
-          githubAuthority.leaseId !== candidate.authorityLeaseId ||
-          githubAuthority.artifactDigest !== candidate.authorityArtifactDigest ||
-          githubAuthority.validationNonce !== candidate.authorityValidationNonce ||
-          githubAuthority.expiresAt !== candidate.authorityExpiresAt
+          secureEnclaveAuthority.leaseId !== candidate.authorityLeaseId ||
+          secureEnclaveAuthority.artifactDigest !== candidate.authorityArtifactDigest ||
+          secureEnclaveAuthority.validationNonce !== candidate.authorityValidationNonce ||
+          secureEnclaveAuthority.expiresAt !== candidate.authorityExpiresAt
         ) {
-          throw new Error('staged validation backend authority does not match GitHub');
+          throw new Error('staged validation backend authority does not match Secure Enclave');
         }
         assertStagedValidationCaseRequest(opened.db, candidate, {
           executable: request.executable,

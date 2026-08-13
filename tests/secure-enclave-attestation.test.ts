@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error Runtime policy script intentionally has no TypeScript declaration.
-import { validateGithubStagedValidationLease } from '../scripts/verify-github-staged-validation-lease.mjs';
+import { validateSecureEnclaveStagedValidationLease } from '../scripts/verify-secure-enclave-staged-validation-lease.mjs';
 
 const SHA = 'a'.repeat(40);
 const NOW = Date.parse('2026-08-13T01:00:00.000Z');
@@ -13,10 +13,12 @@ type Lease = ReturnType<typeof lease>;
 function lease() {
   return {
     version: 1,
+    authority: 'secretive_secure_enclave',
+    signingNamespace: 'major-staged-validation',
     repository: 'ChukaDele/project-baracks',
     exactCommitSha: SHA,
     sourceRef: 'refs/heads/codex/major-v051-release-candidate',
-    leaseId: 'github-123-1',
+    leaseId: 'secure-enclave-12345678-1234-4234-8234-123456789abc',
     issuedAt: '2026-08-13T00:00:00.000Z',
     expiresAt: '2026-08-13T06:00:00.000Z',
     allowedScopes: [
@@ -44,16 +46,14 @@ function lease() {
     ],
     projectRestriction: 'major-owned-or-approved-isolated-worktree',
     maxConcurrentWorkers: 1,
-    nonce: `123.1.${SHA}`,
     validationNonce: 'aaaaaaaa-0000-4000-8000-aaaaaaaaaaaa',
-    releaseWorkflow: { path: '.github/workflows/ci.yml', runId: 123, runAttempt: 1 },
   };
 }
 
-describe('GitHub staged-validation authority policy', () => {
+describe('Secure Enclave staged-validation authority policy', () => {
   it('accepts only the exact current authority shape', () => {
     expect(() =>
-      validateGithubStagedValidationLease(lease(), SHA, 'provider-field', 'codex', NOW),
+      validateSecureEnclaveStagedValidationLease(lease(), SHA, 'provider-field', 'codex', NOW),
     ).not.toThrow();
   });
 
@@ -69,37 +69,43 @@ describe('GitHub staged-validation authority policy', () => {
     const value = lease();
     mutate(value);
     expect(() =>
-      validateGithubStagedValidationLease(value, SHA, 'provider-field', 'codex', NOW),
+      validateSecureEnclaveStagedValidationLease(value, SHA, 'provider-field', 'codex', NOW),
     ).toThrow();
   });
 
   it('rejects an expired lease and a valid lease for the previous release', () => {
     expect(() =>
-      validateGithubStagedValidationLease(
+      validateSecureEnclaveStagedValidationLease(
         lease(),
         SHA,
         'provider-field',
         'codex',
         Date.parse('2026-08-13T07:00:00.000Z'),
       ),
-    ).toThrow(/scope or lifetime/);
+    ).toThrow(/invalid/);
     expect(() =>
-      validateGithubStagedValidationLease(lease(), 'b'.repeat(40), 'provider-field', 'codex', NOW),
-    ).toThrow(/scope or lifetime/);
+      validateSecureEnclaveStagedValidationLease(
+        lease(),
+        'b'.repeat(40),
+        'provider-field',
+        'codex',
+        NOW,
+      ),
+    ).toThrow(/invalid/);
   });
 
   it('rejects a locally fabricated unsigned lease', () => {
     const root = mkdtempSync(join(tmpdir(), 'major-fabricated-attestation-'));
     const leasePath = join(root, 'lease.json');
-    const bundlePath = join(root, 'bundle.json');
+    const signaturePath = join(root, 'lease.json.sig');
     writeFileSync(leasePath, `${JSON.stringify(lease())}\n`);
-    writeFileSync(bundlePath, '{}\n');
+    writeFileSync(signaturePath, 'not-a-signature\n');
     const result = spawnSync(
       process.execPath,
       [
-        'scripts/verify-github-staged-validation-lease.mjs',
+        'scripts/verify-secure-enclave-staged-validation-lease.mjs',
         leasePath,
-        bundlePath,
+        signaturePath,
         SHA,
         'provider-field',
         'codex',
@@ -109,17 +115,27 @@ describe('GitHub staged-validation authority policy', () => {
     expect(result.status).not.toBe(0);
   });
 
-  it('requires both runtime boundaries and the exact pinned GitHub workflow', () => {
+  it('requires both runtime boundaries and the pinned OpenSSH authority', () => {
     for (const path of ['src/security/major-gateway.ts', 'src/execution/lima-backend.ts']) {
-      expect(String(readFileSync(path))).toContain('verifyGithubStagedValidationAuthority');
+      expect(String(readFileSync(path))).toContain('verifySecureEnclaveStagedValidationAuthority');
     }
-    const workflow = String(readFileSync('.github/workflows/ci.yml'));
-    expect(workflow).toContain('actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6');
-    expect(workflow).toContain('Verify exact signed authority offline');
-    const verifier = String(readFileSync('scripts/verify-github-staged-validation-lease.mjs'));
-    expect(verifier).toContain('/opt/homebrew/Cellar/gh/2.95.0/bin/gh');
-    expect(verifier).toContain('798882434e7f6ae5846194191263ecc59d56bc201f13f016270f44cb4f34499e');
-    expect(verifier).toContain('unlinkSync(privateGh)');
-    expect(verifier).toContain("spawnSync('/dev/fd/3'");
+    const verifier = String(
+      readFileSync('scripts/verify-secure-enclave-staged-validation-lease.mjs'),
+    );
+    expect(verifier).toContain("'/usr/bin/ssh-keygen'");
+    expect(verifier).toContain("'verify'");
+    expect(verifier).toContain("'-Y'");
+    expect(verifier).toContain("'/etc/major/staged-validation-allowed-signers'");
+    expect(verifier).not.toContain('guidance/staged-validation-allowed-signers');
+    const issuer = String(readFileSync('scripts/issue-secure-enclave-staged-validation-lease.sh'));
+    expect(issuer).toContain('/etc/major/staged-validation-authority.pub');
+    expect(issuer).not.toContain('guidance/staged-validation-authority.pub');
+    const bootstrap = String(
+      readFileSync('scripts/install-secure-enclave-staged-validation-trust.sh'),
+    );
+    expect(bootstrap).not.toContain('mktemp');
+    expect(bootstrap).toContain('set publicLine to quoted form of item 1 of argv');
+    expect(bootstrap).toContain('test ! -e /etc/major/staged-validation-authority.pub');
+    expect(bootstrap).toContain('[ "$(cat "$SYSTEM_PUBLIC_KEY")" = "$PUBLIC_LINE" ]');
   });
 });

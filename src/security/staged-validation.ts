@@ -12,7 +12,7 @@ import { providerArgs } from '../providers/commands.js';
 import type { ExecuteOutcome, ProviderEvent } from '../providers/types.js';
 import type { ProviderApprovalAuthority } from './provider-approval-policy.js';
 import { isCapabilityAvailable } from './capabilities.js';
-import { verifyGithubStagedValidationAuthority } from './github-attestation.js';
+import { verifySecureEnclaveStagedValidationAuthority } from './secure-enclave-attestation.js';
 
 export type MajorActivationState = 'disabled' | 'staged_validation' | 'supervised' | 'unattended';
 
@@ -152,7 +152,7 @@ export type BackendExecutionAuthority =
   StagedValidationExecutionAuthority | SupervisedExecutionAuthority;
 
 /**
- * Verify the independently issued GitHub Actions authority for this exact release.
+ * Verify the independently issued Secure Enclave authority for this exact release.
  * SQLite remains a replay/evidence ledger and is never accepted as the trust root.
  */
 function assertHex(label: string, value: string, pattern = SHA_256): void {
@@ -190,16 +190,16 @@ export function issueStagedValidationLease(
   if (realpathSync(input.releaseRoot) !== executingRoot) {
     throw new StagedValidationError('staged validation can issue only from the executing runtime');
   }
-  const githubAuthority = verifyGithubStagedValidationAuthority({
+  const secureEnclaveAuthority = verifySecureEnclaveStagedValidationAuthority({
     releaseSha: input.releaseSha,
     caseId: input.caseId,
     provider: input.provider,
   });
-  if (githubAuthority.expiresAt <= now.toISOString()) {
-    throw new StagedValidationError('GitHub staged-validation authority is expired');
+  if (secureEnclaveAuthority.expiresAt <= now.toISOString()) {
+    throw new StagedValidationError('Secure Enclave staged-validation authority is expired');
   }
-  if (input.validationNonce !== githubAuthority.validationNonce) {
-    throw new StagedValidationError('validation nonce does not match GitHub authority');
+  if (input.validationNonce !== secureEnclaveAuthority.validationNonce) {
+    throw new StagedValidationError('validation nonce does not match Secure Enclave authority');
   }
   if (input.predecessorLeaseId) {
     const predecessor = getLease(db, input.predecessorLeaseId);
@@ -220,10 +220,10 @@ export function issueStagedValidationLease(
   const lease = {
     id: newId('vlease'),
     tokenHash: sha256(token),
-    authorityLeaseId: githubAuthority.leaseId,
-    authorityArtifactDigest: githubAuthority.artifactDigest,
-    authorityValidationNonce: githubAuthority.validationNonce,
-    authorityExpiresAt: githubAuthority.expiresAt,
+    authorityLeaseId: secureEnclaveAuthority.leaseId,
+    authorityArtifactDigest: secureEnclaveAuthority.artifactDigest,
+    authorityValidationNonce: secureEnclaveAuthority.validationNonce,
+    authorityExpiresAt: secureEnclaveAuthority.expiresAt,
     releaseRepository: input.releaseRepository,
     releaseSourceCheckout: realpathSync(input.releaseSourceCheckout),
     releaseRoot: realpathSync(input.releaseRoot),
@@ -316,7 +316,7 @@ export function assertStagedValidationCaseRequest(
   if (!match) throw new StagedValidationError('staged validation workspace is not product-owned');
   const [, nonce, workspaceKind] = match;
   if (nonce !== lease.authorityValidationNonce) {
-    throw new StagedValidationError('field request nonce does not match GitHub authority');
+    throw new StagedValidationError('field request nonce does not match Secure Enclave authority');
   }
   const intent = request.providerRequest;
   if (intent.host === 'cursor') {

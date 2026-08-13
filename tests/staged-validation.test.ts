@@ -3,9 +3,9 @@ import { mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } fro
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const verifyGithubAuthority = vi.hoisted(() => vi.fn());
-vi.mock('../src/security/github-attestation.js', () => ({
-  verifyGithubStagedValidationAuthority: verifyGithubAuthority,
+const verifySecureEnclaveAuthority = vi.hoisted(() => vi.fn());
+vi.mock('../src/security/secure-enclave-attestation.js', () => ({
+  verifySecureEnclaveStagedValidationAuthority: verifySecureEnclaveAuthority,
 }));
 import { validationLeases } from '../src/db/schema.js';
 import {
@@ -87,10 +87,10 @@ function issue(db: ReturnType<typeof testDb>, overrides: Record<string, unknown>
 
 describe('staged validation state and fencing', () => {
   beforeEach(() => {
-    verifyGithubAuthority.mockImplementation(
+    verifySecureEnclaveAuthority.mockImplementation(
       ({ releaseSha, caseId, provider }: Record<string, string>) => ({
-        authority: 'github_actions',
-        leaseId: 'github-123-1',
+        authority: 'secretive_secure_enclave',
+        leaseId: 'secure-enclave-12345678-1234-4234-8234-123456789abc',
         sha: releaseSha,
         sourceRef: 'refs/heads/codex/major-v051-release-candidate',
         caseId,
@@ -102,8 +102,8 @@ describe('staged validation state and fencing', () => {
     );
   });
 
-  it('cannot issue a local validation lease without the independent GitHub authority', () => {
-    verifyGithubAuthority.mockImplementationOnce(() => {
+  it('cannot issue a local validation lease without the independent Secure Enclave authority', () => {
+    verifySecureEnclaveAuthority.mockImplementationOnce(() => {
       throw new Error('signature verification failed');
     });
     expect(() => issue(testDb())).toThrow(/signature verification failed/);

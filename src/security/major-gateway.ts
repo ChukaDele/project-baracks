@@ -31,7 +31,7 @@ import {
   stagedValidationRequestDigest,
   type StagedValidationExecutionAuthority,
 } from './staged-validation.js';
-import { verifyGithubStagedValidationAuthority } from './github-attestation.js';
+import { verifySecureEnclaveStagedValidationAuthority } from './secure-enclave-attestation.js';
 
 class StagedEventQueue implements AsyncIterable<ProviderEvent> {
   private readonly values: ProviderEvent[] = [];
@@ -260,20 +260,20 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
           timeout: 10 * 60 * 1000,
         },
       );
-      const githubAuthority = verifyGithubStagedValidationAuthority({
+      const secureEnclaveAuthority = verifySecureEnclaveStagedValidationAuthority({
         releaseSha: lease.releaseSha,
         caseId: lease.caseId as Parameters<
-          typeof verifyGithubStagedValidationAuthority
+          typeof verifySecureEnclaveStagedValidationAuthority
         >[0]['caseId'],
         provider: lease.provider as BackendProviderRequest['host'],
       });
       if (
-        githubAuthority.leaseId !== lease.authorityLeaseId ||
-        githubAuthority.artifactDigest !== lease.authorityArtifactDigest ||
-        githubAuthority.validationNonce !== lease.authorityValidationNonce ||
-        githubAuthority.expiresAt !== lease.authorityExpiresAt
+        secureEnclaveAuthority.leaseId !== lease.authorityLeaseId ||
+        secureEnclaveAuthority.artifactDigest !== lease.authorityArtifactDigest ||
+        secureEnclaveAuthority.validationNonce !== lease.authorityValidationNonce ||
+        secureEnclaveAuthority.expiresAt !== lease.authorityExpiresAt
       ) {
-        throw new Error('staged validation does not match its GitHub authority');
+        throw new Error('staged validation does not match its Secure Enclave authority');
       }
       assertActiveResourceLease({
         leaseId: lease.resourceLeaseId,
