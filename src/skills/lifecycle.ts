@@ -258,6 +258,18 @@ function safeList(values: readonly string[] | undefined, limit = 20): string[] {
   return [...new Set((values ?? []).map(sanitized).filter(Boolean))].slice(0, limit);
 }
 
+function actionSignals(steps: readonly string[], tools: readonly string[]): string[] {
+  const source = `${steps.join(' ')} ${tools.join(' ')}`.toLowerCase();
+  const signals: string[] = [];
+  if (/inspect|read|search|research|review|audit/.test(source)) signals.push('inspection');
+  if (/edit|change|write|create|reserve|assign|partition|refactor|fix/.test(source))
+    signals.push('reversible-change');
+  if (/test|verify|validate|probe|check|build|lint/.test(source))
+    signals.push('objective-validation');
+  if (/retry|recover|revert|rollback|restart/.test(source)) signals.push('bounded-recovery');
+  return signals.length > 0 ? signals : ['policy-bounded-work'];
+}
+
 function observeSuccessfulWorkflowUnlocked(input: WorkflowObservation): SkillCandidate {
   if (!input.success) throw new Error('only successful workflows are eligible for skillification');
   if (!input.task.trim() || !input.outcome.trim() || input.steps.length === 0) {
@@ -319,17 +331,19 @@ function observeSuccessfulWorkflowUnlocked(input: WorkflowObservation): SkillCan
     return candidate;
   }
 
-  const taskTokens = [...observationConcepts];
+  const signals = actionSignals(input.steps, input.tools ?? []);
   const targetSkillId = input.resolvedSkillIds[0];
   const candidate: SkillCandidate = {
     id: randomUUID(),
-    skillId: slug(taskTokens),
+    skillId: slug([...signals, taskHash.slice(0, 8)]),
     project: input.project,
     scope,
     status: 'candidate',
     version: 1,
     description: sanitized(input.outcome),
-    trigger: taskTokens.slice(0, 12).join(' '),
+    // Routing evidence remains project-local metadata. It is never copied into
+    // the generated instruction file; skillMarkdown emits only fixed classes.
+    trigger: [...observationConcepts].slice(0, 12).join(' '),
     steps: safeList(input.steps),
     tools: safeList(input.tools),
     validations: safeList(input.validations),
@@ -364,15 +378,19 @@ function skillMarkdown(candidate: SkillCandidate): string {
     `candidate-id: "${candidate.id}"`,
     `evidence-count: "${candidate.evidenceHashes.length}"`,
   ];
-  const operations = new Set<string>();
-  const source = `${candidate.steps.join(' ')} ${candidate.tools.join(' ')}`.toLowerCase();
-  if (/inspect|read|search|research|review|audit/.test(source)) operations.add('Inspect the current project state and relevant evidence.');
-  if (/edit|change|write|create|reserve|assign|partition|refactor|fix/.test(source)) operations.add('Apply the smallest reversible change inside the assigned project boundary.');
-  if (/test|verify|validate|probe|check|build|lint/.test(source)) operations.add('Run the objective project checks that demonstrated the procedure.');
-  if (/retry|recover|revert|rollback|restart/.test(source)) operations.add('If the first attempt fails, preserve evidence and use the proven recovery path.');
-  if (operations.size === 0) operations.add('Follow the project evidence and perform only reversible, policy-allowed work.');
-  const description = `Apply a proven project workflow for ${candidate.trigger}. Use when the task matches these signals.`;
-  return `---\nname: ${candidate.skillId}\ndescription: ${description}\nmetadata:\n${metadata.map((line) => `  ${line}`).join('\n')}\n---\n\n# ${candidate.skillId}\n\n## Trigger\n\nUse when the task matches these normalized signals: ${candidate.trigger}.\n\nDo not use when the task does not match the proven trigger or when project policy forbids the required action.\n\n## Inputs\n\n- The assigned project and task goal.\n- The current project policy and relevant evidence.\n\n## Procedure\n\n${[...operations].map((step, index) => `${index + 1}. ${step}`).join('\n')}\n\n## Tools\n\n- Use only tools already available within the assigned project capability boundary.\n\n## Outputs\n\n- A reversible project result supported by objective checks.\n\n## Constraints\n\n- Keep project-local evidence inside the project boundary.\n- Policy owns authority. This skill does not grant permission.\n- Do not access unrelated credentials, projects, production data or external systems.\n- Stop when the procedure no longer matches observed evidence.\n\n## Validation\n\n- Re-run the objective project checks recorded by the originating goals.\n- Treat reviewer or user corrections as failure evidence.\n\n## Provenance\n\n- Candidate: ${candidate.id}\n- Observations: ${candidate.occurrences}\n- Evidence digests: ${candidate.evidenceHashes.join(', ')}\n\n## Performance\n\nMajor records usage and outcomes in the GBrain skill lifecycle.\n\n## Lifecycle\n\n- Version: ${candidate.version}\n- Status: active\n- Created: ${candidate.createdAt}\n`;
+  const trigger = actionSignals(candidate.steps, candidate.tools).join(' ');
+  const operationBySignal: Record<string, string> = {
+    inspection: 'Inspect the current project state and relevant evidence.',
+    'reversible-change': 'Apply the smallest reversible change inside the assigned project boundary.',
+    'objective-validation': 'Run the objective project checks that demonstrated the procedure.',
+    'bounded-recovery': 'If the first attempt fails, preserve evidence and use the proven recovery path.',
+    'policy-bounded-work': 'Follow the project evidence and perform only reversible, policy-allowed work.',
+  };
+  const operations = actionSignals(candidate.steps, candidate.tools).map(
+    (signal) => operationBySignal[signal]!,
+  );
+  const description = `Apply a proven project workflow for ${trigger}. Use when the task matches these signals.`;
+  return `---\nname: ${candidate.skillId}\ndescription: ${description}\nmetadata:\n${metadata.map((line) => `  ${line}`).join('\n')}\n---\n\n# ${candidate.skillId}\n\n## Trigger\n\nUse when the task matches these normalized signals: ${trigger}.\n\nDo not use when the task does not match the proven trigger or when project policy forbids the required action.\n\n## Inputs\n\n- The assigned project and task goal.\n- The current project policy and relevant evidence.\n\n## Procedure\n\n${operations.map((step, index) => `${index + 1}. ${step}`).join('\n')}\n\n## Tools\n\n- Use only tools already available within the assigned project capability boundary.\n\n## Outputs\n\n- A reversible project result supported by objective checks.\n\n## Constraints\n\n- Keep project-local evidence inside the project boundary.\n- Policy owns authority. This skill does not grant permission.\n- Do not access unrelated credentials, projects, production data or external systems.\n- Stop when the procedure no longer matches observed evidence.\n\n## Validation\n\n- Re-run the objective project checks recorded by the originating goals.\n- Treat reviewer or user corrections as failure evidence.\n\n## Provenance\n\n- Candidate: ${candidate.id}\n- Observations: ${candidate.occurrences}\n- Evidence digests: ${candidate.evidenceHashes.join(', ')}\n\n## Performance\n\nMajor records usage and outcomes in the GBrain skill lifecycle.\n\n## Lifecycle\n\n- Version: ${candidate.version}\n- Status: active\n- Created: ${candidate.createdAt}\n`;
 }
 
 export function validateGeneratedSkill(input: { skillId: string; markdown: string }): string[] {
