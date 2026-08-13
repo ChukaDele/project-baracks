@@ -432,7 +432,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
                   ? 'cancelled'
                   : 'failed',
             ...(result.runId ? { runId: result.runId } : {}),
-            outcomeReason: `${result.status}; cleanup=${result.cleanup ?? 'unknown'}`,
+            outcomeReason: `${result.status}; errorKind=${result.errorKind ?? 'none'}; cleanup=${result.cleanup ?? 'unknown'}`,
             evidenceHash: createHash('sha256')
               .update(
                 JSON.stringify({

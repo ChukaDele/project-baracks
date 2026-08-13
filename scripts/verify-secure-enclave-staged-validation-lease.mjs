@@ -30,6 +30,7 @@ const VALIDATION_CASES = [
   'jss-field',
   'surface-talent-field',
   'cross-project-isolation',
+  'failure-recovery',
   'burn-in-1',
   'burn-in-2',
   'burn-in-3',

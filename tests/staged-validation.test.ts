@@ -16,6 +16,7 @@ import {
   completeStagedCliProviderField,
   completeStagedCursorField,
   currentActivationState,
+  fixedStagedValidationCase,
   getStagedValidationLease,
   issueStagedValidationLease,
   recoverStaleValidationLeases,
@@ -71,13 +72,14 @@ function issue(db: ReturnType<typeof testDb>, overrides: Record<string, unknown>
     resourceLeaseId: 'lease_worker',
     ...overrides,
   });
+  const persisted = getStagedValidationLease(db, secret.leaseId);
   return {
     shaped,
     authority: {
       kind: 'staged_validation' as const,
       leaseId: secret.leaseId,
       token: secret.token,
-      requestDigest: stagedValidationRequestDigest(shaped),
+      requestDigest: persisted.requestDigest,
       releaseSha: 'a'.repeat(40),
       workerId: 'release-validator',
       processNonce: 'process-1',
@@ -100,6 +102,47 @@ describe('staged validation state and fencing', () => {
         validationNonce: '11111111-1111-4111-8111-111111111111',
       }),
     );
+  });
+
+  it('derives every post-merge field from fixed product-owned contracts', () => {
+    const nonce = '11111111-1111-4111-8111-111111111111';
+    const jss = fixedStagedValidationCase('jss-field', nonce);
+    expect(jss).toMatchObject({ host: 'claude', allowGuestMutation: true });
+    expect(jss.prompt).toContain('internal JSS P0');
+    expect(jss.prompt).toContain(jss.token);
+    for (const caseId of [
+      'surface-talent-field',
+      'cross-project-isolation',
+      'failure-recovery',
+      'burn-in-1',
+      'burn-in-2',
+      'burn-in-3',
+    ] as const) {
+      const definition = fixedStagedValidationCase(caseId, nonce);
+      expect(definition).toMatchObject({ host: 'codex', allowGuestMutation: false });
+      expect(definition.prompt).toContain(definition.token);
+    }
+    expect(fixedStagedValidationCase('failure-recovery', nonce, 'failure')).toMatchObject({
+      host: 'cursor',
+      workspaceKind: 'failure-recovery',
+      allowGuestMutation: false,
+    });
+  });
+
+  it('hashes nested project workspaces while excluding Git and dependencies', () => {
+    const root = workspace();
+    mkdirSync(join(root, '.git'));
+    mkdirSync(join(root, 'node_modules'));
+    mkdirSync(join(root, 'src'));
+    writeFileSync(join(root, '.git', 'config'), 'ignored');
+    writeFileSync(join(root, 'node_modules', 'package.js'), 'ignored');
+    writeFileSync(join(root, 'src', 'operator.ts'), 'first');
+    const first = stagedValidationWorkspaceDigest(root);
+    writeFileSync(join(root, '.git', 'config'), 'changed but ignored');
+    writeFileSync(join(root, 'node_modules', 'package.js'), 'changed but ignored');
+    expect(stagedValidationWorkspaceDigest(root)).toBe(first);
+    writeFileSync(join(root, 'src', 'operator.ts'), 'second');
+    expect(stagedValidationWorkspaceDigest(root)).not.toBe(first);
   });
 
   it('cannot issue a local validation lease without the independent Secure Enclave authority', () => {
@@ -367,6 +410,67 @@ describe('staged validation state and fencing', () => {
     });
     expect(terminal.status).toBe('failed');
     expect(currentActivationState(db)).toBe('disabled');
+  });
+
+  it('requires a matching contained failure before issuing recovery', () => {
+    const naturalDb = testDb();
+    const natural = issue(naturalDb, {
+      caseId: 'failure-recovery',
+      provider: 'cursor',
+      projectRootHash: hex('natural failure worktree'),
+      requestDigest: hex('natural failure request'),
+    });
+    admitStagedValidationLease(naturalDb, natural.authority);
+    consumeStagedValidationExecution(naturalDb, natural.authority, natural.authority.requestDigest);
+    settleStagedValidationLease(naturalDb, {
+      authority: natural.authority,
+      status: 'failed',
+      outcomeReason: 'failed; errorKind=provider_failed; cleanup=complete',
+      evidenceHash: hex('natural failure'),
+    });
+    expect(() =>
+      issue(naturalDb, {
+        caseId: 'failure-recovery',
+        provider: 'codex',
+        projectRootHash: hex('natural failure worktree'),
+        requestDigest: hex('invalid recovery request'),
+        predecessorLeaseId: natural.authority.leaseId,
+      }),
+    ).toThrow(/not a matching contained failure/);
+
+    const db = testDb();
+    const rootHash = hex('same recovery worktree');
+    expect(() =>
+      issue(db, {
+        caseId: 'failure-recovery',
+        provider: 'codex',
+        projectRootHash: rootHash,
+      }),
+    ).toThrow(/recovery requires its failed validation predecessor/);
+
+    const failed = issue(db, {
+      caseId: 'failure-recovery',
+      provider: 'cursor',
+      projectRootHash: rootHash,
+      requestDigest: hex('forced failure request'),
+    });
+    admitStagedValidationLease(db, failed.authority);
+    consumeStagedValidationExecution(db, failed.authority, failed.authority.requestDigest);
+    settleStagedValidationLease(db, {
+      authority: failed.authority,
+      status: 'failed',
+      outcomeReason: 'failed; errorKind=interrupted; cleanup=complete',
+      evidenceHash: hex('contained failure'),
+    });
+    expect(() =>
+      issue(db, {
+        caseId: 'failure-recovery',
+        provider: 'codex',
+        projectRootHash: rootHash,
+        requestDigest: hex('recovery request'),
+        predecessorLeaseId: failed.authority.leaseId,
+      }),
+    ).not.toThrow();
   });
 
   it('records cancellation truthfully even when the outcome settles just after expiry', () => {
