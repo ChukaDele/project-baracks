@@ -1,7 +1,14 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  readlinkSync,
+  realpathSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { and, eq, gt, inArray, lt } from 'drizzle-orm';
 import type { Db, DbConn } from '../db/client.js';
 import { validationLeases } from '../db/schema.js';
@@ -74,6 +81,13 @@ export function stagedValidationWorkspaceDigest(workspace: string): string {
       } else if (stat.isFile() && stat.nlink === 1) {
         hash.update(`f\0${rel}\0${stat.mode & 0o777}\0`);
         hash.update(readFileSync(path));
+      } else if (stat.isSymbolicLink()) {
+        const target = readlinkSync(path);
+        const resolvedTarget = resolve(dirname(path), target);
+        if (resolvedTarget !== root && !resolvedTarget.startsWith(`${root}${sep}`)) {
+          throw new StagedValidationError('field workspace contains an escaping symlink');
+        }
+        hash.update(`l\0${rel}\0${target}\0`);
       } else {
         throw new StagedValidationError('field workspace contains an unsafe artifact');
       }

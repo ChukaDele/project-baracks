@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -143,6 +150,17 @@ describe('staged validation state and fencing', () => {
     expect(stagedValidationWorkspaceDigest(root)).toBe(first);
     writeFileSync(join(root, 'src', 'operator.ts'), 'second');
     expect(stagedValidationWorkspaceDigest(root)).not.toBe(first);
+  });
+
+  it('hashes safe project-local symlinks and rejects escaping links', () => {
+    const root = workspace();
+    mkdirSync(join(root, '.agents'));
+    mkdirSync(join(root, '.agents', 'skill'));
+    mkdirSync(join(root, '.claude'));
+    symlinkSync('../.agents/skill', join(root, '.claude', 'skill'));
+    expect(stagedValidationWorkspaceDigest(root)).toMatch(/^[a-f0-9]{64}$/);
+    symlinkSync('/tmp', join(root, '.claude', 'escape'));
+    expect(() => stagedValidationWorkspaceDigest(root)).toThrow(/escaping symlink/);
   });
 
   it('cannot issue a local validation lease without the independent Secure Enclave authority', () => {
