@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -20,6 +20,22 @@ describe('Lima workspace quarantine', () => {
     writeFileSync(join(source, 'node_modules', 'package.js'), 'private\n');
     snapshotWorkspace(source, output);
     expect(validateWorkspaceTree(output)).toEqual({ entries: 1, bytes: 5 });
+  });
+
+  it('preserves safe relative symlinks when snapshotting a workspace', () => {
+    const source = temp('major-source-');
+    const output = temp('major-output-');
+    mkdirSync(join(source, '.agents', 'skills', 'safe'), { recursive: true });
+    mkdirSync(join(source, '.claude', 'skills'), { recursive: true });
+    writeFileSync(join(source, '.agents', 'skills', 'safe', 'SKILL.md'), 'safe\n');
+    symlinkSync('../../.agents/skills/safe', join(source, '.claude', 'skills', 'safe'));
+
+    snapshotWorkspace(source, output);
+
+    expect(readlinkSync(join(output, '.claude', 'skills', 'safe'))).toBe(
+      '../../.agents/skills/safe',
+    );
+    expect(() => validateWorkspaceTree(output)).not.toThrow();
   });
 
   it('rejects absolute and escaping symlinks', () => {
