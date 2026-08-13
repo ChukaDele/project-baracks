@@ -517,5 +517,8 @@ describe('staged validation state and fencing', () => {
     expect(readFileSync('scripts/build-major-runtime-snapshot.sh', 'utf8')).toContain(
       'corepack pnpm install --prod --frozen-lockfile --dir "$DEST"',
     );
+    expect(readFileSync('scripts/install-major-runtime.sh', 'utf8')).toContain(
+      'corepack pnpm install --frozen-lockfile',
+    );
   });
 });

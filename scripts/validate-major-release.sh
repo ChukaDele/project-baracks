@@ -20,11 +20,11 @@ bash scripts/validate-major.sh
 bash scripts/validate-major-stability.sh
 bash scripts/validate-provider-cli-contracts.sh
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-major-install-transaction.py
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+corepack pnpm format:check
+corepack pnpm lint
+corepack pnpm typecheck
+corepack pnpm test
+corepack pnpm build
 bash scripts/build-major-runtime-snapshot.sh "$RUNTIME_DEST"
 
 echo "Major canonical release validation passed."
