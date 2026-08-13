@@ -17,6 +17,15 @@ if [ "$(git -C "$ROOT" rev-parse HEAD)" != "$SHA" ] || [ -n "$(git -C "$ROOT" st
   echo "ERROR: authority issuance requires the clean exact source SHA" >&2
   exit 1
 fi
+if ! git -C "$ROOT" fetch --quiet origin main; then
+  echo "ERROR: authority issuance could not refresh origin/main" >&2
+  exit 1
+fi
+REMOTE_MAIN_SHA="$(git -C "$ROOT" rev-parse FETCH_HEAD)"
+if [ "$SHA" != "$REMOTE_MAIN_SHA" ]; then
+  echo "ERROR: authority issuance requires the exact current origin/main SHA" >&2
+  exit 1
+fi
 if [ ! -S "$SOCKET" ]; then
   echo "ERROR: Secretive SSH agent is unavailable" >&2
   exit 1

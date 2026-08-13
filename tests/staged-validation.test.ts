@@ -92,7 +92,7 @@ describe('staged validation state and fencing', () => {
         authority: 'secretive_secure_enclave',
         leaseId: 'secure-enclave-12345678-1234-4234-8234-123456789abc',
         sha: releaseSha,
-        sourceRef: 'refs/heads/codex/major-v051-release-candidate',
+        sourceRef: 'refs/heads/main',
         caseId,
         provider,
         expiresAt: '2099-01-01T00:00:00.000Z',

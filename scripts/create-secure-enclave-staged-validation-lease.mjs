@@ -16,7 +16,7 @@ const lease = {
   signingNamespace: 'major-staged-validation',
   repository: 'ChukaDele/project-baracks',
   exactCommitSha: exactSha,
-  sourceRef: 'refs/heads/codex/major-v051-release-candidate',
+  sourceRef: 'refs/heads/main',
   leaseId: `secure-enclave-${randomUUID()}`,
   issuedAt: issuedAt.toISOString(),
   expiresAt: expiresAt.toISOString(),

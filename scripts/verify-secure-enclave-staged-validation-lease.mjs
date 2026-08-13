@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const REPOSITORY = 'ChukaDele/project-baracks';
-const SOURCE_REF = 'refs/heads/codex/major-v051-release-candidate';
+const SOURCE_REF = 'refs/heads/main';
 const NAMESPACE = 'major-staged-validation';
 const SYSTEM_ALLOWED_SIGNERS = '/etc/major/staged-validation-allowed-signers';
 const ALLOWED_SCOPES = [
