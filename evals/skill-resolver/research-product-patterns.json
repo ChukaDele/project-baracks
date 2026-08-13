@@ -1,0 +1,16 @@
+{
+  "skill": "research-product-patterns",
+  "should_trigger": [
+    "Research Mobbin onboarding flows before redesigning our operator onboarding.",
+    "Use public Baymard research to assess search filters and product comparison patterns.",
+    "Study production table, bulk action and approval workflow patterns for this SaaS product.",
+    "Find relevant AI review and human confirmation patterns before recommending the interaction."
+  ],
+  "should_not_trigger": [
+    "Increase the card padding by four pixels in the approved design.",
+    "Fix a broken API response with no rendered interface.",
+    "Implement the already approved design contract exactly.",
+    "Summarize the competitor's annual report.",
+    "Wait for human-only approval before the irreversible external action."
+  ]
+}

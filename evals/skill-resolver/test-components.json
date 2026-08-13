@@ -1,0 +1,15 @@
+{
+  "skill": "test-components",
+  "should_trigger": [
+    "Evaluate Storybook for an interaction-heavy reusable component system.",
+    "Add browser interaction stories for this dialog, form and filter component.",
+    "Our design system components regress across loading, empty and error states.",
+    "Pilot isolated table component stories with keyboard and dense-content tests."
+  ],
+  "should_not_trigger": [
+    "Build a small static marketing page with no reusable components.",
+    "Run the full checkout journey in an end-to-end browser test.",
+    "Fix one trivial icon component snapshot.",
+    "Review a backend-only worker lease."
+  ]
+}

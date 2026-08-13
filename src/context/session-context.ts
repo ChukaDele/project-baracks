@@ -142,8 +142,9 @@ SESSION CONTRACT
 - A REVIEW-DUE learning has recurred at least twice. Before closing the task, either promote the proven lesson into guidance/skill or record why it remains unstable/project-specific.
 - If the user explicitly corrects behavior or says a mistake happened before: fix and verify the real task, then capture the correction with major learn capture without making the user ask. Use one stable learning key for the same failure class across runs.
 - For MCP/connectors/plugins, load mcp-integration-ops and prove the actual integration state.
-- For substantial UI/website creation, redesign, or "generic/AI-looking/too safe" feedback, load design-direction-and-taste first. It is the single Major taste authority; do not stack competing generic taste skills.
-- For customer-facing website QA, load website-design-qa; add responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js work.
+- Before non-trivial reusable capability work, load research-before-build and validate the adoption record with major reuse check.
+- For substantial UI/website creation, redesign, or "generic/AI-looking/too safe" feedback, load craft-web-interfaces first. Complete its three-direction approval gate and pass major design check on the project-local decision record before broad production code.
+- For rendered web QA, load verify-in-browser; add responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js work and test-components only when isolated component states justify it.
 - Owner-approved build projects may continue ordinary reversible engineering without permission ceremony. Client/PII data remains project-local.`);
   return true;
 }

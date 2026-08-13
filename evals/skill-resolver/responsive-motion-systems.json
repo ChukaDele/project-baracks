@@ -12,6 +12,6 @@
     "Review static copy for grammar."
   ],
   "conflicts": [
-    "Pair with website-design-qa for the broader site pass. Responsive-motion-systems owns geometry, sticky/pinned ownership, motion lifecycle and responsive motion fallbacks."
+    "Pair with verify-in-browser for the broader site pass. Responsive-motion-systems owns geometry, sticky/pinned ownership, motion lifecycle and responsive motion fallbacks."
   ]
 }

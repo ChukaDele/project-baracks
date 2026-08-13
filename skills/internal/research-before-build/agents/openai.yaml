@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Before Build"
+  short_description: "Find and assess existing solutions before coding"
+  default_prompt: "Use $research-before-build to assess existing options before implementing this capability."

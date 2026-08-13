@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Components"
+  short_description: "Choose and apply selective component testing"
+  default_prompt: "Use $test-components to decide whether Storybook interaction testing fits this component system."

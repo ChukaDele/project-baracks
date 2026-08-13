@@ -38,6 +38,7 @@ required = {
     'communication-style', 'tool-routing-and-source-ingestion',
     'mvp-speed-and-prioritisation', 'autonomy-and-progress',
     'legacy-cleanup', 'security-and-permissions', 'ui-patterns-and-reuse',
+    'reuse-before-build',
     'task-scope', 'model-routing', 'human-approval', 'roadmap-sync'
 }
 missing = required - set(ids)
@@ -64,7 +65,9 @@ if registered_internal != actual_internal:
 for required_skill in [
     'source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code',
     'learning-capture', 'remote-first-web-development', 'human-blocker-orchestration',
-    'dev-server-management', 'video-generation-routing'
+    'dev-server-management', 'video-generation-routing',
+    'research-before-build', 'research-product-patterns', 'craft-web-interfaces',
+    'test-components', 'verify-in-browser'
 ]:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
@@ -79,6 +82,9 @@ for key in [
     'skillifyReusableProcedures',
     'toolsAsCodeForRepeatedDeterministicWork',
     'captureExplicitCorrections',
+    'reuseBeforeBuildRequired',
+    'visualDirectionApprovalRequired',
+    'browserEvidenceRequired',
 ]:
     if policy.get(key) is not True:
         raise SystemExit(f"required skill policy not enabled: {key}")
@@ -90,6 +96,11 @@ for fixture in [
     'evals/skill-resolver/remote-first-web-development.json',
     'evals/skill-resolver/dev-server-management.json',
     'evals/skill-resolver/video-generation-routing.json',
+    'evals/skill-resolver/research-before-build.json',
+    'evals/skill-resolver/research-product-patterns.json',
+    'evals/skill-resolver/craft-web-interfaces.json',
+    'evals/skill-resolver/test-components.json',
+    'evals/skill-resolver/verify-in-browser.json',
 ]:
     if not Path(fixture).is_file():
         raise SystemExit(f"resolver eval missing: {fixture}")
@@ -138,6 +149,11 @@ grep -Fq "install-major-skills.sh" scripts/bootstrap-major-project.sh || fail "s
 grep -Fq "core|knowledge|web-ui|exploratory|full" scripts/install-major-skills.sh || fail "knowledge profile missing from skill installer"
 grep -Fq "A failed first tool is not a failed task" templates/project/major-core.md || fail "project tool-routing rule missing"
 grep -Fq "Skill-first execution" templates/project/major-core.md || fail "project skill-first rule missing"
+grep -Fq "major reuse check" templates/project/major-core.md || fail "project reuse gate missing"
+grep -Fq "major design check" templates/project/major-core.md || fail "project visual approval gate missing"
+[ -f templates/project/DESIGN-DIRECTION.md ] || fail "durable design direction template missing"
+[ -f src/design/direction.ts ] || fail "design direction validator missing"
+grep -Fq 'runDesignCli' src/entry.ts || fail "design direction CLI is not wired into Major entrypoint"
 grep -Fq "BUILT" templates/project/major-core.md || fail "project readiness language missing"
 
 [ -f guidance/global-worker-rules.md ] || fail "compact global worker rules missing"
@@ -150,6 +166,8 @@ grep -Fq "MAJOR SHADOW PLAN" guidance/global-worker-rules.md || fail "observe-fi
 grep -Fq "Three consecutive passing shadow grades" guidance/global-worker-rules.md || fail "shadow promotion threshold missing"
 grep -Fq "Tools as Code" guidance/global-worker-rules.md || fail "Tools-as-Code rule missing"
 grep -Fq "skillify" guidance/global-worker-rules.md || fail "skillify rule missing"
+grep -Fq "Reuse before build" guidance/global-worker-rules.md || fail "reuse-before-build global rule missing"
+grep -Fq "three visible and genuinely distinct directions" guidance/global-worker-rules.md || fail "visual-direction approval gate missing"
 grep -Fq "major learn capture" guidance/global-worker-rules.md || fail "explicit correction capture rule missing"
 grep -Fq "remote-first-web-development" guidance/global-worker-rules.md || fail "remote-first web rule missing"
 grep -Fq "major web preflight" guidance/global-worker-rules.md || fail "remote browser-target guard missing"

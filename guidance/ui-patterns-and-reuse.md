@@ -4,17 +4,18 @@ Major should learn from what already works before inventing a new product intera
 
 ## Before material UI work
 
-1. Inspect 3–5 direct competitors or close workflow analogues.
-2. Add 2–3 adjacent best-in-class products when they solve the interaction better.
-3. Study real workflow mechanics: hierarchy, navigation, lists/tables, filters, search, onboarding, statuses, empty states, bulk actions, forms, review, errors and recovery.
-4. Extract what to adopt, adapt, reject or differentiate.
-5. Stop research once the dominant pattern and useful exceptions are clear.
+1. Load `research-product-patterns` and define the user problem and targeted questions.
+2. Inspect at least 3 relevant production flows when access permits it. Use Mobbin through the authenticated browser when relevant, and public Baymard research when applicable.
+3. Add adjacent best-in-class products when they solve the interaction better.
+4. Study real workflow mechanics: hierarchy, navigation, lists/tables, filters, search, onboarding, statuses, empty states, bulk actions, forms, review, errors and recovery.
+5. Map each reference to a decision: adopt, adapt, reject or differentiate.
+6. Stop research once the dominant pattern and useful exceptions are clear.
 
 Learn from patterns and mechanics; do not copy protected brand assets or distinctive trade dress.
 
 ## Proof the flow cheaply
 
-Use the cheapest useful proof medium for interaction uncertainty: Figma, a coded prototype, Storybook, a local page, realistic fixtures, screenshots, or another fast artefact. Prototype the **critical workflow**, not just pretty isolated screens.
+For substantial interfaces, use `craft-web-interfaces`: show three visible directions and obtain owner approval before broad production code. Then use the cheapest useful proof medium for the representative slice. Prototype the **critical workflow**, not just pretty isolated screens.
 
 A prototype may be ahead of backend infrastructure and can serve as an implementation reference for sequence, hierarchy, data requirements, states, actions and acceptance criteria.
 
@@ -50,4 +51,4 @@ For explicitly exploratory, experimental, Awwwards/FWA-style, heavy-motion, imme
 
 ## Visual verification
 
-Meaningful UI changes require rendered browser/preview inspection: hierarchy, composition, alignment, overflow, realistic density, states/recovery, motion when relevant and the critical user path. Prefer deployed-preview inspection for important flows.
+Meaningful UI changes require `verify-in-browser`: hierarchy, composition, alignment, overflow, realistic density, states/recovery, motion when relevant and the critical user path. Prefer deployed-preview inspection for important flows.

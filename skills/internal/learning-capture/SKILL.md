@@ -107,7 +107,7 @@ Cross-project learning means transferring the **sanitized procedure or invariant
 - Bredge motion/zoom failure → responsive-motion skill usable by any website;
 - Surface Talent/JSS wrong-repo mistake → project-context-integrity skill;
 - repeated MCP auth/exposure confusion → mcp-integration-ops;
-- recurring visual QA gaps → website-design-qa.
+- recurring visual QA gaps → verify-in-browser.
 
 Never promote candidate names, CVs, interview transcripts, client credentials or private project content into global learning.
 

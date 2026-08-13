@@ -107,10 +107,23 @@ They define:
 Important recurring meta-skills:
 
 - `skill-resolver`
+- `research-before-build`
 - `skillify`
 - `tools-as-code`
 
 Skills provide technique. Major guidance has higher authority.
+
+For non-trivial capability work, `research-before-build` produces an adoption record before custom code. `major reuse check <record>` validates the required sections, six-layer search matrix, concrete evidence marker and custom-build gap statement. Human or independent review still judges whether the evidence is true and sufficient. This is a selection gate, not a second policy engine.
+
+The canonical web capability flow is:
+
+```text
+research-before-build
+  -> research-product-patterns when product evidence is needed
+  -> craft-web-interfaces for the three-direction owner gate
+  -> test-components only when isolated component states justify it
+  -> verify-in-browser for observable acceptance evidence
+```
 
 ## 4. Tools as Code
 
@@ -231,6 +244,8 @@ Knowledge work:
 ## Product-runtime boundary
 
 Major may build product-specific AI systems, but those shipped runtimes are not Major. Client/product runtimes receive only the permissions, skills, memory and data needed for that product.
+
+Workshop pilots may use isolated fixtures and reversible experiments. Product activation still requires exact project identity, least privilege, durable evidence, independent grading and the existing approval boundaries. A Workshop result cannot silently activate a Product dependency or receive client PII.
 
 ## Legacy rule
 

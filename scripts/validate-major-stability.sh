@@ -14,8 +14,11 @@ for skill in \
   workspace-lifecycle-management \
   mcp-integration-ops \
   major-self-maintenance \
-  design-direction-and-taste \
-  website-design-qa \
+  research-before-build \
+  research-product-patterns \
+  craft-web-interfaces \
+  test-components \
+  verify-in-browser \
   responsive-motion-systems; do
   [ -f "skills/internal/$skill/SKILL.md" ] || fail "required stability skill missing: $skill"
   grep -Fq "\"id\":\"$skill\"" guidance/skills.registry.json || fail "stability skill not registered: $skill"
@@ -26,6 +29,10 @@ grep -Fq 'projectContextIntegrityRequired' guidance/skills.registry.json || fail
 grep -Fq 'majorMainMustStayGreen' guidance/skills.registry.json || fail "Major main-green policy flag missing"
 grep -Fq 'singleCanonicalDesignDirectionLayer' guidance/skills.registry.json || fail "single canonical design direction policy missing"
 grep -Fq 'workspaceLifecyclePolicy' guidance/skills.registry.json || fail "workspace lifecycle policy flag missing"
+grep -Fq 'reuseBeforeBuildRequired' guidance/skills.registry.json || fail "reuse-before-build policy flag missing"
+grep -Fq 'visualDirectionApprovalRequired' guidance/skills.registry.json || fail "visual direction approval policy missing"
+grep -Fq 'browserEvidenceRequired' guidance/skills.registry.json || fail "browser evidence policy missing"
+grep -Fq '"reuse-before-build"' guidance/instructions.registry.json || fail "reuse-before-build guidance not registered"
 
 grep -Fq 'smallest correct modular implementation' guidance/global-worker-rules.md || fail "global code-simplicity invariant missing"
 grep -Fq 'simple-modular-code' guidance/global-worker-rules.md || fail "global rules do not route modular-code guidance"
@@ -48,8 +55,9 @@ grep -Fq 'LEARNINGS.md' src/supervisor/runtime.ts || fail "coordinator does not 
 grep -Fq 'listLearningCandidates' src/supervisor/runtime.ts || fail "coordinator does not preload Major learning candidates"
 grep -Fq 'project-context-integrity' src/supervisor/runtime.ts || fail "coordinator lacks project context integrity contract"
 grep -Fq 'mcp-integration-ops' src/supervisor/runtime.ts || fail "coordinator lacks MCP integration truth-state contract"
-grep -Fq 'design-direction-and-taste' src/supervisor/runtime.ts || fail "coordinator lacks canonical design direction routing"
-grep -Fq 'website-design-qa' src/supervisor/runtime.ts || fail "coordinator lacks website QA routing"
+grep -Fq 'research-before-build' src/supervisor/runtime.ts || fail "coordinator lacks reuse-before-build routing"
+grep -Fq 'craft-web-interfaces' src/supervisor/runtime.ts || fail "coordinator lacks interface direction routing"
+grep -Fq 'verify-in-browser' src/supervisor/runtime.ts || fail "coordinator lacks browser verification routing"
 
 [ -f src/context/session-context.ts ] || fail "enriched session context loader missing"
 grep -Fq 'runSessionContextCli' src/entry.ts || fail "session context loader is not wired into Major entrypoint"
@@ -57,8 +65,9 @@ grep -Fq 'runLearningLifecycleCli' src/entry.ts || fail "learning lifecycle CLI 
 grep -Fq 'DURABLE PROJECT LEARNINGS' src/context/session-context.ts || fail "session attach does not preload project learnings"
 grep -Fq 'ACTIVE MAJOR LEARNINGS' src/context/session-context.ts || fail "session attach does not preload active and promoted learnings"
 grep -Fq 'REVIEW-DUE' src/context/session-context.ts || fail "session attach does not flag recurring learning for promotion review"
-grep -Fq 'design-direction-and-taste' src/context/session-context.ts || fail "session attach lacks canonical design direction routing reminder"
-grep -Fq 'website-design-qa' src/context/session-context.ts || fail "session attach lacks website QA routing reminder"
+grep -Fq 'research-before-build' src/context/session-context.ts || fail "session attach lacks reuse-before-build routing reminder"
+grep -Fq 'craft-web-interfaces' src/context/session-context.ts || fail "session attach lacks interface direction routing reminder"
+grep -Fq 'verify-in-browser' src/context/session-context.ts || fail "session attach lacks browser verification routing reminder"
 grep -Fq 'mcp-integration-ops' src/context/session-context.ts || fail "session attach lacks MCP integration routing reminder"
 
 if grep -Fq "command === 'learn'" src/supervisor/cli.ts; then
@@ -83,8 +92,16 @@ grep -Fq -- '--global-rules-record "$RULES_RECORD_TMP"' scripts/install-major-ru
 grep -Fq 'A correct change in the wrong repo is a failed task' templates/project/major-core.md || fail "project template lacks wrong-repo invariant"
 grep -Fq 'major learn list --project current' templates/project/major-core.md || fail "project template lacks learning preload"
 grep -Fq 'mcp-integration-ops' templates/project/major-core.md || fail "project template lacks MCP integration routing"
-grep -Fq 'website-design-qa' templates/project/major-core.md || fail "project template lacks website QA routing"
+grep -Fq 'major reuse check' templates/project/major-core.md || fail "project template lacks adoption-record validation"
+grep -Fq 'major design check' templates/project/major-core.md || fail "project template lacks durable visual approval validation"
+grep -Fq 'craft-web-interfaces' templates/project/major-core.md || fail "project template lacks interface direction routing"
+grep -Fq 'verify-in-browser' templates/project/major-core.md || fail "project template lacks browser verification routing"
 grep -Fq 'workspace-lifecycle-management' skills/internal/project-start/SKILL.md || fail "project-start does not route lifecycle decisions"
+
+for retired in open-source-leverage competitive-product-audit design-direction-and-taste rapid-ui-prototype website-design-qa; do
+  [ ! -f "skills/internal/$retired/SKILL.md" ] || fail "retired duplicate skill remains: $retired"
+  ! grep -Fq "\"id\":\"$retired\"" guidance/skills.registry.json || fail "retired skill remains registered: $retired"
+done
 
 grep -Fq 'At two occurrences' skills/internal/learning-capture/SKILL.md || fail "learning recurrence promotion threshold missing"
 grep -Fq -- '--key' skills/internal/learning-capture/SKILL.md || fail "learning capture does not teach stable recurrence keys"
