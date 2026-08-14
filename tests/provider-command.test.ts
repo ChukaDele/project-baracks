@@ -53,7 +53,14 @@ describe('provider command authority', () => {
     const provider = new CodexProvider({ gateway });
     expect(() => provider.execute({ prompt: 'work', cwd: '/project' })).toThrow('captured');
     expect(requests[0]?.args).toEqual(
-      expect.arrayContaining(['--sandbox', 'read-only', '--ignore-user-config', '--ephemeral']),
+      expect.arrayContaining([
+        '--disable',
+        'code_mode',
+        '--sandbox',
+        'read-only',
+        '--ignore-user-config',
+        '--ephemeral',
+      ]),
     );
     expect(requests[0]?.args).not.toContain('--dangerously-bypass-approvals-and-sandbox');
   });
