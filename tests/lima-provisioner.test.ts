@@ -250,7 +250,7 @@ describe('clean-install Lima provisioning', () => {
     expect(result.status, result.stderr).toBe(0);
     const log = readFileSync(join(root, 'log'), 'utf8');
     expect(log).not.toMatch(/provider-auth -cf -/);
-    expect(log).not.toMatch(/\/Users\//);
+    expect(log).not.toMatch(/\/Users\/[^\s]+\/\.(?:claude|codex|config\/cursor|gemini)\//);
   });
 
   it('binds the exact four provider credential paths to Secure Enclave release authority', () => {

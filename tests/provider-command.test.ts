@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClaudeCodeProvider } from '../src/providers/claude-code.js';
 import { CodexProvider } from '../src/providers/codex.js';
+import { providerWorkshopArgs } from '../src/providers/commands.js';
 import { cursorProvider } from '../src/providers/cursor.js';
 import { antigravityProvider } from '../src/providers/antigravity.js';
 import type { ExecutionGateway, GatewayExecuteRequest } from '../src/security/gateway.js';
@@ -66,6 +67,21 @@ describe('provider command authority', () => {
       'captured',
     );
     expect(requests[0]?.args).not.toContain('--model');
+  });
+
+  it('disables only Codex inner sandboxing after Workshop admission', () => {
+    const args = ['exec', '--sandbox', 'read-only', '--ignore-user-config', '--ephemeral'];
+    expect(providerWorkshopArgs('codex', args)).toEqual([
+      'exec',
+      '--sandbox',
+      'danger-full-access',
+      '--ignore-user-config',
+      '--ephemeral',
+    ]);
+    expect(providerWorkshopArgs('codex', args)).not.toContain(
+      '--dangerously-bypass-approvals-and-sandbox',
+    );
+    expect(providerWorkshopArgs('claude', ['--safe-mode'])).toEqual(['--safe-mode']);
   });
 
   it('routes Antigravity through the same gateway with sandboxing enabled', () => {
