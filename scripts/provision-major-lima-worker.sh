@@ -7,7 +7,9 @@ INSTANCE="${2:-major-worker}"
 RELEASE_SHA="${3:-legacy-v1}"
 TEMPLATE="$ROOT/templates/lima/major-worker.yaml"
 CREATED=0
-LEGACY_SOURCE_STARTED=0
+AUTH_SOURCE_STARTED=0
+AUTH_SOURCE_INSTANCE="${MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE:-major-worker}"
+AUTH_SOURCE_SHA="${MAJOR_PROVIDER_AUTH_SOURCE_SHA:-}"
 
 case "$INSTANCE" in
   major-worker|major-worker-[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]) ;;
@@ -19,6 +21,21 @@ if [[ "$INSTANCE" != major-worker && ! "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
 fi
 if [[ "$INSTANCE" != major-worker && "$INSTANCE" != "major-worker-${RELEASE_SHA:0:12}" ]]; then
   echo "ERROR: release worker name does not match the full release SHA" >&2
+  exit 2
+fi
+case "$AUTH_SOURCE_INSTANCE" in
+  major-worker) [[ -z "$AUTH_SOURCE_SHA" ]] || { echo "ERROR: legacy auth source cannot declare a release SHA" >&2; exit 2; } ;;
+  major-worker-[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9])
+    [[ "$AUTH_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] && \
+      [[ "$AUTH_SOURCE_INSTANCE" == "major-worker-${AUTH_SOURCE_SHA:0:12}" ]] || {
+        echo "ERROR: release auth source requires its exact full SHA" >&2
+        exit 2
+      }
+    ;;
+  *) echo "ERROR: unsupported Major provider-auth source: $AUTH_SOURCE_INSTANCE" >&2; exit 2 ;;
+esac
+if [[ "$INSTANCE" != major-worker && "$AUTH_SOURCE_INSTANCE" == "$INSTANCE" ]]; then
+  echo "ERROR: provider-auth source and destination must differ" >&2
   exit 2
 fi
 
@@ -65,21 +82,35 @@ migrate_existing_auth() {
   authority_root="${MAJOR_HOME:-$HOME/.major}/staged-validation/authorities/$RELEASE_SHA"
   source_status="$({ "$LIMACTL_PATH" list --json | python3 -c '
 import json, sys
+name = sys.argv[1]
 status = ""
 for line in sys.stdin:
     if not line.strip(): continue
     row = json.loads(line)
-    if row.get("name") == "major-worker": status = row.get("status", "")
+    if row.get("name") == name: status = row.get("status", "")
 print(status)
-'; } || true)"
+' "$AUTH_SOURCE_INSTANCE"; } || true)"
   [[ -z "$source_status" ]] && return 0
   if [[ "$source_status" == Broken ]]; then
-    echo "ERROR: refusing credential migration from broken major-worker" >&2
+    echo "ERROR: refusing credential migration from broken $AUTH_SOURCE_INSTANCE" >&2
     return 1
   fi
   if [[ "$source_status" != Running ]]; then
-    "$LIMACTL_PATH" start major-worker
-    LEGACY_SOURCE_STARTED=1
+    "$LIMACTL_PATH" start "$AUTH_SOURCE_INSTANCE"
+    AUTH_SOURCE_STARTED=1
+  fi
+  if [[ -n "$AUTH_SOURCE_SHA" ]]; then
+    source_marker="/opt/major/releases/$AUTH_SOURCE_SHA"
+    if ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo test \
+        -f "$source_marker" || \
+      ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo test \
+        ! -L "$source_marker" || \
+      [[ "$("$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo stat \
+        -c '%U:%G:%a' "$source_marker")" != "root:root:444" ]]; then
+      restore_auth_source
+      echo "ERROR: provider-auth source release marker is missing or unsafe" >&2
+      return 1
+    fi
   fi
   # Stream only exact provider credentials covered by the current release's
   # independently signed, expiring Secure Enclave validation authority.
@@ -98,17 +129,17 @@ print(status)
       "$RELEASE_SHA" credential-handoff "$provider" >/dev/null 2>&1; then
       continue
     fi
-    if ! "$LIMACTL_PATH" shell --tty=false major-worker sudo test \
+    if ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo test \
         -f "/var/lib/major/provider-auth/$relative" || \
-      ! "$LIMACTL_PATH" shell --tty=false major-worker sudo test \
+      ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo test \
         ! -L "/var/lib/major/provider-auth/$relative"; then
       continue
     fi
-    if ! "$LIMACTL_PATH" shell --tty=false major-worker sudo tar \
+    if ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo tar \
         -C /var/lib/major/provider-auth -cf - "$relative" 2>/dev/null | \
         "$LIMACTL_PATH" shell --tty=false "$INSTANCE" sudo tar \
           -C /var/lib/major/provider-auth -xf -; then
-      restore_legacy_source
+      restore_auth_source
       echo "ERROR: exact $provider credential migration failed" >&2
       return 1
     fi
@@ -123,27 +154,27 @@ print(status)
           ! -L "/var/lib/major/provider-auth/$relative" &&
         [[ "$("$LIMACTL_PATH" shell --tty=false "$INSTANCE" sudo stat -c '%U:%G:%a' "/var/lib/major/provider-auth/$relative")" == "root:major-$provider:440" ]]
     }; then
-      restore_legacy_source
+      restore_auth_source
       echo "ERROR: migrated $provider credential failed destination validation" >&2
       return 1
     fi
   done
-  restore_legacy_source
+  restore_auth_source
 }
 
-restore_legacy_source() {
-  if [[ $LEGACY_SOURCE_STARTED -eq 1 ]]; then
-    if ! "$LIMACTL_PATH" stop major-worker >/dev/null 2>&1; then
-      echo "CRITICAL: failed to restore legacy major-worker to Stopped" >&2
+restore_auth_source() {
+  if [[ $AUTH_SOURCE_STARTED -eq 1 ]]; then
+    if ! "$LIMACTL_PATH" stop "$AUTH_SOURCE_INSTANCE" >/dev/null 2>&1; then
+      echo "CRITICAL: failed to restore provider-auth source $AUTH_SOURCE_INSTANCE to Stopped" >&2
       return 1
     fi
-    LEGACY_SOURCE_STARTED=0
+    AUTH_SOURCE_STARTED=0
   fi
 }
 
 rollback() {
   local code="${1:-$?}"
-  restore_legacy_source || true
+  restore_auth_source || true
   if [[ $code -ne 0 && $CREATED -eq 1 ]]; then
     "$LIMACTL_PATH" stop --force "$INSTANCE" >/dev/null 2>&1 || true
     "$LIMACTL_PATH" delete --force "$INSTANCE" >/dev/null 2>&1 || \
