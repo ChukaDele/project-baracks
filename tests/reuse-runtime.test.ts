@@ -26,12 +26,17 @@ describe('reuse-first provider runtime', () => {
     expect(runtime).not.toContain("option.kind === 'allow_always'");
   });
 
-  it('keeps Claude, Codex and Antigravity on their confined official CLI contracts', () => {
+  it('keeps provider defaults confined and scopes Codex inner-sandbox removal to Workshop', () => {
     const commands = source('src/providers/commands.ts');
+    const gateway = source('src/security/major-gateway.ts');
     expect(commands).toContain("'--safe-mode'");
     expect(commands).toContain("'read-only'");
     expect(commands).toContain("'--sandbox'");
-    expect(commands).not.toContain('danger-full-access');
+    expect(commands).toContain("next[sandbox + 1] = 'danger-full-access'");
+    expect(commands).toContain("if (host !== 'codex') return args");
+    expect(commands).toContain('Codex approval bypass is forbidden');
+    expect(gateway).toContain('workshop && request.providerRequest');
+    expect(gateway).toContain('providerWorkshopArgs(request.providerRequest.host, request.args)');
     expect(source('package.json')).not.toContain('@ai-sdk/harness');
   });
 

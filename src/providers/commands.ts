@@ -100,3 +100,24 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
 export function providerExecuteArgs(host: ProviderCommandHost, request: ExecuteRequest): string[] {
   return providerArgs(host, { ...request, outputMode: 'stream' });
 }
+
+/** Codex's Bubblewrap sandbox cannot create its network namespace inside the
+ * Lima guest. Workshop execution already has an external VM and project
+ * boundary, so disable only the nested OS sandbox after Workshop authority is
+ * established. Approval bypass remains forbidden. */
+export function providerWorkshopArgs(
+  host: ProviderCommandHost,
+  args: readonly string[],
+): readonly string[] {
+  if (host !== 'codex') return args;
+  const sandbox = args.indexOf('--sandbox');
+  if (sandbox < 0 || args[sandbox + 1] !== 'read-only') {
+    throw new Error('Codex Workshop execution requires the canonical sandbox argument');
+  }
+  if (args.includes('--dangerously-bypass-approvals-and-sandbox')) {
+    throw new Error('Codex approval bypass is forbidden');
+  }
+  const next = [...args];
+  next[sandbox + 1] = 'danger-full-access';
+  return next;
+}

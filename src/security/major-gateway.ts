@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
+import { providerWorkshopArgs } from '../providers/commands.js';
 import { assertCapabilityAvailable, isCapabilityAvailable } from './capabilities.js';
 import { darwinSeatbeltContainment } from './containment.js';
 import { ExecutionGateway, type ExecutionPolicyDecision } from './gateway.js';
@@ -401,9 +402,13 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
   });
 
   try {
+    const executionArgs =
+      workshop && request.providerRequest
+        ? providerWorkshopArgs(request.providerRequest.host, request.args)
+        : request.args;
     const handle = gateway.execute({
       executable: request.executable,
-      args: request.args,
+      args: executionArgs,
       cwd: request.cwd,
       ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
       ...(request.parseLine ? { parseLine: request.parseLine } : {}),
