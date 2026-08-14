@@ -24,6 +24,7 @@ if [[ $existing_install -eq 0 && -n "${MAJOR_PROVIDER_SOURCE:-}" ]]; then
   source_root="$(readlink -f "$MAJOR_PROVIDER_SOURCE")"
   claude_real="$source_root/claude/bin/claude"
   codex_real="$source_root/codex/bin/codex-native"
+  codex_code_mode_host_real="$source_root/codex/bin/codex-code-mode-host"
   bwrap_real="$source_root/codex/bin/bwrap"
   cursor_root="$source_root/cursor/bin"
   agy_real="$source_root/antigravity/bin/agy"
@@ -32,6 +33,7 @@ elif [[ $existing_install -eq 0 ]]; then
   codex_entry="$(readlink -f "$admin_home/.local/bin/codex")"
   codex_scope="$(dirname "$(dirname "$(dirname "$codex_entry")")")"
   codex_real="$codex_scope/codex/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/bin/codex"
+  codex_code_mode_host_real="$codex_scope/codex/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/bin/codex-code-mode-host"
   bwrap_real="$codex_scope/codex/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/codex-resources/bwrap"
   cursor_real="$(readlink -f "$admin_home/.local/bin/cursor-agent")"
   cursor_root="$(dirname "$cursor_real")"
@@ -44,6 +46,7 @@ if [[ $existing_install -eq 0 ]]; then
   install -d "$staging/claude/bin" "$staging/codex/bin" "$staging/cursor/bin" "$staging/antigravity/bin"
   cp "$claude_real" "$staging/claude/bin/claude"
   cp "$codex_real" "$staging/codex/bin/codex-native"
+  cp "$codex_code_mode_host_real" "$staging/codex/bin/codex-code-mode-host"
   cp "$bwrap_real" "$staging/codex/bin/bwrap"
   cp -R "$cursor_root/." "$staging/cursor/bin/"
   cp "$agy_real" "$staging/antigravity/bin/agy"
@@ -52,6 +55,7 @@ else
   for executable in \
     "$install_root/claude/bin/claude" \
     "$install_root/codex/bin/codex-native" \
+    "$install_root/codex/bin/codex-code-mode-host" \
     "$install_root/cursor/bin/cursor-agent" \
     "$install_root/antigravity/bin/agy"; do
     [[ -x "$executable" ]] || { echo "existing provider installation is incomplete: $executable" >&2; exit 1; }

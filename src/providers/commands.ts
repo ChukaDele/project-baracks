@@ -51,8 +51,6 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
       const args = request.resumeSessionRef
         ? [
             'exec',
-            '--disable',
-            'code_mode',
             '--sandbox',
             'read-only',
             '--ignore-user-config',
@@ -63,8 +61,6 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
           ]
         : [
             'exec',
-            '--disable',
-            'code_mode',
             '--sandbox',
             'read-only',
             '--ignore-user-config',

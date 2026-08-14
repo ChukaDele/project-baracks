@@ -21,6 +21,8 @@ claude_sha256=2664006219497bf7021ac43156519cd42eda64ceb2a66f434ecab83e7831f942
 codex_version=0.147.0
 codex_url="https://github.com/openai/codex/releases/download/rust-v${codex_version}/codex-aarch64-unknown-linux-musl.tar.gz"
 codex_sha256=eb677c80f666b1ab8b4b1d083b66e8d614b1281d960bb6f9fd8ca98f58b38b90
+codex_code_mode_host_url="https://github.com/openai/codex/releases/download/rust-v${codex_version}/codex-code-mode-host-aarch64-unknown-linux-musl.tar.gz"
+codex_code_mode_host_sha256=dfd4ff98ea4db30ed078af9c31b6f86e3da4836d0573aa87e225e5a5b54d3c7c
 bwrap_url="https://github.com/openai/codex/releases/download/rust-v${codex_version}/bwrap-aarch64-unknown-linux-musl.tar.gz"
 bwrap_sha256=5b7fa3624a971cf5857b19bccfbcba2e653b7d09253020c37395245d70cb8bed
 cursor_version=2026.08.11-e8db854
@@ -32,6 +34,7 @@ antigravity_sha512=fd33d449ddfc7917ab4f38968cda8356d3bca9f0b12eec9665e565af4ca44
 
 lock_contents="claude ${claude_version} sha256:${claude_sha256}
 codex ${codex_version} sha256:${codex_sha256}
+codex-code-mode-host ${codex_version} sha256:${codex_code_mode_host_sha256}
 cursor ${cursor_version} sha256:${cursor_sha256}
 antigravity ${antigravity_version} sha512:${antigravity_sha512}"
 
@@ -44,6 +47,7 @@ if [[ -e "$destination" ]]; then
   for executable in \
     "$destination/claude/bin/claude" \
     "$destination/codex/bin/codex-native" \
+    "$destination/codex/bin/codex-code-mode-host" \
     "$destination/codex/bin/bwrap" \
     "$destination/cursor/bin/cursor-agent" \
     "$destination/antigravity/bin/agy"; do
@@ -106,6 +110,13 @@ download "$codex_url" "$downloads/codex.tar.gz"
 verify_sha256 "$codex_sha256" "$downloads/codex.tar.gz"
 extract_archive "$downloads/codex.tar.gz" "$downloads/codex"
 install -m 0555 "$downloads/codex/codex-aarch64-unknown-linux-musl" "$staging/codex/bin/codex-native"
+
+download "$codex_code_mode_host_url" "$downloads/codex-code-mode-host.tar.gz"
+verify_sha256 "$codex_code_mode_host_sha256" "$downloads/codex-code-mode-host.tar.gz"
+extract_archive "$downloads/codex-code-mode-host.tar.gz" "$downloads/codex-code-mode-host"
+install -m 0555 \
+  "$downloads/codex-code-mode-host/codex-code-mode-host-aarch64-unknown-linux-musl" \
+  "$staging/codex/bin/codex-code-mode-host"
 
 download "$bwrap_url" "$downloads/bwrap.tar.gz"
 verify_sha256 "$bwrap_sha256" "$downloads/bwrap.tar.gz"
