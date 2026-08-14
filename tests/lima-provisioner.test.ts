@@ -15,6 +15,7 @@ function fakeLima(root: string, instance = 'major-worker'): string {
 set -eu
 state="$MAJOR_FAKE_LIMA_STATE"
 log="$MAJOR_FAKE_LIMA_LOG"
+source_instance="\${MAJOR_FAKE_LIMA_SOURCE_INSTANCE:-major-worker}"
 printf '%s\\n' "$*" >> "$log"
 case "$1" in
   list) if [ -f "$state" ]; then
@@ -24,13 +25,13 @@ case "$1" in
     mounts='[]'; [ "\${MAJOR_FAKE_LIMA_UNSAFE:-0}" = 1 ] && mounts='[{"location":"/Users"}]'
     printf '{"name":"${instance}","status":"%s","vmType":"vz","arch":"aarch64","sshAddress":"127.0.0.1","config":{"plain":true,"mounts":%s,"portForwards":[],"networks":[],"propagateProxyEnv":false,"containerd":{"system":false,"user":false},"ssh":{"forwardAgent":false,"forwardX11":false,"forwardX11Trusted":false,"loadDotSSHPubKeys":false}}}\\n' "$(cat "$state")" "$mounts"
     if [ "\${MAJOR_FAKE_LIMA_AUTH_SOURCE:-0}" = 1 ]; then
-      printf '{"name":"major-worker","status":"%s"}\\n' "\${MAJOR_FAKE_LIMA_SOURCE_STATUS:-Running}"
+      printf '{"name":"%s","status":"%s"}\\n' "$source_instance" "\${MAJOR_FAKE_LIMA_SOURCE_STATUS:-Running}"
     fi
   fi ;;
   create) printf 'Stopped' > "$state" ;;
-  start) [ "\${2:-}" = major-worker ] || printf 'Running' > "$state" ;;
+  start) [ "\${2:-}" = "$source_instance" ] || printf 'Running' > "$state" ;;
   stop)
-    if [ "\${2:-}" = major-worker ]; then
+    if [ "\${2:-}" = "$source_instance" ]; then
       [ "\${MAJOR_FAKE_LIMA_FAIL_SOURCE_STOP:-0}" = 1 ] && exit 38
       exit 0
     else
@@ -39,15 +40,19 @@ case "$1" in
   delete) rm -f "$state" ;;
   copy) : ;;
   shell)
-    if [ "\${MAJOR_FAKE_LIMA_AUTH_SOURCE:-0}" = 1 ] && [ "$3" = major-worker ] && echo "$*" | grep -q 'tar -C /var/lib/major/provider-auth -cf -'; then
+    if [ "\${MAJOR_FAKE_LIMA_SOURCE_MARKER_MISSING:-0}" = 1 ] && [ "$3" = "$source_instance" ] && echo "$*" | grep -q 'test -f /opt/major/releases/'; then
+      exit 1
+    fi
+    if [ "\${MAJOR_FAKE_LIMA_AUTH_SOURCE:-0}" = 1 ] && [ "$3" = "$source_instance" ] && echo "$*" | grep -q 'tar -C /var/lib/major/provider-auth -cf -'; then
       printf 'opaque-provider-auth'
       exit 0
     fi
-    if [ "\${MAJOR_FAKE_LIMA_AUTH_MISSING:-0}" = 1 ] && [ "$3" = major-worker ] && echo "$*" | grep -q 'test -f /var/lib/major/provider-auth'; then
+    if [ "\${MAJOR_FAKE_LIMA_AUTH_MISSING:-0}" = 1 ] && [ "$3" = "$source_instance" ] && echo "$*" | grep -q 'test -f /var/lib/major/provider-auth'; then
       exit 1
     fi
     if echo "$*" | grep -q "stat -c %U:%G:%a"; then
       case "$*" in
+        */opt/major/releases/*) printf 'root:root:444\\n' ;;
         *provider-auth/claude/*) printf 'root:major-claude:440\\n' ;;
         *provider-auth/codex/*) printf 'root:major-codex:440\\n' ;;
         *provider-auth/cursor/*) printf 'root:major-cursor:440\\n' ;;
@@ -272,6 +277,64 @@ describe('clean-install Lima provisioning', () => {
     expect(log).not.toMatch(/\/Users\//);
   });
 
+  it('can source authorised credentials from an exact prior release worker', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-prior-auth-'));
+    roots.push(root);
+    const destinationSha = '0'.repeat(40);
+    const sourceSha = `123456789abc${'0'.repeat(28)}`;
+    const sourceInstance = 'major-worker-123456789abc';
+    const result = run(
+      root,
+      {
+        MAJOR_FAKE_LIMA_AUTH_SOURCE: '1',
+        MAJOR_FAKE_LIMA_SOURCE_INSTANCE: sourceInstance,
+        MAJOR_FAKE_LIMA_SOURCE_STATUS: 'Stopped',
+        MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE: sourceInstance,
+        MAJOR_PROVIDER_AUTH_SOURCE_SHA: sourceSha,
+      },
+      'major-worker-000000000000',
+      destinationSha,
+      authorizedProvisioner(root),
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const log = readFileSync(join(root, 'log'), 'utf8');
+    expect(log).toContain(
+      `shell --tty=false ${sourceInstance} sudo test -f /opt/major/releases/${sourceSha}`,
+    );
+    expect(log.indexOf(`start ${sourceInstance}`)).toBeLessThan(
+      log.indexOf(`shell --tty=false ${sourceInstance} sudo test -f`),
+    );
+    expect(log).toContain(`stop ${sourceInstance}`);
+    expect(
+      log.match(
+        new RegExp(`${sourceInstance} sudo tar -C /var/lib/major/provider-auth -cf -`, 'g'),
+      ),
+    ).toHaveLength(4);
+    expect(log).not.toMatch(/shell --tty=false major-worker sudo tar/);
+  });
+
+  it('rejects a prior release auth source without its exact release marker', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-prior-auth-marker-'));
+    roots.push(root);
+    const sourceSha = `123456789abc${'0'.repeat(28)}`;
+    const result = run(
+      root,
+      {
+        MAJOR_FAKE_LIMA_AUTH_SOURCE: '1',
+        MAJOR_FAKE_LIMA_SOURCE_INSTANCE: 'major-worker-123456789abc',
+        MAJOR_FAKE_LIMA_SOURCE_MARKER_MISSING: '1',
+        MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE: 'major-worker-123456789abc',
+        MAJOR_PROVIDER_AUTH_SOURCE_SHA: sourceSha,
+      },
+      'major-worker-000000000000',
+      '0'.repeat(40),
+      authorizedProvisioner(root),
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/provider-auth source release marker is missing/);
+    expect(readFileSync(join(root, 'log'), 'utf8')).not.toMatch(/provider-auth -cf -/);
+  });
+
   it('does not fail installation when authorised provider credentials are absent', () => {
     const root = mkdtempSync(join(tmpdir(), 'major-provision-no-auth-'));
     roots.push(root);
@@ -300,7 +363,7 @@ describe('clean-install Lima provisioning', () => {
       `0123456789ab${'0'.repeat(28)}`,
     );
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/failed to restore legacy major-worker to Stopped/);
+    expect(result.stderr).toMatch(/failed to restore provider-auth source major-worker to Stopped/);
     const log = readFileSync(join(root, 'log'), 'utf8');
     expect(log).toMatch(/start major-worker/);
     expect(log.match(/stop major-worker/g)?.length).toBeGreaterThanOrEqual(2);

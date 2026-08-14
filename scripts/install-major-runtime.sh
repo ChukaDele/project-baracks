@@ -17,6 +17,8 @@ INSTALL_LOCK="$MAJOR_HOME/.install.lock"
 INSTALL_LOCK_HELD=0
 WORKER_CREATED=0
 WORKER_INSTANCE=""
+AUTH_SOURCE_INSTANCE="major-worker"
+AUTH_SOURCE_SHA=""
 LIMACTL_PATH=""
 INSTALL_STAGE=""
 RELEASE_CREATED=0
@@ -201,7 +203,33 @@ elif [[ $worker_inspection -ne 0 ]]; then
   echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
   exit 1
 fi
-bash "$INSTALL_STAGE/runtime/scripts/provision-major-lima-worker.sh" "$LIMACTL_PATH" "$WORKER_INSTANCE" "$INSTALL_SHA"
+if [ -f "$MAJOR_HOME/execution.json" ] && [ ! -L "$MAJOR_HOME/execution.json" ] && \
+   [ -f "$RELEASE_RECORD" ] && [ ! -L "$RELEASE_RECORD" ]; then
+  AUTH_SOURCE_FIELDS="$(python3 - "$MAJOR_HOME/execution.json" "$RELEASE_RECORD" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+execution = json.loads(Path(sys.argv[1]).read_text())
+release = json.loads(Path(sys.argv[2]).read_text())
+instance = execution.get("instance", "")
+sha = release.get("sha", "")
+if not re.fullmatch(r"[0-9a-f]{40}", sha) or instance != f"major-worker-{sha[:12]}":
+    raise SystemExit("ERROR: installed Major provider-auth source identity is invalid")
+print(f"{instance}\t{sha}")
+PY
+)"
+  IFS=$'\t' read -r AUTH_SOURCE_INSTANCE AUTH_SOURCE_SHA <<< "$AUTH_SOURCE_FIELDS"
+  if [ "$AUTH_SOURCE_INSTANCE" = "$WORKER_INSTANCE" ]; then
+    AUTH_SOURCE_INSTANCE="major-worker"
+    AUTH_SOURCE_SHA=""
+  fi
+fi
+MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE="$AUTH_SOURCE_INSTANCE" \
+MAJOR_PROVIDER_AUTH_SOURCE_SHA="$AUTH_SOURCE_SHA" \
+  bash "$INSTALL_STAGE/runtime/scripts/provision-major-lima-worker.sh" \
+    "$LIMACTL_PATH" "$WORKER_INSTANCE" "$INSTALL_SHA"
 
 # Build and execute-smoke the same immutable runtime shape used in production.
 if [ ! -d "$RELEASE_DIR" ]; then
