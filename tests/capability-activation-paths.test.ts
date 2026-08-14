@@ -18,6 +18,8 @@ import { ExecutionGateway } from '../src/security/gateway.js';
 import { executeMajorCommand } from '../src/security/major-gateway.js';
 import { TrustedExecutableRegistry } from '../src/security/trusted-executables.js';
 import { gatewayAllowedRoots } from '../src/supervisor/worker.js';
+import { configureProjectPolicy } from '../src/supervisor/policy.js';
+import { authorizeSessionWorkshop, resolveProjectForCwd } from '../src/supervisor/state.js';
 import {
   ensureObservedModel,
   recordQualifyingVerification,
@@ -60,6 +62,66 @@ describe.runIf(platform() === 'darwin')('M1 release recovery gate', () => {
     ).toThrow(CapabilityUnavailableError);
     expect(existsSync(marker)).toBe(false);
     expect(decisions.map((decision) => decision.allowed)).toEqual([false]);
+  });
+
+  it('recognizes an owner-approved Workshop but still requires the worker resource fence', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'major-workshop-gate-')));
+    spawnSync('git', ['init', '--initial-branch=main', root], { encoding: 'utf8' });
+    const prior = {
+      home: process.env.MAJOR_HOME,
+      state: process.env.MAJOR_STATE_PATH,
+      policy: process.env.MAJOR_POLICY_PATH,
+      stop: process.env.MAJOR_STOP_PATH,
+    };
+    process.env.MAJOR_HOME = join(root, '.major-test');
+    process.env.MAJOR_STATE_PATH = join(root, 'state.json');
+    process.env.MAJOR_POLICY_PATH = join(root, 'policy.json');
+    process.env.MAJOR_STOP_PATH = join(root, 'STOP');
+    try {
+      const project = resolveProjectForCwd(root)!;
+      configureProjectPolicy({
+        project: project.project,
+        repoPath: project.repoPath,
+        projectClass: 'workshop',
+        trust: 'build',
+        ownerApprovedBuild: true,
+      });
+      authorizeSessionWorkshop({
+        host: 'codex',
+        cwd: root,
+        project: project.project,
+        repoPath: project.repoPath,
+        sessionId: 'thread-123',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+      expect(() =>
+        executeMajorCommand({
+          executable: 'codex',
+          args: ['exec'],
+          cwd: root,
+          allowedRoots: [root],
+          providerRequest: {
+            host: 'codex',
+            prompt: 'read package.json',
+            allowGuestMutation: false,
+            approvalAuthority: { decisions: [] },
+          },
+        }),
+      ).toThrow(/requires a worker resource lease/);
+    } finally {
+      for (const [name, value] of Object.entries(prior)) {
+        const key =
+          name === 'home'
+            ? 'MAJOR_HOME'
+            : name === 'state'
+              ? 'MAJOR_STATE_PATH'
+              : name === 'policy'
+                ? 'MAJOR_POLICY_PATH'
+                : 'MAJOR_STOP_PATH';
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it('refuses real Git through the production gateway before mutation', () => {

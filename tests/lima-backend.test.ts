@@ -123,6 +123,35 @@ describe('Lima backend inspection', () => {
     }
   });
 
+  it('rejects a forged Workshop authority before any Lima operation', () => {
+    expect(() =>
+      backend(fakeLima()).execute({
+        executionAuthority: {
+          kind: 'supervised_workshop',
+          attachmentId: 'forged',
+          sessionId: 'forged',
+          project: 'forged',
+          repoPath: process.cwd(),
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+        executable: 'codex',
+        args: ['exec'],
+        cwd: process.cwd(),
+        allowedRoots: [process.cwd()],
+        providerRequest: {
+          host: 'codex',
+          prompt: 'forged',
+          allowGuestMutation: false,
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/supervised Workshop|owner-approved build|registered Git project/);
+  });
+
   it('does not probe a provider or start Lima while M1 is disabled', async () => {
     await expect(backend(fakeLima()).probeProvider('codex')).resolves.toMatchObject({
       installed: false,

@@ -21,6 +21,7 @@ import { resolveProjectForCwd } from '../supervisor/state.js';
 import type { ProviderApprovalAuthority } from './provider-approval-policy.js';
 import { isCapabilityAvailable } from './capabilities.js';
 import { verifySecureEnclaveStagedValidationAuthority } from './secure-enclave-attestation.js';
+import type { SupervisedWorkshopExecutionAuthority } from './supervised-workshop.js';
 
 export type MajorActivationState = 'disabled' | 'staged_validation' | 'supervised' | 'unattended';
 
@@ -217,7 +218,9 @@ export interface SupervisedExecutionAuthority {
 }
 
 export type BackendExecutionAuthority =
-  StagedValidationExecutionAuthority | SupervisedExecutionAuthority;
+  | StagedValidationExecutionAuthority
+  | SupervisedWorkshopExecutionAuthority
+  | SupervisedExecutionAuthority;
 
 /**
  * Verify the independently issued Secure Enclave authority for this exact release.

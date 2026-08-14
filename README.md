@@ -61,6 +61,12 @@ Client/candidate/PII projects may run in `client/build`, but their data stays pr
 bash scripts/install-major-runtime.sh
 ```
 
+For an explicitly authorized development session, install the reviewed main snapshot without starting final release attestation:
+
+```sh
+MAJOR_ACTIVATION_MODE=supervised-workshop bash scripts/install-major-runtime.sh
+```
+
 This installs:
 
 - global `major` CLI;
@@ -96,6 +102,20 @@ major project configure surface-talent \
 `--allow-external-writes` authorizes normal project writes such as branches, PRs, preview deployments and already-authorized integrations. It does not authorize new paid spend, destructive production-data changes, credential/ownership/DNS changes or production security-policy changes.
 
 Then open a fresh Claude/Codex/Cursor session inside the relevant repo and work normally. No `start Major` prompt is required.
+
+Authorize the visible controller session once:
+
+```sh
+major session authorize \
+  --mode supervised-workshop \
+  --host codex \
+  --cwd "$PWD" \
+  --owner-approved
+```
+
+`SUPERVISED_WORKSHOP` is project-bound, expires after eight hours, and never enables background or global execution. It may create many project commits without another release signature. Revoke it with `major session revoke --cwd "$PWD"` or stop all execution with `major stop`.
+
+Secure Enclave signing is reserved for `FINAL_RELEASE_ATTESTATION`: freeze one candidate, run deterministic checks and exact-head CI, sign once, then run final fields and independent review. A code change aborts that attestation and returns the work to Workshop mode.
 
 ## Optional evidence-first path
 

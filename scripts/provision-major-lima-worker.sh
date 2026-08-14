@@ -78,7 +78,7 @@ if violations: raise SystemExit("unsafe existing Lima instance: " + ", ".join(vi
 
 migrate_existing_auth() {
   [[ "$INSTANCE" == major-worker ]] && return 0
-  local source_status provider relative authority_root
+  local source_status provider relative authority_root workshop_authorized
   authority_root="${MAJOR_HOME:-$HOME/.major}/staged-validation/authorities/$RELEASE_SHA"
   source_status="$({ "$LIMACTL_PATH" list --json | python3 -c '
 import json, sys
@@ -123,7 +123,17 @@ print(status)
     'antigravity:antigravity/.gemini/antigravity-cli/antigravity-oauth-token'; do
     provider="${entry%%:*}"
     relative="${entry#*:}"
-    if ! node "$ROOT/scripts/verify-secure-enclave-staged-validation-lease.mjs" \
+    workshop_authorized=0
+    if [[ -n "${MAJOR_WORKSHOP_AUTH_CWD:-}" && -n "${MAJOR_WORKSHOP_SESSION_ID:-}" ]] && \
+      node "$ROOT/dist/entry.js" session verify-handoff \
+        --cwd "$MAJOR_WORKSHOP_AUTH_CWD" \
+        --session-id "$MAJOR_WORKSHOP_SESSION_ID" \
+        --provider "$provider" \
+        --release-sha "$RELEASE_SHA" \
+        --destination-instance "$INSTANCE" >/dev/null 2>&1; then
+      workshop_authorized=1
+    fi
+    if [[ $workshop_authorized -ne 1 ]] && ! node "$ROOT/scripts/verify-secure-enclave-staged-validation-lease.mjs" \
       "$authority_root/major-staged-validation-lease.json" \
       "$authority_root/major-staged-validation-lease.json.sig" \
       "$RELEASE_SHA" credential-handoff "$provider" >/dev/null 2>&1; then

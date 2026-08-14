@@ -10,6 +10,8 @@ export interface BackendProviderRequest {
   allowGuestMutation: boolean;
   /** Major-owned authority. An empty set means no sensitive tool action is approved. */
   approvalAuthority: VerifiedProviderApprovalAuthority;
+  /** Set only by Major after a live session-scoped Workshop authority is verified. */
+  workshopMode?: boolean;
   modelRef?: string;
   resumeSessionRef?: string;
 }

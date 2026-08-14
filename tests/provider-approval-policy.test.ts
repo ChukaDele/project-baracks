@@ -62,6 +62,32 @@ describe('authoritative provider approval policy', () => {
     ).toMatchObject({ outcome: 'approval_required', category: 'command_execution' });
   });
 
+  it('allows isolated shell, dependency installation, and research only in Workshop mode', () => {
+    for (const action of [
+      { kind: 'delete' as const, rawInput: { path: 'obsolete.test.ts' } },
+      { kind: 'execute' as const, rawInput: { command: 'pnpm test' } },
+      { kind: 'dependency_install' as const, rawInput: { command: 'pnpm install' } },
+      { kind: 'fetch' as const, rawInput: { url: 'https://docs.example.invalid' } },
+    ]) {
+      expect(
+        decideProviderAction({
+          host: 'cursor',
+          action,
+          authority: noApprovals,
+          workshopMode: true,
+        }),
+      ).toMatchObject({ outcome: 'automatic' });
+    }
+    expect(
+      decideProviderAction({
+        host: 'cursor',
+        action: { kind: 'push', rawInput: { command: 'git push origin feature' } },
+        authority: noApprovals,
+        workshopMode: true,
+      }),
+    ).toMatchObject({ outcome: 'approval_required', category: 'push' });
+  });
+
   it('rejects destructive actions even when a provider labels them execute', () => {
     expect(
       decideProviderAction({

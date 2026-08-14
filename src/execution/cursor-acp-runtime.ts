@@ -22,11 +22,13 @@ export function decideCursorPermission(
   action: ProviderAction,
   authority: ProviderApprovalAuthority,
   remainingDecisions: ProviderApprovalAuthority['decisions'][number][],
+  workshopMode = false,
 ): ProviderApprovalDecision {
   const decision = decideProviderAction({
     host: 'cursor',
     action,
     authority: { ...authority, decisions: remainingDecisions },
+    workshopMode,
   });
   if (decision.outcome === 'automatic') {
     const approvedIndex = remainingDecisions.findIndex(
@@ -152,6 +154,7 @@ export class CursorAcpRuntime implements AgentRuntimePort {
             action,
             request.approvalAuthority,
             remainingDecisions,
+            request.workshopMode === true,
           );
           request.emit({
             type: 'approval-decision',

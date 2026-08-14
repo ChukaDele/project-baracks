@@ -55,6 +55,7 @@ export interface ExecutionPolicyDecision {
   envDecisionId?: string;
   stagedValidationLeaseId?: string;
   stagedValidationReleaseSha?: string;
+  supervisedWorkshopSessionId?: string;
   at: string;
 }
 
@@ -79,7 +80,7 @@ export interface GatewayExecuteRequest {
   extractUsage?: StreamingSpawnSpec['extractUsage'];
   resourceLeaseId?: string;
   executionAuthority?: BackendExecutionAuthority;
-  providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority'> & {
+  providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority' | 'workshopMode'> & {
     approvalAuthority: ProviderApprovalAuthority;
   };
 }
@@ -279,7 +280,12 @@ export class ExecutionGateway {
         ? request.executionAuthority
         : undefined;
     const staged = Boolean(stagedAuthority);
-    if (!isCapabilityAvailable('live-agent-execution') && !staged) {
+    const workshopAuthority =
+      request.executionAuthority?.kind === 'supervised_workshop'
+        ? request.executionAuthority
+        : undefined;
+    const workshop = Boolean(workshopAuthority);
+    if (!isCapabilityAvailable('live-agent-execution') && !staged && !workshop) {
       const decision: Parameters<typeof this.record>[0] = {
         kind: 'execute',
         allowed: false,
@@ -368,6 +374,7 @@ export class ExecutionGateway {
         verifiedProviderRequest = {
           ...request.providerRequest,
           approvalAuthority: verifiedAuthority,
+          ...(workshop ? { workshopMode: true } : {}),
         };
       } catch (error) {
         this.refuse(
@@ -391,6 +398,7 @@ export class ExecutionGateway {
               stagedValidationReleaseSha: stagedAuthority!.releaseSha,
             }
           : {}),
+        ...(workshop ? { supervisedWorkshopSessionId: workshopAuthority!.sessionId } : {}),
         ...(this.options.authorizedEnv
           ? { envDecisionId: this.options.authorizedEnv.decisionId }
           : {}),
@@ -459,7 +467,7 @@ export class ExecutionGateway {
     if (request.detectExhaustion) spec.detectExhaustion = request.detectExhaustion;
     if (request.extractSessionRef) spec.extractSessionRef = request.extractSessionRef;
     if (request.extractUsage) spec.extractUsage = request.extractUsage;
-    return executeStreaming(spec);
+    return executeStreaming(spec, request.executionAuthority);
   }
 
   /**

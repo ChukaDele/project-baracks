@@ -10,6 +10,7 @@ Apply these defaults across projects unless a project/user instruction is more s
 - Do not make the user remember or repeatedly invoke Major.
 - **Presence is not execution authority.** Read the project policy plus explicit owner direction before delegating or starting background work.
 - The owner may explicitly fast-track a project into `build` with `--owner-approved`; this bypasses shadow/assist ceremony for foreground work but does not grant unattended authority.
+- An explicitly authorized `SUPERVISED_WORKSHOP` session may execute foreground work for one owner-approved build project across multiple Git SHAs. It expires, remains project-bound, and does not replace the exact-SHA Secure Enclave gate for a frozen release.
 - Client/candidate/PII projects may run in owner-approved `client/build`, but their data must remain project-local and must never flow into global Major/GBrain/Ruflo memory.
 - If an active Major goal exists, preserve the durable outcome across the session rather than treating the latest message as an isolated micro-task.
 - Use `$HOME/.local/bin/major status <project>` before declaring a project complete or blocked.

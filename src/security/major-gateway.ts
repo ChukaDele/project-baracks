@@ -16,7 +16,10 @@ import type { ApprovalCategory, ProviderApprovalAuthority } from './provider-app
 import { openDb } from '../db/client.js';
 import { consumeApprovedDecision, isApprovedDecision } from '../domain/decision-service.js';
 import { resolveProjectForCwd } from '../supervisor/state.js';
-import { assertActiveResourceLease } from '../supervisor/resources.js';
+import {
+  assertActiveResourceLease,
+  assertActiveResourceLeaseForProcess,
+} from '../supervisor/resources.js';
 import { globalStopRequested } from '../supervisor/policy.js';
 import {
   admitStagedValidationLease,
@@ -32,6 +35,11 @@ import {
   type StagedValidationExecutionAuthority,
 } from './staged-validation.js';
 import { verifySecureEnclaveStagedValidationAuthority } from './secure-enclave-attestation.js';
+import {
+  assertSupervisedWorkshopAuthority,
+  resolveSupervisedWorkshopAuthority,
+  type SupervisedWorkshopExecutionAuthority,
+} from './supervised-workshop.js';
 
 class StagedEventQueue implements AsyncIterable<ProviderEvent> {
   private readonly values: ProviderEvent[] = [];
@@ -72,7 +80,7 @@ export interface MajorGatewayRequest {
   resourceLeaseId?: string;
   /** Product-owned one-use release validation authority. Never set by normal workers. */
   stagedValidationAuthority?: StagedValidationExecutionAuthority;
-  providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority'> & {
+  providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority' | 'workshopMode'> & {
     approvalAuthority: ProviderApprovalAuthority;
   };
 }
@@ -135,14 +143,35 @@ export function trustedExecutableRegistry(executable: string): TrustedExecutable
 
 /** Production adapter for the single canonical execution gateway. */
 export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle {
-  if (!request.stagedValidationAuthority) {
-    assertCapabilityAvailable('live-agent-execution');
-  }
   const executable = basename(request.executable);
   const runtimeHome = majorHome();
   const staged = request.stagedValidationAuthority;
+  let workshop: SupervisedWorkshopExecutionAuthority | undefined;
+  if (!staged && !isCapabilityAvailable('live-agent-execution')) {
+    try {
+      workshop = resolveSupervisedWorkshopAuthority(request.cwd);
+    } catch {
+      // The immutable M1 refusal remains the public result when no valid
+      // session-scoped Workshop authority is present.
+    }
+  }
+  if (!staged && !workshop) assertCapabilityAvailable('live-agent-execution');
+  if (workshop) {
+    assertSupervisedWorkshopAuthority(workshop, request.cwd);
+    if (request.providerRequest) {
+      if (!request.resourceLeaseId) {
+        throw new Error('supervised Workshop provider execution requires a worker resource lease');
+      }
+      assertActiveResourceLeaseForProcess({
+        leaseId: request.resourceLeaseId,
+        kind: 'worker',
+        pid: process.pid,
+      });
+    }
+  }
   const backendEnabled =
-    (isCapabilityAvailable('live-agent-execution') || Boolean(staged)) && executable !== 'git';
+    (isCapabilityAvailable('live-agent-execution') || Boolean(staged) || Boolean(workshop)) &&
+    executable !== 'git';
   let admittedStaged = false;
   let stagedExpiresAt: string | undefined;
   let stagedExpectedStatus: 'succeeded' | 'cancelled' | undefined;
@@ -384,8 +413,27 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       ...(request.extractUsage ? { extractUsage: request.extractUsage } : {}),
       ...(request.resourceLeaseId ? { resourceLeaseId: request.resourceLeaseId } : {}),
       ...(request.providerRequest ? { providerRequest: request.providerRequest } : {}),
-      ...(staged ? { executionAuthority: staged } : {}),
+      ...(staged
+        ? { executionAuthority: staged }
+        : workshop
+          ? { executionAuthority: workshop }
+          : {}),
     });
+    if (workshop) {
+      const workshopWatcher = setInterval(() => {
+        try {
+          assertSupervisedWorkshopAuthority(workshop, request.cwd);
+        } catch {
+          handle.cancel();
+        }
+      }, 1_000);
+      workshopWatcher.unref();
+      return {
+        events: handle.events,
+        cancel: () => handle.cancel(),
+        outcome: handle.outcome.finally(() => clearInterval(workshopWatcher)),
+      };
+    }
     if (!staged) return handle;
     const expiryTimer = setTimeout(
       () => handle.cancel(),
