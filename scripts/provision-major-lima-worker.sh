@@ -217,6 +217,7 @@ if [[ $CREATED -eq 0 ]]; then
   if "$LIMACTL_PATH" shell --tty=false "$INSTANCE" test \
       -x /opt/major/providers/v1/claude/bin/claude \
       -a -x /opt/major/providers/v1/codex/bin/codex-native \
+      -a -x /opt/major/providers/v1/codex/bin/codex-code-mode-host \
       -a -x /opt/major/providers/v1/cursor/bin/cursor-agent \
       -a -x /opt/major/providers/v1/antigravity/bin/agy \
       -a -r /opt/major/runner-version \
@@ -253,6 +254,7 @@ cp "$ROOT/templates/apparmor/major-cursor-sandbox" "$stage/templates/apparmor/"
 "$LIMACTL_PATH" copy --backend=scp --recursive "$stage" "$INSTANCE:/tmp/major-bootstrap"
 if "$LIMACTL_PATH" shell --tty=false "$INSTANCE" test -x /opt/major/providers/v1/claude/bin/claude \
   -a -x /opt/major/providers/v1/codex/bin/codex-native \
+  -a -x /opt/major/providers/v1/codex/bin/codex-code-mode-host \
   -a -x /opt/major/providers/v1/cursor/bin/cursor-agent \
   -a -x /opt/major/providers/v1/antigravity/bin/agy; then
   "$LIMACTL_PATH" shell --tty=false "$INSTANCE" bash /tmp/major-bootstrap/scripts/bootstrap-major-lima-worker.sh
