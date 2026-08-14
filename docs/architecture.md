@@ -76,6 +76,13 @@ Unknown projects default to observe. Client/candidate/PII projects remain isolat
 
 The global kill switch (`major stop`) cancels active Major gateway work and blocks new work until `major start`.
 
+Foreground execution has two separate authorization modes:
+
+- `SUPERVISED_WORKSHOP` is an expiring controller-session capability for one owner-approved build project. The gateway and Lima backend recheck the session, project identity, worker resource lease and kill switch. It permits project-local autonomous work across multiple Git SHAs. It does not grant unattended execution or bypass provider action policy.
+- `FINAL_RELEASE_ATTESTATION` is the existing exact-SHA Secure Enclave authority. It applies only after a candidate is frozen. Any code change ends that attestation; the next frozen candidate requires one new signature.
+
+The Workshop session may authorize the existing provider-state broker to copy only the four fixed provider authentication files from a prior isolated worker to a new release worker. The transfer stays VM-to-VM, is provider-scoped and audited, and never promotes project/session/workspace state.
+
 ## 2. Human-reviewable policy
 
 Canonical rules live in `guidance/` and are selected by `guidance/instructions.registry.json`.

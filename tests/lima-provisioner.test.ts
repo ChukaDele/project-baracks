@@ -129,6 +129,24 @@ function authorizedProvisioner(root: string): string {
   return script;
 }
 
+function workshopAuthorizedProvisioner(root: string): string {
+  const script = authorizedProvisioner(root);
+  const bundle = resolve(script, '..', '..');
+  mkdirSync(join(bundle, 'dist'), { recursive: true });
+  writeFileSync(
+    join(bundle, 'dist', 'entry.js'),
+    `const args = process.argv.slice(2);
+if (args[0] !== 'session' || args[1] !== 'verify-handoff') process.exit(1);
+const provider = args[args.indexOf('--provider') + 1];
+const sha = args[args.indexOf('--release-sha') + 1];
+const instance = args[args.indexOf('--destination-instance') + 1];
+if (!['claude','codex','cursor','antigravity'].includes(provider) || instance !== 'major-worker-' + sha.slice(0, 12)) process.exit(1);
+`,
+  );
+  rmSync(join(bundle, 'scripts', 'verify-secure-enclave-staged-validation-lease.mjs'));
+  return script;
+}
+
 afterEach(() => {
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
@@ -275,7 +293,30 @@ describe('clean-install Lima provisioning', () => {
     expect(log.match(/sudo chmod 0440/g)).toHaveLength(4);
     expect(log.match(/sudo stat -c %U:%G:%a/g)).toHaveLength(4);
     expect(log).not.toMatch(/\/Users\//);
-  });
+  }, 10_000);
+
+  it('reuses all four credentials under one active supervised Workshop session', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-workshop-auth-'));
+    roots.push(root);
+    const sha = '1'.repeat(40);
+    const instance = 'major-worker-111111111111';
+    const result = run(
+      root,
+      {
+        MAJOR_FAKE_LIMA_AUTH_SOURCE: '1',
+        MAJOR_WORKSHOP_AUTH_CWD: root,
+        MAJOR_WORKSHOP_SESSION_ID: 'thread-123',
+      },
+      instance,
+      sha,
+      workshopAuthorizedProvisioner(root),
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const log = readFileSync(join(root, 'log'), 'utf8');
+    expect(log.match(/sudo tar -C \/var\/lib\/major\/provider-auth -cf -/g)).toHaveLength(4);
+    expect(log.match(/sudo chmod 0440/g)).toHaveLength(4);
+    expect(log).not.toMatch(/\/Users\//);
+  }, 10_000);
 
   it('can source authorised credentials from an exact prior release worker', () => {
     const root = mkdtempSync(join(tmpdir(), 'major-provision-prior-auth-'));

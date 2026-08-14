@@ -40,6 +40,8 @@ Trust/autonomy is earned from real evidence:
 - `build`: validated autonomous build work, maximum 1 worker; still no unattended/login execution by default.
 - `unattended`: maximum 1 worker, background continuation allowed only after representative real-output validation and an independent grade.
 
+`SUPERVISED_WORKSHOP` readiness and final release readiness are distinct. Workshop readiness requires real foreground provider work through the Lima/project boundary. `FINAL_RELEASE_ATTESTATION` starts only after a candidate is frozen and uses one exact-SHA Secure Enclave signature. A defect that changes code aborts that attestation rather than starting a repeated sign-fix loop.
+
 Do not increase trust merely because configuration exists or self-authored tests are green.
 
 ## Client boundary

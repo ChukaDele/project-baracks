@@ -146,18 +146,34 @@ export function decideProviderAction(input: {
   host: ProviderCommandHost;
   action: ProviderAction;
   authority: ProviderApprovalAuthority;
+  workshopMode?: boolean;
 }): ProviderApprovalDecision {
   if (input.authority.bypassAttempted) {
     return { outcome: 'forbidden', reason: 'provider attempted to bypass Major approval policy' };
   }
 
   const kind = classifyProviderAction(input.action);
+  if (kind === 'delete' && input.workshopMode) {
+    return {
+      outcome: 'automatic',
+      reason: 'supervised Workshop permits project-local file deletion',
+    };
+  }
   if (kind === 'delete' || kind === 'destructive' || kind === 'unknown') {
     return { outcome: 'forbidden', reason: `Major forbids provider action '${kind}'` };
   }
 
   const category = APPROVAL_REQUIRED.get(kind);
   if (category) {
+    if (
+      input.workshopMode &&
+      (category === 'command_execution' || category === 'dependency_install' || kind === 'fetch')
+    ) {
+      return {
+        outcome: 'automatic',
+        reason: `supervised Workshop permits isolated '${kind}' inside the assigned project`,
+      };
+    }
     if (!INTERACTIVE_APPROVAL_HOSTS.has(input.host)) {
       return {
         outcome: 'unsupported',

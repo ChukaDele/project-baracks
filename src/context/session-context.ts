@@ -5,7 +5,17 @@ import { getProjectPolicy } from '../supervisor/policy.js';
 import { formatResourceTelemetry, resourceSnapshot } from '../supervisor/resources.js';
 import { supervisorSnapshot } from '../supervisor/runtime.js';
 import { resolveSkills } from '../skills/resolver.js';
-import { activeGoals, attachSession, resolveProjectForCwd } from '../supervisor/state.js';
+import {
+  activeGoals,
+  attachSession,
+  authorizeSessionWorkshop,
+  revokeSessionWorkshop,
+  resolveProjectForCwd,
+} from '../supervisor/state.js';
+import {
+  authorizeSupervisedWorkshopCredentialHandoff,
+  resolveSupervisedWorkshopAuthority,
+} from '../security/supervised-workshop.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -73,11 +83,98 @@ function resolvedGoalSkills(project: string, repoPath: string): string {
 }
 
 export async function runSessionContextCli(args: string[]): Promise<boolean> {
-  if (args[0] !== 'session' || (args[1] !== 'attach' && args[1] !== 'hook')) return false;
+  if (args[0] !== 'session') return false;
+
+  if (args[1] === 'authorize') {
+    if (flag(args, '--mode') !== 'supervised-workshop') {
+      throw new Error('session authorize requires --mode supervised-workshop');
+    }
+    if (!args.includes('--owner-approved')) {
+      throw new Error('supervised Workshop authorization requires explicit --owner-approved');
+    }
+    const host = flag(args, '--host') ?? 'unknown';
+    const cwd = flag(args, '--cwd') ?? process.cwd();
+    const project = resolveProjectForCwd(cwd);
+    if (!project) throw new Error(`cannot authorize a non-project session: ${resolve(cwd)}`);
+    const policy = getProjectPolicy(project.project, project.repoPath);
+    if (policy.trust !== 'build' || !policy.ownerApprovedBuild || policy.allowBackground) {
+      throw new Error(
+        `supervised Workshop requires ${project.project} to be owner-approved build without background authority`,
+      );
+    }
+    const sessionId =
+      flag(args, '--session-id') ?? (host === 'codex' ? process.env.CODEX_THREAD_ID : undefined);
+    if (!sessionId) throw new Error('supervised Workshop requires a stable --session-id');
+    const minutes = Number.parseInt(flag(args, '--expires-minutes') ?? '480', 10);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 480) {
+      throw new Error('--expires-minutes must be between 1 and 480');
+    }
+    const attachment = authorizeSessionWorkshop({
+      host,
+      cwd,
+      project: project.project,
+      repoPath: project.repoPath,
+      sessionId,
+      expiresAt: new Date(Date.now() + minutes * 60_000).toISOString(),
+    });
+    console.log(
+      JSON.stringify(
+        {
+          mode: 'SUPERVISED_WORKSHOP',
+          sessionId,
+          project: project.project,
+          repoPath: project.repoPath,
+          expiresAt: attachment.workshopAuthorization!.expiresAt,
+          unattended: false,
+        },
+        null,
+        2,
+      ),
+    );
+    return true;
+  }
+
+  if (args[1] === 'revoke') {
+    const cwd = flag(args, '--cwd') ?? process.cwd();
+    const project = resolveProjectForCwd(cwd);
+    const sessionId = flag(args, '--session-id');
+    if (!project && !sessionId) {
+      throw new Error('session revoke requires a project cwd or an exact --session-id');
+    }
+    const revoked = revokeSessionWorkshop({
+      ...(sessionId ? { sessionId } : {}),
+      ...(project ? { repoPath: project.repoPath } : {}),
+    });
+    console.log(`supervised Workshop sessions revoked: ${revoked}`);
+    return true;
+  }
+
+  if (args[1] === 'verify-handoff') {
+    const cwd = flag(args, '--cwd') ?? process.cwd();
+    const sessionId = flag(args, '--session-id');
+    const provider = flag(args, '--provider');
+    const releaseSha = flag(args, '--release-sha');
+    const destinationInstance = flag(args, '--destination-instance');
+    if (!sessionId || !provider || !releaseSha || !destinationInstance) {
+      throw new Error('Workshop credential handoff verification is missing its exact scope');
+    }
+    authorizeSupervisedWorkshopCredentialHandoff({
+      cwd,
+      sessionId,
+      provider,
+      releaseSha,
+      destinationInstance,
+    });
+    console.log('SUPERVISED_WORKSHOP_HANDOFF=AUTHORIZED');
+    return true;
+  }
+
+  if (args[1] !== 'attach' && args[1] !== 'hook') return false;
 
   const host = flag(args, '--host') ?? 'unknown';
   let cwd = flag(args, '--cwd') ?? process.cwd();
-  let sessionId = flag(args, '--session-id');
+  let sessionId =
+    flag(args, '--session-id') ?? (host === 'codex' ? process.env.CODEX_THREAD_ID : undefined);
 
   if (args[1] === 'hook') {
     const input = await readStdin();
@@ -108,6 +205,13 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
   }
 
   const policy = getProjectPolicy(project.project, project.repoPath);
+  let workshop = 'inactive';
+  try {
+    const authority = resolveSupervisedWorkshopAuthority(project.repoPath);
+    workshop = `active until ${authority.expiresAt}`;
+  } catch {
+    // Session attachment remains available when no workshop has been authorized.
+  }
   const resources = formatResourceTelemetry(resourceSnapshot().telemetry);
   console.log(`MAJOR CONTROL PLANE: ACTIVE
 host: ${host}
@@ -115,6 +219,7 @@ cwd: ${resolve(cwd)}
 project: ${project.project}
 repo: ${project.repoPath}
 policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}
+workshop: ${workshop}
 
 ACTIVE GOAL STATE
 ${supervisorSnapshot(project.project)}

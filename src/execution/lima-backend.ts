@@ -27,7 +27,11 @@ import {
   stagedValidationRequestDigest,
 } from '../security/staged-validation.js';
 import { verifySecureEnclaveStagedValidationAuthority } from '../security/secure-enclave-attestation.js';
-import { assertActiveResourceLease } from '../supervisor/resources.js';
+import {
+  assertActiveResourceLease,
+  assertActiveResourceLeaseForProcess,
+} from '../supervisor/resources.js';
+import { assertSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import type {
   BackendExecuteRequest,
   BackendProviderStatus,
@@ -488,6 +492,17 @@ export class LimaBackend implements ExecutionBackend {
       if (!isCapabilityAvailable('live-agent-execution')) {
         throw new Error('supervised provider execution is unavailable while M1 is disabled');
       }
+    } else if (request.executionAuthority.kind === 'supervised_workshop') {
+      if (globalStopRequested()) throw new Error('Major global kill switch is active');
+      assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd);
+      if (!request.resourceLeaseId) {
+        throw new Error('supervised Workshop backend requires a worker resource lease');
+      }
+      assertActiveResourceLeaseForProcess({
+        leaseId: request.resourceLeaseId,
+        kind: 'worker',
+        pid: process.pid,
+      });
     } else {
       if (globalStopRequested()) throw new Error('Major global kill switch is active');
       if (!request.providerRequest) {
@@ -627,25 +642,32 @@ export class LimaBackend implements ExecutionBackend {
     );
     timeout.unref();
     const authorityWatcher =
-      request.executionAuthority.kind === 'staged_validation'
+      request.executionAuthority.kind === 'staged_validation' ||
+      request.executionAuthority.kind === 'supervised_workshop'
         ? setInterval(() => {
             if (globalStopRequested()) {
               this.cancel();
               return;
             }
-            const opened = openDb();
-            try {
-              const lease = getStagedValidationLease(
-                opened.db,
-                request.executionAuthority.kind === 'staged_validation'
-                  ? request.executionAuthority.leaseId
-                  : '',
-              );
-              if (!['running', 'validating'].includes(lease.status)) this.cancel();
-            } catch {
-              this.cancel();
-            } finally {
-              opened.sqlite.close();
+            if (request.executionAuthority.kind === 'supervised_workshop') {
+              try {
+                assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd);
+              } catch {
+                this.cancel();
+              }
+            } else if (request.executionAuthority.kind === 'staged_validation') {
+              const opened = openDb();
+              try {
+                const lease = getStagedValidationLease(
+                  opened.db,
+                  request.executionAuthority.leaseId,
+                );
+                if (!['running', 'validating'].includes(lease.status)) this.cancel();
+              } catch {
+                this.cancel();
+              } finally {
+                opened.sqlite.close();
+              }
             }
           }, 1_000)
         : undefined;
@@ -894,6 +916,7 @@ export class LimaBackend implements ExecutionBackend {
           prompt: intent.prompt,
           allowGuestMutation: intent.allowGuestMutation,
           approvalAuthority: intent.approvalAuthority,
+          ...(intent.workshopMode ? { workshopMode: true } : {}),
           ...(intent.modelRef ? { modelRef: intent.modelRef } : {}),
           ...(intent.resumeSessionRef ? { resumeSessionRef: intent.resumeSessionRef } : {}),
           guestRun,

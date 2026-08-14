@@ -7,6 +7,7 @@ export interface AgentRuntimeRequest {
   prompt: string;
   allowGuestMutation: boolean;
   approvalAuthority: ProviderApprovalAuthority;
+  workshopMode?: boolean;
   modelRef?: string;
   resumeSessionRef?: string;
   guestRun: string;

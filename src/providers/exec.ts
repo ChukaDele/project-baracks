@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { assertCapabilityAvailable } from '../security/capabilities.js';
+import { isCapabilityAvailable } from '../security/capabilities.js';
+import type { BackendExecutionAuthority } from '../security/staged-validation.js';
+import { assertSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { assertWithinRoots } from '../security/paths.js';
 import { redactText } from '../security/redact.js';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from './types.js';
@@ -172,7 +175,16 @@ function spawnStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
 
 /** Internal spawn engine. Security policy and OS wrapping are applied by the gateway. */
 /** @internal Production imports are architecture-gated to ExecutionGateway. */
-export function executeStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
-  assertCapabilityAvailable('live-agent-execution');
+export function executeStreaming(
+  spec: StreamingSpawnSpec,
+  authority?: BackendExecutionAuthority,
+): ExecuteHandle {
+  if (!isCapabilityAvailable('live-agent-execution')) {
+    if (authority?.kind === 'supervised_workshop') {
+      assertSupervisedWorkshopAuthority(authority, spec.cwd);
+    } else {
+      assertCapabilityAvailable('live-agent-execution');
+    }
+  }
   return spawnStreaming(spec);
 }

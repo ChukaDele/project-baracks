@@ -93,6 +93,21 @@ INSTALL_BRANCH="${INSTALL_BRANCH:-detached}"
 INSTALL_VERSION="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('package.json','utf8')).version)")"
 RELEASE_DIR="$RELEASES_DIR/$INSTALL_SHA"
 WORKER_INSTANCE="major-worker-${INSTALL_SHA:0:12}"
+ACTIVATION_MODE="${MAJOR_ACTIVATION_MODE:-final-release}"
+case "$ACTIVATION_MODE" in
+  supervised-workshop|final-release) ;;
+  *) echo "ERROR: MAJOR_ACTIVATION_MODE must be supervised-workshop or final-release" >&2; exit 2 ;;
+esac
+WORKSHOP_SESSION_ID=""
+WORKSHOP_AUTH_CWD=""
+if [ "$ACTIVATION_MODE" = supervised-workshop ]; then
+  WORKSHOP_SESSION_ID="${MAJOR_WORKSHOP_SESSION_ID:-${CODEX_THREAD_ID:-}}"
+  WORKSHOP_AUTH_CWD="$ROOT"
+  if [ -z "$WORKSHOP_SESSION_ID" ]; then
+    echo "ERROR: supervised Workshop installation requires an active session id" >&2
+    exit 2
+  fi
+fi
 
 if [ "$INSTALL_BRANCH" != "main" ]; then
   echo "ERROR: refusing to install Major from branch '$INSTALL_BRANCH'." >&2
@@ -228,6 +243,8 @@ PY
 fi
 MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE="$AUTH_SOURCE_INSTANCE" \
 MAJOR_PROVIDER_AUTH_SOURCE_SHA="$AUTH_SOURCE_SHA" \
+MAJOR_WORKSHOP_AUTH_CWD="$WORKSHOP_AUTH_CWD" \
+MAJOR_WORKSHOP_SESSION_ID="$WORKSHOP_SESSION_ID" \
   bash "$INSTALL_STAGE/runtime/scripts/provision-major-lima-worker.sh" \
     "$LIMACTL_PATH" "$WORKER_INSTANCE" "$INSTALL_SHA"
 

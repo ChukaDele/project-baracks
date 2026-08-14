@@ -55,6 +55,14 @@ export interface SessionAttachment {
   project?: string | undefined;
   repoPath?: string | undefined;
   sessionId?: string | undefined;
+  workshopAuthorization?:
+    | {
+        status: 'active' | 'revoked';
+        authorizedAt: string;
+        expiresAt: string;
+        revokedAt?: string | undefined;
+      }
+    | undefined;
   attachedAt: string;
 }
 
@@ -294,6 +302,78 @@ export function attachSession(input: {
     state.sessions = state.sessions.slice(-199);
     state.sessions.push(attachment);
     return attachment;
+  });
+}
+
+export function authorizeSessionWorkshop(input: {
+  host: string;
+  cwd: string;
+  project: string;
+  repoPath: string;
+  sessionId: string;
+  expiresAt: string;
+}): SessionAttachment {
+  return mutateSupervisorState((state) => {
+    const now = new Date().toISOString();
+    const commonDir = gitCommonDir(resolve(input.repoPath));
+    for (const session of state.sessions) {
+      if (
+        session.workshopAuthorization?.status === 'active' &&
+        (session.project === input.project ||
+          (commonDir !== undefined &&
+            session.repoPath !== undefined &&
+            gitCommonDir(resolve(session.repoPath)) === commonDir))
+      ) {
+        session.workshopAuthorization = {
+          ...session.workshopAuthorization,
+          status: 'revoked',
+          revokedAt: now,
+        };
+      }
+    }
+    const attachment: SessionAttachment = {
+      id: randomUUID(),
+      host: input.host,
+      cwd: resolve(input.cwd),
+      project: input.project,
+      repoPath: resolve(input.repoPath),
+      sessionId: input.sessionId,
+      attachedAt: now,
+      workshopAuthorization: {
+        status: 'active',
+        authorizedAt: now,
+        expiresAt: input.expiresAt,
+      },
+    };
+    state.sessions = state.sessions.slice(-199);
+    state.sessions.push(attachment);
+    return attachment;
+  });
+}
+
+export function revokeSessionWorkshop(input: { sessionId?: string; repoPath?: string }): number {
+  return mutateSupervisorState((state) => {
+    const now = new Date().toISOString();
+    const commonDir = input.repoPath ? gitCommonDir(resolve(input.repoPath)) : undefined;
+    let revoked = 0;
+    for (const session of state.sessions) {
+      if (
+        session.workshopAuthorization?.status === 'active' &&
+        (input.sessionId === undefined || session.sessionId === input.sessionId) &&
+        (input.repoPath === undefined ||
+          (commonDir !== undefined &&
+            session.repoPath !== undefined &&
+            gitCommonDir(resolve(session.repoPath)) === commonDir))
+      ) {
+        session.workshopAuthorization = {
+          ...session.workshopAuthorization,
+          status: 'revoked',
+          revokedAt: now,
+        };
+        revoked += 1;
+      }
+    }
+    return revoked;
   });
 }
 

@@ -371,6 +371,24 @@ export function assertActiveResourceLease(input: {
   });
 }
 
+/** Active process fence for a supervised Workshop run whose random owner is not authority. */
+export function assertActiveResourceLeaseForProcess(input: {
+  leaseId: string;
+  kind: ResourceKind;
+  pid: number;
+}): ResourceLease {
+  return withStoreLock((store) => {
+    prune(store);
+    const lease = store.leases.find((candidate) => candidate.id === input.leaseId);
+    if (!lease || lease.kind !== input.kind || lease.pid !== input.pid) {
+      throw new Error(
+        `resource lease is not the active ${input.kind} process fence: ${input.leaseId}`,
+      );
+    }
+    return { ...lease };
+  });
+}
+
 export function heartbeatResource(leaseId: string, ttlMs?: number): ResourceLease {
   return withStoreLock((store) => {
     prune(store);

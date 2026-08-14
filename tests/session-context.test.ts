@@ -1,11 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runSessionContextCli } from '../src/context/session-context.js';
 import { captureLearning, promoteLearning } from '../src/learning/candidates.js';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
-import { startGoal } from '../src/supervisor/state.js';
+import { readSupervisorState, startGoal } from '../src/supervisor/state.js';
+import {
+  assertSupervisedWorkshopAuthority,
+  resolveSupervisedWorkshopAuthority,
+} from '../src/security/supervised-workshop.js';
 
 let root = '';
 const prior: Record<string, string | undefined> = {};
@@ -16,6 +20,7 @@ const envKeys = [
   'MAJOR_RESOURCE_PATH',
   'MAJOR_STOP_PATH',
   'MAJOR_SKILLS_REGISTRY',
+  'MAJOR_HOME',
 ] as const;
 
 beforeEach(() => {
@@ -26,6 +31,7 @@ beforeEach(() => {
   process.env.MAJOR_LEARNING_ROOT = join(root, 'learning');
   process.env.MAJOR_RESOURCE_PATH = join(root, 'resources.json');
   process.env.MAJOR_STOP_PATH = join(root, 'STOP');
+  process.env.MAJOR_HOME = join(root, 'major-home');
 });
 
 afterEach(() => {
@@ -48,6 +54,104 @@ function repo(name: string): string {
 }
 
 describe('fresh session context', () => {
+  it('authorizes one expiring project-bound Workshop session and revokes it', async () => {
+    const current = repo('workshop-project');
+    const sibling = repo('other-project');
+    const separateClone = repo('workshop-clone');
+    writeFileSync(
+      join(separateClone, '.git', 'config'),
+      '[remote "origin"]\n\turl = https://github.com/example/workshop-project.git\n',
+    );
+    configureProjectPolicy({
+      project: 'github.com/example/workshop-project',
+      repoPath: current,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    expect(
+      await runSessionContextCli([
+        'session',
+        'authorize',
+        '--mode',
+        'supervised-workshop',
+        '--owner-approved',
+        '--host',
+        'codex',
+        '--session-id',
+        'thread-123',
+        '--cwd',
+        current,
+        '--expires-minutes',
+        '60',
+      ]),
+    ).toBe(true);
+    const authority = resolveSupervisedWorkshopAuthority(current);
+    expect(authority).toMatchObject({
+      kind: 'supervised_workshop',
+      sessionId: 'thread-123',
+      project: 'github.com/example/workshop-project',
+    });
+    expect(() => assertSupervisedWorkshopAuthority(authority, current)).not.toThrow();
+    expect(() => resolveSupervisedWorkshopAuthority(sibling)).toThrow(
+      /owner-approved build|no active supervised/,
+    );
+    expect(() => resolveSupervisedWorkshopAuthority(separateClone)).toThrow(/no active supervised/);
+    const sha = 'a'.repeat(40);
+    expect(
+      await runSessionContextCli([
+        'session',
+        'verify-handoff',
+        '--cwd',
+        current,
+        '--session-id',
+        'thread-123',
+        '--provider',
+        'codex',
+        '--release-sha',
+        sha,
+        '--destination-instance',
+        `major-worker-${sha.slice(0, 12)}`,
+      ]),
+    ).toBe(true);
+    expect(readFileSync(join(process.env.MAJOR_HOME!, 'workshop-audit.jsonl'), 'utf8')).toContain(
+      'provider-credential-handoff-authorized',
+    );
+
+    expect(
+      await runSessionContextCli([
+        'session',
+        'revoke',
+        '--session-id',
+        'thread-123',
+        '--cwd',
+        current,
+      ]),
+    ).toBe(true);
+    expect(() => resolveSupervisedWorkshopAuthority(current)).toThrow(/no active supervised/);
+    expect(
+      readSupervisorState().sessions.find((session) => session.sessionId === 'thread-123')
+        ?.workshopAuthorization?.status,
+    ).toBe('revoked');
+  });
+
+  it('refuses Workshop authorization without an owner-approved build policy', async () => {
+    const current = repo('observe-project');
+    await expect(
+      runSessionContextCli([
+        'session',
+        'authorize',
+        '--mode',
+        'supervised-workshop',
+        '--owner-approved',
+        '--session-id',
+        'thread-123',
+        '--cwd',
+        current,
+      ]),
+    ).rejects.toThrow(/owner-approved build/);
+  });
+
   it('recalls current-project and global learning, excludes another project, and resolves video routing', async () => {
     const current = repo('creative-site');
     const local = captureLearning({
