@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Command, Option } from 'commander';
 import { openDb, type Db } from '../db/client.js';
@@ -29,6 +29,15 @@ import { ExecutionGateway } from '../security/gateway.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
 import type { RunPurpose } from '../db/schema.js';
 import { majorExecutionBackend } from '../security/major-gateway.js';
+import {
+  capabilityCandidateSchema,
+  capabilityValidationSubject,
+  getCapability,
+  listCapabilities,
+  planCapabilityAcquisition,
+  provisionCapability,
+  validateCapability,
+} from '../capabilities/registry.js';
 
 /**
  * Exit codes (stable, documented in docs/architecture.md):
@@ -68,6 +77,18 @@ function emitJson(kind: string, data: unknown): void {
 
 function db(): Db {
   return openDb().db;
+}
+
+function readJsonFile(path: string): unknown {
+  if (!existsSync(path)) fail(`JSON file not found: ${path}`, EXIT.usage);
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    fail(
+      `invalid JSON file ${path}: ${error instanceof Error ? error.message : String(error)}`,
+      EXIT.usage,
+    );
+  }
 }
 
 /** Executables the CLI's own probes may run (read-only discovery checks). */
@@ -202,6 +223,112 @@ project
         `${row.id}  ${row.name}  ${row.repoPath}${row.githubRepo ? `  ${row.githubRepo}` : ''}`,
       );
     }
+  });
+
+const capability = program
+  .command('capability')
+  .description('Plan and validate project-scoped Toolsmith capabilities');
+
+capability
+  .command('plan')
+  .description('Reuse a proven capability or identify the safest provisional candidate')
+  .requiredOption('--project <name>', 'registered project name')
+  .requiredOption('--operation <name>', 'required operation')
+  .requiredOption('--candidates <path>', 'JSON array of bounded candidate facts')
+  .option('--json', 'emit versioned JSON')
+  .action((opts: { project: string; operation: string; candidates: string; json?: boolean }) => {
+    const database = db();
+    const projectRow = requireProject(database, opts.project);
+    const raw = readJsonFile(opts.candidates);
+    if (!Array.isArray(raw)) fail('--candidates must contain a JSON array', EXIT.usage);
+    const plan = planCapabilityAcquisition(database, {
+      projectId: projectRow.id,
+      operation: opts.operation,
+      candidates: raw.map((candidate) => capabilityCandidateSchema.parse(candidate)),
+    });
+    if (opts.json) return emitJson('capability-plan', plan);
+    if (plan.kind === 'reuse') {
+      console.log(`reuse capability ${plan.capability.key} [${plan.capability.status}]`);
+    } else if (plan.kind === 'provision') {
+      console.log(`provision candidate ${plan.assessment.candidate.key} after sandbox preflight`);
+    } else {
+      console.log(`capability checkpoint: ${plan.reasons.join('; ')}`);
+    }
+  });
+
+capability
+  .command('provision')
+  .description('Record a preflight-passing candidate as provisional; never installs it')
+  .requiredOption('--project <name>', 'registered project name')
+  .requiredOption('--candidate <path>', 'JSON candidate facts with sandbox preflight evidence')
+  .action((opts: { project: string; candidate: string }) => {
+    const database = db();
+    const projectRow = requireProject(database, opts.project);
+    const row = provisionCapability(database, {
+      projectId: projectRow.id,
+      candidate: capabilityCandidateSchema.parse(readJsonFile(opts.candidate)),
+    });
+    console.log(`provisional capability ${row.id} ${row.key}`);
+  });
+
+capability
+  .command('validate')
+  .description('Apply an independent validation result to a provisional capability')
+  .requiredOption('--id <capabilityId>', 'capability id')
+  .requiredOption('--reviewer <identity>', 'independent reviewer identity')
+  .requiredOption('--verification-run <id>', 'passed verification run from that reviewer')
+  .requiredOption('--evidence <summary>', 'independent validation evidence')
+  .requiredOption('--artifact <path>', 'capability-specific verification artifact JSON')
+  .requiredOption('--result <pass|fail>', 'independent validation result')
+  .action(
+    (opts: {
+      id: string;
+      reviewer: string;
+      verificationRun: string;
+      evidence: string;
+      artifact: string;
+      result: string;
+    }) => {
+      if (opts.result !== 'pass' && opts.result !== 'fail') {
+        fail('--result must be pass or fail', EXIT.usage);
+      }
+      const row = validateCapability(db(), {
+        id: opts.id,
+        passed: opts.result === 'pass',
+        reviewer: opts.reviewer,
+        evidence: opts.evidence,
+        verificationRunId: opts.verificationRun,
+        artifact: readJsonFile(opts.artifact) as Parameters<
+          typeof validateCapability
+        >[1]['artifact'],
+      });
+      console.log(`capability ${row.id} ${row.status}`);
+    },
+  );
+
+capability
+  .command('validation-subject')
+  .description('Print the immutable binding required on an independent verification run')
+  .requiredOption('--id <capabilityId>', 'provisional capability id')
+  .requiredOption('--operation <name>', 'capability operation under review')
+  .action((opts: { id: string; operation: string }) => {
+    const record = getCapability(db(), opts.id);
+    if (record.status !== 'provisional' || !record.operations.includes(opts.operation)) {
+      fail('validation subject requires a provisional capability operation', EXIT.usage);
+    }
+    console.log(capabilityValidationSubject(record, opts.operation));
+  });
+
+capability
+  .command('list')
+  .description('List project-scoped capability records')
+  .requiredOption('--project <name>', 'registered project name')
+  .option('--json', 'emit versioned JSON')
+  .action((opts: { project: string; json?: boolean }) => {
+    const database = db();
+    const rows = listCapabilities(database, requireProject(database, opts.project).id);
+    if (opts.json) return emitJson('capability-list', rows);
+    for (const row of rows) console.log(`${row.id}  [${row.status}]  ${row.key}`);
   });
 
 const task = program.command('task').description('Manage engineering tasks');

@@ -75,7 +75,11 @@ export function ensureObservedModel(
  * exit code 0, completed timestamps, produced under a succeeded agent run of
  * the same task, and cited by an evidence row.
  */
-export function recordQualifyingVerification(db: Db, taskId: string) {
+export function recordQualifyingVerification(
+  db: Db,
+  taskId: string,
+  input: { validationSubject?: string } = {},
+) {
   const providerId = ensureProvider(db);
   const run = createRun(db, {
     taskId,
@@ -92,6 +96,7 @@ export function recordQualifyingVerification(db: Db, taskId: string) {
     status: 'passed',
     exitCode: 0,
     agentRunId: run.id,
+    ...(input.validationSubject ? { validationSubject: input.validationSubject } : {}),
   });
   const proof = addEvidence(db, {
     taskId,

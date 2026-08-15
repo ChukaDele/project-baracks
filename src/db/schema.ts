@@ -279,6 +279,148 @@ export const discoveryObservations = sqliteTable(
   ],
 );
 
+/** Project-scoped tools, adapters and providers that Toolsmith has evaluated.
+ * These are distinct from the immutable build-capability gates in
+ * security/capabilities.ts: a record says what a project may use, never what
+ * authority the Major runtime grants. */
+export const CAPABILITY_TYPES = [
+  'local_tool',
+  'skill',
+  'mcp',
+  'api',
+  'cli',
+  'library',
+  'open_source',
+  'adapter',
+  'browser',
+] as const;
+export type CapabilityType = (typeof CAPABILITY_TYPES)[number];
+
+export const CAPABILITY_STATUSES = [
+  'candidate',
+  'provisional',
+  'validated',
+  'preferred',
+  'degraded',
+  'deprecated',
+  'blocked',
+] as const;
+export type CapabilityStatus = (typeof CAPABILITY_STATUSES)[number];
+
+export const CAPABILITY_VALIDATION_STATES = [
+  'not_started',
+  'preflight_passed',
+  'capability_verified',
+  'independently_validated',
+  'failed',
+] as const;
+export type CapabilityValidationState = (typeof CAPABILITY_VALIDATION_STATES)[number];
+
+export const capabilityRecords = sqliteTable(
+  'capability_records',
+  {
+    id: id(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id),
+    key: text('key').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    type: text('type', { enum: CAPABILITY_TYPES }).notNull(),
+    operationsJson: text('operations_json').notNull(),
+    riskLevel: text('risk_level', { enum: ['low', 'medium', 'high'] }).notNull(),
+    sourceJson: text('source_json').notNull(),
+    sourceFingerprint: text('source_fingerprint').notNull(),
+    provenanceJson: text('provenance_json').notNull(),
+    verificationArtifactId: text('verification_artifact_id'),
+    status: text('status', { enum: CAPABILITY_STATUSES }).notNull().default('candidate'),
+    validationState: text('validation_state', { enum: CAPABILITY_VALIDATION_STATES })
+      .notNull()
+      .default('not_started'),
+    successCount: integer('success_count').notNull().default(0),
+    failureCount: integer('failure_count').notNull().default(0),
+    lastUsedAt: text('last_used_at'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('capability_records_project_key').on(t.projectId, t.key),
+    index('capability_records_project_status').on(t.projectId, t.status),
+    enumCheck('capability_records_type_valid', 'type', CAPABILITY_TYPES),
+    enumCheck('capability_records_status_valid', 'status', CAPABILITY_STATUSES),
+    enumCheck(
+      'capability_records_validation_valid',
+      'validation_state',
+      CAPABILITY_VALIDATION_STATES,
+    ),
+    check('capability_records_counts_non_negative', sql`success_count >= 0 AND failure_count >= 0`),
+  ],
+);
+
+/** Compact, capability-specific verification provenance. Full logs stay with
+ * the verifier; this record contains only the facts needed to revalidate. */
+export const capabilityVerificationArtifacts = sqliteTable(
+  'capability_verification_artifacts',
+  {
+    id: id(),
+    capabilityId: text('capability_id')
+      .notNull()
+      .references(() => capabilityRecords.id),
+    sourceFingerprint: text('source_fingerprint').notNull(),
+    operation: text('operation').notNull(),
+    fixtureJson: text('fixture_json').notNull(),
+    expectedJson: text('expected_json').notNull(),
+    actualJson: text('actual_json').notNull(),
+    validator: text('validator').notNull(),
+    environmentJson: text('environment_json').notNull(),
+    securityJson: text('security_json').notNull(),
+    status: text('status', { enum: ['passed', 'failed'] }).notNull(),
+    verificationRunId: text('verification_run_id').references(() => verificationRuns.id),
+    validationSubject: text('validation_subject').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('capability_verification_artifacts_capability').on(t.capabilityId),
+    enumCheck('capability_verification_artifacts_status_valid', 'status', ['passed', 'failed']),
+  ],
+);
+
+/** Append-only evidence for Toolsmith lifecycle decisions and real outcomes. */
+export const capabilityEvents = sqliteTable(
+  'capability_events',
+  {
+    id: id(),
+    capabilityId: text('capability_id')
+      .notNull()
+      .references(() => capabilityRecords.id),
+    kind: text('kind', {
+      enum: [
+        'provisioned',
+        'validated',
+        'validation_failed',
+        'outcome',
+        'reported_use',
+        'deprecated',
+        'preferred',
+      ],
+    }).notNull(),
+    evidenceJson: text('evidence_json').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('capability_events_capability').on(t.capabilityId),
+    enumCheck('capability_events_kind_valid', 'kind', [
+      'provisioned',
+      'validated',
+      'validation_failed',
+      'outcome',
+      'reported_use',
+      'deprecated',
+      'preferred',
+    ]),
+  ],
+);
+
 export const RUN_PURPOSES = [
   'implementation',
   'verification',
@@ -445,6 +587,8 @@ export const verificationRuns = sqliteTable(
     status: text('status', { enum: VERIFICATION_STATUSES }).notNull().default('pending'),
     exitCode: integer('exit_code'),
     outputSummary: text('output_summary'),
+    /** Immutable capability/version/operation binding when this run validates a capability. */
+    validationSubject: text('validation_subject'),
     startedAt: text('started_at'),
     endedAt: text('ended_at'),
     createdAt: createdAt(),

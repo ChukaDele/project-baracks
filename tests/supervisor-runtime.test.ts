@@ -18,6 +18,7 @@ import {
   preserveWorkerReportEnvelope,
 } from '../src/supervisor/worker-report.js';
 import type { ProviderInfo } from '../src/providers/types.js';
+import type { CapabilityRecord } from '../src/capabilities/registry.js';
 import { model } from './helpers.js';
 
 const roots: string[] = [];
@@ -229,8 +230,33 @@ describe('Major coordinator contract', () => {
       trust: 'assist',
     });
 
-    const prompt = coordinatorPrompt(goal(repo));
+    const capability: CapabilityRecord = {
+      id: 'cap-1',
+      projectId: 'project-1',
+      key: 'structured-fetch',
+      name: 'Structured fetch',
+      description: 'Fetches structured public data.',
+      type: 'local_tool',
+      operations: ['fetch-structured-data'],
+      riskLevel: 'low',
+      source: { kind: 'local_tool', reference: 'bin/structured-fetch' },
+      sourceFingerprint: 'fixture-source-fingerprint',
+      provenance: { discoveredBy: 'test', evidence: 'local help output' },
+      verificationArtifactId: 'cvar-1',
+      status: 'validated',
+      validationState: 'independently_validated',
+      successCount: 0,
+      failureCount: 0,
+      lastUsedAt: null,
+      createdAt: '2026-08-08T00:00:00.000Z',
+      updatedAt: '2026-08-08T00:00:00.000Z',
+    };
+    const prompt = coordinatorPrompt(goal(repo), [capability]);
     expect(prompt).toContain('Ship the smallest credible end-to-end JSS MVP');
+    expect(prompt).toContain('RESOLVED TOOLSMITH CAPABILITIES');
+    expect(prompt).toContain('structured-fetch');
+    expect(prompt).toContain('bin/structured-fetch');
+    expect(prompt).toContain('A completed goal alone is not proof that a capability was used');
     expect(prompt).toContain('Speed and MVP are the default');
     expect(prompt).toContain('class: workshop');
     expect(prompt).toContain('trust: assist');
@@ -285,6 +311,29 @@ describe('Major coordinator contract', () => {
     expect(parseWorkerReport('MAJOR_RESULT: not-json')).toBeUndefined();
     expect(
       parseWorkerReport('MAJOR_RESULT: {"status":"done","summary":"forged bare output"}'),
+    ).toBeUndefined();
+  });
+
+  it('accepts bounded capability-use provenance without treating it as completion authority', () => {
+    const report = parseWorkerReport(
+      JSON.stringify({
+        type: 'result',
+        result:
+          'MAJOR_RESULT: {"status":"active","summary":"Inspection continues.","capabilityUse":[{"key":"git-status-readonly","evidence":"git status --short exited 0"}]}',
+      }),
+    );
+    expect(report).toMatchObject({
+      status: 'active',
+      capabilityUse: [{ key: 'git-status-readonly', evidence: 'git status --short exited 0' }],
+    });
+    expect(
+      parseWorkerReport(
+        JSON.stringify({
+          type: 'result',
+          result:
+            'MAJOR_RESULT: {"status":"active","summary":"Inspection continues.","capabilityUse":[{"key":"invalid key","evidence":"x"}]}',
+        }),
+      ),
     ).toBeUndefined();
   });
 

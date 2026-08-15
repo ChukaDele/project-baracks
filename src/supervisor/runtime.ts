@@ -11,6 +11,19 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { openDb } from '../db/client.js';
+import { getProjectByRepoPath } from '../config/project-service.js';
+import {
+  listCapabilities,
+  blockCapabilityVerification,
+  invalidateCapabilitySource,
+  planCapabilityAcquisition,
+  provisionCapability,
+  recordReportedCapabilityUse,
+  validateDiscoveredCapability,
+  type CapabilityRecord,
+} from '../capabilities/registry.js';
+import { discoverCapabilities, type DiscoveredCapability } from '../capabilities/discovery.js';
+import { isCapabilitySourceCurrent } from '../capabilities/verifier.js';
 import { captureLearning, listLearningCandidates } from '../learning/candidates.js';
 import {
   consumeModelRetry,
@@ -162,6 +175,143 @@ export function selectCoordinator(
   };
 }
 
+export interface ToolsmithDependencies {
+  discover(input: { operation: string; repoPath: string }): DiscoveredCapability[];
+  sourceCurrent(capability: CapabilityRecord, repoPath: string): boolean;
+}
+
+const defaultToolsmithDependencies: ToolsmithDependencies = {
+  discover: discoverCapabilities,
+  sourceCurrent: isCapabilitySourceCurrent,
+};
+
+export function resolveGoalCapabilities(
+  goal: SupervisorGoal,
+  dependencies: ToolsmithDependencies = defaultToolsmithDependencies,
+): { kind: 'ready'; capabilities: CapabilityRecord[] } | { kind: 'checkpoint'; reason: string } {
+  if (!goal.requiredOperations || goal.requiredOperations.length === 0) {
+    return { kind: 'ready', capabilities: [] };
+  }
+  const state = openDb();
+  try {
+    const project = getProjectByRepoPath(state.db, goal.repoPath);
+    const capabilities: CapabilityRecord[] = [];
+    for (const operation of goal.requiredOperations) {
+      for (const capability of listCapabilities(state.db, project.id)) {
+        if (
+          capability.operations.includes(operation) &&
+          ['validated', 'preferred'].includes(capability.status) &&
+          !dependencies.sourceCurrent(capability, goal.repoPath)
+        ) {
+          invalidateCapabilitySource(state.db, capability.id);
+        }
+      }
+      const existingPlan = planCapabilityAcquisition(state.db, {
+        projectId: project.id,
+        operation,
+        candidates: [],
+      });
+      if (existingPlan.kind === 'reuse') {
+        capabilities.push(existingPlan.capability);
+        continue;
+      }
+      const discovered = dependencies.discover({ operation, repoPath: goal.repoPath });
+      const existingKeys = new Set(
+        listCapabilities(state.db, project.id)
+          .filter(
+            (capability) => !['degraded', 'blocked', 'deprecated'].includes(capability.status),
+          )
+          .map((capability) => capability.key),
+      );
+      const remaining = discovered.filter(
+        (candidate) => !existingKeys.has(candidate.candidate.key),
+      );
+      const reasons: string[] = [];
+      for (;;) {
+        const plan = planCapabilityAcquisition(state.db, {
+          projectId: project.id,
+          operation,
+          candidates: remaining.map((candidate) => candidate.candidate),
+        });
+        if (plan.kind === 'reuse') {
+          capabilities.push(plan.capability);
+          break;
+        }
+        if (plan.kind === 'blocked') {
+          reasons.push(...plan.reasons);
+          return {
+            kind: 'checkpoint',
+            reason: `Toolsmith checkpoint for ${operation}: ${[...new Set(reasons)].join('; ')}`,
+          };
+        }
+        const discoveredCandidate = remaining.find(
+          (candidate) => candidate.candidate.key === plan.assessment.candidate.key,
+        );
+        if (!discoveredCandidate) {
+          return {
+            kind: 'checkpoint',
+            reason: `Toolsmith checkpoint for ${operation}: discovery drift`,
+          };
+        }
+        const provisional = provisionCapability(state.db, {
+          projectId: project.id,
+          candidate: discoveredCandidate.candidate,
+        });
+        let verified: CapabilityRecord;
+        try {
+          verified = validateDiscoveredCapability(state.db, {
+            id: provisional.id,
+            repoPath: goal.repoPath,
+          });
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          blockCapabilityVerification(state.db, provisional.id, reason);
+          reasons.push(`candidate ${discoveredCandidate.candidate.key} verifier error: ${reason}`);
+          remaining.splice(remaining.indexOf(discoveredCandidate), 1);
+          continue;
+        }
+        if (verified.status === 'validated') {
+          capabilities.push(verified);
+          break;
+        }
+        reasons.push(`candidate ${verified.key} failed capability-specific validation`);
+        remaining.splice(remaining.indexOf(discoveredCandidate), 1);
+      }
+    }
+    return { kind: 'ready', capabilities };
+  } catch (error) {
+    return {
+      kind: 'checkpoint',
+      reason: `Toolsmith capability resolution failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  } finally {
+    state.sqlite.close();
+  }
+}
+
+/** Store a worker report as provenance only. It cannot promote a capability
+ * because a worker claim is not independent validation. */
+export function recordReportedCapabilityUses(
+  capabilities: readonly CapabilityRecord[],
+  uses: readonly { key: string; evidence: string }[] | undefined,
+): void {
+  if (!uses || uses.length === 0) return;
+  const capabilityState = openDb();
+  try {
+    for (const usage of uses) {
+      const capability = capabilities.find((candidate) => candidate.key === usage.key);
+      if (capability) {
+        recordReportedCapabilityUse(capabilityState.db, {
+          id: capability.id,
+          evidence: usage.evidence,
+        });
+      }
+    }
+  } finally {
+    capabilityState.sqlite.close();
+  }
+}
+
 function trustContract(policy: ProjectPolicy): string {
   const external = policy.allowExternalWrites
     ? 'External writes may occur only when already authorized by project/user policy.'
@@ -186,7 +336,10 @@ function trustContract(policy: ProjectPolicy): string {
 - Client data and PII stay inside the project boundary. Never use client/candidate data as global training/memory material.`;
 }
 
-export function coordinatorPrompt(goal: SupervisorGoal): string {
+export function coordinatorPrompt(
+  goal: SupervisorGoal,
+  capabilities: readonly CapabilityRecord[] = [],
+): string {
   const context = readProjectContext(goal.repoPath);
   const learningContext = readLearningContext(goal.project, goal.repoPath);
   let resolvedSkills: ReturnType<typeof resolveSkills>['skills'] = [];
@@ -217,6 +370,24 @@ ${goal.goal}
 CANONICAL TARGET:
 - project: ${goal.project}
 - repository path: ${goal.repoPath}
+
+RESOLVED TOOLSMITH CAPABILITIES:
+${
+  capabilities.length === 0
+    ? '(No capability was required for this goal.)'
+    : capabilities
+        .map(
+          (capability) =>
+            `- ${capability.key}: ${capability.description}\n` +
+            `  operations: ${capability.operations.join(', ')}\n` +
+            `  source: ${capability.source.kind} (${capability.source.reference})\n` +
+            `  status: ${capability.status}`,
+        )
+        .join('\n')
+}
+Use only these already-validated capabilities for the operations they declare. Do not install, configure, or substitute a new capability. Report capability-specific evidence in the final result when you use one. A completed goal alone is not proof that a capability was used.
+Use this exact optional field for that evidence:
+"capabilityUse":[{"key":"capability-key","evidence":"specific operation and observed result"}].
 
 Before any substantive mutation, verify that the current Git root/remote and the task's named or implied target agree with this canonical target. If the task clearly belongs to another known project, do not patch this repository. Use project-context-integrity and reroute to the correct repository when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong repository is a failed task.
 
@@ -388,6 +559,19 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
     return;
   }
   const host = selection.host;
+  const capabilityResolution = resolveGoalCapabilities(goal);
+  if (capabilityResolution.kind === 'checkpoint') {
+    updateGoal(goal.id, {
+      status: 'blocked',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: capabilityResolution.reason,
+      nextRunAt: undefined,
+      ownerGate: 'Review the Toolsmith checkpoint or register an approved capability.',
+    });
+    console.error(capabilityResolution.reason);
+    return;
+  }
   let routedSkillIds: string[] = [];
   try {
     routedSkillIds = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills.map(
@@ -408,7 +592,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
 
   const outcome = await runWorker({
     host,
-    prompt: coordinatorPrompt(goal),
+    prompt: coordinatorPrompt(goal, capabilityResolution.capabilities),
     cwd: goal.repoPath,
     timeoutMs: Math.max(1, policy.maxRunMinutes) * 60 * 1000,
     modelRef: selection.modelRef,
@@ -445,6 +629,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
 
   if (outcome.status === 'succeeded') {
     const report = parseWorkerReport(outcome.stdout);
+    recordReportedCapabilityUses(capabilityResolution.capabilities, report?.capabilityUse);
     let learningWarning = '';
     if (report?.learning) {
       try {

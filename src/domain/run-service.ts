@@ -342,6 +342,7 @@ export function recordVerificationRun(
     status: (typeof verificationRuns.$inferInsert)['status'];
     exitCode?: number;
     outputSummary?: string;
+    validationSubject?: string;
     agentRunId?: string;
     startedAt?: string;
     endedAt?: string;
@@ -362,6 +363,7 @@ export function recordVerificationRun(
     status,
     exitCode: exitCode ?? null,
     outputSummary: outputSummary !== undefined ? redactText(outputSummary) : null,
+    validationSubject: input.validationSubject ?? null,
     startedAt: input.startedAt ?? (terminal ? nowIso() : null),
     endedAt: input.endedAt ?? (terminal ? nowIso() : null),
   };

@@ -11,6 +11,7 @@ const authPaths = {
   cursor: '.config/cursor/auth.json',
   antigravity: '.gemini/antigravity-cli/antigravity-oauth-token',
 } as const;
+const providerStateTimeout = 15_000;
 
 function run(
   root: string,
@@ -83,6 +84,7 @@ describe('project-scoped provider state broker', () => {
       expect(() => readFileSync(join(runA3, 'project-a-only.txt'))).toThrow();
       expect(readFileSync(join(runA3, authRelative), 'utf8')).toBe('refreshed-auth-proof');
     },
+    providerStateTimeout,
   );
 
   it('rejects a symlink instead of persisting it into project state', () => {

@@ -157,6 +157,35 @@ Typical routes:
 
 A failed first tool is not a failed task.
 
+### Toolsmith lifecycle
+
+Toolsmith extends this router with a project-scoped capability lifecycle. It
+reuses proven local capability records first. A missing safe capability is
+discovered, provisioned, verified, and returned to the original goal in the
+same supervisor cycle. A missing capability is assessed
+from bounded candidate facts, never blindly installed. A passing preflight
+creates a `provisional` record. A capability-specific artifact is required for
+every validation. Manual validation also requires a passed persisted run from
+a reviewer distinct from the candidate discoverer. The process-free local
+catalog can verify only Major's existing low-risk path adapter, with a
+separate deterministic verifier and exact runtime source-revision binding. Repeated verified
+outcomes can make a capability `preferred`; failures degrade it; deprecation
+removes it from routing without deleting provenance. See
+[Toolsmith and validation](toolsmith.md).
+
+Toolsmith records cannot change the immutable runtime capability gates. They
+also do not create skills. The existing GBrain skill lifecycle promotes only
+repeated, independently validated successful workflows.
+
+## 5.1 Artifact-aware validation and ship gate
+
+Major runs deterministic artifact-specific checks before an independent/model
+review. Writing, code, analysis, presentation, and web
+outputs use distinct evidence contracts rather than one generic judge prompt.
+The web ship gate blocks on missing applicable functional, data, visual,
+technical, performance, security, deployment, and public-site SEO evidence.
+It does not treat a build, a preview URL, or a policy record as runtime proof.
+
 ## 6. Worker adapters
 
 Thin adapters invoke available coding/reasoning environments:

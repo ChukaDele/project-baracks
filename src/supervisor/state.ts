@@ -39,6 +39,7 @@ export interface SupervisorGoal {
   activePid?: number | undefined;
   nextRunAt?: string | undefined;
   lastCoordinator?: WorkerHost | undefined;
+  requiredOperations?: string[] | undefined;
   pendingCompletion?:
     | {
         summary: string;
@@ -153,6 +154,7 @@ export function startGoal(input: {
   goal: string;
   autonomous: boolean;
   preferredCoordinator?: WorkerHost;
+  requiredOperations?: string[];
 }): SupervisorGoal {
   return mutateSupervisorState((state) => {
     const now = new Date().toISOString();
@@ -168,6 +170,7 @@ export function startGoal(input: {
         existing.goal = input.goal;
         existing.repoPath = resolve(input.repoPath);
         existing.autonomous = input.autonomous;
+        existing.requiredOperations = input.requiredOperations;
         existing.status = 'active';
         existing.updatedAt = now;
         existing.ownerGate = undefined;
@@ -184,6 +187,9 @@ export function startGoal(input: {
       autonomous: input.autonomous,
       status: 'active',
       preferredCoordinator: input.preferredCoordinator ?? 'claude',
+      ...(input.requiredOperations && input.requiredOperations.length > 0
+        ? { requiredOperations: input.requiredOperations }
+        : {}),
       cycle: 0,
       consecutiveFailures: 0,
       createdAt: now,

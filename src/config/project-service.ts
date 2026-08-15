@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { resolve } from 'node:path';
 import type { Db } from '../db/client.js';
 import { projects } from '../db/schema.js';
 import { newId } from '../domain/ids.js';
@@ -24,6 +25,13 @@ export function listProjects(db: Db) {
 export function getProjectByName(db: Db, name: string) {
   const row = db.select().from(projects).where(eq(projects.name, name)).get();
   if (!row) throw new Error(`project not found: ${name}`);
+  return row;
+}
+
+export function getProjectByRepoPath(db: Db, repoPath: string) {
+  const normalized = resolve(repoPath);
+  const row = listProjects(db).find((candidate) => resolve(candidate.repoPath) === normalized);
+  if (!row) throw new Error(`project not found for repository: ${normalized}`);
   return row;
 }
 

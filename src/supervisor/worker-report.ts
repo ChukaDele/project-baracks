@@ -25,6 +25,7 @@ export interface WorkerReport {
     validations: string[];
     scope: 'project' | 'global';
   };
+  capabilityUse?: { key: string; evidence: string }[];
 }
 
 export function completedWorkflow(
@@ -170,12 +171,28 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
       if (!task || !outcome || !steps || !tools || !validations) return undefined;
       workflow = { task, outcome, steps, tools, validations, scope };
     }
+    let capabilityUse: WorkerReport['capabilityUse'];
+    if (value.capabilityUse !== undefined) {
+      if (!Array.isArray(value.capabilityUse) || value.capabilityUse.length > 24) return undefined;
+      const seen = new Set<string>();
+      capabilityUse = [];
+      for (const item of value.capabilityUse) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
+        const candidate = item as Record<string, unknown>;
+        const key = typeof candidate.key === 'string' ? candidate.key.trim() : '';
+        const evidence = typeof candidate.evidence === 'string' ? candidate.evidence.trim() : '';
+        if (!/^[a-z0-9][a-z0-9-]{1,79}$/.test(key) || !evidence || seen.has(key)) return undefined;
+        seen.add(key);
+        capabilityUse.push({ key, evidence: redactText(evidence).slice(0, 2_000) });
+      }
+    }
     return {
       status: value.status as WorkerReport['status'],
       summary,
       ...(ownerGate ? { ownerGate } : {}),
       ...(learning ? { learning } : {}),
       ...(workflow ? { workflow } : {}),
+      ...(capabilityUse ? { capabilityUse } : {}),
     };
   } catch {
     return undefined;
