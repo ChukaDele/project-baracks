@@ -169,6 +169,53 @@ describe('major CLI', () => {
     expect(parsed.data[0]?.name).toBe('demo');
   });
 
+  it('exposes Toolsmith planning through the compiled control-plane CLI', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'major-capability-cli-'));
+    const candidates = join(scratch, 'candidates.json');
+    writeFileSync(
+      candidates,
+      JSON.stringify([
+        {
+          key: 'local-fetch',
+          name: 'Local fetch',
+          description: 'Fetch structured public data.',
+          type: 'local_tool',
+          operations: ['fetch-structured-data'],
+          riskLevel: 'low',
+          costProfile: 'none',
+          permissions: [],
+          source: { kind: 'local_tool', reference: 'bin/local-fetch' },
+          provenance: { discoveredBy: 'cli-discovery', evidence: 'help output' },
+          preflight: {
+            dependencyReviewed: true,
+            permissionsReviewed: true,
+            secretsSafe: true,
+            telemetryReviewed: true,
+            compatibilityChecked: true,
+            smokeTestPassed: true,
+            failureBehaviorPassed: true,
+          },
+        },
+      ]),
+    );
+    const result = major(
+      'capability',
+      'plan',
+      '--project',
+      'demo',
+      '--operation',
+      'fetch-structured-data',
+      '--candidates',
+      candidates,
+      '--json',
+    );
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      kind: 'capability-plan',
+      data: { kind: 'provision', assessment: { accepted: true } },
+    });
+  });
+
   it('rejects invalid option values with a usage exit code', () => {
     const result = major(
       'task',
@@ -263,6 +310,7 @@ describe('major CLI', () => {
     // This is the Commander task-ledger surface. The successor supervisor is
     // routed by src/entry.ts before Commander and has separate contract tests.
     expect(listCommands(help.stdout).sort()).toEqual([
+      'capability',
       'doctor',
       'help',
       'project',

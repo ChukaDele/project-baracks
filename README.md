@@ -33,6 +33,11 @@ Permanent Major code stays focused on deterministic control-plane concerns:
 
 Reusable procedure belongs in tested skills. Repeated deterministic mechanics can be composed at runtime with `tools-as-code`. A successful novel procedure becomes a reusable skill only after it works, via `skillify`.
 
+Toolsmith keeps the related capability question separate: it records and
+reuses project-scoped tools/adapters only after preflight and independent
+validation. It never installs blindly or opens a runtime authority gate. See
+[Toolsmith and validation](docs/toolsmith.md).
+
 ## Always present, owner-controlled authority
 
 Major's communication/routing/project context should be present across supported agent tools. The owner decides how much execution authority each project receives.

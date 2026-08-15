@@ -58,6 +58,12 @@ function flag(args: string[], name: string): string | undefined {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+function flags(args: string[], name: string): string[] {
+  return args.flatMap((value, index) =>
+    value === name && args[index + 1] ? [args[index + 1]!] : [],
+  );
+}
+
 function hasFlag(args: string[], name: string): boolean {
   return args.includes(name);
 }
@@ -324,6 +330,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const policy = getProjectPolicy(project.project, project.repoPath);
     const preferredRaw = flag(args, '--coordinator');
     const requestedAutonomy = hasFlag(args, '--autonomous');
+    const requiredOperations = [...new Set(flags(args, '--capability'))];
     if (requestedAutonomy && !policy.allowBackground) {
       throw new Error(
         `project ${project.project} is ${policy.projectClass}/${policy.trust}; unattended execution is not allowed`,
@@ -334,6 +341,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       repoPath: project.repoPath,
       goal: goalText,
       autonomous: requestedAutonomy,
+      ...(requiredOperations.length > 0 ? { requiredOperations } : {}),
       ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
     });
     console.log(`Major goal active: ${goal.id}`);

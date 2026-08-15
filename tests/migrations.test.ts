@@ -96,4 +96,66 @@ describe('migrations', () => {
     expect(suggestion.source_type).toBe('human');
     void db;
   });
+
+  it('upgrades a prior Toolsmith artifact without silently reusing it', () => {
+    const path = tempDbPath();
+    const sqlite = new Database(path);
+    sqlite.pragma('foreign_keys = OFF');
+    sqlite.exec(`
+      CREATE TABLE capability_records (
+        id text PRIMARY KEY NOT NULL,
+        status text NOT NULL,
+        validation_state text NOT NULL,
+        verification_artifact_id text
+      );
+      CREATE TABLE capability_verification_artifacts (
+        id text PRIMARY KEY NOT NULL,
+        capability_id text NOT NULL,
+        source_fingerprint text NOT NULL,
+        operation text NOT NULL,
+        fixture_json text NOT NULL,
+        expected_json text NOT NULL,
+        actual_json text NOT NULL,
+        validator text NOT NULL,
+        environment_json text NOT NULL,
+        security_json text NOT NULL,
+        status text NOT NULL,
+        verification_run_id text,
+        created_at text NOT NULL
+      );
+      CREATE TABLE verification_runs (id text PRIMARY KEY NOT NULL);
+    `);
+    sqlite
+      .prepare(
+        `INSERT INTO capability_records (id, status, validation_state, verification_artifact_id)
+         VALUES ('cap_legacy', 'validated', 'independently_validated', 'cvar_legacy')`,
+      )
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO capability_verification_artifacts (id, capability_id, source_fingerprint, operation, fixture_json, expected_json, actual_json, validator, environment_json, security_json, status, created_at)
+         VALUES ('cvar_legacy', 'cap_legacy', 'legacy-source', 'fetch', '{}', '{}', '{}', 'legacy-validator', '{}', '{}', 'passed', '2026-01-01')`,
+      )
+      .run();
+
+    applyRaw(sqlite, '0018_striped_the_hand.sql');
+
+    expect(
+      sqlite
+        .prepare('SELECT validation_subject FROM capability_verification_artifacts WHERE id = ?')
+        .get('cvar_legacy'),
+    ).toMatchObject({ validation_subject: 'legacy-unbound:cvar_legacy' });
+    expect(
+      sqlite
+        .prepare(
+          'SELECT status, validation_state, verification_artifact_id FROM capability_records WHERE id = ?',
+        )
+        .get('cap_legacy'),
+    ).toMatchObject({
+      status: 'degraded',
+      validation_state: 'failed',
+      verification_artifact_id: null,
+    });
+    sqlite.close();
+  });
 });
