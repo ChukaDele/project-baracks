@@ -30,6 +30,7 @@ export default tseslint.config(
       'src/providers/host-credential.ts',
       'src/execution/lima-backend.ts',
       'src/execution/cursor-acp-runtime.ts',
+      'src/cli/lifecycle-ops.ts',
     ],
     rules: {
       'no-restricted-imports': [

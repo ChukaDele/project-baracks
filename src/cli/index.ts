@@ -28,6 +28,7 @@ import { CodexProvider } from '../providers/codex.js';
 import { cursorProvider } from '../providers/cursor.js';
 import { antigravityProvider } from '../providers/antigravity.js';
 import { checkHostCredential } from '../providers/host-credential.js';
+import { runRollbackScript } from './lifecycle-ops.js';
 import {
   loadPersistedProviderInfos,
   persistProviderDiscovery,
@@ -315,6 +316,20 @@ program
     );
     if (!report.liveExecutionReady) {
       console.log(`\nnot ready: ${report.liveExecution.blockers.join('; ')}`);
+    }
+  });
+
+program
+  .command('rollback')
+  .description('Activate the release installed immediately before the current one')
+  .action(() => {
+    try {
+      runRollbackScript();
+    } catch (error) {
+      fail(
+        `rollback failed: ${error instanceof Error ? error.message : String(error)}`,
+        EXIT.error,
+      );
     }
   });
 

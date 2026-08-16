@@ -19,6 +19,10 @@ describe('single execution boundary', () => {
       return [relative(root, path)];
     });
     expect(offenders.sort()).toEqual([
+      // Execs an existing, already-audited lifecycle script (rollback) that
+      // must run outside the currently-loaded process. No logic here beyond
+      // that one exec — see the module doc comment.
+      'src/cli/lifecycle-ops.ts',
       'src/execution/cursor-acp-runtime.ts',
       'src/execution/lima-backend.ts',
       'src/providers/exec.ts',

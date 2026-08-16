@@ -423,6 +423,7 @@ describe('major CLI', () => {
       'help',
       'project',
       'queue',
+      'rollback',
       'route',
       'setup',
       'task',

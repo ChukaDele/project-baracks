@@ -358,6 +358,26 @@ rm -f "$LEARNING_MIGRATION_LOCK" || \
   echo "WARN: remove the completed Major learning migration lock: $LEARNING_MIGRATION_LOCK" >&2
 LEARNING_LOCK_HELD=0
 
+# Append-only install history so `major rollback` can identify the prior
+# installed release without guessing from directory mtimes. Only written
+# after activation actually committed — a failed/aborted install must never
+# record a history entry for a release that never became active.
+python3 - "$MAJOR_HOME/install-history.jsonl" "$RECORD_TMP" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+history_path = Path(sys.argv[1])
+record = json.loads(Path(sys.argv[2]).read_text())
+with history_path.open('a') as handle:
+    handle.write(json.dumps({
+        "sha": record["sha"],
+        "version": record["version"],
+        "releaseDir": record["releaseDir"],
+        "installedAt": record["installedAt"],
+    }) + "\n")
+PY
+
 # Pilot posture: no auto-start daemon. Never install or auto-start a global daemon.
 # The loaded-service postcondition was verified before activation so no
 # fallible check remains after the user-state transaction commits.
