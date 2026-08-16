@@ -10,9 +10,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
+import tomllib
 from pathlib import Path
 
 MAGNIFIC_NAME = "magnific"
@@ -33,7 +35,7 @@ def load_json_object(path: Path) -> dict:
     return data
 
 
-def atomic_write_json(path: Path, data: dict, dry_run: bool) -> None:
+def atomic_write_text(path: Path, content: str, dry_run: bool) -> None:
     if dry_run:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -41,13 +43,16 @@ def atomic_write_json(path: Path, data: dict, dry_run: bool) -> None:
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(fd, "w") as handle:
-            json.dump(data, handle, indent=2)
-            handle.write("\n")
+            handle.write(content)
         os.chmod(tmp_name, previous_mode)
         os.replace(tmp_name, path)
     finally:
         if os.path.exists(tmp_name):
             os.unlink(tmp_name)
+
+
+def atomic_write_json(path: Path, data: dict, dry_run: bool) -> None:
+    atomic_write_text(path, json.dumps(data, indent=2) + "\n", dry_run)
 
 
 def merge_server(path: Path, server: dict, dry_run: bool) -> str:
@@ -62,6 +67,8 @@ def merge_server(path: Path, server: dict, dry_run: bool) -> str:
     previous = servers.get(MAGNIFIC_NAME)
     if previous == server:
         return "already configured"
+    if previous is not None:
+        return "manual review required (existing Magnific entry differs)"
 
     servers[MAGNIFIC_NAME] = server
     atomic_write_json(path, data, dry_run)
@@ -109,27 +116,97 @@ def configure_claude(dry_run: bool) -> str:
     return "configured"
 
 
-def configure_codex(dry_run: bool) -> str:
-    if shutil.which("codex") is None:
-        return "skipped (codex CLI not installed)"
-    if dry_run:
-        return "would configure streamable HTTP MCP"
+def load_codex_toml(path: Path) -> tuple[str, dict]:
+    if not path.exists():
+        return "", {}
+    if path.is_symlink():
+        raise SystemExit(f"refusing to modify symlinked MCP config: {path}")
+    raw = path.read_text()
+    try:
+        parsed = tomllib.loads(raw) if raw.strip() else {}
+    except tomllib.TOMLDecodeError as exc:
+        raise SystemExit(f"refusing to overwrite malformed Codex TOML config: {path}") from exc
+    if not isinstance(parsed, dict):
+        raise SystemExit(f"Codex config root must be a TOML table: {path}")
+    return raw, parsed
 
-    listed = run(["codex", "mcp", "list"], dry_run=False)
-    assert listed is not None
-    combined = listed.stdout + listed.stderr
-    if listed.returncode == 0 and MAGNIFIC_NAME in combined and MAGNIFIC_URL in combined:
+
+def codex_config_status(parsed: dict) -> str:
+    servers = parsed.get("mcp_servers")
+    if servers is None:
+        return "missing"
+    if not isinstance(servers, dict):
+        return "manual review required (mcp_servers is not a table)"
+    previous = servers.get(MAGNIFIC_NAME)
+    if previous is None:
+        return "missing"
+    if isinstance(previous, dict) and previous.get("url") == MAGNIFIC_URL:
         return "already configured"
-    if listed.returncode == 0 and MAGNIFIC_NAME in combined:
-        return "manual review required (existing Magnific entry uses another endpoint)"
+    return "manual review required (existing Magnific entry differs)"
 
-    added = run(["codex", "mcp", "add", MAGNIFIC_NAME, "--url", MAGNIFIC_URL], dry_run=False)
-    assert added is not None
-    if added.returncode != 0:
-        detail = (added.stderr or added.stdout).strip().splitlines()
-        suffix = f": {detail[-1]}" if detail else ""
-        return f"failed{suffix}"
-    return "configured"
+
+def verify_codex_runtime() -> bool | None:
+    if shutil.which("codex") is None:
+        return None
+    checked = subprocess.run(
+        ["codex", "mcp", "get", MAGNIFIC_NAME, "--json"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return checked.returncode == 0 and MAGNIFIC_URL in (checked.stdout + checked.stderr)
+
+
+def configure_codex(home: Path, dry_run: bool) -> str:
+    """Safely add the global Codex MCP table and prove the parser accepts it.
+
+    We write the minimal URL table directly instead of invoking `codex mcp add
+    --url`, because current Codex releases have an open upstream regression where
+    that command can emit a config its own loader rejects. A failed runtime check
+    rolls the write back immediately.
+    """
+
+    path = home / ".codex" / "config.toml"
+    raw, parsed = load_codex_toml(path)
+    status = codex_config_status(parsed)
+    if status != "missing":
+        if status == "already configured" and not dry_run:
+            runtime_ok = verify_codex_runtime()
+            if runtime_ok is False:
+                return "configured but Codex runtime verification failed"
+        return status
+
+    # TOML inline tables cannot be extended by a later table header. Refuse the
+    # uncommon shape rather than risk corrupting the user's global Codex config.
+    if re.search(r"(?m)^\s*mcp_servers\s*=", raw):
+        return "manual review required (inline mcp_servers table cannot be extended safely)"
+
+    entry = f'[mcp_servers.{MAGNIFIC_NAME}]\nurl = "{MAGNIFIC_URL}"\n'
+    prefix = raw
+    if prefix and not prefix.endswith("\n"):
+        prefix += "\n"
+    if prefix.strip():
+        prefix += "\n"
+    updated = prefix + entry
+
+    if dry_run:
+        return "would configure"
+
+    existed = path.exists()
+    previous_mode = path.stat().st_mode & 0o777 if existed else None
+    atomic_write_text(path, updated, dry_run=False)
+    runtime_ok = verify_codex_runtime()
+    if runtime_ok is False:
+        if existed:
+            atomic_write_text(path, raw, dry_run=False)
+            if previous_mode is not None:
+                os.chmod(path, previous_mode)
+        else:
+            path.unlink(missing_ok=True)
+        return "failed runtime verification; rolled back Codex config"
+    if runtime_ok is None:
+        return "configured (Codex CLI unavailable for runtime verification)"
+    return "configured and parser-verified"
 
 
 def main() -> None:
@@ -137,9 +214,9 @@ def main() -> None:
     parser.add_argument("--home", type=Path, default=Path.home())
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
-        "--skip-native-clis",
+        "--skip-claude-cli",
         action="store_true",
-        help="configure JSON-based hosts only; intended for tests or staged setup",
+        help="skip the native Claude CLI call; intended for tests or staged setup",
     )
     args = parser.parse_args()
 
@@ -182,14 +259,15 @@ def main() -> None:
         )
     )
 
-    # Claude and Codex have native MCP config CLIs; use them rather than guessing
-    # internal config formats. Both calls are idempotent for the canonical URL.
-    if args.skip_native_clis:
+    # Codex uses a global ~/.codex/config.toml MCP table. The helper validates
+    # the existing TOML, writes only a new Magnific subtable, and rolls back if
+    # an installed Codex CLI cannot parse/resolve the new entry.
+    results.append(("Codex", configure_codex(home, args.dry_run)))
+
+    if args.skip_claude_cli:
         results.append(("Claude Code", "skipped by flag"))
-        results.append(("Codex", "skipped by flag"))
     else:
         results.append(("Claude Code", configure_claude(args.dry_run)))
-        results.append(("Codex", configure_codex(args.dry_run)))
 
     print("Magnific MCP configuration")
     for host, status in results:
