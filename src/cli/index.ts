@@ -28,6 +28,7 @@ import { CodexProvider } from '../providers/codex.js';
 import { cursorProvider } from '../providers/cursor.js';
 import { antigravityProvider } from '../providers/antigravity.js';
 import { checkHostCredential } from '../providers/host-credential.js';
+import { buildSupportBundle } from '../doctor/support-bundle.js';
 import { runRollbackScript } from './lifecycle-ops.js';
 import {
   loadPersistedProviderInfos,
@@ -331,6 +332,54 @@ program
         EXIT.error,
       );
     }
+  });
+
+program
+  .command('support-bundle')
+  .description('Sanitized diagnostic bundle for sharing when asking for help')
+  .option('--json', 'emit the full bundle as versioned JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const database = db();
+    const gateway = probeGateway(database);
+    const freshReport = await runDoctor({
+      providers: providers(gateway),
+      configuredProjects: listProjects(database).map((p) => ({
+        name: p.name,
+        repoPath: p.repoPath,
+      })),
+      resolve: (name) => gateway.resolveExecutable(name),
+      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
+    });
+    for (const info of freshReport.providers) {
+      persistProviderDiscovery(database, info, { source: 'cli' });
+    }
+    const report = withPersistedReadiness(database, freshReport);
+    const bundle = buildSupportBundle(report);
+    if (opts.json) {
+      emitJson('support-bundle', bundle);
+      return;
+    }
+    console.log('MAJOR SUPPORT BUNDLE\n');
+    console.log(`generated       ${bundle.generatedAt}`);
+    console.log(`os              ${bundle.os.platform} ${bundle.os.release} (${bundle.os.arch})`);
+    console.log(
+      `major           ${bundle.major.version ?? 'unknown'} sha=${bundle.major.installedSha ?? 'unknown'} gate=${bundle.major.releaseGateAtInstall ?? 'unknown'}`,
+    );
+    console.log(`worker          ${bundle.worker.instance ?? 'not configured'}`);
+    console.log(`core ready      ${bundle.core.ready ? 'yes' : 'no'}`);
+    console.log(
+      `live execution  ${bundle.liveExecution.ready ? 'READY' : 'NOT READY'} (${bundle.liveExecution.healthyProviderCount} healthy provider(s))`,
+    );
+    for (const p of bundle.providers) {
+      console.log(`  provider:${p.provider}  ${p.state}  ${p.detail}`);
+    }
+    if (bundle.errorChecks.length > 0) {
+      console.log('\nissues:');
+      for (const c of bundle.errorChecks) {
+        console.log(`  ${c.status}  ${c.name}: ${c.detail}`);
+      }
+    }
+    console.log('\n(share this output, or --json for the full sanitized bundle)');
   });
 
 const project = program.command('project').description('Manage supervised projects');

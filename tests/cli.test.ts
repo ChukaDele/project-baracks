@@ -426,6 +426,7 @@ describe('major CLI', () => {
       'rollback',
       'route',
       'setup',
+      'support-bundle',
       'task',
     ]);
 
