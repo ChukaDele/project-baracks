@@ -16,7 +16,7 @@ import {
   type TrustLevel,
 } from './policy.js';
 import {
-  activeGoals,
+  admitGoal,
   applyIndependentCompletionGrade,
   authorizeSessionWorkshop,
   bindGoalToProject,
@@ -96,11 +96,18 @@ function validHost(value: string): WorkerHost {
 /** Best-effort recovery of the session id an earlier `session attach`/`hook`
  * call already recorded for this host+project, so an ambient admission call
  * does not need its own separate identity scheme. */
+/** An attachment older than this is not trusted as "the current session":
+ * long enough to cover a normal working session, short enough that a
+ * months-old attachment can't quietly authorize a brand new admission. */
+const RECENT_SESSION_MS = 24 * 60 * 60 * 1000;
+
 function mostRecentSessionId(host: WorkerHost, repoPath: string): string | undefined {
   const commonDir = gitCommonDir(resolve(repoPath));
+  const cutoff = Date.now() - RECENT_SESSION_MS;
   const match = [...readSupervisorState().sessions].reverse().find((session) => {
     if (session.host !== host || !session.sessionId) return false;
     if (session.repoPath === undefined) return false;
+    if (Date.parse(session.attachedAt) < cutoff) return false;
     return (
       resolve(session.repoPath) === resolve(repoPath) ||
       (commonDir !== undefined && gitCommonDir(resolve(session.repoPath)) === commonDir)
@@ -446,23 +453,20 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         'goal admit requires --session-id (no matching attached session found; run `major session attach`/`session hook` first)',
       );
     }
-    // Create-or-resume: reuse the existing active goal for this project
-    // rather than starting a fresh one for every admitted message, and
-    // preserve its durable outcome text unless --refine explicitly says the
-    // objective itself changed (not merely the latest implementation step).
-    const existing = activeGoals(project.project, project.repoPath)[0];
-    let goal =
-      existing ??
-      startGoal({
-        project: project.project,
-        repoPath: project.repoPath,
-        goal: outcome,
-        autonomous: false,
-        preferredCoordinator: host,
-      });
-    if (existing && hasFlag(args, '--refine')) {
-      goal = updateGoal(goal.id, { goal: outcome });
-    }
+    // Create-or-resume, atomically: reuse the existing active goal for this
+    // project rather than starting a fresh one for every admitted message,
+    // preserving its durable outcome text unless --refine explicitly says
+    // the objective itself changed (not merely the latest implementation
+    // step). admitGoal() does the find-or-create in one state mutation so
+    // two concurrent admissions can never race each other into overwriting
+    // one another's outcome.
+    const { goal, created } = admitGoal({
+      project: project.project,
+      repoPath: project.repoPath,
+      outcome,
+      preferredCoordinator: host,
+      refine: hasFlag(args, '--refine'),
+    });
     const claimResult = claimLiveWorker(goal.id, { host, sessionId });
     let authorityExpiresAt: string;
     try {
@@ -482,7 +486,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         {
           admitted: true,
           goalId: goal.id,
-          created: !existing,
+          created,
           outcome: goal.goal,
           authority: { status: 'active', expiresAt: authorityExpiresAt },
           ownLiveWork: claimResult.owned,

@@ -230,6 +230,60 @@ export function startGoal(input: {
   });
 }
 
+/**
+ * Create-or-resume a goal for ambient admission, atomically: the whole
+ * find-existing-or-create decision happens inside one state mutation, so
+ * two concurrent admissions for the same project can never race each other
+ * into overwriting one another's outcome text. Unlike startGoal(), resuming
+ * an existing goal here never overwrites its outcome unless `refine` is
+ * set, and never resets status/ownerGate/pendingCompletion/retryImmediately
+ * — an ambient admission call is not a deliberate goal redefinition and
+ * must not silently unblock or restart a goal that legitimately has an
+ * owner gate or an in-flight capacity rotation.
+ */
+export function admitGoal(input: {
+  project: string;
+  repoPath: string;
+  outcome: string;
+  preferredCoordinator?: WorkerHost;
+  refine: boolean;
+}): { goal: SupervisorGoal; created: boolean } {
+  return mutateSupervisorState((state) => {
+    const now = new Date().toISOString();
+    const inputCommonDir = gitCommonDir(resolve(input.repoPath));
+    const existing = state.goals.find(
+      (candidate) =>
+        (candidate.project === input.project ||
+          (inputCommonDir !== undefined &&
+            gitCommonDir(resolve(candidate.repoPath)) === inputCommonDir)) &&
+        ['active', 'running', 'blocked'].includes(candidate.status),
+    );
+    if (existing) {
+      if (input.refine) {
+        existing.goal = input.outcome;
+        existing.updatedAt = now;
+      }
+      return { goal: existing, created: false };
+    }
+    const goal: SupervisorGoal = {
+      id: randomUUID(),
+      project: input.project,
+      repoPath: resolve(input.repoPath),
+      goal: input.outcome,
+      autonomous: false,
+      status: 'active',
+      preferredCoordinator: input.preferredCoordinator ?? 'claude',
+      cycle: 0,
+      consecutiveFailures: 0,
+      createdAt: now,
+      updatedAt: now,
+      nextRunAt: now,
+    };
+    state.goals.push(goal);
+    return { goal, created: true };
+  });
+}
+
 export function updateGoal(id: string, patch: Partial<Omit<SupervisorGoal, 'id'>>): SupervisorGoal {
   return mutateSupervisorState((state) => {
     const goal = state.goals.find((candidate) => candidate.id === id);

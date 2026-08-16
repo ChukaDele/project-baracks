@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
 import { runSupervisorCli } from '../src/supervisor/cli.js';
-import { activeGoals } from '../src/supervisor/state.js';
+import { activeGoals, readSupervisorState, writeSupervisorState } from '../src/supervisor/state.js';
 
 let root = '';
 let priorStatePath: string | undefined;
@@ -230,6 +230,78 @@ describe('major goal admit', () => {
     expect(result.authority.status).toBe('active');
     expect(result.guidance).toContain('codex');
     expect(activeGoals('jss-tool', repoPath)).toHaveLength(1);
+  });
+
+  it('does not fall back to a stale (24h+) attached session id', async () => {
+    const repoPath = repo();
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const state = readSupervisorState();
+    state.sessions.push({
+      id: 'old-attachment',
+      host: 'codex',
+      cwd: repoPath,
+      project: 'jss-tool',
+      repoPath,
+      sessionId: 'ancient-thread',
+      attachedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+    });
+    writeSupervisorState(state);
+
+    await expect(
+      runSupervisorCli([
+        'goal',
+        'admit',
+        '--cwd',
+        repoPath,
+        '--host',
+        'codex',
+        '--outcome',
+        'Ship the MVP',
+      ]),
+    ).rejects.toThrow(/requires --session-id/);
+  });
+
+  it('does fall back to a recently attached session id', async () => {
+    const repoPath = repo();
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const state = readSupervisorState();
+    state.sessions.push({
+      id: 'recent-attachment',
+      host: 'codex',
+      cwd: repoPath,
+      project: 'jss-tool',
+      repoPath,
+      sessionId: 'todays-thread',
+      attachedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    });
+    writeSupervisorState(state);
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => logs.push(String(value)));
+
+    await runSupervisorCli([
+      'goal',
+      'admit',
+      '--cwd',
+      repoPath,
+      '--host',
+      'codex',
+      '--outcome',
+      'Ship the MVP',
+    ]);
+    const result = lastLog(logs) as { liveWorker: { sessionId: string } };
+    expect(result.liveWorker.sessionId).toBe('todays-thread');
   });
 });
 
