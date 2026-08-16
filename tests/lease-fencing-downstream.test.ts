@@ -192,7 +192,12 @@ describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
 
   it('refuses run status changes and run events once the claim lease expired', () => {
     const db = testDb();
-    const { claim, run } = seededClaimedRun(db, 50);
+    // 500ms lease / 550ms wait matches the margin already used below for the
+    // same kind of assertion (line ~369): under full-suite load, this
+    // helper's own setup writes can themselves take tens of ms, so a lease
+    // much shorter than that (e.g. 50ms/75ms) can appear already expired
+    // before the test's own deliberate wait even runs.
+    const { claim, run } = seededClaimedRun(db, 500);
     expect(() =>
       db
         .update(taskClaims)
@@ -200,7 +205,7 @@ describe('DB fencing backstop on run-linked writes (retained for M4)', () => {
         .where(eq(taskClaims.id, claim.id))
         .run(),
     ).toThrow(/cannot expire a live task claim/);
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 75);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 550);
     db.update(taskClaims)
       .set({ status: 'expired', outcomeReason: 'simulated recovery' })
       .where(eq(taskClaims.id, claim.id))

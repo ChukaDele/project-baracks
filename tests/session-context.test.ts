@@ -4,12 +4,18 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runSessionContextCli } from '../src/context/session-context.js';
 import { captureLearning, promoteLearning } from '../src/learning/candidates.js';
+import { openDb } from '../src/db/client.js';
+import {
+  persistProviderDiscovery,
+  recordBillingObservation,
+} from '../src/providers/discovery-store.js';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
 import { readSupervisorState, startGoal } from '../src/supervisor/state.js';
 import {
   assertSupervisedWorkshopAuthority,
   resolveSupervisedWorkshopAuthority,
 } from '../src/security/supervised-workshop.js';
+import { model } from './helpers.js';
 
 let root = '';
 const prior: Record<string, string | undefined> = {};
@@ -21,6 +27,7 @@ const envKeys = [
   'MAJOR_STOP_PATH',
   'MAJOR_SKILLS_REGISTRY',
   'MAJOR_HOME',
+  'MAJOR_DB_PATH',
 ] as const;
 
 beforeEach(() => {
@@ -32,6 +39,10 @@ beforeEach(() => {
   process.env.MAJOR_RESOURCE_PATH = join(root, 'resources.json');
   process.env.MAJOR_STOP_PATH = join(root, 'STOP');
   process.env.MAJOR_HOME = join(root, 'major-home');
+  // The banner's current-worker-capacity read opens a real DB connection;
+  // isolate it like every other piece of Major state, or these tests would
+  // read whatever happens to be at the developer's real ~/.major/major.db.
+  process.env.MAJOR_DB_PATH = join(root, 'major.db');
 });
 
 afterEach(() => {
@@ -267,5 +278,80 @@ describe('fresh session context', () => {
     const output = lines.join('\n');
     expect(output).toContain('MAJOR CONTROL PLANE: ACTIVE');
     expect(output).toContain('Major skill registry unavailable');
+  });
+
+  it('reports foreground authority as ready (not active) for an eligible project with no grant yet', async () => {
+    const current = repo('ready-project');
+    configureProjectPolicy({
+      project: 'github.com/example/ready-project',
+      repoPath: current,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    expect(
+      await runSessionContextCli(['session', 'attach', '--host', 'codex', '--cwd', current]),
+    ).toBe(true);
+    const output = lines.join('\n');
+    expect(output).toContain('foreground authority: ready');
+    expect(output).toContain('active goal: none');
+  });
+
+  it('reports foreground authority as not applicable for a project without owner-approved build', async () => {
+    const current = repo('observe-only-project');
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    expect(
+      await runSessionContextCli(['session', 'attach', '--host', 'codex', '--cwd', current]),
+    ).toBe(true);
+    const output = lines.join('\n');
+    expect(output).toContain('foreground authority: not applicable');
+  });
+
+  it('surfaces the active goal summary and discovered worker capacity in the banner', async () => {
+    const current = repo('capacity-project');
+    configureProjectPolicy({
+      project: 'github.com/example/capacity-project',
+      repoPath: current,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    startGoal({
+      project: 'github.com/example/capacity-project',
+      repoPath: current,
+      goal: 'Ship the ranking/shortlist workflow correctly',
+      autonomous: false,
+    });
+    const { db, sqlite } = openDb(process.env.MAJOR_DB_PATH);
+    persistProviderDiscovery(
+      db,
+      {
+        name: 'codex',
+        installed: true,
+        authenticated: true,
+        models: [model({ modelRef: 'gpt-codex', routingClass: 'codex' })],
+      },
+      { source: 'cli' },
+    );
+    recordBillingObservation(db, {
+      providerName: 'codex',
+      modelRef: 'gpt-codex',
+      billingMode: 'subscription_included',
+      source: 'human',
+    });
+    sqlite.close();
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    expect(
+      await runSessionContextCli(['session', 'attach', '--host', 'codex', '--cwd', current]),
+    ).toBe(true);
+    const output = lines.join('\n');
+    expect(output).toContain('active goal: Ship the ranking/shortlist workflow correctly [active]');
+    expect(output).toContain('current worker capacity:');
+    expect(output).toMatch(/current worker capacity:.*\bcodex\b/);
+    expect(output).toMatch(/current worker capacity:.*claude \(not yet discovered\)/);
   });
 });

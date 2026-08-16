@@ -113,7 +113,7 @@ const PROVIDER_HOSTS: Record<string, WorkerHost> = {
   antigravity: 'antigravity',
 };
 
-const HOST_PROVIDERS: Record<WorkerHost, string> = {
+export const HOST_PROVIDERS: Record<WorkerHost, string> = {
   claude: 'claude-code',
   codex: 'codex',
   cursor: 'cursor',

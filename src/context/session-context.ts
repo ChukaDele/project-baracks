@@ -1,9 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { openDb } from '../db/client.js';
 import { listLearningCandidates } from '../learning/candidates.js';
+import { parseCapacityKey } from '../providers/account.js';
+import { loadPersistedProviderInfos } from '../providers/discovery-store.js';
 import { getProjectPolicy } from '../supervisor/policy.js';
 import { formatResourceTelemetry, resourceSnapshot } from '../supervisor/resources.js';
-import { supervisorSnapshot } from '../supervisor/runtime.js';
+import { HOST_PROVIDERS, supervisorSnapshot } from '../supervisor/runtime.js';
 import { resolveSkills } from '../skills/resolver.js';
 import {
   activeGoals,
@@ -80,6 +83,40 @@ function resolvedGoalSkills(project: string, repoPath: string): string {
   }
   if (unique.size === 0) return '(No installed skill matched the active goal.)';
   return [...unique].map(([id, path]) => `- ${id}: ${path}`).join('\n');
+}
+
+/** One-line, discovery-store-backed capacity read for the banner — not a
+ * routing decision, just what an operator/agent can see at a glance. */
+function currentWorkerCapacity(): string {
+  let infos;
+  try {
+    const opened = openDb();
+    try {
+      infos = loadPersistedProviderInfos(opened.db);
+    } finally {
+      opened.sqlite.close();
+    }
+  } catch {
+    return '(unavailable: Major discovery store unreachable)';
+  }
+  const usableByProvider = new Map<string, boolean>();
+  for (const info of infos) {
+    const { providerName } = parseCapacityKey(info.name);
+    const usable = info.models.some((m) => m.authenticated && m.availability === 'available');
+    usableByProvider.set(providerName, (usableByProvider.get(providerName) ?? false) || usable);
+  }
+  return Object.entries(HOST_PROVIDERS)
+    .map(([host, providerName]) => {
+      if (!usableByProvider.has(providerName)) return `${host} (not yet discovered)`;
+      return usableByProvider.get(providerName) ? host : `${host} (unavailable)`;
+    })
+    .join(', ');
+}
+
+function activeGoalSummary(project: string, repoPath: string): string {
+  const goal = activeGoals(project, repoPath)[0];
+  if (!goal) return 'none';
+  return `${goal.goal} [${goal.status}]`;
 }
 
 export async function runSessionContextCli(args: string[]): Promise<boolean> {
@@ -205,23 +242,19 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
   }
 
   const policy = getProjectPolicy(project.project, project.repoPath);
-  let workshop = 'inactive';
+  let workshopActiveUntil: string | undefined;
   try {
-    const authority = resolveSupervisedWorkshopAuthority(project.repoPath);
-    workshop = `active until ${authority.expiresAt}`;
+    workshopActiveUntil = resolveSupervisedWorkshopAuthority(project.repoPath).expiresAt;
   } catch {
     // Session attachment remains available when no workshop has been authorized.
   }
   const workshopEligible =
     policy.trust === 'build' && policy.ownerApprovedBuild && !policy.allowBackground;
-  const workshopGateNote =
-    workshopEligible && workshop === 'inactive'
-      ? '\nNOTE: this session is attached (presence/telemetry only) but holds no execution authority. ' +
-        'Major-dispatched work and its automatic provider/account failover on exhaustion only run under an ' +
-        'active Supervised Workshop authorization for this project: `major session authorize --mode ' +
-        `supervised-workshop --owner-approved --host ${host} --session-id <stable-id>\`. ` +
-        'Without it, if the model driving this interactive session hits a usage limit, nothing else picks the work back up.'
-      : '';
+  const foregroundAuthority = workshopActiveUntil
+    ? `active until ${workshopActiveUntil}`
+    : workshopEligible
+      ? 'ready — `major goal admit` activates it automatically for substantive work'
+      : `not applicable (trust=${policy.trust}${policy.ownerApprovedBuild ? '' : ', not owner-approved build'})`;
   const resources = formatResourceTelemetry(resourceSnapshot().telemetry);
   console.log(`MAJOR CONTROL PLANE: ACTIVE
 host: ${host}
@@ -229,7 +262,9 @@ cwd: ${resolve(cwd)}
 project: ${project.project}
 repo: ${project.repoPath}
 policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}
-workshop: ${workshop}${workshopGateNote}
+foreground authority: ${foregroundAuthority}
+active goal: ${activeGoalSummary(project.project, project.repoPath)}
+current worker capacity: ${currentWorkerCapacity()}
 
 ACTIVE GOAL STATE
 ${supervisorSnapshot(project.project)}
@@ -251,7 +286,11 @@ concurrent build cap: 1
 
 SESSION CONTRACT
 - Major is already active; do not ask the user to start it again.
-- Before substantive edits, confirm any named/implied project matches this repo. If not, load project-context-integrity and reroute before mutation.
+${
+  workshopEligible
+    ? `- This is an owner-approved build project: for SUBSTANTIVE project work (build/fix/redesign/implement/deploy/debug/investigate/modify the repo/multi-step build-or-research tasks), call \`major goal admit --host ${host} --outcome "<the durable outcome, not the latest implementation step>"\` before starting. It creates or resumes the one durable goal for this project (do not call it again per message once admitted this conversation — reuse the result), auto-grants foreground authority, and tells you if another session already owns live work here. Skip it for lightweight interaction (explaining code, answering questions, opinions, summaries, read-only inspection) unless a goal is already active. The response echoes the goal's current \`outcome\` even when resuming — read it: if it plainly does not match what the user is actually asking for right now, pass \`--refine\` to redefine it; the mechanism preserves outcome text by default and cannot tell staleness from a refinement on its own.\n`
+    : ''
+}- Before substantive edits, confirm any named/implied project matches this repo. If not, load project-context-integrity and reroute before mutation.
 - Run Major's skill resolver and load the exact project or immutable-runtime skill paths it returns before inventing a workflow.
 - Treat the durable learnings above as active constraints. A fresh session is not permission to repeat a prior correction.
 - A REVIEW-DUE learning has recurred at least twice. Before closing the task, either promote the proven lesson into guidance/skill or record why it remains unstable/project-specific.

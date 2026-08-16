@@ -15,6 +15,20 @@ import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
 
+export interface LiveWorkerClaim {
+  host: string;
+  sessionId: string;
+  claimedAt: string;
+  heartbeatAt: string;
+}
+
+/** How long an interactive session's live-worker claim survives without a
+ * heartbeat before another attaching session may reclaim it as abandoned.
+ * Long enough to cover normal thinking/back-and-forth gaps in a
+ * conversation, unlike the per-cycle repo lock's much shorter staleness
+ * window. */
+const LIVE_WORKER_STALE_MS = 45 * 60 * 1000;
+
 export const GOAL_STATUSES = ['active', 'running', 'blocked', 'done', 'failed', 'paused'] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
 export const WORKER_HOSTS = ['claude', 'codex', 'cursor', 'antigravity'] as const;
@@ -45,6 +59,12 @@ export interface SupervisorGoal {
    * with other capacity still eligible: the foreground continuation loop
    * may immediately dispatch another cycle without a new owner action. */
   retryImmediately?: boolean | undefined;
+  /** Which single interactive session is currently doing this goal's live
+   * work right now, if any. Distinct from activePid/the per-cycle repo
+   * lock: those are held only for the duration of one dispatched worker
+   * call, while an attached conversational session can span a long
+   * interaction with idle gaps between turns. */
+  liveWorker?: LiveWorkerClaim | undefined;
   pendingCompletion?:
     | {
         summary: string;
@@ -210,6 +230,61 @@ export function startGoal(input: {
   });
 }
 
+/**
+ * Create-or-resume a goal for ambient admission, atomically: the whole
+ * find-existing-or-create decision happens inside one state mutation, so a
+ * plain (non-refining) admission can never accidentally overwrite another
+ * admission's outcome text through a read-then-write race. `refine: true`
+ * is a deliberate redefinition, not ambient bookkeeping: if two refining
+ * calls race, the later one intentionally wins, same as any other
+ * explicit edit. Unlike startGoal(), resuming an existing goal here never
+ * resets status/ownerGate/pendingCompletion/retryImmediately — an ambient
+ * admission call must not silently unblock or restart a goal that
+ * legitimately has an owner gate or an in-flight capacity rotation.
+ */
+export function admitGoal(input: {
+  project: string;
+  repoPath: string;
+  outcome: string;
+  preferredCoordinator?: WorkerHost;
+  refine: boolean;
+}): { goal: SupervisorGoal; created: boolean } {
+  return mutateSupervisorState((state) => {
+    const now = new Date().toISOString();
+    const inputCommonDir = gitCommonDir(resolve(input.repoPath));
+    const existing = state.goals.find(
+      (candidate) =>
+        (candidate.project === input.project ||
+          (inputCommonDir !== undefined &&
+            gitCommonDir(resolve(candidate.repoPath)) === inputCommonDir)) &&
+        ['active', 'running', 'blocked'].includes(candidate.status),
+    );
+    if (existing) {
+      if (input.refine) {
+        existing.goal = input.outcome;
+        existing.updatedAt = now;
+      }
+      return { goal: existing, created: false };
+    }
+    const goal: SupervisorGoal = {
+      id: randomUUID(),
+      project: input.project,
+      repoPath: resolve(input.repoPath),
+      goal: input.outcome,
+      autonomous: false,
+      status: 'active',
+      preferredCoordinator: input.preferredCoordinator ?? 'claude',
+      cycle: 0,
+      consecutiveFailures: 0,
+      createdAt: now,
+      updatedAt: now,
+      nextRunAt: now,
+    };
+    state.goals.push(goal);
+    return { goal, created: true };
+  });
+}
+
 export function updateGoal(id: string, patch: Partial<Omit<SupervisorGoal, 'id'>>): SupervisorGoal {
   return mutateSupervisorState((state) => {
     const goal = state.goals.find((candidate) => candidate.id === id);
@@ -262,6 +337,65 @@ export function applyIndependentCompletionGrade(input: {
 
 export function getGoal(id: string): SupervisorGoal | undefined {
   return readSupervisorState().goals.find((goal) => goal.id === id);
+}
+
+/**
+ * Claim (or refresh) this goal as the one interactive session actively
+ * doing its live work right now. If a different, still-fresh session
+ * already holds the claim, this does not steal it — it reports who holds
+ * it so the caller can surface that instead of silently starting parallel
+ * work against the same repo. A claim with no heartbeat inside
+ * LIVE_WORKER_STALE_MS is treated as abandoned and may be reclaimed.
+ */
+export function claimLiveWorker(
+  goalId: string,
+  input: { host: string; sessionId: string },
+  now: () => Date = () => new Date(),
+): { claim: LiveWorkerClaim; owned: boolean } {
+  return mutateSupervisorState((state) => {
+    const goal = state.goals.find((candidate) => candidate.id === goalId);
+    if (!goal) throw new Error(`goal not found: ${goalId}`);
+    const nowIso = now().toISOString();
+    const existing = goal.liveWorker;
+    const sameSession = existing?.sessionId === input.sessionId && existing?.host === input.host;
+    const stale =
+      existing !== undefined &&
+      now().getTime() - Date.parse(existing.heartbeatAt) > LIVE_WORKER_STALE_MS;
+    if (existing && !sameSession && !stale) {
+      return { claim: existing, owned: false };
+    }
+    const claim: LiveWorkerClaim = {
+      host: input.host,
+      sessionId: input.sessionId,
+      claimedAt: sameSession ? existing.claimedAt : nowIso,
+      heartbeatAt: nowIso,
+    };
+    goal.liveWorker = claim;
+    goal.updatedAt = nowIso;
+    return { claim, owned: true };
+  });
+}
+
+/** Heartbeat an already-held live-worker claim. Returns false (without
+ * throwing) if a different session has since taken it over, it was never
+ * claimed, or the goal no longer exists — the caller should stop treating
+ * itself as the live worker in that case rather than fight over it. */
+export function heartbeatLiveWorker(
+  goalId: string,
+  input: { host: string; sessionId: string },
+  now: () => Date = () => new Date(),
+): boolean {
+  return mutateSupervisorState((state) => {
+    const goal = state.goals.find((candidate) => candidate.id === goalId);
+    if (!goal?.liveWorker) return false;
+    if (goal.liveWorker.host !== input.host || goal.liveWorker.sessionId !== input.sessionId) {
+      return false;
+    }
+    const nowIso = now().toISOString();
+    goal.liveWorker.heartbeatAt = nowIso;
+    goal.updatedAt = nowIso;
+    return true;
+  });
 }
 
 export function bindGoalToProject(
