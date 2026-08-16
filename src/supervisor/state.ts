@@ -232,14 +232,15 @@ export function startGoal(input: {
 
 /**
  * Create-or-resume a goal for ambient admission, atomically: the whole
- * find-existing-or-create decision happens inside one state mutation, so
- * two concurrent admissions for the same project can never race each other
- * into overwriting one another's outcome text. Unlike startGoal(), resuming
- * an existing goal here never overwrites its outcome unless `refine` is
- * set, and never resets status/ownerGate/pendingCompletion/retryImmediately
- * — an ambient admission call is not a deliberate goal redefinition and
- * must not silently unblock or restart a goal that legitimately has an
- * owner gate or an in-flight capacity rotation.
+ * find-existing-or-create decision happens inside one state mutation, so a
+ * plain (non-refining) admission can never accidentally overwrite another
+ * admission's outcome text through a read-then-write race. `refine: true`
+ * is a deliberate redefinition, not ambient bookkeeping: if two refining
+ * calls race, the later one intentionally wins, same as any other
+ * explicit edit. Unlike startGoal(), resuming an existing goal here never
+ * resets status/ownerGate/pendingCompletion/retryImmediately — an ambient
+ * admission call must not silently unblock or restart a goal that
+ * legitimately has an owner gate or an in-flight capacity rotation.
  */
 export function admitGoal(input: {
   project: string;

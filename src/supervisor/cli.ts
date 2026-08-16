@@ -103,11 +103,17 @@ const RECENT_SESSION_MS = 24 * 60 * 60 * 1000;
 
 function mostRecentSessionId(host: WorkerHost, repoPath: string): string | undefined {
   const commonDir = gitCommonDir(resolve(repoPath));
-  const cutoff = Date.now() - RECENT_SESSION_MS;
+  const now = Date.now();
+  const cutoff = now - RECENT_SESSION_MS;
   const match = [...readSupervisorState().sessions].reverse().find((session) => {
     if (session.host !== host || !session.sessionId) return false;
     if (session.repoPath === undefined) return false;
-    if (Date.parse(session.attachedAt) < cutoff) return false;
+    const attachedAtMs = Date.parse(session.attachedAt);
+    // Fail closed: a malformed/missing timestamp must not read as "always
+    // fresh" (NaN < cutoff is false), and a clock-skewed future timestamp
+    // must not stay fresh forever either.
+    if (!Number.isFinite(attachedAtMs)) return false;
+    if (attachedAtMs < cutoff || attachedAtMs > now + 5 * 60 * 1000) return false;
     return (
       resolve(session.repoPath) === resolve(repoPath) ||
       (commonDir !== undefined && gitCommonDir(resolve(session.repoPath)) === commonDir)

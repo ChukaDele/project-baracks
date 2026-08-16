@@ -303,6 +303,52 @@ describe('major goal admit', () => {
     const result = lastLog(logs) as { liveWorker: { sessionId: string } };
     expect(result.liveWorker.sessionId).toBe('todays-thread');
   });
+
+  it('treats a malformed or clock-skewed-future attachedAt as not fresh (fails closed)', async () => {
+    const repoPath = repo();
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const state = readSupervisorState();
+    state.sessions.push(
+      {
+        id: 'malformed-attachment',
+        host: 'codex',
+        cwd: repoPath,
+        project: 'jss-tool',
+        repoPath,
+        sessionId: 'malformed-thread',
+        attachedAt: 'not-a-timestamp',
+      },
+      {
+        id: 'future-attachment',
+        host: 'codex',
+        cwd: repoPath,
+        project: 'jss-tool',
+        repoPath,
+        sessionId: 'future-thread',
+        attachedAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      },
+    );
+    writeSupervisorState(state);
+
+    await expect(
+      runSupervisorCli([
+        'goal',
+        'admit',
+        '--cwd',
+        repoPath,
+        '--host',
+        'codex',
+        '--outcome',
+        'Ship the MVP',
+      ]),
+    ).rejects.toThrow(/requires --session-id/);
+  });
 });
 
 describe('major goal heartbeat', () => {
