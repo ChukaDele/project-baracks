@@ -126,7 +126,11 @@ export type CoordinatorSelection =
       host: WorkerHost;
       provider: string;
       /** Which authenticated account/profile of the provider this is, when
-       * more than one is configured. 'default' when only one exists. */
+       * more than one is configured. 'default' when only one exists.
+       * NOT YET used to select distinct execution credentials below this
+       * point — runWorker() dispatches by `host` alone, so every account of
+       * a provider currently runs through the same canonical CLI login.
+       * This field only distinguishes capacity/availability bookkeeping. */
       accountLabel: string;
       modelRef: string;
       reason: string;
@@ -495,30 +499,46 @@ export function tryAcquireRepoCycleLock(repoPath: string): (() => void) | undefi
   };
 }
 
-export async function runGoalCycle(goalId: string): Promise<void> {
+/** Whether a runGoalCycle() call actually attempted a coordinator turn.
+ * `false` covers every early-return path (already terminal, awaiting an
+ * independent completion grade, or another integration owner already holds
+ * this repo's lock) — those are not this call's failure or capacity state
+ * to report, and a caller looping on them must not mistake them for
+ * progress. */
+export interface GoalCycleOutcome {
+  ranCycle: boolean;
+}
+
+export async function runGoalCycle(
+  goalId: string,
+  options: { maxTimeoutMs?: number } = {},
+): Promise<GoalCycleOutcome> {
   const goal = getGoal(goalId);
   if (!goal) throw new Error(`goal not found: ${goalId}`);
-  if (goal.status === 'done' || goal.status === 'paused') return;
+  if (goal.status === 'done' || goal.status === 'paused') return { ranCycle: false };
   if (goal.pendingCompletion) {
     console.error(`Goal ${goal.id} is awaiting an independent completion grade.`);
-    return;
+    return { ranCycle: false };
   }
   const releaseRepoLock = tryAcquireRepoCycleLock(goal.repoPath);
   if (!releaseRepoLock) {
     console.error(`Repository ${goal.repoPath} already has an active Major integration owner.`);
-    return;
+    return { ranCycle: false };
   }
   try {
-    await runLockedGoalCycle(goal);
+    await runLockedGoalCycle(goal, options.maxTimeoutMs);
+    return { ranCycle: true };
   } finally {
     releaseRepoLock();
   }
 }
 
 /** Bounded safety net so an authoritative-exhaustion loop can never hot-loop
- * indefinitely even if capacity bookkeeping is wrong: capped well above any
- * real provider/account count. */
-const FOREGROUND_CONTINUATION_HOP_LIMIT = 8;
+ * forever even if capacity bookkeeping is wrong. Deliberately well above any
+ * realistic near-term provider x model x account count rather than a tight
+ * fit to today's four providers, so a legitimately larger capacity pool
+ * cannot be mistaken for exhaustion. */
+const FOREGROUND_CONTINUATION_HOP_LIMIT = 32;
 
 /**
  * Run an already-authorized foreground goal forward to its next real
@@ -530,28 +550,41 @@ const FOREGROUND_CONTINUATION_HOP_LIMIT = 8;
  * process happened to dispatch it.
  *
  * It stops the instant a cycle resolves for any other reason (success,
- * generic failure, done, blocked, or no capacity left at all) or the
- * bounded hop/time budget is spent. This is not unattended background
- * looping: it is still one synchronous, already-approved foreground call,
- * bounded by the project's own maxRunMinutes policy.
+ * generic failure, done, blocked, or no capacity left at all), the cycle
+ * made no observable progress (e.g. another integration owner is already
+ * running against this repo), or the bounded hop/time budget is spent.
+ * This is not unattended background looping: it is still one synchronous,
+ * already-approved foreground call, and its total wall-clock is bounded by
+ * the project's own maxRunMinutes policy — including the per-cycle worker
+ * timeout, which is clamped to whatever budget remains rather than each
+ * hop separately getting a fresh full maxRunMinutes allowance.
  */
 export async function runForegroundGoal(
   goalId: string,
   options: {
     maxRunMinutes?: number;
     /** Injectable for tests; defaults to the real single-cycle dispatch. */
-    runCycle?: (goalId: string) => Promise<void>;
+    runCycle?: (
+      goalId: string,
+      cycleOptions?: { maxTimeoutMs?: number },
+    ) => Promise<GoalCycleOutcome>;
   } = {},
 ): Promise<void> {
   const runCycle = options.runCycle ?? runGoalCycle;
   const maxRunMinutes = Math.max(1, options.maxRunMinutes ?? 120);
   const deadline = Date.now() + maxRunMinutes * 60 * 1000;
   for (let hop = 0; hop < FOREGROUND_CONTINUATION_HOP_LIMIT; hop++) {
-    await runCycle(goalId);
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
+    const { ranCycle } = await runCycle(goalId, { maxTimeoutMs: remainingMs });
+    // The repo lock was held by another integration owner, or the goal hit
+    // an early-return path (already done/paused/awaiting completion): this
+    // call contributed nothing. Stop rather than hot-loop or fabricate a
+    // "capacity rotation happened" cleanup for a cycle that never ran.
+    if (!ranCycle) return;
     const goal = getGoal(goalId);
     if (!goal?.retryImmediately) return;
     if (goal.status !== 'active' && goal.status !== 'running') return;
-    if (Date.now() >= deadline) break;
   }
   const stalled = getGoal(goalId);
   if (stalled?.retryImmediately) {
@@ -565,7 +598,7 @@ export async function runForegroundGoal(
   }
 }
 
-async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
+async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): Promise<void> {
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   assertExecutionAllowed(policy);
 
@@ -677,7 +710,10 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
     host,
     prompt: coordinatorPrompt(goal, capabilityResolution.capabilities),
     cwd: goal.repoPath,
-    timeoutMs: Math.max(1, policy.maxRunMinutes) * 60 * 1000,
+    // Clamped to whatever foreground continuation budget remains, so a
+    // rotation across several exhausted providers cannot stack multiple
+    // full maxRunMinutes allowances into a much longer total wall-clock.
+    timeoutMs: Math.min(Math.max(1, policy.maxRunMinutes) * 60 * 1000, maxTimeoutMs ?? Infinity),
     modelRef: selection.modelRef,
   });
   try {

@@ -181,6 +181,10 @@ export function startGoal(input: {
         existing.ownerGate = undefined;
         existing.pendingCompletion = undefined;
         existing.nextRunAt = now;
+        // A redefined goal starts its own fresh cycle; it must not inherit an
+        // immediate-retry flag left over from whatever the prior goal text
+        // was doing.
+        existing.retryImmediately = false;
         return existing;
       }
     }

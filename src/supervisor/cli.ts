@@ -406,6 +406,10 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       lastFinishedAt: new Date().toISOString(),
       ownerGate: ownerGate ? redactText(ownerGate).slice(0, 4_000) : undefined,
       pendingCompletion: undefined,
+      // An external report supersedes whatever the last automatic cycle left
+      // behind; it must not leave a stale immediate-retry flag pointing at a
+      // capacity rotation this report just overrode.
+      retryImmediately: false,
     };
     updateGoal(id, patch);
     console.log(`goal ${id}: ${statusRaw}`);

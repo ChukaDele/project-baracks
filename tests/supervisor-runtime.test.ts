@@ -628,6 +628,7 @@ describe('foreground continuation loop', () => {
             lastCoordinator: 'claude',
           });
         }
+        return { ranCycle: true };
       },
     });
     expect(calls).toBe(2);
@@ -645,6 +646,7 @@ describe('foreground continuation loop', () => {
           retryImmediately: false,
           nextRunAt: new Date(Date.now() + 10_000).toISOString(),
         });
+        return { ranCycle: true };
       },
     });
     expect(calls).toBe(1);
@@ -657,9 +659,10 @@ describe('foreground continuation loop', () => {
       runCycle: async (goalId) => {
         calls += 1;
         updateGoal(goalId, { status: 'active', retryImmediately: true });
+        return { ranCycle: true };
       },
     });
-    expect(calls).toBe(8);
+    expect(calls).toBe(32);
     const after = getGoal(created.id)!;
     expect(after.retryImmediately).toBe(false);
     expect(after.lastSummary).toContain('checkpointing instead of hot-looping');
@@ -676,6 +679,7 @@ describe('foreground continuation loop', () => {
           calls += 1;
           updateGoal(goalId, { status: 'active', retryImmediately: true });
           vi.advanceTimersByTime(61_000);
+          return { ranCycle: true };
         },
       });
       expect(calls).toBe(1);
@@ -692,8 +696,59 @@ describe('foreground continuation loop', () => {
       runCycle: async (goalId) => {
         calls += 1;
         updateGoal(goalId, { status: 'blocked', retryImmediately: true, ownerGate: 'sign in' });
+        return { ranCycle: true };
       },
     });
     expect(calls).toBe(1);
+  });
+
+  it('stops without touching state when a cycle makes no progress (e.g. repo lock held elsewhere)', async () => {
+    const created = isolatedGoal();
+    updateGoal(created.id, { retryImmediately: true });
+    const before = getGoal(created.id)!;
+    let calls = 0;
+    await runForegroundGoal(created.id, {
+      runCycle: async () => {
+        calls += 1;
+        // Mirrors runGoalCycle's repo-lock-contention early return: no
+        // updateGoal call at all, and ranCycle:false so the caller knows
+        // nothing was actually attempted.
+        return { ranCycle: false };
+      },
+    });
+    expect(calls).toBe(1);
+    const after = getGoal(created.id)!;
+    expect(after.updatedAt).toBe(before.updatedAt);
+    // The stale flag from before this call is left exactly as it was: this
+    // function must not fabricate a "capacity rotation happened" cleanup
+    // for a cycle that never actually ran.
+    expect(after.retryImmediately).toBe(true);
+  });
+
+  it("clamps each hop's timeout to the remaining budget instead of granting a fresh allowance every time", async () => {
+    const created = isolatedGoal();
+    const seenTimeouts: (number | undefined)[] = [];
+    let calls = 0;
+    await runForegroundGoal(created.id, {
+      maxRunMinutes: 10,
+      runCycle: async (goalId, cycleOptions) => {
+        calls += 1;
+        seenTimeouts.push(cycleOptions?.maxTimeoutMs);
+        if (calls < 3) {
+          updateGoal(goalId, { status: 'active', retryImmediately: true });
+        } else {
+          updateGoal(goalId, { status: 'done', retryImmediately: false });
+        }
+        return { ranCycle: true };
+      },
+    });
+    expect(calls).toBe(3);
+    for (const timeout of seenTimeouts) {
+      expect(timeout).toBeGreaterThan(0);
+      expect(timeout).toBeLessThanOrEqual(10 * 60_000);
+    }
+    for (let i = 1; i < seenTimeouts.length; i++) {
+      expect(seenTimeouts[i]!).toBeLessThanOrEqual(seenTimeouts[i - 1]!);
+    }
   });
 });
