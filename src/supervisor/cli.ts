@@ -93,14 +93,14 @@ function validHost(value: string): WorkerHost {
   return value as WorkerHost;
 }
 
-/** Best-effort recovery of the session id an earlier `session attach`/`hook`
- * call already recorded for this host+project, so an ambient admission call
- * does not need its own separate identity scheme. */
 /** An attachment older than this is not trusted as "the current session":
  * long enough to cover a normal working session, short enough that a
  * months-old attachment can't quietly authorize a brand new admission. */
 const RECENT_SESSION_MS = 24 * 60 * 60 * 1000;
 
+/** Best-effort recovery of the session id an earlier `session attach`/`hook`
+ * call already recorded for this host+project, so an ambient admission call
+ * does not need its own separate identity scheme. */
 function mostRecentSessionId(host: WorkerHost, repoPath: string): string | undefined {
   const commonDir = gitCommonDir(resolve(repoPath));
   const now = Date.now();
@@ -366,7 +366,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
 
   if (command === 'run' && args[1] && !args.includes('--task')) {
     const projectArg = args[1];
-    const goalText = requireFlag(args, '--goal');
+    const goalIdArg = flag(args, '--goal-id');
     const project = resolveProject(projectArg);
     const policy = getProjectPolicy(project.project, project.repoPath);
     const preferredRaw = flag(args, '--coordinator');
@@ -377,14 +377,42 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         `project ${project.project} is ${policy.projectClass}/${policy.trust}; unattended execution is not allowed`,
       );
     }
-    const goal = startGoal({
-      project: project.project,
-      repoPath: project.repoPath,
-      goal: goalText,
-      autonomous: requestedAutonomy,
-      ...(requiredOperations.length > 0 ? { requiredOperations } : {}),
-      ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
-    });
+    if (
+      goalIdArg &&
+      (flag(args, '--goal') || preferredRaw || requestedAutonomy || requiredOperations.length > 0)
+    ) {
+      throw new Error(
+        '--goal-id dispatches an already-admitted goal as-is; it cannot be combined with --goal, ' +
+          '--coordinator, --autonomous, or --capability, which only take effect when a goal is ' +
+          'first created via --goal',
+      );
+    }
+    // --goal-id dispatches an already-admitted goal (e.g. from `goal admit`)
+    // as-is: it must not go through startGoal's redefine-on-reuse semantics,
+    // which would overwrite the preserved outcome text and reset
+    // ownerGate/pendingCompletion/retryImmediately. bindGoalToProject is the
+    // existing, already-reviewed way to find a goal and confirm it belongs
+    // to this project -- it does still rebind the goal's own project/
+    // repoPath/updatedAt fields to the values resolved here (a no-op when
+    // they already match, but a real identity move if this is invoked from
+    // a different worktree of the same repository than where the goal was
+    // admitted).
+    const goal = goalIdArg
+      ? (() => {
+          const bound = bindGoalToProject(goalIdArg, project.project, project.repoPath);
+          if (!bound) {
+            throw new Error(`goal ${goalIdArg} does not belong to project ${project.project}`);
+          }
+          return bound;
+        })()
+      : startGoal({
+          project: project.project,
+          repoPath: project.repoPath,
+          goal: requireFlag(args, '--goal'),
+          autonomous: requestedAutonomy,
+          ...(requiredOperations.length > 0 ? { requiredOperations } : {}),
+          ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
+        });
     console.log(`Major goal active: ${goal.id}`);
     console.log(`project: ${goal.project}`);
     console.log(`repo: ${goal.repoPath}`);
@@ -411,7 +439,14 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         'supervisor: running this goal in the foreground until it is done, blocked, or ' +
           `out of eligible capacity (up to ${policy.maxRunMinutes} minutes)`,
       );
-      await runForegroundGoal(goal.id, { maxRunMinutes: policy.maxRunMinutes });
+      const outcome = await runForegroundGoal(goal.id, { maxRunMinutes: policy.maxRunMinutes });
+      if (outcome.hops === 0) {
+        console.log(
+          'supervisor: no cycle actually ran this call — another Major process already holds ' +
+            "this repository's integration-owner lock. Nothing new was dispatched; wait for " +
+            'that run to finish rather than treating this call as having done the work.',
+        );
+      }
     } else if (goal.autonomous) {
       console.log('supervisor: queued for an explicitly started Major daemon');
     } else {

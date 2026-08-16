@@ -563,6 +563,15 @@ const FOREGROUND_CONTINUATION_HOP_LIMIT = 32;
  * hop run somewhat past its requested timeout under lease contention, the
  * same way a single non-looping foreground cycle always could.
  */
+export interface ForegroundGoalOutcome {
+  /** How many cycles actually ran (repo-lock contention or an early-return
+   * goal state counts as zero, however many hops were attempted). A caller
+   * that dispatched this and sees 0 knows nothing new happened this call --
+   * e.g. another integration owner already had the repo lock -- instead of
+   * mistaking a silent no-op for a completed run. */
+  hops: number;
+}
+
 export async function runForegroundGoal(
   goalId: string,
   options: {
@@ -573,10 +582,11 @@ export async function runForegroundGoal(
       cycleOptions?: { maxTimeoutMs?: number },
     ) => Promise<GoalCycleOutcome>;
   } = {},
-): Promise<void> {
+): Promise<ForegroundGoalOutcome> {
   const runCycle = options.runCycle ?? runGoalCycle;
   const maxRunMinutes = Math.max(1, options.maxRunMinutes ?? 120);
   const deadline = Date.now() + maxRunMinutes * 60 * 1000;
+  let hops = 0;
   for (let hop = 0; hop < FOREGROUND_CONTINUATION_HOP_LIMIT; hop++) {
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) break;
@@ -585,10 +595,11 @@ export async function runForegroundGoal(
     // an early-return path (already done/paused/awaiting completion): this
     // call contributed nothing. Stop rather than hot-loop or fabricate a
     // "capacity rotation happened" cleanup for a cycle that never ran.
-    if (!ranCycle) return;
+    if (!ranCycle) return { hops };
+    hops += 1;
     const goal = getGoal(goalId);
-    if (!goal?.retryImmediately) return;
-    if (goal.status !== 'active' && goal.status !== 'running') return;
+    if (!goal?.retryImmediately) return { hops };
+    if (goal.status !== 'active' && goal.status !== 'running') return { hops };
   }
   const stalled = getGoal(goalId);
   if (stalled?.retryImmediately) {
@@ -600,6 +611,7 @@ export async function runForegroundGoal(
       nextRunAt: new Date(Date.now() + 60_000).toISOString(),
     });
   }
+  return { hops };
 }
 
 async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): Promise<void> {
