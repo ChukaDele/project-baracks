@@ -17,12 +17,20 @@ import {
 } from '../domain/task-service.js';
 import { loadProjectConfig, resolveRepoPath } from '../config/project-config.js';
 import { addProject, getProjectByName, listProjects } from '../config/project-service.js';
-import { runDoctor } from '../doctor/doctor.js';
+import { runDoctor, type DoctorReport } from '../doctor/doctor.js';
+import {
+  computeLiveExecutionReadiness,
+  computeMultiProviderReadiness,
+  computeProviderReadiness,
+} from '../doctor/readiness.js';
 import { ClaudeCodeProvider } from '../providers/claude-code.js';
 import { CodexProvider } from '../providers/codex.js';
 import { cursorProvider } from '../providers/cursor.js';
 import { antigravityProvider } from '../providers/antigravity.js';
-import { persistProviderDiscovery } from '../providers/discovery-store.js';
+import {
+  loadPersistedProviderInfos,
+  persistProviderDiscovery,
+} from '../providers/discovery-store.js';
 import { route, type RoutingRequest } from '../routing/router.js';
 import { dbDecisionRecorder } from '../security/audit.js';
 import { ExecutionGateway } from '../security/gateway.js';
@@ -125,6 +133,31 @@ function providers(gateway: ExecutionGateway) {
   ];
 }
 
+/**
+ * runDoctor's own providerReadiness/liveExecution reflect only THIS run's
+ * fresh, resolution-only host discovery — never the persisted, authoritative
+ * state from an isolated probe or a billing attestation (both recorded only
+ * after runDoctor returns). Recompute readiness from the persisted state so
+ * `major doctor`/`major setup` reflect what `major provider probe` and
+ * `major provider attest-billing` actually observed, not just this run's
+ * PATH resolution.
+ */
+function withPersistedReadiness(database: Db, report: DoctorReport): DoctorReport {
+  const persisted = loadPersistedProviderInfos(database);
+  const providerReadiness = persisted.map((info) => computeProviderReadiness(info));
+  const liveExecution = computeLiveExecutionReadiness(report.core, providerReadiness);
+  const multiProvider = computeMultiProviderReadiness(liveExecution);
+  return {
+    ...report,
+    providerReadiness,
+    liveExecution,
+    liveExecutionReady: liveExecution.ready,
+    liveExecutionBlockers: liveExecution.blockers,
+    multiProviderReady: multiProvider.ready,
+    multiProvider,
+  };
+}
+
 program
   .command('doctor')
   .description('Check prerequisites, providers, models and overnight-execution safety')
@@ -132,7 +165,7 @@ program
   .action(async (opts: { json?: boolean }) => {
     const database = db();
     const gateway = probeGateway(database);
-    const report = await runDoctor({
+    const freshReport = await runDoctor({
       providers: providers(gateway),
       configuredProjects: listProjects(database).map((p) => ({
         name: p.name,
@@ -141,9 +174,10 @@ program
       resolve: (name) => gateway.resolveExecutable(name),
       inspectExecutionBackend: () => majorExecutionBackend().inspect(),
     });
-    for (const info of report.providers) {
+    for (const info of freshReport.providers) {
       persistProviderDiscovery(database, info, { source: 'cli' });
     }
+    const report = withPersistedReadiness(database, freshReport);
     if (opts.json) {
       emitJson('doctor-report', report);
     } else {
@@ -192,7 +226,7 @@ program
   .action(async (opts: { json?: boolean }) => {
     const database = db();
     const gateway = probeGateway(database);
-    const report = await runDoctor({
+    const freshReport = await runDoctor({
       providers: providers(gateway),
       configuredProjects: listProjects(database).map((p) => ({
         name: p.name,
@@ -201,9 +235,10 @@ program
       resolve: (name) => gateway.resolveExecutable(name),
       inspectExecutionBackend: () => majorExecutionBackend().inspect(),
     });
-    for (const info of report.providers) {
+    for (const info of freshReport.providers) {
       persistProviderDiscovery(database, info, { source: 'cli' });
     }
+    const report = withPersistedReadiness(database, freshReport);
     if (opts.json) {
       emitJson('setup-report', {
         core: report.core,

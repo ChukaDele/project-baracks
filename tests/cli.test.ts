@@ -10,6 +10,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { openDb } from '../src/db/client.js';
+import {
+  persistProviderDiscovery,
+  recordBillingObservation,
+} from '../src/providers/discovery-store.js';
 
 /**
  * Integration tests against the COMPILED CLI (`dist/cli/index.js`, built in
@@ -327,6 +332,64 @@ describe('major CLI', () => {
     }
     // No JSON envelope from setup ever claims unattended/overnight authority.
     expect(result.stdout).not.toMatch(/overnightExecution.*"safe"/i);
+  }, 90_000);
+
+  it("doctor and setup reflect a persisted probe+billing observation, not just this run's host resolution", () => {
+    // runDoctor's OWN pass is resolution-only host discovery; the CLI must
+    // reconcile with what `major provider probe` / `attest-billing` already
+    // recorded (see withPersistedReadiness), so a real isolated-probe result
+    // is not discarded by the next doctor/setup run's fresh discovery.
+    const scratch = mkdtempSync(join(tmpdir(), 'major-persisted-readiness-'));
+    const isoDb = join(scratch, 'major.db');
+    const opened = openDb(isoDb);
+    try {
+      const persisted = persistProviderDiscovery(
+        opened.db,
+        {
+          name: 'codex',
+          executable: '/opt/major/providers/v1/codex/bin/codex-native',
+          installed: true,
+          authenticated: true,
+          models: [
+            {
+              modelRef: 'auto',
+              routingClass: 'codex',
+              visible: true,
+              authenticated: true,
+              availability: 'available',
+              billingMode: 'unknown',
+              prohibited: false,
+              source: 'probe',
+            },
+          ],
+        },
+        { source: 'probe', note: 'authenticated in the isolated worker' },
+      );
+      recordBillingObservation(opened.db, {
+        providerName: 'codex',
+        modelRef: 'auto',
+        billingMode: 'subscription_included',
+        source: 'human',
+        note: 'ChatGPT Plus subscription confirmed by owner',
+      });
+      expect(persisted.models[0]?.modelRef).toBe('auto');
+    } finally {
+      opened.sqlite.close();
+    }
+
+    const result = majorEnv({ ...process.env, MAJOR_DB_PATH: isoDb }, 'setup', '--json');
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout) as {
+      data: {
+        providerReadiness: { provider: string; state: string }[];
+        liveExecution: { ready: boolean; healthyProviders: string[] };
+      };
+    };
+    expect(parsed.data.providerReadiness).toEqual(
+      expect.arrayContaining([expect.objectContaining({ provider: 'codex', state: 'READY' })]),
+    );
+    expect(parsed.data.liveExecution.healthyProviders).toContain('codex');
+    expect(parsed.data.liveExecution.ready).toBe(true);
   }, 90_000);
 
   it('keeps the legacy task-ledger CLI free of execution and downstream-write commands', () => {

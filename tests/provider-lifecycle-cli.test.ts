@@ -18,6 +18,7 @@ vi.mock('../src/security/major-gateway.js', () => ({
 
 import { agentModels, agentProviders } from '../src/db/schema.js';
 import { openDb } from '../src/db/client.js';
+import { persistProviderDiscovery } from '../src/providers/discovery-store.js';
 import { runProviderLifecycleCli } from '../src/providers/lifecycle-cli.js';
 import { eq } from 'drizzle-orm';
 
@@ -90,6 +91,64 @@ describe('major provider probe', () => {
     expect(handled).toBe(true);
     expect(logs.join('\n')).toMatch(/"installed": false/);
     expect(logs.join('\n')).toMatch(/"authenticated": false/);
+  });
+
+  it('keeps installed=true when the probe is installed but not yet authenticated', async () => {
+    // visible/installed and authenticated are separate dimensions: an
+    // installed-but-unauthenticated probe result must produce AUTH_REQUIRED
+    // readiness (installed: true), never NOT_CONFIGURED (installed: false).
+    const seed = openDb(dbPath);
+    try {
+      persistProviderDiscovery(
+        seed.db,
+        {
+          name: 'codex',
+          installed: true,
+          authenticated: false,
+          models: [
+            {
+              modelRef: 'auto',
+              routingClass: 'codex',
+              visible: false,
+              authenticated: false,
+              availability: 'unknown',
+              billingMode: 'unknown',
+              prohibited: false,
+              source: 'registry',
+            },
+          ],
+        },
+        { source: 'registry' },
+      );
+    } finally {
+      seed.sqlite.close();
+    }
+
+    probeResult = {
+      installed: true,
+      authenticated: false,
+      executable: '/opt/major/providers/v1/codex/bin/codex-native',
+      detail: 'provider is installed but authentication was not confirmed',
+    };
+    await runProviderLifecycleCli(['provider', 'probe', '--provider', 'codex']);
+
+    const opened = openDb(dbPath);
+    try {
+      const provider = opened.db
+        .select()
+        .from(agentProviders)
+        .where(eq(agentProviders.name, 'codex'))
+        .get();
+      const model = opened.db
+        .select()
+        .from(agentModels)
+        .where(eq(agentModels.providerId, provider!.id))
+        .get();
+      expect(model?.visible).toBe(true);
+      expect(model?.authenticated).toBe(false);
+    } finally {
+      opened.sqlite.close();
+    }
   });
 
   it('bypasses the passive backoff window for this explicit owner-triggered re-probe', async () => {

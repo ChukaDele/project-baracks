@@ -47,7 +47,12 @@ export function computeProviderReadiness(
       action: `install and authenticate ${provider} to enable it`,
     };
   }
-  if (!info.authenticated) {
+  // info.authenticated is best-effort and frequently undefined (resolution-only
+  // host discovery cannot verify it; loadPersistedProviderInfos never sets it
+  // at all). The model list is the reliable signal: it always carries an
+  // explicit authenticated flag per model.
+  const authenticated = info.authenticated ?? info.models.some((m) => m.authenticated);
+  if (!authenticated) {
     return {
       provider,
       state: 'AUTH_REQUIRED',

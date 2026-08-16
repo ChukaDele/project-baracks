@@ -99,13 +99,16 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     const opened = openDb();
     try {
       const existing = loadPersistedProviderInfos(opened.db).find((p) => p.name === providerName);
-      // An authenticated probe is exactly the "newly authorized validation
-      // attempt" that legitimately clears a stale exhausted/rate-limited
-      // flag from before the owner's account swap; an unauthenticated probe
-      // leaves availability alone rather than guessing at it.
+      // visible (is the model known to exist) and authenticated (is it logged
+      // in) are separate dimensions: an installed-but-unauthenticated probe
+      // must not also erase the installed signal. An authenticated probe is
+      // exactly the "newly authorized validation attempt" that legitimately
+      // clears a stale exhausted/rate-limited flag from before the owner's
+      // account swap; an unauthenticated probe leaves availability alone
+      // rather than guessing at it.
       const models = (existing?.models ?? []).map((m) => ({
         ...m,
-        visible: authenticated,
+        visible: installed,
         authenticated,
         ...(authenticated ? { availability: 'available' as const } : {}),
       }));
