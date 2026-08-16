@@ -68,22 +68,39 @@ function run(env: Record<string, string>): { status: number; stdout: string; std
   }
 }
 
-// Every tool the script's own preflight checks for, so filtering one out of
-// this list is exactly "that one tool is missing" -- not also missing
-// whatever this list forgot to include.
+// Every tool the script's own preflight checks for EXCEPT limactl -- a real
+// limactl exists on this developer's Mac but not on Linux CI runners, so
+// resolving it via minimalPath()'s `command -v` would make these tests
+// depend on what happens to be installed on whatever machine runs them.
+// Every test that needs the script to get PAST the limactl check provides
+// its own fake one explicitly (see fakeLimactl below); filtering one tool
+// out of this list is exactly "that one tool is missing" -- not also
+// missing whatever this list forgot to include.
 const ALL_TOOLS = [
   'git',
   'node',
   'curl',
   'python3',
   'corepack',
-  'limactl',
   'uname',
   'command',
   'grep',
   'mktemp',
   'rm',
 ];
+
+function fakeLimactl(version = 'limactl version 2.2.4'): string {
+  return fakeBin('limactl', `echo "${version}"`);
+}
+
+// The script's first real check after the URL guards is `uname -s` == Darwin.
+// This developer's Mac genuinely is Darwin, but CI runs on Linux -- any test
+// that needs to get PAST the platform check must fake `uname` to say Darwin
+// rather than relying on whatever the real host happens to report, or it
+// silently tests the wrong thing (or nothing) depending on where it runs.
+function fakeDarwinUname(): string {
+  return fakeBin('uname', 'echo Darwin');
+}
 
 describe('major-beta-install.sh (pre-network guards)', () => {
   it('refuses a non-https MAJOR_REPO_URL before touching the network', () => {
@@ -112,7 +129,12 @@ describe('major-beta-install.sh (pre-network guards)', () => {
   });
 
   it('refuses when a required tool is missing from PATH, naming exactly that tool', () => {
-    const result = run({ PATH: minimalPath(ALL_TOOLS.filter((t) => t !== 'python3')) });
+    // Fake Darwin + a fake limactl so the ONLY thing genuinely missing is
+    // python3 -- otherwise this would fail at the platform check on Linux
+    // CI, or also report limactl missing, either way testing the wrong thing.
+    const result = run({
+      PATH: `${fakeDarwinUname()}:${fakeLimactl()}:${minimalPath(ALL_TOOLS.filter((t) => t !== 'python3'))}`,
+    });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toBe(
       'ERROR: missing required tools on PATH: python3\nInstall them, then re-run this script.\n',
@@ -120,15 +142,16 @@ describe('major-beta-install.sh (pre-network guards)', () => {
   });
 
   it('refuses when neither corepack nor pnpm is present', () => {
-    const result = run({ PATH: minimalPath(ALL_TOOLS.filter((t) => t !== 'corepack')) });
+    const result = run({
+      PATH: `${fakeDarwinUname()}:${fakeLimactl()}:${minimalPath(ALL_TOOLS.filter((t) => t !== 'corepack'))}`,
+    });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/neither corepack nor pnpm/);
   });
 
   it('refuses when the installed Lima version is outside the supported range', () => {
-    const fakeLimactl = fakeBin('limactl', 'echo "limactl version 3.0.0"');
     const result = run({
-      PATH: `${fakeLimactl}:${minimalPath(ALL_TOOLS.filter((t) => t !== 'limactl'))}`,
+      PATH: `${fakeDarwinUname()}:${fakeLimactl('limactl version 3.0.0')}:${minimalPath(ALL_TOOLS)}`,
     });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/Lima >=2\.2\.0/);
@@ -139,9 +162,8 @@ describe('major-beta-install.sh (pre-network guards)', () => {
     // docstring) -- proving control reaches `git clone` is enough to show
     // every guard above it passed; the clone itself fails against a
     // deliberately unreachable host, which is the expected outcome here.
-    const fakeLimactl = fakeBin('limactl', 'echo "limactl version 2.2.4"');
     const result = run({
-      PATH: `${fakeLimactl}:${minimalPath(ALL_TOOLS.filter((t) => t !== 'limactl'))}`,
+      PATH: `${fakeDarwinUname()}:${fakeLimactl()}:${minimalPath(ALL_TOOLS)}`,
       MAJOR_REPO_URL: 'https://127.0.0.1.invalid.example/does-not-exist.git',
       HOME: mkdtempSync(join(tmpdir(), 'major-beta-install-home-')),
     });
