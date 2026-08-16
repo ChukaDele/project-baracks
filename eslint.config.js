@@ -27,6 +27,7 @@ export default tseslint.config(
       'src/security/system-memory.ts',
       'src/security/secure-enclave-attestation.ts',
       'src/providers/exec.ts',
+      'src/providers/host-credential.ts',
       'src/execution/lima-backend.ts',
       'src/execution/cursor-acp-runtime.ts',
     ],

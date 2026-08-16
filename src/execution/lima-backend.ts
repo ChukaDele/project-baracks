@@ -376,6 +376,114 @@ export class LimaBackend implements ExecutionBackend {
     }
   }
 
+  /**
+   * Moves the user's OWN host provider credential into their OWN local
+   * worker's canonical provider-auth store — the self-service onboarding
+   * operation (`major provider connect`). Requires no Workshop/staged
+   * authority: the caller already has read access to the host file and
+   * control of this local worker. Scope is fixed and narrow (one exact
+   * provider, one exact host path, this worker) — never arbitrary transfer.
+   * All process spawning stays inside this already-audited module; the
+   * actual host-side symlink/hardlink/mode checks happen twice — once here
+   * as defense in depth, and once already in the caller
+   * (src/providers/host-credential.ts) before this is ever invoked.
+   */
+  async importProviderCredential(
+    host: 'claude' | 'codex' | 'cursor' | 'antigravity',
+    hostCredentialPath: string,
+  ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
+    if (!isCapabilityAvailable('live-agent-execution')) {
+      return {
+        ok: false,
+        detail: 'credential import is disabled while live-agent-execution is unavailable',
+      };
+    }
+    const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
+    const importScript = join(executingRoot, 'scripts', 'import-major-provider-credential.py');
+    const stateRoot = join(majorHome(), 'execution', 'lima');
+    const lock = join(stateRoot, 'backend.lock');
+    mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+    await this.acquireLock(lock);
+    try {
+      await this.start();
+      const guestTmp = '/tmp/major-credential-import';
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        guestTmp,
+      ]);
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'install',
+        '-d',
+        '-m',
+        '0700',
+        guestTmp,
+      ]);
+      const copiedCredential = await this.lima([
+        'copy',
+        hostCredentialPath,
+        `${this.config.instance}:${guestTmp}/staged`,
+      ]);
+      if (copiedCredential.code !== 0) {
+        return {
+          ok: false,
+          detail: `failed to copy host credential into the worker: ${redactText(copiedCredential.stderr)}`,
+        };
+      }
+      const copiedScript = await this.lima([
+        'copy',
+        importScript,
+        `${this.config.instance}:${guestTmp}/import.py`,
+      ]);
+      if (copiedScript.code !== 0) {
+        return {
+          ok: false,
+          detail: `failed to stage the import broker: ${redactText(copiedScript.stderr)}`,
+        };
+      }
+      const placed = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'python3',
+        `${guestTmp}/import.py`,
+        host,
+      ]);
+      if (placed.code !== 0) {
+        return {
+          ok: false,
+          detail: `credential import broker refused: ${redactText(placed.stderr || placed.stdout)}`,
+        };
+      }
+      return { ok: true, detail: placed.stdout.trim() };
+    } finally {
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        '/tmp/major-credential-import',
+      ]).catch(() => undefined);
+      try {
+        await this.stop();
+      } finally {
+        rmSync(lock, { recursive: true, force: true });
+      }
+    }
+  }
+
   private async stop(force = false): Promise<void> {
     const before = await this.instance();
     if (before.status === 'Stopped') return;

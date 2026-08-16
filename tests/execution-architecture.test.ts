@@ -22,6 +22,10 @@ describe('single execution boundary', () => {
       'src/execution/cursor-acp-runtime.ts',
       'src/execution/lima-backend.ts',
       'src/providers/exec.ts',
+      // Checks only for the EXISTENCE of a macOS Keychain entry (no `-w`,
+      // never reads the stored secret) as part of host credential detection
+      // for `major provider connect`. Narrow, single-purpose, audited here.
+      'src/providers/host-credential.ts',
       'src/security/major-gateway.ts',
       'src/security/secure-enclave-attestation.ts',
       'src/security/system-memory.ts',

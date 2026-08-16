@@ -1,0 +1,1 @@
+ALTER TABLE `agent_providers` ADD `credential_fingerprint` text;

@@ -420,3 +420,38 @@ export function loadPersistedProviderInfos(
     return info;
   });
 }
+
+/** The fingerprint of the credential currently imported for this provider,
+ * or null if none has been imported (or the provider is unknown). Never the
+ * credential itself — see `fingerprintCredentialFile` in host-credential.ts. */
+export function getCredentialFingerprint(db: DbConn, providerName: string): string | null {
+  return selectProviderByCapacityKey(db, providerName)?.credentialFingerprint ?? null;
+}
+
+/** Records which credential (by fingerprint only) is currently imported for
+ * a provider. Called only after a successful import — never speculatively. */
+export function setCredentialFingerprint(db: Db, providerName: string, fingerprint: string): void {
+  const { providerName: name, accountLabel } = parseCapacityKey(providerName);
+  const now = new Date().toISOString();
+  const existing = db
+    .select()
+    .from(agentProviders)
+    .where(and(eq(agentProviders.name, name), eq(agentProviders.accountLabel, accountLabel)))
+    .get();
+  if (existing) {
+    db.update(agentProviders)
+      .set({ credentialFingerprint: fingerprint })
+      .where(eq(agentProviders.id, existing.id))
+      .run();
+    return;
+  }
+  db.insert(agentProviders)
+    .values({
+      id: newId('aprov'),
+      name,
+      accountLabel,
+      credentialFingerprint: fingerprint,
+      lastDiscoveredAt: now,
+    })
+    .run();
+}

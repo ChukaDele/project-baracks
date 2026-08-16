@@ -27,6 +27,7 @@ import { ClaudeCodeProvider } from '../providers/claude-code.js';
 import { CodexProvider } from '../providers/codex.js';
 import { cursorProvider } from '../providers/cursor.js';
 import { antigravityProvider } from '../providers/antigravity.js';
+import { checkHostCredential } from '../providers/host-credential.js';
 import {
   loadPersistedProviderInfos,
   persistProviderDiscovery,
@@ -262,10 +263,25 @@ program
       persistProviderDiscovery(database, info, { source: 'cli' });
     }
     const report = withPersistedReadiness(database, freshReport);
+    const providerToHost: Record<string, 'claude' | 'codex' | 'cursor' | 'antigravity'> = {
+      'claude-code': 'claude',
+      codex: 'codex',
+      cursor: 'cursor',
+      antigravity: 'antigravity',
+    };
+    const hostLogins = report.providerReadiness.map((p) => {
+      const host = providerToHost[p.provider];
+      const check = host ? checkHostCredential(host) : undefined;
+      return {
+        provider: p.provider,
+        hostLoginFound: check?.status === 'found' || check?.status === 'unsafe',
+      };
+    });
     if (opts.json) {
       emitJson('setup-report', {
         core: report.core,
         providerReadiness: report.providerReadiness,
+        hostLogins,
         liveExecution: report.liveExecution,
         multiProvider: report.multiProvider,
       });
@@ -279,10 +295,16 @@ program
     }
     console.log('\nProviders');
     for (const p of report.providerReadiness) {
+      const host = providerToHost[p.provider];
+      const hostCheck = host ? checkHostCredential(host) : undefined;
       console.log(`\n${p.provider}`);
-      console.log(`  status                ${p.state}`);
-      console.log(`  detail                ${p.detail}`);
-      if (p.action) console.log(`  action                ${p.action}`);
+      console.log(
+        `  host login            ${hostCheck?.status === 'found' ? 'found' : hostCheck?.status === 'unsafe' ? 'found (' + hostCheck.detail.split('.')[0] + ')' : 'not found'}`,
+      );
+      console.log(`  Major login           ${p.state === 'READY' ? 'READY' : p.state}`);
+      if (p.state !== 'READY') {
+        console.log(`  action                major provider connect --provider ${p.provider}`);
+      }
     }
     console.log('\nMajor');
     console.log(`  live execution        ${report.liveExecutionReady ? 'READY' : 'NOT READY'}`);
