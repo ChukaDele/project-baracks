@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -35,6 +35,7 @@
     {"id":"human-blocker-orchestration","source":"major-internal","availability":"all-projects","load":"authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"},
     {"id":"dev-server-management","source":"major-internal","availability":"web-projects","load":"explicit-owner-approved-localhost-exception-only"},
     {"id":"mcp-integration-ops","source":"major-internal","availability":"all-projects","load":"mcp-connector-plugin-integration-authentication-tool-exposure-reconnect-permission-provider-operation"},
+    {"id":"creative-media-routing","source":"major-internal","availability":"all-projects","load":"image-video-audio-vector-3d-creative-asset-generation-edit-upscale-background-stock-open-media-character-product-style-reference-spaces-workflow"},
     {"id":"source-ingestion","source":"major-internal","availability":"all-projects","load":"named-url-file-video-audio-document-primary-source"},
     {"id":"knowledge-work","source":"major-internal","availability":"all-projects","load":"research-strategy-synthesis-comparison-decision-work"},
     {"id":"competitive-product-audit","source":"major-internal","availability":"all-projects","load":"project-start-or-material-product-work"},
