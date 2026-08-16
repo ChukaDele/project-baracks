@@ -146,6 +146,35 @@ describe('computeLiveExecutionReadiness', () => {
     expect(live.ready).toBe(false);
     expect(live.blockers.join()).toMatch(/no providers configured/);
   });
+
+  // The two acceptance scenarios named literally in the beta-operability
+  // spec: an unauthenticated optional provider never blocks a READY one, and
+  // an authoritatively exhausted provider never blocks a different READY one
+  // — with the exact provider names used in that spec, not just structurally
+  // equivalent stand-ins.
+  it('is ready with Claude AUTH_REQUIRED alongside Codex READY', () => {
+    const claude = computeProviderReadiness(provider('claude-code', { authenticated: false }));
+    const codex = computeProviderReadiness(
+      provider('codex', { models: [model({ modelRef: 'auto', routingClass: 'codex' })] }),
+    );
+    const live = computeLiveExecutionReadiness(readyCore(), [claude, codex]);
+    expect(live.ready).toBe(true);
+    expect(live.healthyProviders).toEqual(['codex']);
+  });
+
+  it('reroutes readiness to Cursor when Codex is authoritatively EXHAUSTED', () => {
+    const codex = computeProviderReadiness(
+      provider('codex', {
+        models: [model({ modelRef: 'auto', routingClass: 'codex', availability: 'exhausted' })],
+      }),
+    );
+    const cursor = computeProviderReadiness(
+      provider('cursor', { models: [model({ modelRef: 'auto', routingClass: 'sonnet' })] }),
+    );
+    const live = computeLiveExecutionReadiness(readyCore(), [codex, cursor]);
+    expect(live.ready).toBe(true);
+    expect(live.healthyProviders).toEqual(['cursor']);
+  });
 });
 
 describe('computeMultiProviderReadiness', () => {
