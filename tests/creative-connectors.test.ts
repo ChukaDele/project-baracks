@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -19,7 +25,8 @@ function json(path: string): Record<string, unknown> {
 }
 
 afterEach(() => {
-  for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
+  for (const home of homes.splice(0))
+    rmSync(home, { recursive: true, force: true });
 });
 
 describe('Magnific creative connector setup', () => {
@@ -28,14 +35,15 @@ describe('Magnific creative connector setup', () => {
     mkdirSync(join(home, '.cursor'), { recursive: true });
     writeFileSync(
       join(home, '.cursor', 'mcp.json'),
-      JSON.stringify({ mcpServers: { existing: { url: 'https://example.test/mcp' } } }),
+      JSON.stringify({
+        mcpServers: { existing: { url: 'https://example.test/mcp' } },
+      }),
     );
 
-    execFileSync(
-      'python3',
-      [script, '--home', home, '--skip-native-clis'],
-      { cwd: process.cwd(), encoding: 'utf8' },
-    );
+    execFileSync('python3', [script, '--home', home, '--skip-native-clis'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    });
 
     expect(json(join(home, '.cursor', 'mcp.json'))).toMatchObject({
       mcpServers: {
@@ -46,7 +54,9 @@ describe('Magnific creative connector setup', () => {
     expect(json(join(home, '.gemini', 'settings.json'))).toMatchObject({
       mcpServers: { magnific: { httpUrl: endpoint } },
     });
-    expect(json(join(home, '.gemini', 'config', 'mcp_config.json'))).toMatchObject({
+    expect(
+      json(join(home, '.gemini', 'config', 'mcp_config.json')),
+    ).toMatchObject({
       mcpServers: { magnific: { serverUrl: endpoint } },
     });
   });
@@ -57,10 +67,14 @@ describe('Magnific creative connector setup', () => {
       cwd: process.cwd(),
     });
     const before = readFileSync(join(home, '.cursor', 'mcp.json'), 'utf8');
-    const output = execFileSync('python3', [script, '--home', home, '--skip-native-clis'], {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-    });
+    const output = execFileSync(
+      'python3',
+      [script, '--home', home, '--skip-native-clis'],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      },
+    );
     const after = readFileSync(join(home, '.cursor', 'mcp.json'), 'utf8');
 
     expect(after).toBe(before);
