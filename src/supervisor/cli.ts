@@ -16,9 +16,14 @@ import {
   type TrustLevel,
 } from './policy.js';
 import {
+  activeGoals,
   applyIndependentCompletionGrade,
+  authorizeSessionWorkshop,
   bindGoalToProject,
+  claimLiveWorker,
   getGoal,
+  gitCommonDir,
+  heartbeatLiveWorker,
   resolveProject,
   resolveProjectForCwd,
   readSupervisorState,
@@ -28,6 +33,7 @@ import {
   type GoalStatus,
   type WorkerHost,
 } from './state.js';
+import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
 import {
@@ -85,6 +91,22 @@ function validHost(value: string): WorkerHost {
     throw new Error(`unsupported provider: ${value}`);
   }
   return value as WorkerHost;
+}
+
+/** Best-effort recovery of the session id an earlier `session attach`/`hook`
+ * call already recorded for this host+project, so an ambient admission call
+ * does not need its own separate identity scheme. */
+function mostRecentSessionId(host: WorkerHost, repoPath: string): string | undefined {
+  const commonDir = gitCommonDir(resolve(repoPath));
+  const match = [...readSupervisorState().sessions].reverse().find((session) => {
+    if (session.host !== host || !session.sessionId) return false;
+    if (session.repoPath === undefined) return false;
+    return (
+      resolve(session.repoPath) === resolve(repoPath) ||
+      (commonDir !== undefined && gitCommonDir(resolve(session.repoPath)) === commonDir)
+    );
+  });
+  return match?.sessionId;
 }
 
 function validProjectClass(value: string): ProjectClass {
@@ -388,6 +410,102 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'status') {
     console.log(supervisorSnapshot(args[1]));
     console.log(formatResourceTelemetry(resourceSnapshot().telemetry));
+    return true;
+  }
+
+  if (command === 'goal' && args[1] === 'admit') {
+    const cwd = resolve(flag(args, '--cwd') ?? process.cwd());
+    const host = validHost(requireFlag(args, '--host'));
+    const outcome = requireFlag(args, '--outcome');
+    const project = resolveProjectForCwd(cwd);
+    if (!project) {
+      console.log(
+        JSON.stringify({ admitted: false, reason: `no registered Git project at ${cwd}` }, null, 2),
+      );
+      return true;
+    }
+    const policy = getProjectPolicy(project.project, project.repoPath);
+    if (policy.trust !== 'build' || !policy.ownerApprovedBuild || policy.allowBackground) {
+      console.log(
+        JSON.stringify(
+          {
+            admitted: false,
+            reason:
+              `${project.project} is ${policy.projectClass}/${policy.trust}; automatic ` +
+              'admission requires owner-approved build without background authority',
+          },
+          null,
+          2,
+        ),
+      );
+      return true;
+    }
+    const sessionId = flag(args, '--session-id') ?? mostRecentSessionId(host, project.repoPath);
+    if (!sessionId) {
+      throw new Error(
+        'goal admit requires --session-id (no matching attached session found; run `major session attach`/`session hook` first)',
+      );
+    }
+    // Create-or-resume: reuse the existing active goal for this project
+    // rather than starting a fresh one for every admitted message, and
+    // preserve its durable outcome text unless --refine explicitly says the
+    // objective itself changed (not merely the latest implementation step).
+    const existing = activeGoals(project.project, project.repoPath)[0];
+    let goal =
+      existing ??
+      startGoal({
+        project: project.project,
+        repoPath: project.repoPath,
+        goal: outcome,
+        autonomous: false,
+        preferredCoordinator: host,
+      });
+    if (existing && hasFlag(args, '--refine')) {
+      goal = updateGoal(goal.id, { goal: outcome });
+    }
+    const claimResult = claimLiveWorker(goal.id, { host, sessionId });
+    let authorityExpiresAt: string;
+    try {
+      authorityExpiresAt = resolveSupervisedWorkshopAuthority(project.repoPath).expiresAt;
+    } catch {
+      authorityExpiresAt = authorizeSessionWorkshop({
+        host,
+        cwd: project.repoPath,
+        project: project.project,
+        repoPath: project.repoPath,
+        sessionId,
+        expiresAt: new Date(Date.now() + 480 * 60_000).toISOString(),
+      }).workshopAuthorization!.expiresAt;
+    }
+    console.log(
+      JSON.stringify(
+        {
+          admitted: true,
+          goalId: goal.id,
+          created: !existing,
+          outcome: goal.goal,
+          authority: { status: 'active', expiresAt: authorityExpiresAt },
+          ownLiveWork: claimResult.owned,
+          liveWorker: claimResult.claim,
+          guidance: claimResult.owned
+            ? 'proceed as the current worker for this goal'
+            : `another session already holds live work on this goal (${claimResult.claim.host} ` +
+              `since ${claimResult.claim.claimedAt}); coordinate before mutating — check git ` +
+              'status and avoid parallel edits',
+        },
+        null,
+        2,
+      ),
+    );
+    return true;
+  }
+
+  if (command === 'goal' && args[1] === 'heartbeat') {
+    const id = requireFlag(args, '--id');
+    const host = validHost(requireFlag(args, '--host'));
+    const sessionId = requireFlag(args, '--session-id');
+    const ok = heartbeatLiveWorker(id, { host, sessionId });
+    console.log(JSON.stringify({ heartbeat: ok }, null, 2));
     return true;
   }
 
