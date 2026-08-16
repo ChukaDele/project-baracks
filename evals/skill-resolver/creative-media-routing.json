@@ -1,0 +1,18 @@
+{
+  "skill": "creative-media-routing",
+  "should_trigger": [
+    "Generate three hero images and a five-second product clip, using our existing creative tools.",
+    "Upscale this image, remove the background and make social variants.",
+    "Find an openly licensed photo and preserve the attribution.",
+    "Use a consistent character reference across these images and video shots.",
+    "Magnific credits are unavailable; find a usable open-licensed audio track instead."
+  ],
+  "should_not_trigger": [
+    "Fix the database migration.",
+    "Review this pull request for security regressions.",
+    "Summarize the latest customer interview transcript."
+  ],
+  "conflicts": [
+    "design-direction-and-taste owns visual direction; creative-media-routing chooses/reuses the media provider and asset path; mcp-integration-ops owns connection/auth/tool exposure; source-ingestion owns reading supplied source media."
+  ]
+}
