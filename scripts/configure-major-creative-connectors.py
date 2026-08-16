@@ -136,6 +136,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--home", type=Path, default=Path.home())
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--skip-native-clis",
+        action="store_true",
+        help="configure JSON-based hosts only; intended for tests or staged setup",
+    )
     args = parser.parse_args()
 
     home = args.home.expanduser().resolve()
@@ -179,8 +184,12 @@ def main() -> None:
 
     # Claude and Codex have native MCP config CLIs; use them rather than guessing
     # internal config formats. Both calls are idempotent for the canonical URL.
-    results.append(("Claude Code", configure_claude(args.dry_run)))
-    results.append(("Codex", configure_codex(args.dry_run)))
+    if args.skip_native_clis:
+        results.append(("Claude Code", "skipped by flag"))
+        results.append(("Codex", "skipped by flag"))
+    else:
+        results.append(("Claude Code", configure_claude(args.dry_run)))
+        results.append(("Codex", configure_codex(args.dry_run)))
 
     print("Magnific MCP configuration")
     for host, status in results:
