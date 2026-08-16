@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { agentModels, discoveryObservations, routingCheckpoints } from '../src/db/schema.js';
+import {
+  agentModels,
+  agentProviders,
+  discoveryObservations,
+  routingCheckpoints,
+} from '../src/db/schema.js';
 import {
   consumeModelRetry,
   loadPersistedProviderInfos,
@@ -293,6 +298,85 @@ describe('discovery persistence', () => {
     const db = testDb();
     persistProviderDiscovery(db, providerInfo(), { source: 'cli' });
     expect(() => db.delete(discoveryObservations).run()).toThrow(/append-only/);
+  });
+
+  it('tracks a second account of the same provider as an independent capacity row', () => {
+    const db = testDb();
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        name: 'codex',
+        models: [model({ modelRef: 'gpt-codex', routingClass: 'codex' })],
+      }),
+      { source: 'cli' },
+    );
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        name: 'codex#work-b',
+        models: [model({ modelRef: 'gpt-codex', routingClass: 'codex' })],
+      }),
+      { source: 'cli' },
+    );
+    const infos = loadPersistedProviderInfos(db);
+    const names = infos.map((info) => info.name).sort();
+    expect(names).toEqual(['codex', 'codex#work-b']);
+
+    // Default account is a distinct DB row from the second account, so
+    // upserting one by name+accountLabel never collides with the other.
+    const rows = db.select().from(agentProviders).all();
+    expect(rows.filter((row) => row.name === 'codex')).toHaveLength(2);
+    expect(rows.map((row) => row.accountLabel).sort()).toEqual(['default', 'work-b']);
+  });
+
+  it('exhausting one account leaves a second account of the same provider routable', () => {
+    const db = testDb();
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        name: 'codex',
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            billingMode: 'subscription_included',
+          }),
+        ],
+      }),
+      { source: 'cli' },
+    );
+    persistProviderDiscovery(
+      db,
+      providerInfo({
+        name: 'codex#work-b',
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            billingMode: 'subscription_included',
+          }),
+        ],
+      }),
+      { source: 'cli' },
+    );
+    for (const providerName of ['codex', 'codex#work-b']) {
+      recordBillingObservation(db, {
+        providerName,
+        modelRef: 'gpt-codex',
+        billingMode: 'subscription_included',
+        source: 'human',
+      });
+    }
+    recordModelOutcome(db, { providerName: 'codex', modelRef: 'gpt-codex', outcome: 'exhausted' });
+
+    const infos = loadPersistedProviderInfos(db);
+    const defaultAccount = infos.find((info) => info.name === 'codex')!;
+    const secondAccount = infos.find((info) => info.name === 'codex#work-b')!;
+    expect(defaultAccount.models[0]!.availability).toBe('exhausted');
+    expect(secondAccount.models[0]!.availability).toBe('available');
+
+    const decision = route({ purpose: 'implementation', complexity: 'complex' }, infos);
+    expect(decision).toMatchObject({ kind: 'route', provider: 'codex#work-b' });
   });
 });
 

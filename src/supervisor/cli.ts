@@ -30,7 +30,13 @@ import {
 } from './state.js';
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
-import { runDaemon, runGoalCycle, supervisorSnapshot, tryAcquireRepoCycleLock } from './runtime.js';
+import {
+  runDaemon,
+  runForegroundGoal,
+  runGoalCycle,
+  supervisorSnapshot,
+  tryAcquireRepoCycleLock,
+} from './runtime.js';
 import { runGatewayCommand, runWorker } from './worker.js';
 import {
   RESOURCE_KINDS,
@@ -366,8 +372,11 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     }
 
     if (hasFlag(args, '--foreground')) {
-      console.log('supervisor: running one visible foreground cycle');
-      await runGoalCycle(goal.id);
+      console.log(
+        'supervisor: running this goal in the foreground until it is done, blocked, or ' +
+          `out of eligible capacity (up to ${policy.maxRunMinutes} minutes)`,
+      );
+      await runForegroundGoal(goal.id, { maxRunMinutes: policy.maxRunMinutes });
     } else if (goal.autonomous) {
       console.log('supervisor: queued for an explicitly started Major daemon');
     } else {
@@ -397,6 +406,10 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       lastFinishedAt: new Date().toISOString(),
       ownerGate: ownerGate ? redactText(ownerGate).slice(0, 4_000) : undefined,
       pendingCompletion: undefined,
+      // An external report supersedes whatever the last automatic cycle left
+      // behind; it must not leave a stale immediate-retry flag pointing at a
+      // capacity rotation this report just overrode.
+      retryImmediately: false,
     };
     updateGoal(id, patch);
     console.log(`goal ${id}: ${statusRaw}`);

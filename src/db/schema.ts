@@ -197,16 +197,25 @@ export const taskSuggestions = sqliteTable(
   ],
 );
 
-export const agentProviders = sqliteTable('agent_providers', {
-  id: id(),
-  /** e.g. 'claude-code', 'codex' */
-  name: text('name').notNull().unique(),
-  executable: text('executable'),
-  version: text('version'),
-  lastDiscoveredAt: text('last_discovered_at'),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
+export const agentProviders = sqliteTable(
+  'agent_providers',
+  {
+    id: id(),
+    /** e.g. 'claude-code', 'codex' */
+    name: text('name').notNull(),
+    /** Distinguishes multiple authenticated accounts/subscriptions for the
+     * same provider CLI (e.g. two independently logged-in Codex accounts).
+     * 'default' when the provider has only one configured account; existing
+     * single-account rows and callers are unaffected. */
+    accountLabel: text('account_label').notNull().default('default'),
+    executable: text('executable'),
+    version: text('version'),
+    lastDiscoveredAt: text('last_discovered_at'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('agent_providers_name_account').on(t.name, t.accountLabel)],
+);
 
 export const ROUTING_CLASSES = ['fable', 'opus', 'sonnet', 'codex', 'unknown'] as const;
 export type RoutingClass = (typeof ROUTING_CLASSES)[number];

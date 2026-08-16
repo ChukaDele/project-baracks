@@ -40,6 +40,11 @@ export interface SupervisorGoal {
   nextRunAt?: string | undefined;
   lastCoordinator?: WorkerHost | undefined;
   requiredOperations?: string[] | undefined;
+  /** Set by the last cycle when it stopped on an authoritative provider
+   * exhaustion/rate-limit (or a selected CLI turning out to be missing)
+   * with other capacity still eligible: the foreground continuation loop
+   * may immediately dispatch another cycle without a new owner action. */
+  retryImmediately?: boolean | undefined;
   pendingCompletion?:
     | {
         summary: string;
@@ -176,6 +181,10 @@ export function startGoal(input: {
         existing.ownerGate = undefined;
         existing.pendingCompletion = undefined;
         existing.nextRunAt = now;
+        // A redefined goal starts its own fresh cycle; it must not inherit an
+        // immediate-retry flag left over from whatever the prior goal text
+        // was doing.
+        existing.retryImmediately = false;
         return existing;
       }
     }

@@ -9,6 +9,7 @@ import {
 } from '../db/schema.js';
 import { newId } from '../domain/ids.js';
 import { redactText } from '../security/redact.js';
+import { capacityKey, parseCapacityKey } from './account.js';
 import type { ModelState, ProviderInfo } from './types.js';
 
 /**
@@ -42,7 +43,14 @@ const DEFAULT_BACKOFF_MS: Record<'rate_limited' | 'exhausted', number> = {
 };
 
 function upsertProvider(db: DbConn, info: ProviderInfo, now: string, source: ObservationSource) {
-  const existing = db.select().from(agentProviders).where(eq(agentProviders.name, info.name)).get();
+  const { providerName, accountLabel } = parseCapacityKey(info.name);
+  const existing = db
+    .select()
+    .from(agentProviders)
+    .where(
+      and(eq(agentProviders.name, providerName), eq(agentProviders.accountLabel, accountLabel)),
+    )
+    .get();
   if (existing) {
     const authoritative = source === 'human' || source === 'probe' || source === 'run_outcome';
     db.update(agentProviders)
@@ -59,13 +67,28 @@ function upsertProvider(db: DbConn, info: ProviderInfo, now: string, source: Obs
   db.insert(agentProviders)
     .values({
       id,
-      name: info.name,
+      name: providerName,
+      accountLabel,
       executable: info.executable ?? null,
       version: info.version ?? null,
       lastDiscoveredAt: now,
     })
     .run();
   return id;
+}
+
+/** Resolve the persisted provider row for a routing/outcome capacity key,
+ * which may be a bare provider name (default account) or a
+ * `${providerName}#${accountLabel}` composite for a non-default account. */
+function selectProviderByCapacityKey(db: DbConn, key: string) {
+  const { providerName, accountLabel } = parseCapacityKey(key);
+  return db
+    .select()
+    .from(agentProviders)
+    .where(
+      and(eq(agentProviders.name, providerName), eq(agentProviders.accountLabel, accountLabel)),
+    )
+    .get();
 }
 
 /**
@@ -177,11 +200,7 @@ export function recordBillingObservation(
 ) {
   return db.transaction(
     (tx) => {
-      const provider = tx
-        .select()
-        .from(agentProviders)
-        .where(eq(agentProviders.name, input.providerName))
-        .get();
+      const provider = selectProviderByCapacityKey(tx, input.providerName);
       if (!provider) throw new Error(`provider not persisted: ${input.providerName}`);
       const model = tx
         .select()
@@ -233,11 +252,7 @@ export function recordModelOutcome(
 ) {
   return db.transaction(
     (tx) => {
-      const provider = tx
-        .select()
-        .from(agentProviders)
-        .where(eq(agentProviders.name, input.providerName))
-        .get();
+      const provider = selectProviderByCapacityKey(tx, input.providerName);
       if (!provider) throw new Error(`provider not persisted: ${input.providerName}`);
       const model = tx
         .select()
@@ -298,11 +313,7 @@ export function consumeModelRetry(
 ): boolean {
   return db.transaction(
     (tx) => {
-      const provider = tx
-        .select()
-        .from(agentProviders)
-        .where(eq(agentProviders.name, input.providerName))
-        .get();
+      const provider = selectProviderByCapacityKey(tx, input.providerName);
       if (!provider) return false;
       const model = tx
         .select()
@@ -388,7 +399,7 @@ export function loadPersistedProviderInfos(
       return state;
     });
     const info: ProviderInfo = {
-      name: provider.name,
+      name: capacityKey(provider.name, provider.accountLabel),
       installed: states.some((s) => s.visible),
       models: states,
     };
