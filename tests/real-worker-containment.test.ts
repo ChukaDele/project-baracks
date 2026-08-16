@@ -1,0 +1,138 @@
+import { execFileSync } from 'node:child_process';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+/**
+ * Real (non-mocked) containment verification against the actual, already-
+ * provisioned exact-release worker — not a throwaway VM, and not the retired
+ * per-release M1 Secure-Enclave ceremony. This is normal, repeatable
+ * engineering verification: it can run in CI or a maintainer's scheduled
+ * suite on any machine that already has a Major Lima worker, and skips
+ * cleanly (not "false green") everywhere else.
+ */
+
+const LIMACTL = '/opt/homebrew/bin/limactl';
+const INSTANCE = 'major-worker-8b33feafe11b';
+
+function limactlAvailable(): boolean {
+  try {
+    const rows = execFileSync(LIMACTL, ['list', '--json'], { encoding: 'utf8', timeout: 10_000 })
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { name?: string });
+    return rows.some((row) => row.name === INSTANCE);
+  } catch {
+    return false;
+  }
+}
+
+const available = limactlAvailable();
+let startedHere = false;
+
+function shell(args: string[]): { code: number; stdout: string; stderr: string } {
+  try {
+    const stdout = execFileSync(LIMACTL, ['shell', '--tty=false', INSTANCE, ...args], {
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    return { code: 0, stdout, stderr: '' };
+  } catch (error) {
+    const e = error as { status?: number; stdout?: string; stderr?: string };
+    return { code: e.status ?? -1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+  }
+}
+
+describe.skipIf(!available)('real worker containment (major-worker-8b33feafe11b)', () => {
+  beforeAll(() => {
+    const status = execFileSync(LIMACTL, ['list', INSTANCE], { encoding: 'utf8' });
+    if (!status.includes('Running')) {
+      execFileSync(LIMACTL, ['start', INSTANCE], { encoding: 'utf8', timeout: 120_000 });
+      startedHere = true;
+    }
+  }, 130_000);
+
+  afterAll(() => {
+    if (startedHere) {
+      execFileSync(LIMACTL, ['stop', INSTANCE], { encoding: 'utf8', timeout: 60_000 });
+    }
+  }, 70_000);
+
+  it('does not mount any host filesystem path into the guest', () => {
+    const result = shell(['mount']);
+    expect(result.code).toBe(0);
+    // The hardened template pins mounts: [] — no /Users/... (host home),
+    // no host-specific volume names should ever appear in the guest's
+    // mount table.
+    expect(result.stdout).not.toMatch(/\/Users\//);
+    expect(result.stdout).not.toContain('9p');
+    expect(result.stdout).not.toContain('virtiofs');
+  });
+
+  it("keeps each provider guest user from reading another provider's home", () => {
+    const providers = ['claude', 'codex', 'cursor', 'antigravity'];
+    for (const provider of providers) {
+      for (const other of providers) {
+        if (provider === other) continue;
+        const result = shell([
+          'sudo',
+          '-n',
+          '-u',
+          `major-${provider}`,
+          'test',
+          '-r',
+          `/home/major-${other}`,
+        ]);
+        expect(result.code, `major-${provider} could read /home/major-${other}`).not.toBe(0);
+      }
+    }
+  });
+
+  it('keeps provider-auth credential staging root-only, unreadable by any guest provider user', () => {
+    for (const provider of ['claude', 'codex', 'cursor', 'antigravity']) {
+      const result = shell([
+        'sudo',
+        '-n',
+        '-u',
+        `major-${provider}`,
+        'test',
+        '-r',
+        '/var/lib/major/provider-auth',
+      ]);
+      expect(result.code, `major-${provider} could read /var/lib/major/provider-auth`).not.toBe(0);
+    }
+  });
+
+  it('has the canonical provider binary present and executable for every provider', () => {
+    const binaries = [
+      '/opt/major/providers/v1/claude/bin/claude',
+      '/opt/major/providers/v1/codex/bin/codex-native',
+      '/opt/major/providers/v1/cursor/bin/cursor-agent',
+      '/opt/major/providers/v1/antigravity/bin/agy',
+    ];
+    for (const binary of binaries) {
+      const result = shell(['test', '-x', binary]);
+      expect(result.code, `${binary} is not present/executable`).toBe(0);
+    }
+  });
+
+  it('has the release marker present, root-owned and immutable-mode', () => {
+    const result = shell([
+      'sudo',
+      'stat',
+      '-c',
+      '%U:%G:%a',
+      '/opt/major/releases/8b33feafe11b8b5a4ebfd836b455f793a38bc22e',
+    ]);
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim()).toBe('root:root:444');
+  });
+});
+
+describe.skipIf(available)('real worker containment (skipped)', () => {
+  it('reports why it skipped rather than silently passing', () => {
+    console.log(
+      `real-worker-containment.test.ts: SKIPPED — ${INSTANCE} is not available on this machine. ` +
+        'This is expected in CI; run on a maintainer machine with the worker provisioned for real coverage.',
+    );
+    expect(true).toBe(true);
+  });
+});

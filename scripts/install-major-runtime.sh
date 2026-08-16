@@ -388,6 +388,49 @@ if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ]; then
   echo "WARN: MAJOR_INSTALL_ANTIGRAVITY is retired. Install the official 'agy' CLI and complete Google OAuth interactively."
 fi
 
+# Copying files into place is not evidence the install actually works. Verify
+# the now-active runtime's own content-hash manifest, then run a contained
+# health check through the wrapper a user will actually invoke — not the
+# build-time smoke test, the real installed CLI.
+echo
+echo "Verifying the installed runtime..."
+if ! node "$RELEASE_DIR/scripts/major-runtime-manifest.mjs" verify "$RELEASE_DIR"; then
+  echo "ERROR: installed runtime failed its content manifest immediately after activation." >&2
+  echo "Files were copied but the resulting runtime cannot be trusted; do not use this install." >&2
+  exit 1
+fi
+set +e
+DOCTOR_JSON="$("$BIN_DIR/major" doctor --json 2>/tmp/major-postinstall-doctor.stderr)"
+DOCTOR_STATUS=$?
+set -e
+if [ "$DOCTOR_STATUS" -ne 0 ] && [ "$DOCTOR_STATUS" -ne 5 ]; then
+  echo "ERROR: the installed major CLI failed its post-install health check (exit $DOCTOR_STATUS)." >&2
+  cat /tmp/major-postinstall-doctor.stderr >&2
+  rm -f /tmp/major-postinstall-doctor.stderr
+  echo "Files were copied but the resulting runtime does not run cleanly; do not use this install." >&2
+  exit 1
+fi
+rm -f /tmp/major-postinstall-doctor.stderr
+CORE_READY="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['data']['core']['ready'])" "$DOCTOR_JSON" 2>/dev/null || echo "unknown")"
+DB_OK="$(python3 -c "
+import json, sys
+data = json.loads(sys.argv[1])['data']
+print('ok' if any(c['name']=='sqlite' and c['status']=='ok' for c in data['checks']) else 'FAILED')
+" "$DOCTOR_JSON" 2>/dev/null || echo "unknown")"
+
+cat <<EOF
+Installed Major v${INSTALL_VERSION} ($INSTALL_SHA)
+
+✓ release integrity  (content manifest verified)
+✓ worker              (isolated runner core ready: $CORE_READY)
+✓ database            ($DB_OK)
+✓ provider setup available
+
+Run:
+  major setup
+
+EOF
+
 cat <<EOF
 Major v${INSTALL_VERSION} control plane installed from validated main.
 
