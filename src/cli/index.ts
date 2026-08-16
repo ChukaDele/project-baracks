@@ -185,6 +185,59 @@ program
     if (!report.inspectionEnvironmentOk) process.exit(EXIT.unsafe);
   });
 
+program
+  .command('setup')
+  .description('Friend-facing readiness check: core, providers, and what to do next')
+  .option('--json', 'emit the full report as versioned JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const database = db();
+    const gateway = probeGateway(database);
+    const report = await runDoctor({
+      providers: providers(gateway),
+      configuredProjects: listProjects(database).map((p) => ({
+        name: p.name,
+        repoPath: p.repoPath,
+      })),
+      resolve: (name) => gateway.resolveExecutable(name),
+      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
+    });
+    for (const info of report.providers) {
+      persistProviderDiscovery(database, info, { source: 'cli' });
+    }
+    if (opts.json) {
+      emitJson('setup-report', {
+        core: report.core,
+        providerReadiness: report.providerReadiness,
+        liveExecution: report.liveExecution,
+        multiProvider: report.multiProvider,
+      });
+      return;
+    }
+    console.log('MAJOR SETUP\n');
+    console.log('Core');
+    console.log(`  isolated runner       ${report.core.ready ? '✓' : '✗'}`);
+    if (!report.core.ready) {
+      for (const issue of report.core.issues) console.log(`  - ${issue}`);
+    }
+    console.log('\nProviders');
+    for (const p of report.providerReadiness) {
+      console.log(`\n${p.provider}`);
+      console.log(`  status                ${p.state}`);
+      console.log(`  detail                ${p.detail}`);
+      if (p.action) console.log(`  action                ${p.action}`);
+    }
+    console.log('\nMajor');
+    console.log(`  live execution        ${report.liveExecutionReady ? 'READY' : 'NOT READY'}`);
+    console.log(`  healthy providers     ${report.liveExecution.healthyProviders.length}`);
+    console.log(`  fallback available    ${report.multiProviderReady ? 'YES' : 'NO'}`);
+    console.log(
+      `  overnight execution   DISABLED (${report.overnightExecutionReasons[0] ?? 'see major doctor'})`,
+    );
+    if (!report.liveExecutionReady) {
+      console.log(`\nnot ready: ${report.liveExecution.blockers.join('; ')}`);
+    }
+  });
+
 const project = program.command('project').description('Manage supervised projects');
 
 project

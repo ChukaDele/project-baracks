@@ -3,6 +3,7 @@ import { BILLING_MODES, type BillingMode } from '../db/schema.js';
 import { trustedExecutableRegistry } from '../security/major-gateway.js';
 import { majorExecutionBackend } from '../security/major-gateway.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
+import { ExecutableTrustError } from '../security/trusted-executables.js';
 import {
   loadPersistedProviderInfos,
   persistProviderDiscovery,
@@ -62,6 +63,71 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
           }
         }
       }
+    } finally {
+      opened.sqlite.close();
+    }
+    return true;
+  }
+  if (args[1] === 'probe') {
+    // A cheap, explicit re-check — the supported path for "I switched
+    // accounts, is the provider ready now?" (see docs/readiness-model.md).
+    // Unlike routine discovery, this is a deliberate owner action: it may
+    // observe a materially changed auth state sooner than the passive
+    // backoff window would otherwise allow, and it never requires a new
+    // release, a database edit or re-running M1 field validation.
+    const providerName = attestableProvider(required(args, '--provider'));
+    const executableName = ATTESTABLE_PROVIDERS[providerName];
+    const backendProbe = isCapabilityAvailable('live-agent-execution')
+      ? await majorExecutionBackend().probeProvider(executableName)
+      : undefined;
+    let trustedSpawnPath: string | undefined;
+    if (!backendProbe) {
+      try {
+        trustedSpawnPath =
+          trustedExecutableRegistry(executableName).verify(executableName).spawnPath;
+      } catch (error) {
+        if (!(error instanceof ExecutableTrustError)) throw error;
+      }
+    }
+    const installed = backendProbe ? backendProbe.installed : Boolean(trustedSpawnPath);
+    const authenticated = backendProbe ? backendProbe.authenticated : false;
+    const detail =
+      backendProbe?.detail ??
+      (trustedSpawnPath
+        ? `resolved at ${trustedSpawnPath} (isolated probe unavailable; presence only)`
+        : `${executableName} is not installed or not trusted`);
+    const opened = openDb();
+    try {
+      const existing = loadPersistedProviderInfos(opened.db).find((p) => p.name === providerName);
+      // An authenticated probe is exactly the "newly authorized validation
+      // attempt" that legitimately clears a stale exhausted/rate-limited
+      // flag from before the owner's account swap; an unauthenticated probe
+      // leaves availability alone rather than guessing at it.
+      const models = (existing?.models ?? []).map((m) => ({
+        ...m,
+        visible: authenticated,
+        authenticated,
+        ...(authenticated ? { availability: 'available' as const } : {}),
+      }));
+      const executablePath = backendProbe?.executable ?? trustedSpawnPath;
+      const result = persistProviderDiscovery(
+        opened.db,
+        {
+          name: providerName,
+          ...(executablePath !== undefined ? { executable: executablePath } : {}),
+          installed,
+          authenticated,
+          models,
+        },
+        { source: 'probe', note: detail, bypassBackoff: true },
+      );
+      console.log(
+        JSON.stringify(
+          { provider: providerName, installed, authenticated, detail, ...result },
+          null,
+          2,
+        ),
+      );
     } finally {
       opened.sqlite.close();
     }

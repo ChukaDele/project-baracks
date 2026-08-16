@@ -9,6 +9,16 @@ import {
 import { detectContainment, type ContainmentStatus } from '../security/containment.js';
 import { redactText } from '../security/redact.js';
 import type { BackendStatus } from '../execution/backend.js';
+import {
+  computeCoreReadiness,
+  computeLiveExecutionReadiness,
+  computeMultiProviderReadiness,
+  computeProviderReadiness,
+  type CoreReadiness,
+  type LiveExecutionReadiness,
+  type MultiProviderReadiness,
+  type ProviderReadiness,
+} from './readiness.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'missing';
 
@@ -40,6 +50,17 @@ export interface DoctorReport {
   liveExecutionBlockers: string[];
   /** Immutable build capability status (hard-coded, not configurable). */
   capabilities: CapabilityStatus[];
+  /** Core platform safety: isolated runner containment + required prerequisites.
+   * Independent of any single provider's auth/billing state. */
+  core: CoreReadiness;
+  /** Per-provider actionable status. One provider's failure never changes
+   * another provider's entry. */
+  providerReadiness: ProviderReadiness[];
+  /** liveExecutionReady restated with the providers that make it true and how
+   * much fallback capacity exists. */
+  liveExecution: LiveExecutionReadiness;
+  multiProviderReady: boolean;
+  multiProvider: MultiProviderReadiness;
 }
 
 /**
@@ -171,21 +192,27 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     status: containment.liveExecutionReady ? 'ok' : 'warn',
     detail: containment.detail,
   });
-  const liveExecutionBlockers: string[] = [];
-  if (!liveExecutionCapabilityAvailable) {
-    liveExecutionBlockers.push(
-      'live-agent-execution capability remains disabled pending M1 review',
-    );
-  }
-  if (!containment.liveExecutionReady) {
-    liveExecutionBlockers.push(`descendant containment insufficient: ${containment.detail}`);
-  }
 
   const missingPrerequisites = checks
     .filter((c) => c.required && c.status === 'missing')
     .map((c) => c.name);
 
   const capabilities = capabilityStatuses();
+
+  // Core platform safety is independent of any single provider's state.
+  const core = computeCoreReadiness({
+    runnerCapabilityAvailable: liveExecutionCapabilityAvailable,
+    containmentReady: containment.liveExecutionReady,
+    containmentDetail: containment.detail,
+    missingRequiredPrerequisites: missingPrerequisites,
+  });
+
+  // Provider health is computed independently per provider: one provider's
+  // failure never changes another provider's entry or blocks its evidence.
+  const providerReadiness = providerInfos.map((info) => computeProviderReadiness(info));
+  const liveExecution = computeLiveExecutionReadiness(core, providerReadiness);
+  const multiProvider = computeMultiProviderReadiness(liveExecution);
+  const liveExecutionBlockers = liveExecution.blockers;
 
   // Inspection health is independent of foreground execution readiness.
   const inspectionEnvironmentIssues: string[] = [];
@@ -238,8 +265,13 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     overnightExecutionReasons,
     inspectionEnvironmentOk: inspectionEnvironmentIssues.length === 0,
     inspectionEnvironmentIssues,
-    liveExecutionReady: liveExecutionCapabilityAvailable && containment.liveExecutionReady,
+    liveExecutionReady: liveExecution.ready,
     liveExecutionBlockers,
     capabilities,
+    core,
+    providerReadiness,
+    liveExecution,
+    multiProviderReady: multiProvider.ready,
+    multiProvider,
   };
 }

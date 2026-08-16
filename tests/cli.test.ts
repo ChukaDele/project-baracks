@@ -274,7 +274,7 @@ describe('major CLI', () => {
     expect(suppressed.stderr).toMatch(/suppressed/);
   });
 
-  it('doctor emits versioned JSON, strict exit codes, and the closed M1 gate', () => {
+  it('doctor emits versioned JSON, strict exit codes, and all five build capabilities available', () => {
     const result = major('doctor', '--json');
     expect([0, 5]).toContain(result.status);
     const parsed = JSON.parse(result.stdout) as {
@@ -291,14 +291,42 @@ describe('major CLI', () => {
       'paid-provider-execution',
       'worker-owned-downstream-mutations',
     ]);
-    expect(
-      parsed.data.capabilities.find((c) => c.capability === 'live-agent-execution')?.available,
-    ).toBe(false);
-    expect(
-      parsed.data.capabilities
-        .filter((c) => c.capability !== 'live-agent-execution')
-        .every((c) => c.available),
-    ).toBe(true);
+    // live-agent-execution gates core isolated-runner safety, not per-provider
+    // field-test outcome, so it stays available regardless of which providers
+    // are authenticated on the machine running this test.
+    expect(parsed.data.capabilities.every((c) => c.available)).toBe(true);
+  }, 90_000);
+
+  it('setup reports core, per-provider readiness, and never requires unattended authority', () => {
+    const result = major('setup', '--json');
+    expect([0, 1]).toContain(result.status);
+    const parsed = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      kind: string;
+      data: {
+        core: { ready: boolean; issues: string[] };
+        providerReadiness: { provider: string; state: string }[];
+        liveExecution: { ready: boolean; healthyProviders: string[]; fallbackCount: number };
+        multiProvider: { ready: boolean; healthyCount: number };
+      };
+    };
+    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.kind).toBe('setup-report');
+    expect(typeof parsed.data.core.ready).toBe('boolean');
+    expect(Array.isArray(parsed.data.providerReadiness)).toBe(true);
+    for (const provider of parsed.data.providerReadiness) {
+      expect([
+        'READY',
+        'AUTH_REQUIRED',
+        'RATE_LIMITED',
+        'EXHAUSTED',
+        'UNAVAILABLE',
+        'UNSUPPORTED_VERSION',
+        'NOT_CONFIGURED',
+      ]).toContain(provider.state);
+    }
+    // No JSON envelope from setup ever claims unattended/overnight authority.
+    expect(result.stdout).not.toMatch(/overnightExecution.*"safe"/i);
   }, 90_000);
 
   it('keeps the legacy task-ledger CLI free of execution and downstream-write commands', () => {
@@ -316,6 +344,7 @@ describe('major CLI', () => {
       'project',
       'queue',
       'route',
+      'setup',
       'task',
     ]);
 

@@ -99,7 +99,18 @@ function selectProviderByCapacityKey(db: DbConn, key: string) {
 export function persistProviderDiscovery(
   db: Db,
   info: ProviderInfo,
-  options: { source: ObservationSource; note?: string; now?: () => Date },
+  options: {
+    source: ObservationSource;
+    note?: string;
+    now?: () => Date;
+    /** An explicit, human-triggered re-probe (e.g. `major provider probe`)
+     * may observe a materially changed auth state — a credential refresh or
+     * account swap — sooner than the passive backoff window would otherwise
+     * allow. Automatic/background discovery must never set this: it exists
+     * to record an intentional owner action, not to let routine polling
+     * defeat the backoff that prevents hot-looping a real provider. */
+    bypassBackoff?: boolean;
+  },
 ) {
   return db.transaction(
     (tx) => {
@@ -115,6 +126,7 @@ export function persistProviderDiscovery(
           )
           .get();
         const backingOff =
+          !options.bypassBackoff &&
           existing &&
           (existing.availability === 'rate_limited' || existing.availability === 'exhausted') &&
           existing.nextProbeAt !== null &&

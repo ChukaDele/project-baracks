@@ -71,16 +71,22 @@ describe('Lima backend inspection', () => {
     });
   });
 
-  it('rejects direct backend execution before starting a VM while M1 is disabled', () => {
-    expect(() =>
-      backend(fakeLima()).execute({
-        executionAuthority: { kind: 'supervised' },
-        executable: 'node',
-        args: [],
-        cwd: process.cwd(),
-        allowedRoots: [process.cwd()],
-      }),
-    ).toThrow(/supervised provider execution is unavailable/);
+  it('attempts real supervised execution now that core-runner safety is active (M1)', async () => {
+    // live-agent-execution gates core isolated-runner safety, which is active,
+    // so a supervised request is no longer synchronously refused at the
+    // capability gate. execute() returns a handle immediately; the actual
+    // Lima start happens asynchronously and fails here only because the fake
+    // limactl in this test does not implement `start`.
+    const handle = backend(fakeLima()).execute({
+      executionAuthority: { kind: 'supervised' },
+      executable: 'node',
+      args: [],
+      cwd: process.cwd(),
+      allowedRoots: [process.cwd()],
+    });
+    const outcome = await handle.outcome;
+    expect(outcome.status).toBe('failed');
+    expect(outcome.stderrTail ?? '').toMatch(/failed to start Lima instance|Lima/);
   });
 
   it('rejects a forged staged authority before any Lima operation', () => {
@@ -152,11 +158,12 @@ describe('Lima backend inspection', () => {
     ).toThrow(/supervised Workshop|owner-approved build|registered Git project/);
   });
 
-  it('does not probe a provider or start Lima while M1 is disabled', async () => {
-    await expect(backend(fakeLima()).probeProvider('codex')).resolves.toMatchObject({
-      installed: false,
-      authenticated: false,
-      detail: expect.stringMatching(/disabled/),
-    });
+  it('attempts a real provider probe now that core-runner safety is active (M1)', async () => {
+    // With live-agent-execution active, probeProvider no longer short-circuits
+    // to a disabled stub — it starts the real Lima instance, which fails here
+    // only because the fake limactl in this test does not implement `start`.
+    await expect(backend(fakeLima()).probeProvider('codex')).rejects.toThrow(
+      /failed to start Lima instance/,
+    );
   });
 });

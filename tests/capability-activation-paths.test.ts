@@ -2,7 +2,34 @@ import { existsSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// 'M1 release recovery gate' below exercises the production gateway's
+// pre-activation defense-in-depth ordering (capability gate before any path
+// validation or spawn), independent of this build's real (now active)
+// live-agent-execution state — see tests/activated-capabilities.test.ts for
+// the real-value assertion and doctor.test.ts/readiness.test.ts for the
+// per-provider readiness that now governs actual live execution.
+vi.mock('../src/security/capabilities.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/security/capabilities.js')>();
+  const isCapabilityAvailable = (capability: string) =>
+    capability === 'live-agent-execution'
+      ? false
+      : actual.isCapabilityAvailable(capability as never);
+  return {
+    ...actual,
+    isCapabilityAvailable,
+    // Reimplemented against the override above: assertCapabilityAvailable's
+    // real body closes over the real module's own isCapabilityAvailable, so
+    // spreading actual.assertCapabilityAvailable here would silently ignore
+    // this mock.
+    assertCapabilityAvailable: (capability: string) => {
+      if (!isCapabilityAvailable(capability)) {
+        throw new actual.CapabilityUnavailableError(capability as never);
+      }
+    },
+  };
+});
 
 import { agentProviders, roadmapItems } from '../src/db/schema.js';
 import { claimNextTask, completeClaim, heartbeatClaim } from '../src/domain/claim-service.js';

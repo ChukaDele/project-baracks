@@ -58,7 +58,7 @@ describe('major doctor', () => {
     expect(JSON.stringify(report)).not.toMatch(/"overnightExecution":"(safe|SAFE)"/);
   });
 
-  it('reports M1 closed and M2-M5 implemented (diagnostic; enforcement remains in code)', async () => {
+  it('reports all five build capabilities implemented (diagnostic; enforcement remains in code)', async () => {
     const report = await runDoctor({
       providers: [healthyProvider()],
       configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
@@ -73,17 +73,12 @@ describe('major doctor', () => {
       'paid-provider-execution',
       'worker-owned-downstream-mutations',
     ]);
-    expect(
-      report.capabilities.find((c) => c.capability === 'live-agent-execution')?.available,
-    ).toBe(false);
-    expect(
-      report.capabilities
-        .filter((c) => c.capability !== 'live-agent-execution')
-        .every((c) => c.available),
-    ).toBe(true);
+    // live-agent-execution gates core isolated-runner safety only, not any
+    // single provider's field-test outcome.
+    expect(report.capabilities.every((c) => c.available)).toBe(true);
   });
 
-  it('reports foreground ready only when M1 and containment are both ready', async () => {
+  it('is foreground ready when core containment and at least one provider are both ready', async () => {
     const ready = await runDoctor({
       providers: [healthyProvider()],
       configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
@@ -92,8 +87,11 @@ describe('major doctor', () => {
       fileExists: () => true,
       detectContainment: readyContainment,
     });
-    expect(ready.liveExecutionReady).toBe(false);
-    expect(ready.liveExecutionBlockers.join()).toMatch(/capability.*M1/i);
+    expect(ready.core.ready).toBe(true);
+    expect(ready.liveExecutionReady).toBe(true);
+    expect(ready.liveExecution.healthyProviders).toEqual(['claude-code']);
+    expect(ready.liveExecution.fallbackCount).toBe(0);
+    expect(ready.multiProviderReady).toBe(false);
 
     const unavailable = await runDoctor({
       providers: [healthyProvider()],
@@ -107,10 +105,67 @@ describe('major doctor', () => {
         detail: 'no supported OS sandbox',
       }),
     });
+    expect(unavailable.core.ready).toBe(false);
     expect(unavailable.liveExecutionReady).toBe(false);
     expect(unavailable.liveExecutionBlockers.join()).toMatch(
       /containment.*no supported OS sandbox/i,
     );
+  });
+
+  it('keeps one broken provider from blocking a healthy fallback provider', async () => {
+    const broken = new MockProvider({
+      name: 'cursor',
+      installed: true,
+      authenticated: false,
+    });
+    const report = await runDoctor({
+      providers: [broken, healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      resolve: fullToolchain,
+      detectContainment: readyContainment,
+    });
+    expect(report.providerReadiness).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provider: 'cursor', state: 'AUTH_REQUIRED' }),
+        expect.objectContaining({ provider: 'claude-code', state: 'READY' }),
+      ]),
+    );
+    expect(report.liveExecutionReady).toBe(true);
+    expect(report.liveExecution.healthyProviders).toEqual(['claude-code']);
+  });
+
+  it('reports NOT_CONFIGURED for an uninstalled provider without touching others', async () => {
+    const notConfigured = new MockProvider({ name: 'gemini', installed: false });
+    const report = await runDoctor({
+      providers: [notConfigured, healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      resolve: fullToolchain,
+      detectContainment: readyContainment,
+    });
+    expect(report.providerReadiness).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provider: 'gemini', state: 'NOT_CONFIGURED' }),
+        expect.objectContaining({ provider: 'claude-code', state: 'READY' }),
+      ]),
+    );
+    expect(report.liveExecutionReady).toBe(true);
+  });
+
+  it('reports multiProviderReady only with more than one healthy provider', async () => {
+    const codex = new MockProvider({
+      name: 'codex',
+      installed: true,
+      authenticated: true,
+      models: [model({ modelRef: 'gpt-5-codex', routingClass: 'codex' })],
+    });
+    const report = await runDoctor({
+      providers: [healthyProvider(), codex],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      resolve: fullToolchain,
+      detectContainment: readyContainment,
+    });
+    expect(report.multiProviderReady).toBe(true);
+    expect(report.multiProvider.healthyCount).toBe(2);
   });
 
   it('smoke-reports the real OS containment without rewriting its result', async () => {

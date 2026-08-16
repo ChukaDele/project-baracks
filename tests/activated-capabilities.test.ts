@@ -24,6 +24,10 @@ import {
   isCapabilityAvailable,
   type Capability,
 } from '../src/security/capabilities.js';
+import {
+  currentActivationState,
+  issueStagedValidationLease,
+} from '../src/security/staged-validation.js';
 import { seedProject, testDb } from './helpers.js';
 
 const ALL_FIVE: Capability[] = [
@@ -34,33 +38,32 @@ const ALL_FIVE: Capability[] = [
   'external-roadmap-application',
 ];
 
-describe('the v0.5.1 capability gate', () => {
-  it('keeps M1 closed while the four implemented downstream capabilities stay frozen', () => {
+describe('the v0.5.2 capability gate', () => {
+  it('keeps all five build capabilities frozen and available', () => {
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual([...ALL_FIVE].sort());
     expect(Object.isFrozen(CAPABILITY_DEFINITIONS)).toBe(true);
     for (const capability of ALL_FIVE) {
       expect(Object.isFrozen(CAPABILITY_DEFINITIONS[capability])).toBe(true);
     }
-    expect(isCapabilityAvailable('live-agent-execution')).toBe(false);
-    expect(() => assertCapabilityAvailable('live-agent-execution')).toThrow();
-    for (const capability of ALL_FIVE.slice(1)) {
+    // live-agent-execution now gates core isolated-runner safety only (verified:
+    // containment, credential broker, guest isolation, release integrity). It
+    // is deliberately independent of any single provider's field-test outcome
+    // — that per-provider health lives in src/doctor/readiness.ts instead.
+    for (const capability of ALL_FIVE) {
       expect(isCapabilityAvailable(capability)).toBe(true);
       expect(() => assertCapabilityAvailable(capability)).not.toThrow();
     }
   });
 
-  it('reports only M1 as release-recovery pending', () => {
+  it('reports live-agent-execution as core-runner activated, not provider-gated', () => {
     const statuses = capabilityStatuses();
     expect(statuses.map((status) => status.capability).sort()).toEqual([...ALL_FIVE].sort());
-    expect(statuses.find((status) => status.capability === 'live-agent-execution')).toMatchObject({
-      available: false,
-      milestone: 'M1 — release recovery pending',
-    });
-    expect(
-      statuses
-        .filter((status) => status.capability !== 'live-agent-execution')
-        .every((status) => status.available),
-    ).toBe(true);
+    const liveAgentExecution = statuses.find(
+      (status) => status.capability === 'live-agent-execution',
+    );
+    expect(liveAgentExecution?.available).toBe(true);
+    expect(liveAgentExecution?.reason).toMatch(/per-provider/);
+    expect(statuses.every((status) => status.available)).toBe(true);
   });
 
   it('cannot be changed by environment variables', () => {
@@ -73,15 +76,45 @@ describe('the v0.5.1 capability gate', () => {
     const previous = names.map((name) => [name, process.env[name]] as const);
     for (const name of names) process.env[name] = '0';
     try {
-      expect(isCapabilityAvailable('live-agent-execution')).toBe(false);
-      for (const capability of ALL_FIVE.slice(1))
-        expect(isCapabilityAvailable(capability)).toBe(true);
+      for (const capability of ALL_FIVE) expect(isCapabilityAvailable(capability)).toBe(true);
     } finally {
       for (const [name, value] of previous) {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
       }
     }
+  });
+
+  it('retires the pre-activation staged-validation bridge now that core-runner safety is active', () => {
+    // Staged validation was a bootstrap: prove the isolated runner safe BEFORE
+    // live-agent-execution could be turned on. Now that it is on, issuing a
+    // new staged lease must refuse immediately — real execution goes through
+    // the normal supervised path instead. Historical leases from before
+    // activation remain untouched (append-only; see tests/staged-validation.test.ts).
+    expect(() =>
+      issueStagedValidationLease(testDb(), {
+        releaseRepository: '/release/project-baracks',
+        releaseSourceCheckout: '/tmp/does-not-matter',
+        releaseRoot: process.cwd(),
+        releaseBranch: 'main',
+        releaseSha: 'a'.repeat(40),
+        releaseTreeHash: 'b'.repeat(64),
+        releaseManifestHash: 'c'.repeat(64),
+        provider: 'codex',
+        projectIdentityHash: 'd'.repeat(64),
+        projectRootHash: 'e'.repeat(64),
+        caseId: 'provider-field',
+        requestDigest: 'f'.repeat(64),
+        expectedEvidenceHash: '0'.repeat(64),
+        expectedExecutionStatus: 'succeeded',
+        validationNonce: '11111111-1111-4111-8111-111111111111',
+        workerId: 'w',
+        processNonce: 'n',
+        resourceLeaseId: 'r',
+        leaseMs: 60_000,
+      }),
+    ).toThrow(/unavailable after supervised activation/);
+    expect(currentActivationState(testDb())).toBe('supervised');
   });
 });
 
@@ -123,6 +156,8 @@ describe('activation does not expand adjacent authority', () => {
       registryPath,
       JSON.stringify({
         version: 1,
+        // Deliberately claims the OPPOSITE of the real value below, so this
+        // test fails loudly if config ever gains influence over the flag.
         capabilities: { 'live-agent-execution': { available: false } },
         entries: [
           {
@@ -144,9 +179,7 @@ describe('activation does not expand adjacent authority', () => {
         { name: 'claude-code', installed: true, authenticated: true, models },
       ]).kind,
     ).toBe('checkpoint');
-    expect(isCapabilityAvailable('live-agent-execution')).toBe(false);
-    for (const capability of ALL_FIVE.slice(1))
-      expect(isCapabilityAvailable(capability)).toBe(true);
+    for (const capability of ALL_FIVE) expect(isCapabilityAvailable(capability)).toBe(true);
   });
 
   it('keeps the immutable default registry separate from activation constants', () => {
