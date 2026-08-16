@@ -554,10 +554,14 @@ const FOREGROUND_CONTINUATION_HOP_LIMIT = 32;
  * made no observable progress (e.g. another integration owner is already
  * running against this repo), or the bounded hop/time budget is spent.
  * This is not unattended background looping: it is still one synchronous,
- * already-approved foreground call, and its total wall-clock is bounded by
- * the project's own maxRunMinutes policy — including the per-cycle worker
- * timeout, which is clamped to whatever budget remains rather than each
- * hop separately getting a fresh full maxRunMinutes allowance.
+ * already-approved foreground call. Each hop's worker timeout is clamped to
+ * whatever of the project's maxRunMinutes budget remains, rather than every
+ * hop separately getting a fresh full allowance — this keeps a rotation
+ * across several exhausted providers from stacking multiple full
+ * maxRunMinutes durations end to end. It is a budget clamp, not a hard
+ * real-time guarantee: runWorker's own resource-lease wait can still let one
+ * hop run somewhat past its requested timeout under lease contention, the
+ * same way a single non-looping foreground cycle always could.
  */
 export async function runForegroundGoal(
   goalId: string,
