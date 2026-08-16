@@ -410,19 +410,20 @@ if ! node "$RELEASE_DIR/scripts/major-runtime-manifest.mjs" verify "$RELEASE_DIR
   mark_release_gate_failed "failed-content-manifest"
   exit 1
 fi
+POSTINSTALL_DOCTOR_STDERR="$(mktemp "${TMPDIR:-/tmp}/major-postinstall-doctor.XXXXXX")"
 set +e
-DOCTOR_JSON="$("$BIN_DIR/major" doctor --json 2>/tmp/major-postinstall-doctor.stderr)"
+DOCTOR_JSON="$("$BIN_DIR/major" doctor --json 2>"$POSTINSTALL_DOCTOR_STDERR")"
 DOCTOR_STATUS=$?
 set -e
 if [ "$DOCTOR_STATUS" -ne 0 ] && [ "$DOCTOR_STATUS" -ne 5 ]; then
   echo "ERROR: the installed major CLI failed its post-install health check (exit $DOCTOR_STATUS)." >&2
-  cat /tmp/major-postinstall-doctor.stderr >&2
-  rm -f /tmp/major-postinstall-doctor.stderr
+  cat "$POSTINSTALL_DOCTOR_STDERR" >&2
+  rm -f "$POSTINSTALL_DOCTOR_STDERR"
   echo "Files were copied but the resulting runtime does not run cleanly; do not use this install." >&2
   mark_release_gate_failed "failed-post-install-health-check"
   exit 1
 fi
-rm -f /tmp/major-postinstall-doctor.stderr
+rm -f "$POSTINSTALL_DOCTOR_STDERR"
 CORE_READY="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['data']['core']['ready'])" "$DOCTOR_JSON" 2>/dev/null || echo "unknown")"
 DB_OK="$(python3 -c "
 import json, sys
