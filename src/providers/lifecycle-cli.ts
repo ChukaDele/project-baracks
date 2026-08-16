@@ -45,8 +45,27 @@ function attestableProvider(value: string): AttestableProvider {
   return value as AttestableProvider;
 }
 
+const PROVIDER_HELP = `Usage: major provider <command> [options]
+
+Commands:
+  status                                             list persisted provider/model state
+  probe --provider <name>                            re-check a provider through the isolated runner (e.g. after an account swap)
+  attest-billing --provider <p> --model <m> --billing <mode> --evidence <text>
+                                                      record the owner-confirmed billing mode for a model
+  attest-availability --provider <p> --model <m> --evidence <text>
+                                                      record an owner-confirmed installed+authenticated observation
+  help                                               show this message
+
+<name>/<p> is one of: claude-code, codex, cursor, antigravity
+<mode> is one of: subscription_included, usage_credits, api_billing
+`;
+
 export async function runProviderLifecycleCli(args: string[]): Promise<boolean> {
   if (args[0] !== 'provider') return false;
+  if (args[1] === undefined || args[1] === '--help' || args[1] === '-h' || args[1] === 'help') {
+    console.log(PROVIDER_HELP);
+    return true;
+  }
   if (args[1] === 'status') {
     const opened = openDb();
     try {
@@ -122,7 +141,11 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
           authenticated,
           models,
         },
-        { source: 'probe', note: detail, bypassBackoff: true },
+        // Only an authenticated probe is the "materially changed state" that
+        // justifies bypassing backoff; a still-failing probe has observed
+        // nothing new and must leave any existing backoff window intact
+        // rather than silently clearing it while availability stays exhausted.
+        { source: 'probe', note: detail, bypassBackoff: authenticated },
       );
       console.log(
         JSON.stringify(
@@ -212,5 +235,9 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     }
     return true;
   }
-  return false;
+  // args[0] === 'provider' but args[1] matched no known subcommand: this is
+  // definitely a provider-command typo, not some other CLI's command, so
+  // report it here rather than falling through to an unrelated dispatcher's
+  // misleading "unknown command" error.
+  throw new Error(`unknown provider subcommand: ${args[1]}\n\n${PROVIDER_HELP}`);
 }

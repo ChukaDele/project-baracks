@@ -112,6 +112,26 @@ describe('major doctor', () => {
     );
   });
 
+  it('degrades to core-not-ready instead of crashing when the execution backend cannot be inspected', async () => {
+    // A missing/malformed ~/.major/execution.json, or a stale limactl path,
+    // throws before LimaBackend's own inspect() try/catch ever runs — the
+    // fresh-machine and stale-config cases a friend hits before Lima is set
+    // up. This must degrade gracefully, never crash major doctor/setup.
+    const report = await runDoctor({
+      providers: [healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      resolve: fullToolchain,
+      inspectExecutionBackend: () => {
+        throw new Error('ENOENT: no such file or directory, open .major/execution.json');
+      },
+    });
+    expect(report.core.ready).toBe(false);
+    expect(report.core.issues.join()).toMatch(/execution backend unavailable/);
+    expect(report.liveExecutionReady).toBe(false);
+    // The rest of the report still comes back — providers, checks, etc.
+    expect(report.providers[0]?.name).toBe('claude-code');
+  });
+
   it('keeps one broken provider from blocking a healthy fallback provider', async () => {
     const broken = new MockProvider({
       name: 'cursor',
@@ -132,6 +152,30 @@ describe('major doctor', () => {
     );
     expect(report.liveExecutionReady).toBe(true);
     expect(report.liveExecution.healthyProviders).toEqual(['claude-code']);
+  });
+
+  it('keeps reporting healthy providers when one provider throws during discovery', async () => {
+    const throwing = new MockProvider({
+      name: 'antigravity',
+      throwOnDiscover: new Error('probe-gateway allowlist is missing this executable'),
+    });
+    const report = await runDoctor({
+      providers: [throwing, healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      resolve: fullToolchain,
+      detectContainment: readyContainment,
+    });
+    expect(report.checks.find((c) => c.name === 'provider:antigravity')).toMatchObject({
+      status: 'missing',
+      detail: expect.stringMatching(/discovery failed/),
+    });
+    expect(report.providerReadiness).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provider: 'antigravity', state: 'NOT_CONFIGURED' }),
+        expect.objectContaining({ provider: 'claude-code', state: 'READY' }),
+      ]),
+    );
+    expect(report.liveExecutionReady).toBe(true);
   });
 
   it('reports NOT_CONFIGURED for an uninstalled provider without touching others', async () => {

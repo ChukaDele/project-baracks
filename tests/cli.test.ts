@@ -390,6 +390,23 @@ describe('major CLI', () => {
     );
     expect(parsed.data.liveExecution.healthyProviders).toContain('codex');
     expect(parsed.data.liveExecution.ready).toBe(true);
+
+    // doctor's overnightExecutionReasons must not still claim "no
+    // verified+authenticated provider"/"no provider is READY" once the
+    // reconciled provider state (just proven above) says codex is READY —
+    // that self-contradiction is exactly what a friend would see otherwise.
+    const doctorResult = majorEnv({ ...process.env, MAJOR_DB_PATH: isoDb }, 'doctor', '--json');
+    // Exit 5 here reflects inspection health (no projects configured in this
+    // isolated fixture db), not live-execution readiness — see the EXIT enum
+    // in src/cli/index.ts.
+    expect([0, 5]).toContain(doctorResult.status);
+    const doctorParsed = JSON.parse(doctorResult.stdout) as {
+      data: { overnightExecutionReasons: string[]; liveExecutionReady: boolean };
+    };
+    expect(doctorParsed.data.liveExecutionReady).toBe(true);
+    expect(doctorParsed.data.overnightExecutionReasons.join('; ')).not.toMatch(
+      /no verified\+authenticated|no provider is READY/,
+    );
   }, 90_000);
 
   it('keeps the legacy task-ledger CLI free of execution and downstream-write commands', () => {

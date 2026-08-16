@@ -108,7 +108,26 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
 
   const providerInfos: ProviderInfo[] = [];
   for (const provider of inputs.providers) {
-    const info = await provider.discover();
+    // One provider's discover() throwing must never take down the whole
+    // report — every other provider's evidence still has to come back.
+    let info: ProviderInfo;
+    try {
+      info = await provider.discover();
+    } catch (error) {
+      providerInfos.push({
+        name: provider.name,
+        installed: false,
+        authenticated: false,
+        models: [],
+      });
+      checks.push({
+        name: `provider:${provider.name}`,
+        required: false,
+        status: 'missing',
+        detail: `discovery failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      continue;
+    }
     providerInfos.push(info);
     const unverified = info.executableUnverified === true;
     checks.push({
@@ -167,10 +186,27 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
   // Descendant/process containment and the immutable M1 activation gate are
   // reported separately.
   const liveExecutionCapabilityAvailable = isCapabilityAvailable('live-agent-execution');
-  const backendStatus =
-    liveExecutionCapabilityAvailable && inputs.inspectExecutionBackend
-      ? await inputs.inspectExecutionBackend()
-      : undefined;
+  let backendStatus: BackendStatus | undefined;
+  if (liveExecutionCapabilityAvailable && inputs.inspectExecutionBackend) {
+    // A missing/malformed ~/.major/execution.json, or a stale limactl path,
+    // throws before inspect()'s own try/catch ever runs (config loading and
+    // LimaBackend construction both happen synchronously first). That must
+    // degrade to "core not ready" with a clear reason, never crash the whole
+    // report — this is exactly the fresh-machine / stale-config case a
+    // friend hits before Lima is fully set up.
+    try {
+      backendStatus = await inputs.inspectExecutionBackend();
+    } catch (error) {
+      backendStatus = {
+        kind: 'lima',
+        available: false,
+        filesystemIsolation: false,
+        networkIsolation: false,
+        lifecycleIsolation: false,
+        detail: `execution backend unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
   const containment = backendStatus
     ? {
         platform: 'lima',

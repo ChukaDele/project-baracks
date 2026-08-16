@@ -147,6 +147,28 @@ function withPersistedReadiness(database: Db, report: DoctorReport): DoctorRepor
   const providerReadiness = persisted.map((info) => computeProviderReadiness(info));
   const liveExecution = computeLiveExecutionReadiness(report.core, providerReadiness);
   const multiProvider = computeMultiProviderReadiness(liveExecution);
+  // overnightExecutionReasons embeds two provider-derived lines built from
+  // THIS run's fresh discovery (the stale "no provider is READY: ..." from
+  // liveExecutionBlockers, and the separate usable-provider check below) —
+  // both must be replaced with the same reconciled data used above, or the
+  // human-readable report can show a provider as e.g. AUTH_REQUIRED in one
+  // section and NOT_CONFIGURED in another within the same run.
+  const usableProvider = providerReadiness.some((p) => p.state === 'READY');
+  const overnightExecutionReasons = report.overnightExecutionReasons
+    .filter(
+      (reason) =>
+        !reason.startsWith('no provider is READY') &&
+        !reason.startsWith('no verified+authenticated'),
+    )
+    .concat(
+      liveExecution.blockers.filter((reason) => reason.startsWith('no provider is READY')),
+      usableProvider
+        ? []
+        : [
+            'no verified+authenticated agent provider (resolution-only discovery is not a provider ' +
+              'lifecycle probe)',
+          ],
+    );
   return {
     ...report,
     providerReadiness,
@@ -155,6 +177,7 @@ function withPersistedReadiness(database: Db, report: DoctorReport): DoctorRepor
     liveExecutionBlockers: liveExecution.blockers,
     multiProviderReady: multiProvider.ready,
     multiProvider,
+    overnightExecutionReasons,
   };
 }
 

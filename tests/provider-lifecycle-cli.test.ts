@@ -44,6 +44,25 @@ afterEach(() => {
   rmSync(dbPath, { force: true });
 });
 
+describe('major provider help/usage', () => {
+  it('prints usage for `provider` alone and `provider --help`, listing every subcommand', async () => {
+    for (const args of [['provider'], ['provider', '--help'], ['provider', 'help']]) {
+      logs = [];
+      expect(await runProviderLifecycleCli(args)).toBe(true);
+      const output = logs.join('\n');
+      expect(output).toMatch(/probe --provider/);
+      expect(output).toMatch(/attest-billing/);
+      expect(output).toMatch(/attest-availability/);
+    }
+  });
+
+  it('reports an actionable error for an unknown provider subcommand instead of a silent fallthrough', async () => {
+    await expect(runProviderLifecycleCli(['provider', 'frobnicate'])).rejects.toThrow(
+      /unknown provider subcommand: frobnicate/,
+    );
+  });
+});
+
 describe('major provider probe', () => {
   it('persists a fresh READY state through the isolated probe', async () => {
     probeResult = {
@@ -197,6 +216,58 @@ describe('major provider probe', () => {
         .get();
       expect(model?.authenticated).toBe(true);
       expect(model?.availability).toBe('available');
+    } finally {
+      verify.sqlite.close();
+    }
+  });
+
+  it('leaves an existing backoff window intact when the re-probe still fails', async () => {
+    // A probe that observes nothing new (still not authenticated) must not
+    // silently clear the backoff timestamp while availability stays
+    // exhausted — that combination defeats the hot-loop protection for
+    // whatever eventually schedules automatic re-probes.
+    const opened = openDb(dbPath);
+    const providerId = 'aprov_test_still_exhausted';
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    try {
+      opened.db
+        .insert(agentProviders)
+        .values({ id: providerId, name: 'codex', accountLabel: 'default' })
+        .run();
+      opened.db
+        .insert(agentModels)
+        .values({
+          id: 'amodel_test_still_exhausted',
+          providerId,
+          modelRef: 'auto',
+          routingClass: 'codex',
+          visible: true,
+          authenticated: false,
+          availability: 'exhausted',
+          nextProbeAt: future,
+        })
+        .run();
+    } finally {
+      opened.sqlite.close();
+    }
+
+    probeResult = {
+      installed: true,
+      authenticated: false,
+      executable: '/opt/major/providers/v1/codex/bin/codex-native',
+      detail: 'still not authenticated',
+    };
+    await runProviderLifecycleCli(['provider', 'probe', '--provider', 'codex']);
+
+    const verify = openDb(dbPath);
+    try {
+      const model = verify.db
+        .select()
+        .from(agentModels)
+        .where(eq(agentModels.providerId, providerId))
+        .get();
+      expect(model?.availability).toBe('exhausted');
+      expect(model?.nextProbeAt).toBe(future);
     } finally {
       verify.sqlite.close();
     }

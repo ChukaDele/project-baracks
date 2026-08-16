@@ -20,6 +20,10 @@ export interface MockProviderScript {
   models?: ModelState[];
   events?: ProviderEvent[];
   outcome?: Partial<ExecuteOutcome>;
+  /** Simulates a discover() that throws, e.g. a probe-gateway allowlist
+   * missing this provider's executable — for testing that one provider's
+   * discovery failure never takes down the whole doctor/setup report. */
+  throwOnDiscover?: Error;
 }
 
 export class MockProvider implements ProviderAdapter {
@@ -33,6 +37,7 @@ export class MockProvider implements ProviderAdapter {
   }
 
   async discover(): Promise<ProviderInfo> {
+    if (this.script.throwOnDiscover) throw this.script.throwOnDiscover;
     const info: ProviderInfo = {
       name: this.name,
       installed: this.script.installed ?? true,
