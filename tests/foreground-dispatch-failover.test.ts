@@ -23,6 +23,7 @@ import {
 } from '../src/providers/discovery-store.js';
 import { runSupervisorCli } from '../src/supervisor/cli.js';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
+import { tryAcquireRepoCycleLock } from '../src/supervisor/runtime.js';
 import { getGoal } from '../src/supervisor/state.js';
 import { model } from './helpers.js';
 
@@ -320,5 +321,79 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     // SECOND (non-exhausted) provider, with no further dispatch needed.
     expect(goal.pendingCompletion).toMatchObject({ summary: 'shipped' });
     expect(goal.retryImmediately).toBe(false);
+  });
+
+  it('rejects combining --goal-id with flags that only apply when creating a goal via --goal', async () => {
+    const repoPath = repo();
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => logs.push(String(value)));
+    await runSupervisorCli([
+      'goal',
+      'admit',
+      '--cwd',
+      repoPath,
+      '--host',
+      'codex',
+      '--outcome',
+      'Ship the MVP',
+      '--session-id',
+      'thread-a',
+    ]);
+    const goalId = (lastLog(logs) as { goalId: string }).goalId;
+
+    await expect(
+      runSupervisorCli(['run', 'jss-tool', '--goal-id', goalId, '--coordinator', 'claude']),
+    ).rejects.toThrow(/cannot be combined/);
+    await expect(
+      runSupervisorCli(['run', 'jss-tool', '--goal-id', goalId, '--capability', 'x']),
+    ).rejects.toThrow(/cannot be combined/);
+    await expect(
+      runSupervisorCli(['run', 'jss-tool', '--goal-id', goalId, '--goal', 'something else']),
+    ).rejects.toThrow(/cannot be combined/);
+    expect(runWorkerMock).not.toHaveBeenCalled();
+  });
+
+  it('tells the caller plainly when a dispatch did nothing because another integration owner holds the repo lock', async () => {
+    const repoPath = repo();
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => logs.push(String(value)));
+    await runSupervisorCli([
+      'goal',
+      'admit',
+      '--cwd',
+      repoPath,
+      '--host',
+      'codex',
+      '--outcome',
+      'Ship the MVP',
+      '--session-id',
+      'thread-a',
+    ]);
+    const goalId = (lastLog(logs) as { goalId: string }).goalId;
+
+    const release = tryAcquireRepoCycleLock(repoPath);
+    expect(release).toBeTypeOf('function');
+    try {
+      await runSupervisorCli(['run', 'jss-tool', '--goal-id', goalId, '--foreground']);
+    } finally {
+      release?.();
+    }
+
+    expect(runWorkerMock).not.toHaveBeenCalled();
+    expect(logs.some((line) => line.includes('no cycle actually ran'))).toBe(true);
   });
 });
