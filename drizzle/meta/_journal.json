@@ -134,6 +134,13 @@
       "when": 1786778627960,
       "tag": "0018_striped_the_hand",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1786847428993,
+      "tag": "0019_flaky_firebird",
+      "breakpoints": true
     }
   ]
 }

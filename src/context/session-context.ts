@@ -212,6 +212,16 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
   } catch {
     // Session attachment remains available when no workshop has been authorized.
   }
+  const workshopEligible =
+    policy.trust === 'build' && policy.ownerApprovedBuild && !policy.allowBackground;
+  const workshopGateNote =
+    workshopEligible && workshop === 'inactive'
+      ? '\nNOTE: this session is attached (presence/telemetry only) but holds no execution authority. ' +
+        'Major-dispatched work and its automatic provider/account failover on exhaustion only run under an ' +
+        'active Supervised Workshop authorization for this project: `major session authorize --mode ' +
+        `supervised-workshop --owner-approved --host ${host} --session-id <stable-id>\`. ` +
+        'Without it, if the model driving this interactive session hits a usage limit, nothing else picks the work back up.'
+      : '';
   const resources = formatResourceTelemetry(resourceSnapshot().telemetry);
   console.log(`MAJOR CONTROL PLANE: ACTIVE
 host: ${host}
@@ -219,7 +229,7 @@ cwd: ${resolve(cwd)}
 project: ${project.project}
 repo: ${project.repoPath}
 policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}
-workshop: ${workshop}
+workshop: ${workshop}${workshopGateNote}
 
 ACTIVE GOAL STATE
 ${supervisorSnapshot(project.project)}

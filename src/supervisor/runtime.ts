@@ -25,6 +25,7 @@ import {
 import { discoverCapabilities, type DiscoveredCapability } from '../capabilities/discovery.js';
 import { isCapabilitySourceCurrent } from '../capabilities/verifier.js';
 import { captureLearning, listLearningCandidates } from '../learning/candidates.js';
+import { parseCapacityKey } from '../providers/account.js';
 import {
   consumeModelRetry,
   loadPersistedProviderInfos,
@@ -120,7 +121,16 @@ const HOST_PROVIDERS: Record<WorkerHost, string> = {
 };
 
 export type CoordinatorSelection =
-  | { kind: 'route'; host: WorkerHost; provider: string; modelRef: string; reason: string }
+  | {
+      kind: 'route';
+      host: WorkerHost;
+      provider: string;
+      /** Which authenticated account/profile of the provider this is, when
+       * more than one is configured. 'default' when only one exists. */
+      accountLabel: string;
+      modelRef: string;
+      reason: string;
+    }
   | { kind: 'checkpoint'; reason: string };
 
 export function modelOutcomeForWorker(
@@ -147,9 +157,12 @@ export function selectCoordinator(
   providers: ProviderInfo[],
 ): CoordinatorSelection {
   const preferred = HOST_PROVIDERS[goal.preferredCoordinator];
+  const baseName = (providerKey: string) => parseCapacityKey(providerKey).providerName;
   const ordered = [...providers].sort((left, right) => {
-    if (left.name === preferred) return -1;
-    if (right.name === preferred) return 1;
+    const leftPreferred = baseName(left.name) === preferred;
+    const rightPreferred = baseName(right.name) === preferred;
+    if (leftPreferred && !rightPreferred) return -1;
+    if (rightPreferred && !leftPreferred) return 1;
     return left.name.localeCompare(right.name);
   });
   const failedProvider =
@@ -157,19 +170,21 @@ export function selectCoordinator(
       ? HOST_PROVIDERS[goal.lastCoordinator]
       : undefined;
   const alternatives = failedProvider
-    ? ordered.filter((provider) => provider.name !== failedProvider)
+    ? ordered.filter((provider) => baseName(provider.name) !== failedProvider)
     : ordered;
   let decision = route({ purpose: 'analysis', complexity: 'architectural' }, alternatives);
   if (decision.kind === 'checkpoint' && alternatives.length !== ordered.length) {
     decision = route({ purpose: 'analysis', complexity: 'architectural' }, ordered);
   }
   if (decision.kind === 'checkpoint') return decision;
-  const host = PROVIDER_HOSTS[decision.provider];
+  const parsed = parseCapacityKey(decision.provider);
+  const host = PROVIDER_HOSTS[parsed.providerName];
   if (!host) return { kind: 'checkpoint', reason: `unsupported provider: ${decision.provider}` };
   return {
     kind: 'route',
     host,
     provider: decision.provider,
+    accountLabel: parsed.accountLabel,
     modelRef: decision.modelRef,
     reason: decision.reason,
   };
@@ -500,6 +515,56 @@ export async function runGoalCycle(goalId: string): Promise<void> {
   }
 }
 
+/** Bounded safety net so an authoritative-exhaustion loop can never hot-loop
+ * indefinitely even if capacity bookkeeping is wrong: capped well above any
+ * real provider/account count. */
+const FOREGROUND_CONTINUATION_HOP_LIMIT = 8;
+
+/**
+ * Run an already-authorized foreground goal forward to its next real
+ * stopping point. One provider or account hitting an authoritative rate
+ * limit or exhaustion is capacity unavailability, not a reason the goal
+ * should stall: this immediately re-selects from the remaining capacity
+ * pool and keeps driving the SAME goal, so a `major run --foreground`
+ * invocation does not depend on being reissued by whichever session or
+ * process happened to dispatch it.
+ *
+ * It stops the instant a cycle resolves for any other reason (success,
+ * generic failure, done, blocked, or no capacity left at all) or the
+ * bounded hop/time budget is spent. This is not unattended background
+ * looping: it is still one synchronous, already-approved foreground call,
+ * bounded by the project's own maxRunMinutes policy.
+ */
+export async function runForegroundGoal(
+  goalId: string,
+  options: {
+    maxRunMinutes?: number;
+    /** Injectable for tests; defaults to the real single-cycle dispatch. */
+    runCycle?: (goalId: string) => Promise<void>;
+  } = {},
+): Promise<void> {
+  const runCycle = options.runCycle ?? runGoalCycle;
+  const maxRunMinutes = Math.max(1, options.maxRunMinutes ?? 120);
+  const deadline = Date.now() + maxRunMinutes * 60 * 1000;
+  for (let hop = 0; hop < FOREGROUND_CONTINUATION_HOP_LIMIT; hop++) {
+    await runCycle(goalId);
+    const goal = getGoal(goalId);
+    if (!goal?.retryImmediately) return;
+    if (goal.status !== 'active' && goal.status !== 'running') return;
+    if (Date.now() >= deadline) break;
+  }
+  const stalled = getGoal(goalId);
+  if (stalled?.retryImmediately) {
+    updateGoal(goalId, {
+      retryImmediately: false,
+      lastSummary: trim(
+        `${stalled.lastSummary ?? ''} Foreground continuation stopped after rotating through available capacity; checkpointing instead of hot-looping.`.trim(),
+      ),
+      nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+  }
+}
+
 async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   assertExecutionAllowed(policy);
@@ -531,6 +596,8 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
     providerState.sqlite.close();
   }
   if (selection.kind === 'checkpoint') {
+    // No eligible capacity remains anywhere in the pool: a genuine stop, not
+    // a hop the foreground continuation loop should chase further.
     const summary = `Provider routing checkpoint: ${selection.reason}`;
     updateGoal(goal.id, {
       status: 'active',
@@ -538,6 +605,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
       lastFinishedAt: new Date().toISOString(),
       lastSummary: summary,
       nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+      retryImmediately: false,
     });
     console.error(summary);
     return;
@@ -547,13 +615,27 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
     const summary =
       `Provider routing checkpoint: ${selection.provider}/${selection.modelRef} is persisted as ` +
       `available but the canonical CLI is missing at ${resolve(majorHome(), '..', '.local', 'bin', executable)}. ` +
-      'Install or link that exact provider CLI, then attest availability again.';
+      'Marking it unavailable and rerouting to the next candidate instead of selecting it again.';
+    const unavailableState = openDb();
+    try {
+      recordModelOutcome(unavailableState.db, {
+        providerName: selection.provider,
+        modelRef: selection.modelRef,
+        outcome: 'unknown',
+      });
+    } finally {
+      unavailableState.sqlite.close();
+    }
     updateGoal(goal.id, {
       status: 'active',
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
       lastSummary: summary,
-      nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+      nextRunAt: new Date().toISOString(),
+      // One more candidate was just removed from the pool; let the
+      // foreground continuation loop try again immediately rather than
+      // repeatedly re-selecting a CLI that isn't actually installed.
+      retryImmediately: true,
     });
     console.error(summary);
     return;
@@ -568,6 +650,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
       lastSummary: capabilityResolution.reason,
       nextRunAt: undefined,
       ownerGate: 'Review the Toolsmith checkpoint or register an approved capability.',
+      retryImmediately: false,
     });
     console.error(capabilityResolution.reason);
     return;
@@ -668,6 +751,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
         lastSummary: `${report.summary}${learningWarning}`,
         ownerGate: report.ownerGate,
         pendingCompletion: undefined,
+        retryImmediately: false,
       });
       return;
     }
@@ -681,6 +765,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
         lastSummary: `Worker completion claim awaiting independent validation: ${report.summary}${learningWarning}`,
         nextRunAt: undefined,
         pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
+        retryImmediately: false,
       });
       return;
     }
@@ -694,19 +779,86 @@ async function runLockedGoalCycle(goal: SupervisorGoal): Promise<void> {
         : trim(outcome.stdout || 'Coordinator cycle completed without an explicit Major report.'),
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
       pendingCompletion: undefined,
+      retryImmediately: false,
     });
   } else {
-    const failures = after.consecutiveFailures + 1;
+    const patch = nonSuccessCyclePatch({
+      modelOutcome,
+      stderr: outcome.stderr,
+      stdout: outcome.stdout,
+      provider: selection.provider,
+      modelRef: selection.modelRef,
+      host,
+      consecutiveFailures: after.consecutiveFailures,
+    });
     updateGoal(goal.id, {
-      status: failures >= 6 ? 'failed' : 'active',
-      consecutiveFailures: failures,
+      status: patch.status,
+      consecutiveFailures: patch.consecutiveFailures,
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
-      lastSummary: trim(outcome.stderr || outcome.stdout || `Coordinator ${host} failed.`),
-      nextRunAt: new Date(Date.now() + Math.min(60_000, failures * 10_000)).toISOString(),
+      lastSummary: patch.lastSummary,
+      nextRunAt: new Date(Date.now() + patch.nextRunDelayMs).toISOString(),
       pendingCompletion: undefined,
+      retryImmediately: patch.retryImmediately,
     });
   }
+}
+
+/**
+ * Pure classification of a non-succeeded worker outcome, split out so the
+ * distinction between authoritative provider state and a genuine work
+ * failure is unit-testable without a live DB/CLI/Lima stack.
+ *
+ * A defined modelOutcome ('exhausted', 'rate_limited', or 'unknown' for an
+ * auth/trust failure) means this exact provider/model was just recorded as
+ * ineligible in the discovery store: it is authoritative capacity state,
+ * not a work failure, so it must not count against consecutiveFailures or
+ * apply the generic exponential backoff. It marks the goal immediately
+ * retriable so the foreground continuation loop reroutes to the next
+ * eligible provider/account without waiting on an external retrigger — the
+ * pool only shrinks each hop, so this cannot loop past its bounded size.
+ * An undefined modelOutcome carries no provider-state signal at all (a
+ * generic bug, timeout, or failing test) and is treated as before: a
+ * genuine failure that backs off and, after enough repeats, gives up.
+ */
+export function nonSuccessCyclePatch(input: {
+  modelOutcome: ReturnType<typeof modelOutcomeForWorker>;
+  stderr: string;
+  stdout: string;
+  provider: string;
+  modelRef: string;
+  host: WorkerHost;
+  consecutiveFailures: number;
+}): {
+  status: 'active' | 'failed';
+  consecutiveFailures: number;
+  lastSummary: string;
+  nextRunDelayMs: number;
+  retryImmediately: boolean;
+} {
+  if (input.modelOutcome !== undefined && input.modelOutcome !== 'available') {
+    const stateDescription =
+      input.modelOutcome === 'unknown'
+        ? 'unavailable (authentication/trust failure)'
+        : input.modelOutcome;
+    return {
+      status: 'active',
+      consecutiveFailures: input.consecutiveFailures,
+      lastSummary:
+        `Provider ${input.provider}/${input.modelRef} reported ${stateDescription}; ` +
+        'marked unavailable and rerouting to the next available capacity.',
+      nextRunDelayMs: 0,
+      retryImmediately: true,
+    };
+  }
+  const failures = input.consecutiveFailures + 1;
+  return {
+    status: failures >= 6 ? 'failed' : 'active',
+    consecutiveFailures: failures,
+    lastSummary: trim(input.stderr || input.stdout || `Coordinator ${input.host} failed.`),
+    nextRunDelayMs: Math.min(60_000, failures * 10_000),
+    retryImmediately: false,
+  };
 }
 
 function pidAlive(pid: number): boolean {

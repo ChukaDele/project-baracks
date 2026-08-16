@@ -2,17 +2,19 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureLearning, promoteLearning } from '../src/learning/candidates.js';
 import { configureProjectPolicy, recordShadowGrade } from '../src/supervisor/policy.js';
 import {
   coordinatorPrompt,
   modelOutcomeForWorker,
+  nonSuccessCyclePatch,
   parseWorkerReport,
+  runForegroundGoal,
   selectCoordinator,
   tryAcquireRepoCycleLock,
 } from '../src/supervisor/runtime.js';
-import type { SupervisorGoal } from '../src/supervisor/state.js';
+import { getGoal, startGoal, updateGoal, type SupervisorGoal } from '../src/supervisor/state.js';
 import {
   completedWorkflow,
   preserveWorkerReportEnvelope,
@@ -173,6 +175,49 @@ describe('Major coordinator contract', () => {
       },
     ]);
     expect(selection).toMatchObject({ kind: 'route', provider: 'codex' });
+  });
+
+  it('resolves a second account of the same provider to its worker host and accountLabel', () => {
+    const current = goal('/tmp/project');
+    current.preferredCoordinator = 'codex';
+    const selection = selectCoordinator(current, [
+      {
+        name: 'codex#work-b',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            billingMode: 'subscription_included',
+          }),
+        ],
+      },
+    ]);
+    expect(selection).toMatchObject({
+      kind: 'route',
+      host: 'codex',
+      provider: 'codex#work-b',
+      accountLabel: 'work-b',
+    });
+  });
+
+  it('a default-account selection reports accountLabel "default"', () => {
+    const current = goal('/tmp/project');
+    current.preferredCoordinator = 'codex';
+    const selection = selectCoordinator(current, [
+      {
+        name: 'codex',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            billingMode: 'subscription_included',
+          }),
+        ],
+      },
+    ]);
+    expect(selection).toMatchObject({ kind: 'route', accountLabel: 'default' });
   });
 
   it('keeps the product goal while loading durable project and correction learnings', () => {
@@ -469,5 +514,186 @@ describe('Major coordinator contract', () => {
     );
     expect(report?.summary).toContain('[REDACTED]');
     expect(report?.summary).not.toContain('sk-this-is-a-secret-value');
+  });
+});
+
+describe('non-success cycle classification', () => {
+  const base = {
+    stdout: '',
+    provider: 'codex',
+    modelRef: 'gpt-codex',
+    host: 'codex' as const,
+    consecutiveFailures: 3,
+  };
+
+  it('treats exhaustion and rate limits as immediately-retriable capacity, not a failure', () => {
+    for (const modelOutcome of ['exhausted', 'rate_limited'] as const) {
+      const patch = nonSuccessCyclePatch({
+        ...base,
+        modelOutcome,
+        stderr: 'usage limit reached',
+      });
+      expect(patch).toMatchObject({
+        status: 'active',
+        consecutiveFailures: 3,
+        retryImmediately: true,
+        nextRunDelayMs: 0,
+      });
+      expect(patch.lastSummary).toContain(modelOutcome);
+    }
+  });
+
+  it('an authentication/trust failure is also immediately retriable, not repeatedly reselected', () => {
+    const patch = nonSuccessCyclePatch({
+      ...base,
+      modelOutcome: 'unknown',
+      stderr: 'not logged in',
+    });
+    expect(patch).toMatchObject({
+      status: 'active',
+      consecutiveFailures: 3,
+      retryImmediately: true,
+    });
+    expect(patch.lastSummary).toContain('authentication/trust failure');
+  });
+
+  it('a generic failure with no provider-state signal keeps the exponential backoff', () => {
+    const patch = nonSuccessCyclePatch({
+      ...base,
+      modelOutcome: undefined,
+      stderr: 'task tests failed',
+      consecutiveFailures: 1,
+    });
+    expect(patch).toMatchObject({
+      status: 'active',
+      consecutiveFailures: 2,
+      retryImmediately: false,
+      nextRunDelayMs: 20_000,
+      lastSummary: 'task tests failed',
+    });
+  });
+
+  it('gives up after six consecutive generic failures', () => {
+    const patch = nonSuccessCyclePatch({
+      ...base,
+      modelOutcome: undefined,
+      stderr: 'still broken',
+      consecutiveFailures: 5,
+    });
+    expect(patch).toMatchObject({
+      status: 'failed',
+      consecutiveFailures: 6,
+      retryImmediately: false,
+    });
+  });
+});
+
+describe('foreground continuation loop', () => {
+  const roots: string[] = [];
+  let priorMajorHome: string | undefined;
+
+  beforeEach(() => {
+    priorMajorHome = process.env.MAJOR_HOME;
+  });
+
+  afterEach(() => {
+    if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+    else process.env.MAJOR_HOME = priorMajorHome;
+    while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
+  });
+
+  function isolatedGoal() {
+    const repo = mkdtempSync(join(tmpdir(), 'major-foreground-'));
+    roots.push(repo);
+    process.env.MAJOR_HOME = join(repo, '.major-test');
+    return startGoal({ project: 'p', repoPath: repo, goal: 'ship it', autonomous: false });
+  }
+
+  it('keeps advancing the same goal across an immediate-retry cycle without an external retrigger', async () => {
+    const created = isolatedGoal();
+    let calls = 0;
+    await runForegroundGoal(created.id, {
+      runCycle: async (goalId) => {
+        calls += 1;
+        if (calls === 1) {
+          updateGoal(goalId, {
+            status: 'active',
+            retryImmediately: true,
+            lastCoordinator: 'codex',
+          });
+        } else {
+          updateGoal(goalId, {
+            status: 'done',
+            retryImmediately: false,
+            lastCoordinator: 'claude',
+          });
+        }
+      },
+    });
+    expect(calls).toBe(2);
+    expect(getGoal(created.id)).toMatchObject({ status: 'done', lastCoordinator: 'claude' });
+  });
+
+  it('stops after one cycle when that cycle does not request an immediate retry', async () => {
+    const created = isolatedGoal();
+    let calls = 0;
+    await runForegroundGoal(created.id, {
+      runCycle: async (goalId) => {
+        calls += 1;
+        updateGoal(goalId, {
+          status: 'active',
+          retryImmediately: false,
+          nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+        });
+      },
+    });
+    expect(calls).toBe(1);
+  });
+
+  it('bounds the loop even if capacity never stops rotating, and clears the stale retry flag', async () => {
+    const created = isolatedGoal();
+    let calls = 0;
+    await runForegroundGoal(created.id, {
+      runCycle: async (goalId) => {
+        calls += 1;
+        updateGoal(goalId, { status: 'active', retryImmediately: true });
+      },
+    });
+    expect(calls).toBe(8);
+    const after = getGoal(created.id)!;
+    expect(after.retryImmediately).toBe(false);
+    expect(after.lastSummary).toContain('checkpointing instead of hot-looping');
+  });
+
+  it('stops once the wall-clock budget for this foreground invocation is spent', async () => {
+    const created = isolatedGoal();
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      await runForegroundGoal(created.id, {
+        maxRunMinutes: 1,
+        runCycle: async (goalId) => {
+          calls += 1;
+          updateGoal(goalId, { status: 'active', retryImmediately: true });
+          vi.advanceTimersByTime(61_000);
+        },
+      });
+      expect(calls).toBe(1);
+      expect(getGoal(created.id)!.retryImmediately).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops immediately once the goal is no longer active (done/blocked)', async () => {
+    const created = isolatedGoal();
+    let calls = 0;
+    await runForegroundGoal(created.id, {
+      runCycle: async (goalId) => {
+        calls += 1;
+        updateGoal(goalId, { status: 'blocked', retryImmediately: true, ownerGate: 'sign in' });
+      },
+    });
+    expect(calls).toBe(1);
   });
 });
