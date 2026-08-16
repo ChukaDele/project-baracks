@@ -24,7 +24,14 @@ import type { ProviderCommandHost } from './commands.js';
  * but a frozen computation made this untestable in-process and is a latent
  * footgun for any future caller that does change it dynamically.
  */
-function hostCredentialPath(host: ProviderCommandHost): string | undefined {
+/**
+ * Exported so callers that accept a (host, path) pair from elsewhere (the
+ * Lima import backend) can re-verify the path actually matches the claimed
+ * host before acting on it, rather than trusting that every call site always
+ * derives both from the same map — an invariant that holds today only by
+ * caller discipline, not by construction.
+ */
+export function hostCredentialPath(host: ProviderCommandHost): string | undefined {
   switch (host) {
     case 'claude':
       return join(homedir(), '.claude', '.credentials.json');

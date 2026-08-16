@@ -1,5 +1,5 @@
 import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { LimaBackend } from '../src/execution/lima-backend.js';
@@ -165,5 +165,34 @@ describe('Lima backend inspection', () => {
     await expect(backend(fakeLima()).probeProvider('codex')).rejects.toThrow(
       /failed to start Lima instance/,
     );
+  });
+});
+
+describe('Lima backend credential import: cross-provider path binding', () => {
+  // An adversarial review found that neither this method nor the guest-side
+  // broker verified the (host, path) pair actually matched — the invariant
+  // held only because lifecycle-cli.ts's single call site always derives
+  // both from the same map. These tests exercise the structural guard added
+  // in response, entirely before any real Lima operation is attempted.
+  it("refuses a path that does not match the claimed provider's known host credential location", async () => {
+    const result = await backend(fakeLima()).importProviderCredential(
+      'codex',
+      '/tmp/definitely-not-codexs-real-credential.json',
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/does not match codex's known host credential location/),
+    });
+  });
+
+  it('does not refuse on the mismatch guard when the path genuinely matches the claimed provider', async () => {
+    const realCodexPath = join(homedir(), '.codex', 'auth.json');
+    // The fake limactl in this suite doesn't implement `start`, so this
+    // still ends in failure past the guard -- the point is which failure:
+    // it must be the real Lima-start failure, not the mismatch guard,
+    // proving the guard itself passed for a genuine match.
+    await expect(
+      backend(fakeLima()).importProviderCredential('codex', realCodexPath),
+    ).rejects.toThrow(/failed to start Lima instance/);
   });
 });

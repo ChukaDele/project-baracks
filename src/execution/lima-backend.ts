@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { hostCredentialPath as expectedHostCredentialPath } from '../providers/host-credential.js';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from '../providers/types.js';
 import { openDb } from '../db/client.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
@@ -398,6 +399,16 @@ export class LimaBackend implements ExecutionBackend {
         detail: 'credential import is disabled while live-agent-execution is unavailable',
       };
     }
+    // This invariant otherwise holds only because the single current caller
+    // (lifecycle-cli.ts's `connect`) derives both `host` and this path from
+    // the same map — re-verify it structurally so a future caller can't
+    // import provider A's credential under provider B's identity by mistake.
+    if (hostCredentialPath !== expectedHostCredentialPath(host)) {
+      return {
+        ok: false,
+        detail: `refusing to import: the given path does not match ${host}'s known host credential location`,
+      };
+    }
     const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
     const importScript = join(executingRoot, 'scripts', 'import-major-provider-credential.py');
     const stateRoot = join(majorHome(), 'execution', 'lima');
@@ -435,7 +446,9 @@ export class LimaBackend implements ExecutionBackend {
       if (copiedCredential.code !== 0) {
         return {
           ok: false,
-          detail: `failed to copy host credential into the worker: ${redactText(copiedCredential.stderr)}`,
+          detail:
+            'could not send this credential to the isolated worker — try again; ' +
+            `technical detail: ${redactText(copiedCredential.stderr)}`,
         };
       }
       const copiedScript = await this.lima([
@@ -446,7 +459,9 @@ export class LimaBackend implements ExecutionBackend {
       if (copiedScript.code !== 0) {
         return {
           ok: false,
-          detail: `failed to stage the import broker: ${redactText(copiedScript.stderr)}`,
+          detail:
+            'could not prepare the isolated worker to receive this credential — try again; ' +
+            `technical detail: ${redactText(copiedScript.stderr)}`,
         };
       }
       const placed = await this.lima([

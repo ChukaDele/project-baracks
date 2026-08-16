@@ -392,11 +392,22 @@ fi
 # the now-active runtime's own content-hash manifest, then run a contained
 # health check through the wrapper a user will actually invoke — not the
 # build-time smoke test, the real installed CLI.
+#
+# installed-release.json and install-history.jsonl were already written by
+# the point this runs (activation itself must complete before a live doctor
+# check can even be attempted). A failure here must correct that record
+# in place, not just exit — otherwise a support bundle or a maintainer
+# reading installed-release.json afterward would see releaseGate: "passed"
+# for a release this very script just refused to vouch for.
+mark_release_gate_failed() {
+  python3 "$SNAPSHOT_ROOT/scripts/mark-major-release-gate.py" "$RELEASE_RECORD" "$1"
+}
 echo
 echo "Verifying the installed runtime..."
 if ! node "$RELEASE_DIR/scripts/major-runtime-manifest.mjs" verify "$RELEASE_DIR"; then
   echo "ERROR: installed runtime failed its content manifest immediately after activation." >&2
   echo "Files were copied but the resulting runtime cannot be trusted; do not use this install." >&2
+  mark_release_gate_failed "failed-content-manifest"
   exit 1
 fi
 set +e
@@ -408,6 +419,7 @@ if [ "$DOCTOR_STATUS" -ne 0 ] && [ "$DOCTOR_STATUS" -ne 5 ]; then
   cat /tmp/major-postinstall-doctor.stderr >&2
   rm -f /tmp/major-postinstall-doctor.stderr
   echo "Files were copied but the resulting runtime does not run cleanly; do not use this install." >&2
+  mark_release_gate_failed "failed-post-install-health-check"
   exit 1
 fi
 rm -f /tmp/major-postinstall-doctor.stderr
