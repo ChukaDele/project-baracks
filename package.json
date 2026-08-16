@@ -24,6 +24,7 @@
     "validate:cursor-acp-field": "node scripts/validate-cursor-acp-field.mjs",
     "validate:lima-provider-field": "node scripts/validate-cli-provider-field.mjs && node scripts/validate-cursor-acp-field.mjs",
     "validate:release": "bash scripts/validate-major-release.sh",
+    "configure:creative-media": "python3 scripts/configure-major-creative-connectors.py",
     "major": "tsx src/entry.ts",
     "install:runtime": "bash scripts/install-major-runtime.sh",
     "db:generate": "drizzle-kit generate"
