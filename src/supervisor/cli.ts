@@ -366,7 +366,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
 
   if (command === 'run' && args[1] && !args.includes('--task')) {
     const projectArg = args[1];
-    const goalText = requireFlag(args, '--goal');
+    const goalIdArg = flag(args, '--goal-id');
     const project = resolveProject(projectArg);
     const policy = getProjectPolicy(project.project, project.repoPath);
     const preferredRaw = flag(args, '--coordinator');
@@ -377,14 +377,28 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         `project ${project.project} is ${policy.projectClass}/${policy.trust}; unattended execution is not allowed`,
       );
     }
-    const goal = startGoal({
-      project: project.project,
-      repoPath: project.repoPath,
-      goal: goalText,
-      autonomous: requestedAutonomy,
-      ...(requiredOperations.length > 0 ? { requiredOperations } : {}),
-      ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
-    });
+    // --goal-id dispatches an already-admitted goal (e.g. from `goal admit`)
+    // as-is: it must not go through startGoal's redefine-on-reuse semantics,
+    // which would overwrite the preserved outcome text and reset
+    // ownerGate/pendingCompletion/retryImmediately. bindGoalToProject is the
+    // existing, already-reviewed way to find-and-validate a goal belongs to
+    // this exact project without mutating it.
+    const goal = goalIdArg
+      ? (() => {
+          const bound = bindGoalToProject(goalIdArg, project.project, project.repoPath);
+          if (!bound) {
+            throw new Error(`goal ${goalIdArg} does not belong to project ${project.project}`);
+          }
+          return bound;
+        })()
+      : startGoal({
+          project: project.project,
+          repoPath: project.repoPath,
+          goal: requireFlag(args, '--goal'),
+          autonomous: requestedAutonomy,
+          ...(requiredOperations.length > 0 ? { requiredOperations } : {}),
+          ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
+        });
     console.log(`Major goal active: ${goal.id}`);
     console.log(`project: ${goal.project}`);
     console.log(`repo: ${goal.repoPath}`);
