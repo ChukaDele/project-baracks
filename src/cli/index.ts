@@ -19,6 +19,7 @@ import {
 import { loadProjectConfig, resolveRepoPath } from '../config/project-config.js';
 import { addProject, getProjectByName, listProjects } from '../config/project-service.js';
 import { runDoctor, type DoctorReport } from '../doctor/doctor.js';
+import { formatStorageHuman } from '../resources/storage-report.js';
 import {
   computeLiveExecutionReadiness,
   computeMultiProviderReadiness,
@@ -249,6 +250,7 @@ program
           ? 'inspection environment: OK'
           : `inspection environment: NEEDS ATTENTION — ${report.inspectionEnvironmentIssues.join('; ')}`,
       );
+      console.log(formatStorageHuman(report.storage));
     }
     // Exit code reflects inspection health, not unattended authority.
     if (!report.inspectionEnvironmentOk) process.exit(EXIT.unsafe);
@@ -441,6 +443,53 @@ program
         EXIT.error,
       );
     }
+  });
+
+program
+  .command('cleanup')
+  .description('Reclaim Major-owned ephemeral, orphan and expired cache resources')
+  .option('--dry-run', 'print classified inventory and predicted reclaim; mutate nothing')
+  .option('--json', 'emit versioned JSON')
+  .option('--aggressive', 'also offer the legacy pre-SHA worker and extra release generations')
+  .action(async (opts: { dryRun?: boolean; json?: boolean; aggressive?: boolean }) => {
+    const { formatCleanupHuman, productionCleanupDeps, reconcileResources } =
+      await import('../resources/reconcile.js');
+    const deps = productionCleanupDeps();
+    if (opts.dryRun) {
+      const result = reconcileResources({
+        ...deps,
+        phase: 'before-create',
+        apply: false,
+        aggressive: opts.aggressive === true,
+      });
+      if (opts.json) {
+        emitJson('cleanup-plan', {
+          inventory: result.plan.inventory,
+          wouldRemove: result.plan.wouldRemove.map((resource) => resource.id),
+          estimatedReclaimBytes: result.plan.estimatedReclaimBytes,
+          estimatedReclaimLabel: result.plan.estimatedReclaimLabel,
+        });
+        return;
+      }
+      console.log(formatCleanupHuman(result.plan));
+      return;
+    }
+    const result = reconcileResources({
+      ...deps,
+      phase: 'before-create',
+      apply: true,
+      aggressive: opts.aggressive === true,
+    });
+    if (opts.json) {
+      emitJson('cleanup-result', {
+        inventory: result.plan.inventory,
+        removed: result.applied?.removed.map((item) => item.id) ?? [],
+        reclaimedBytes: result.applied?.reclaimedBytes ?? 0,
+        reclaimedSource: result.applied?.reclaimedSource ?? 'df-delta',
+      });
+      return;
+    }
+    console.log(formatCleanupHuman(result.plan, result.applied));
   });
 
 program

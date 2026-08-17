@@ -275,3 +275,45 @@ Git history is the archive. After a successor path is independently validated on
 ## Migration status
 
 The thin-kernel runtime is **built**, not yet **ready**. The migration is incomplete until the JSS assist pilot and independent grade pass, then the old v1 runtime can be removed under `docs/migrations/major-v2-legacy-receipt.md`.
+
+## 11. Resource hygiene
+
+Resource efficiency is designed before creation, enforced during operation, reconciled after operation, and continuously verified.
+
+Major does not invent a store manager. It classifies, applies retention policy and reports; reclamation is delegated to `limactl delete` / `limactl prune`, `git worktree prune`, `pnpm store prune`, and recursive removal of Major-owned ephemeral trees.
+
+### Resource classes
+
+Every inventoried resource has exactly one class:
+
+| Class | Meaning | Deletable |
+|---|---|---|
+| `active` | Active release or active worker from declared GC roots | never |
+| `rollback` | Newest rollback generation (`ROLLBACK_GENERATIONS = 1`) | never |
+| `credential-bearing` | Only remaining source of a provider credential absent from the active worker | never |
+| `cache` | Reconstructible cache inside its 14-day window, or expired cache | expired only |
+| `ephemeral` | Staging, test workers, failed destination workers, in-window logs/runs/worktrees | when immediate or outside window |
+| `orphan` | Identity matches no root and no retention window | yes |
+| `cold-archive` | Old immutable snapshots, logs and diagnostics beyond retention | compact/archive only |
+| `unknown` | Major cannot classify confidently | never (safe default) |
+
+GC roots are read, never guessed: `installed-release.json`, `install-history.jsonl`, `execution.json`, active resource leases and live supervisor goals.
+
+### Retention windows
+
+| Resource | Window |
+|---|---|
+| Execution run-state dirs | newest 10 and anything younger than 48h |
+| Logs | 7 days |
+| Caches | 14 days |
+| Temp worktrees | prune when the directory is gone or older than 7 days |
+| Install staging | newest 1; remove on success |
+| Staged-validation | newest 1 |
+| Test workers | remove immediately after the test run |
+| Toolsmith provisional capabilities | 24h if never validated |
+| Diagnostic artifacts | 14 days |
+| Failed destination workers | remove immediately |
+| Lima workers | active + 1 rollback generation + unique credential-bearing; no VM per SHA |
+
+Dry-run reclaim is an explicit allocated-blocks **upper bound**. Apply reports the measured `df` free-bytes delta. A `du` sum is never presented as actual reclaimed space.
+

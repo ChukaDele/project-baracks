@@ -15,6 +15,8 @@ import sys
 print(Path(sys.argv[1]).expanduser().resolve())
 PY
 )"
+# shellcheck source=scripts/major-clone-tree.sh
+source "$ROOT/scripts/major-clone-tree.sh"
 ACCOUNT_HOME="$(python3 - <<'PY'
 import os
 import pwd
@@ -32,15 +34,30 @@ fi
 rm -rf "$DEST"
 mkdir -p "$DEST"
 cp "$ROOT/package.json" "$ROOT/pnpm-lock.yaml" "$DEST/"
-cp -R "$ROOT/dist" "$DEST/dist"
-cp -R "$ROOT/drizzle" "$DEST/drizzle"
-cp -R "$ROOT/guidance" "$DEST/guidance"
-cp -R "$ROOT/skills" "$DEST/skills"
-cp -R "$ROOT/evals" "$DEST/evals"
-cp -R "$ROOT/scripts" "$DEST/scripts"
-cp -R "$ROOT/templates" "$DEST/templates"
+major_clone_or_copy "$ROOT/dist" "$DEST/dist"
+major_clone_or_copy "$ROOT/drizzle" "$DEST/drizzle"
+major_clone_or_copy "$ROOT/guidance" "$DEST/guidance"
+major_clone_or_copy "$ROOT/skills" "$DEST/skills"
+major_clone_or_copy "$ROOT/evals" "$DEST/evals"
+major_clone_or_copy "$ROOT/scripts" "$DEST/scripts"
+major_clone_or_copy "$ROOT/templates" "$DEST/templates"
 
-corepack pnpm install --prod --frozen-lockfile --dir "$DEST"
+MAJOR_HOME="${MAJOR_HOME:-$HOME/.major}"
+LOCK_HASH="$(shasum -a 256 "$DEST/pnpm-lock.yaml" | awk '{print $1}')"
+DONOR=""
+for dir in "$MAJOR_HOME/releases"/* "$MAJOR_HOME/staged-releases"/*; do
+  [ -d "$dir/node_modules" ] && [ -f "$dir/pnpm-lock.yaml" ] || continue
+  [ "$dir" = "$DEST" ] && continue
+  if [ "$(shasum -a 256 "$dir/pnpm-lock.yaml" | awk '{print $1}')" = "$LOCK_HASH" ]; then
+    DONOR="$dir"
+    break
+  fi
+done
+if [ -n "$DONOR" ]; then
+  major_clone_or_copy "$DONOR/node_modules" "$DEST/node_modules"
+else
+  corepack pnpm install --prod --frozen-lockfile --dir "$DEST"
+fi
 
 # pnpm's package-manager metadata includes a build timestamp, and its generated
 # executable shims embed the absolute installation path. Major imports its

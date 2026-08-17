@@ -73,21 +73,29 @@ describe('Lima backend inspection', () => {
   });
 
   it('attempts real supervised execution now that core-runner safety is active (M1)', async () => {
-    // live-agent-execution gates core isolated-runner safety, which is active,
-    // so a supervised request is no longer synchronously refused at the
-    // capability gate. execute() returns a handle immediately; the actual
-    // Lima start happens asynchronously and fails here only because the fake
-    // limactl in this test does not implement `start`.
-    const handle = backend(fakeLima()).execute({
-      executionAuthority: { kind: 'supervised' },
-      executable: 'node',
-      args: [],
-      cwd: process.cwd(),
-      allowedRoots: [process.cwd()],
-    });
-    const outcome = await handle.outcome;
-    expect(outcome.status).toBe('failed');
-    expect(outcome.stderrTail ?? '').toMatch(/failed to start Lima instance|Lima/);
+    const priorHome = process.env.MAJOR_HOME;
+    const home = mkdtempSync(join(tmpdir(), 'major-lima-home-'));
+    process.env.MAJOR_HOME = home;
+    try {
+      // live-agent-execution gates core isolated-runner safety, which is active,
+      // so a supervised request is no longer synchronously refused at the
+      // capability gate. execute() returns a handle immediately; the actual
+      // Lima start happens asynchronously and fails here only because the fake
+      // limactl in this test does not implement `start`.
+      const handle = backend(fakeLima()).execute({
+        executionAuthority: { kind: 'supervised' },
+        executable: 'node',
+        args: [],
+        cwd: process.cwd(),
+        allowedRoots: [process.cwd()],
+      });
+      const outcome = await handle.outcome;
+      expect(outcome.status).toBe('failed');
+      expect(outcome.stderrTail ?? '').toMatch(/failed to start Lima instance|Lima/);
+    } finally {
+      if (priorHome === undefined) delete process.env.MAJOR_HOME;
+      else process.env.MAJOR_HOME = priorHome;
+    }
   });
 
   it('rejects a forged staged authority before any Lima operation', () => {

@@ -1,11 +1,17 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { runDoctor } from '../src/doctor/doctor.js';
 import { buildSupportBundle } from '../src/doctor/support-bundle.js';
 import { MockProvider } from '../src/providers/mock.js';
 import { model } from './helpers.js';
+
+// `runDoctor` builds a Storage section from MAJOR_HOME. Isolate it so these
+// tests never walk the developer's real ~/.major (slow, and machine-dependent).
+const storageHome = mkdtempSync(join(tmpdir(), 'major-support-bundle-home-'));
+process.env.MAJOR_HOME = storageHome;
+afterAll(() => rmSync(storageHome, { recursive: true, force: true }));
 
 function fixtureMajorHome(): string {
   return mkdtempSync(join(tmpdir(), 'major-support-bundle-fixture-'));

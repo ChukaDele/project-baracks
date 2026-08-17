@@ -34,6 +34,9 @@ describe('single execution boundary', () => {
       // `--version` only, for the host/guest compatibility diagnostic in
       // `major provider connect`. No other args, no shell, short timeout.
       'src/providers/host-provider-version.ts',
+      // Delegates reclamation to limactl/git/pnpm/tar. Major classifies;
+      // these tools perform the proven delete/prune/archive operations.
+      'src/resources/tools.ts',
       'src/security/major-gateway.ts',
       'src/security/secure-enclave-attestation.ts',
       'src/security/system-memory.ts',

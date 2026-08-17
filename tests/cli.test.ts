@@ -5,11 +5,12 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openDb } from '../src/db/client.js';
 import {
   persistProviderDiscovery,
@@ -36,6 +37,13 @@ interface CliResult {
 let dbPath: string;
 let repoDir: string;
 let configPath: string;
+
+// `major doctor` now reports a Storage section derived from MAJOR_HOME. Point it
+// at an empty directory (inherited by every spawned CLI here) so these tests do
+// not walk the developer's real ~/.major, which is slow and machine-dependent.
+const storageHome = mkdtempSync(join(tmpdir(), 'major-cli-home-'));
+process.env.MAJOR_HOME = storageHome;
+afterAll(() => rmSync(storageHome, { recursive: true, force: true }));
 
 function majorEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
   try {
@@ -454,6 +462,10 @@ describe('major CLI', () => {
     // routed by src/entry.ts before Commander and has separate contract tests.
     expect(listCommands(help.stdout).sort()).toEqual([
       'capability',
+      // `cleanup` reclaims Major-owned resources. It is deliberately part of
+      // this pinned surface: it removes only resources Major created, and
+      // refuses active, rollback, credential-bearing and unknown ones.
+      'cleanup',
       'doctor',
       'help',
       'hosts',

@@ -70,3 +70,69 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Major-specific layer retained:** provider and capability selection
 - **Rejected alternatives:** adopt Aider as a Major subsystem
 - **Evidence:** Aider release cadence and feature comparison, 2026.
+
+## 2026-08-17 — reachability-based resource garbage collection
+
+- **Capability:** reachability-based resource garbage collection
+- **Date:** 2026-08-17
+- **Candidates:** Nix GC roots/generations; Docker/containerd prune; build-cache GC; bespoke Major store
+- **Decision:** BORROW the Nix GC-root reachability model
+- **Reason:** "everything not reachable from a declared set of roots is garbage" is exactly Major's problem and needs no dependency. Major's roots are installed-release.json, a bounded window of install-history.jsonl generations, execution.json, active resource leases and live supervisor goals.
+- **Major-specific layer retained:** classification, retention policy and reporting
+- **Rejected alternatives:** adopting Nix or a bespoke store manager
+- **Evidence:** Nix treats anything symlinked under gcroots (and profile generations) as a root and deletes all unreachable store paths.
+
+## 2026-08-17 — cleanup UX and usage reporting
+
+- **Capability:** cleanup UX and usage reporting
+- **Date:** 2026-08-17
+- **Candidates:** docker system df / docker system prune --dry-run; bespoke
+- **Decision:** BORROW the docker UX shape
+- **Reason:** usage-by-category plus a dry-run that predicts reclaim is the proven, legible pattern.
+- **Major-specific layer retained:** Major resource classes and measured df-delta reporting
+- **Rejected alternatives:** a bespoke reporting format
+- **Evidence:** docker system df prints usage by category; docker system prune --dry-run predicts reclaim without mutating.
+
+## 2026-08-17 — physical (not logical) disk measurement on APFS
+
+- **Capability:** physical (not logical) disk measurement on APFS
+- **Date:** 2026-08-17
+- **Candidates:** du; df; a thin allocated-blocks helper
+- **Decision:** BUILD a thin measurement helper, because no portable tool reports shared-extent-aware per-tree usage
+- **Reason:** verified on this machine that `cp -c` clones a 40MB file for 0MB of df-used while `du` still reports 40MB for BOTH copies, so du is an UPPER BOUND once clonefile is used. Therefore: dry-run reports an explicitly-labelled upper-bound estimate from allocated blocks; apply reports the MEASURED df delta. Never present a du sum as actual reclaimed space.
+- **Major-specific layer retained:** allocated-blocks upper bound plus measured df-delta after apply
+- **Rejected alternatives:** reporting du sums as reclaimed space
+- **Evidence:** Earlier in this project a 54GB du reduction produced an 18GiB df reduction; that gap must never be reported as success.
+
+## 2026-08-17 — reclaiming space inside and around Lima instances
+
+- **Capability:** reclaiming space inside and around Lima instances
+- **Date:** 2026-08-17
+- **Candidates:** limactl delete; limactl prune; fstrim/sparse; bespoke image surgery
+- **Decision:** WRAP limactl
+- **Reason:** `limactl delete` is the supported instance removal path and `limactl prune` ("Prune garbage objects") handles Lima's own cached objects; fstrim/sparse handling belongs to Lima.
+- **Major-specific layer retained:** classification of which Major workers are deletable
+- **Rejected alternatives:** any direct manipulation of Lima disk images by Major
+- **Evidence:** limactl delete is the documented instance removal path; limactl prune is documented as "Prune garbage objects".
+
+## 2026-08-17 — deduplicating release payloads
+
+- **Capability:** deduplicating release payloads
+- **Date:** 2026-08-17
+- **Candidates:** APFS clonefile via `cp -c`; pnpm content-addressed store; hardlinks; tar/compress
+- **Decision:** ADOPT `cp -c` clonefile for release snapshot payloads, and WRAP `pnpm store prune` for the pnpm store
+- **Reason:** verified `cp -c` costs 0MB on this volume; Bun already uses clonefile on macOS for exactly this. node_modules is 45MB of each ~49MB release snapshot, duplicated across 6 releases plus 6 staged-releases.
+- **Major-specific layer retained:** clone-or-copy fallback and byte-identity verification
+- **Rejected alternatives:** compressing or hardlinking release payloads, because hardlinks break release immutability (a write through one path mutates all) while clones are copy-on-write and preserve integrity
+- **Evidence:** verified `cp -c` clones a 40MB file for 0MB of df-used on this volume.
+
+## 2026-08-17 — stale worktree and run-state reclamation
+
+- **Capability:** stale worktree and run-state reclamation
+- **Date:** 2026-08-17
+- **Candidates:** git worktree prune; a new Major run reaper; extending lima-backend stale-run reconciliation
+- **Decision:** WRAP `git worktree prune` and EXTEND Major's existing stale-run reconciliation in src/execution/lima-backend.ts (pendingRunManifests / removeGuestRun / removeGuestTransfer)
+- **Reason:** Major already has per-run cleanup; a second parallel mechanism would drift.
+- **Major-specific layer retained:** retention windows for host run-state dirs and worktrees
+- **Rejected alternatives:** writing a new run reaper
+- **Evidence:** lima-backend already reconciles pending run manifests and removes guest run/transfer paths.

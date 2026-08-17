@@ -32,6 +32,7 @@ export default tseslint.config(
       'src/execution/lima-backend.ts',
       'src/execution/cursor-acp-runtime.ts',
       'src/cli/lifecycle-ops.ts',
+      'src/resources/tools.ts',
     ],
     rules: {
       'no-restricted-imports': [

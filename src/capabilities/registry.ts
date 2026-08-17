@@ -214,6 +214,10 @@ export function listCapabilities(db: Db, projectId: string): CapabilityRecord[] 
     .map(parseRecord);
 }
 
+export function listAllCapabilities(db: Db): CapabilityRecord[] {
+  return db.select().from(capabilityRecords).all().map(parseRecord);
+}
+
 export function getCapability(db: Db, id: string): CapabilityRecord {
   const row = db.select().from(capabilityRecords).where(eq(capabilityRecords.id, id)).get();
   if (!row) throw new Error(`capability not found: ${id}`);
