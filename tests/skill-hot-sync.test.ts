@@ -1,0 +1,52 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { afterEach, describe, expect, it } from 'vitest';
+import { resolveSkills } from '../src/skills/resolver.js';
+
+const roots: string[] = [];
+const priorMajorHome = process.env.MAJOR_HOME;
+
+afterEach(() => {
+  if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+  else process.env.MAJOR_HOME = priorMajorHome;
+  while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
+});
+
+describe('Major hot skill sync', () => {
+  it('validates and activates all current internal skills without a runtime reinstall', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-sync-home-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+
+    const result = spawnSync('bash', ['scripts/sync-major-skills.sh', process.cwd()], {
+      cwd: process.cwd(),
+      env: { ...process.env, MAJOR_HOME: home },
+      encoding: 'utf8',
+    });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+
+    const current = join(home, 'skill-bundles', 'current');
+    expect(existsSync(join(current, 'bundle.json'))).toBe(true);
+    expect(existsSync(join(current, 'guidance', 'skills.registry.json'))).toBe(true);
+    expect(existsSync(join(current, 'skills', 'internal', 'presentation-storylining', 'SKILL.md'))).toBe(
+      true,
+    );
+
+    const marker = JSON.parse(readFileSync(join(current, 'bundle.json'), 'utf8')) as {
+      version: number;
+      sha: string;
+    };
+    expect(marker.version).toBe(1);
+    expect(marker.sha).toMatch(/^[0-9a-f]{40}$/);
+
+    const resolved = resolveSkills({
+      task: 'Turn this analysis into a board deck and make the argument airtight.',
+      limit: 6,
+    });
+    const presentation = resolved.skills.find((skill) => skill.id === 'presentation-storylining');
+    expect(presentation).toBeDefined();
+    expect(presentation?.path).toContain('/skill-bundles/current/skills/internal/presentation-storylining/SKILL.md');
+  });
+});
