@@ -6,12 +6,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 let hostCheck: { status: 'found' | 'not-found' | 'unsafe'; path?: string; detail: string };
 let fingerprint: string;
 let importResult: { ok: boolean; detail: string };
-let probeResult: { installed: boolean; authenticated: boolean; executable: string; detail: string };
+let probeResult: {
+  installed: boolean;
+  authenticated: boolean;
+  executable: string;
+  detail: string;
+  version?: string;
+};
+let loginResult: { ok: boolean; detail: string };
+let hostVersion: string | undefined;
 let importCalls: Array<{ host: string; path: string }>;
+let loginCalls: Array<{ host: string }>;
+let loginLines: string[];
 
 vi.mock('../src/providers/host-credential.js', () => ({
   checkHostCredential: (_host: string) => hostCheck,
   fingerprintCredentialFile: (_path: string) => fingerprint,
+}));
+
+vi.mock('../src/providers/host-provider-version.js', () => ({
+  hostProviderVersion: (_path: string) => hostVersion,
 }));
 
 vi.mock('../src/security/major-gateway.js', () => ({
@@ -21,18 +35,22 @@ vi.mock('../src/security/major-gateway.js', () => ({
       importCalls.push({ host, path });
       return importResult;
     },
+    loginProviderNative: async (host: string, onLine: (line: string) => void) => {
+      loginCalls.push({ host });
+      for (const line of loginLines) onLine(line);
+      return loginResult;
+    },
   }),
   trustedExecutableRegistry: () => ({
-    verify: () => {
-      throw new Error('not trusted in this test');
-    },
+    verify: () => ({ spawnPath: '/usr/local/bin/codex' }),
   }),
 }));
 
-import { agentProviders } from '../src/db/schema.js';
+import { agentModels, agentProviders } from '../src/db/schema.js';
 import { openDb } from '../src/db/client.js';
 import { runProviderLifecycleCli } from '../src/providers/lifecycle-cli.js';
 import { eq } from 'drizzle-orm';
+import { ensureObservedModel } from './helpers.js';
 
 let dbPath = '';
 let priorDbPath: string | undefined;
@@ -49,6 +67,16 @@ beforeEach(() => {
     logs.push(line);
   });
   importCalls = [];
+  loginCalls = [];
+  loginLines = [];
+  hostVersion = undefined;
+  probeResult = {
+    installed: true,
+    authenticated: false,
+    executable: '/opt/major/providers/v1/codex/bin/codex-native',
+    detail: 'not authenticated',
+  };
+  loginResult = { ok: false, detail: 'not configured for this test' };
   priorIsTTY = process.stdin.isTTY;
   Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
 });
@@ -66,44 +94,55 @@ function output(): string {
 }
 
 describe('major provider connect', () => {
-  it('reports no-host-credential and a next-step action when nothing is found', async () => {
+  it('falls back to native login when no host credential is found, rather than stranding the user', async () => {
     hostCheck = {
       status: 'not-found',
       detail: 'no known host credential location for codex on this platform',
     };
+    loginResult = { ok: false, detail: 'login was cancelled' };
     await runProviderLifecycleCli(['provider', 'connect', '--provider', 'codex']);
-    expect(output()).toMatch(/"status": "no-host-credential"/);
-    expect(output()).toMatch(/sign in with codex/);
     expect(importCalls).toHaveLength(0);
+    expect(loginCalls).toEqual([{ host: 'codex' }]);
+    expect(output()).toMatch(/no host login found for codex/);
+    expect(output()).toMatch(/"status": "login-failed"/);
   });
 
-  it('refuses a symlinked/malformed source without ever attempting import', async () => {
+  it('falls back to native login when the host credential is unsafe to reuse (e.g. symlinked)', async () => {
     hostCheck = { status: 'unsafe', detail: 'refusing to import a symlinked credential' };
+    loginResult = { ok: false, detail: 'login was cancelled' };
     await runProviderLifecycleCli(['provider', 'connect', '--provider', 'codex']);
-    expect(output()).toMatch(/"status": "blocked"/);
-    expect(output()).toMatch(/symlinked credential/);
     expect(importCalls).toHaveLength(0);
+    expect(loginCalls).toEqual([{ host: 'codex' }]);
+    expect(output()).toMatch(/symlinked credential/);
   });
 
-  it('requires explicit confirmation and never imports without it (non-interactive, no --yes)', async () => {
+  it('asks again (does not silently fall through) when reuse is ambiguous: found, changed, non-interactive, no --yes/--no', async () => {
     hostCheck = { status: 'found', path: '/Users/test/.codex/auth.json', detail: 'found' };
     fingerprint = 'aaaa';
+    hostVersion = '0.145.0';
+    probeResult = { ...probeResult, version: '0.145.0' };
     await runProviderLifecycleCli(['provider', 'connect', '--provider', 'codex']);
     expect(output()).toMatch(/"status": "confirmation-required"/);
     expect(importCalls).toHaveLength(0);
+    expect(loginCalls).toHaveLength(0);
   });
 
-  it('never imports when the user explicitly declines with --no', async () => {
+  it('falls back to native login when the user explicitly declines host reuse with --no', async () => {
     hostCheck = { status: 'found', path: '/Users/test/.codex/auth.json', detail: 'found' };
     fingerprint = 'aaaa';
+    hostVersion = '0.145.0';
+    probeResult = { ...probeResult, version: '0.145.0' };
+    loginResult = { ok: false, detail: 'login was cancelled' };
     await runProviderLifecycleCli(['provider', 'connect', '--provider', 'codex', '--no']);
-    expect(output()).toMatch(/"status": "declined"/);
     expect(importCalls).toHaveLength(0);
+    expect(loginCalls).toEqual([{ host: 'codex' }]);
+    expect(output()).toMatch(/declined reusing the host login/);
   });
 
   it('imports opaquely through the broker and probes on --yes, without ever logging the path as a secret', async () => {
     hostCheck = { status: 'found', path: '/Users/test/.codex/auth.json', detail: 'found' };
     fingerprint = 'bbbb';
+    hostVersion = '0.145.0';
     importResult = {
       ok: true,
       detail: 'imported codex credential -> /var/lib/major/provider-auth/codex/.codex/auth.json',
@@ -113,10 +152,13 @@ describe('major provider connect', () => {
       authenticated: true,
       executable: '/opt/major/providers/v1/codex/bin/codex-native',
       detail: 'authenticated',
+      version: '0.145.0',
     };
     await runProviderLifecycleCli(['provider', 'connect', '--provider', 'codex', '--yes']);
     expect(importCalls).toEqual([{ host: 'codex', path: '/Users/test/.codex/auth.json' }]);
+    expect(loginCalls).toHaveLength(0);
     expect(output()).toMatch(/"authenticated": true/);
+    expect(output()).toMatch(/"credentialReuse": "compatible"/);
 
     const opened = openDb(dbPath);
     try {
@@ -131,26 +173,45 @@ describe('major provider connect', () => {
     }
   });
 
-  it('reports import-failed and does not fabricate a READY state when the broker refuses', async () => {
+  it('falls back to native login when the broker refuses the host import', async () => {
     hostCheck = { status: 'found', path: '/Users/test/.codex/auth.json', detail: 'found' };
     fingerprint = 'cccc';
+    hostVersion = '0.145.0';
+    probeResult = { ...probeResult, version: '0.145.0' };
     importResult = {
       ok: false,
       detail: 'credential import broker refused: unsafe staged credential copy',
     };
+    loginResult = { ok: false, detail: 'login was cancelled' };
     await runProviderLifecycleCli(['provider', 'connect', '--provider', 'codex', '--yes']);
-    expect(output()).toMatch(/"status": "import-failed"/);
+    expect(loginCalls).toEqual([{ host: 'codex' }]);
+    expect(output()).toMatch(/host login import failed/);
     expect(output()).not.toMatch(/"authenticated": true/);
+  });
+
+  it('falls back to native login when host and guest versions are proven incompatible', async () => {
+    hostCheck = { status: 'found', path: '/Users/test/.codex/auth.json', detail: 'found' };
+    fingerprint = 'dddd';
+    hostVersion = '0.145.0';
+    probeResult = { ...probeResult, version: '0.147.0' };
+    loginResult = { ok: false, detail: 'login was cancelled' };
+    await runProviderLifecycleCli(['provider', 'connect', '--provider', 'codex', '--yes']);
+    expect(importCalls).toHaveLength(0); // never even attempted the reuse
+    expect(loginCalls).toEqual([{ host: 'codex' }]);
+    expect(output()).toMatch(/"credentialReuse": "not compatible"/);
+    expect(output()).toMatch(/Host login cannot be safely reused/);
   });
 
   it('re-probes without re-importing when the credential is unchanged (already connected)', async () => {
     hostCheck = { status: 'found', path: '/Users/test/.codex/auth.json', detail: 'found' };
     fingerprint = 'same-fingerprint';
+    hostVersion = '0.145.0';
     probeResult = {
       installed: true,
       authenticated: true,
       executable: '/opt/major/providers/v1/codex/bin/codex-native',
       detail: 'authenticated',
+      version: '0.145.0',
     };
     const seed = openDb(dbPath);
     try {
@@ -170,12 +231,14 @@ describe('major provider connect', () => {
     // No confirmation was needed and no import happened — the stored
     // fingerprint already matches the host credential's current fingerprint.
     expect(importCalls).toHaveLength(0);
+    expect(loginCalls).toHaveLength(0);
     expect(output()).toMatch(/"authenticated": true/);
   });
 
   it('prompts to replace (not silently swap) when the host credential fingerprint changed — the manual account-swap signal', async () => {
     hostCheck = { status: 'found', path: '/Users/test/.claude/.credentials.json', detail: 'found' };
     fingerprint = 'new-account-fingerprint';
+    hostVersion = undefined; // claude has no verified guest version signal here -> 'unknown', not blocked
     const seed = openDb(dbPath);
     try {
       seed.db
@@ -219,5 +282,108 @@ describe('major provider connect', () => {
     } finally {
       verify.sqlite.close();
     }
+  });
+
+  it('does not touch anything and reports already-ready when the provider is already READY', async () => {
+    probeResult = {
+      installed: true,
+      authenticated: true,
+      executable: '/opt/major/providers/v1/codex/bin/codex-native',
+      detail: 'authenticated',
+      version: '0.145.0',
+    };
+    const seed = openDb(dbPath);
+    try {
+      seed.db
+        .insert(agentProviders)
+        .values({ id: 'aprov_ready', name: 'codex', accountLabel: 'default' })
+        .run();
+      const modelId = ensureObservedModel(seed.db, 'aprov_ready', 'auto', 'subscription_included');
+      seed.db
+        .update(agentModels)
+        .set({ visible: true, authenticated: true, availability: 'available' })
+        .where(eq(agentModels.id, modelId))
+        .run();
+    } finally {
+      seed.sqlite.close();
+    }
+    await runProviderLifecycleCli(['provider', 'connect', 'codex']);
+    expect(importCalls).toHaveLength(0);
+    expect(loginCalls).toHaveLength(0);
+    expect(output()).toMatch(/"status": "already-ready"/);
+  });
+
+  it('--relogin re-authenticates even when already READY, rather than short-circuiting', async () => {
+    hostCheck = { status: 'not-found', detail: 'no known host credential location' };
+    probeResult = {
+      installed: true,
+      authenticated: true,
+      executable: '/opt/major/providers/v1/codex/bin/codex-native',
+      detail: 'authenticated',
+      version: '0.145.0',
+    };
+    loginResult = { ok: false, detail: 'login was cancelled' };
+    await runProviderLifecycleCli(['provider', 'connect', 'codex', '--relogin']);
+    expect(loginCalls).toEqual([{ host: 'codex' }]);
+  });
+
+  it('accepts a bare positional provider name identically to --provider', async () => {
+    hostCheck = { status: 'not-found', detail: 'no known host credential location' };
+    loginResult = { ok: false, detail: 'login was cancelled' };
+    await runProviderLifecycleCli(['provider', 'connect', 'codex']);
+    expect(loginCalls).toEqual([{ host: 'codex' }]);
+  });
+
+  it('relays every native-login line to the console as it arrives', async () => {
+    hostCheck = { status: 'not-found', detail: 'no known host credential location' };
+    loginLines = [
+      'Open this link in your browser',
+      'https://auth.openai.com/codex/device',
+      'TEST-CODE',
+    ];
+    loginResult = { ok: true, detail: 'imported codex credential -> ...' };
+    probeResult = {
+      installed: true,
+      authenticated: true,
+      executable: '/opt/major/providers/v1/codex/bin/codex-native',
+      detail: 'authenticated',
+    };
+    await runProviderLifecycleCli(['provider', 'connect', 'codex']);
+    expect(output()).toMatch(/https:\/\/auth\.openai\.com\/codex\/device/);
+    expect(output()).toMatch(/TEST-CODE/);
+    expect(output()).toMatch(/"authenticated": true/);
+  });
+
+  it('reports billing-confirmation-required (never silently authorizing spend) when non-interactive after a successful login', async () => {
+    hostCheck = { status: 'not-found', detail: 'no known host credential location' };
+    loginResult = { ok: true, detail: 'imported codex credential -> ...' };
+    probeResult = {
+      installed: true,
+      authenticated: true,
+      executable: '/opt/major/providers/v1/codex/bin/codex-native',
+      detail: 'authenticated',
+    };
+    const seed = openDb(dbPath);
+    try {
+      seed.db
+        .insert(agentProviders)
+        .values({ id: 'aprov_billing', name: 'codex', accountLabel: 'default' })
+        .run();
+      seed.db
+        .insert(agentModels)
+        .values({
+          id: 'amodel_billing',
+          providerId: 'aprov_billing',
+          modelRef: 'auto',
+          routingClass: 'codex',
+          billingMode: 'unknown',
+        })
+        .run();
+    } finally {
+      seed.sqlite.close();
+    }
+    await runProviderLifecycleCli(['provider', 'connect', 'codex']);
+    expect(output()).toMatch(/"status": "billing-confirmation-required"/);
+    expect(output()).toMatch(/attest-billing/);
   });
 });

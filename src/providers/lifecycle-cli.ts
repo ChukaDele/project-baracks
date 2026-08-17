@@ -1,11 +1,13 @@
 import { createInterface } from 'node:readline/promises';
 import { openDb } from '../db/client.js';
 import { BILLING_MODES, type BillingMode } from '../db/schema.js';
+import { computeProviderReadiness } from '../doctor/readiness.js';
 import { trustedExecutableRegistry } from '../security/major-gateway.js';
 import { majorExecutionBackend } from '../security/major-gateway.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
 import { ExecutableTrustError } from '../security/trusted-executables.js';
 import { checkHostCredential, fingerprintCredentialFile } from './host-credential.js';
+import { hostProviderVersion } from './host-provider-version.js';
 import type { ProviderCommandHost } from './commands.js';
 import {
   getCredentialFingerprint,
@@ -135,11 +137,93 @@ async function confirm(question: string): Promise<boolean | undefined> {
   }
 }
 
+/** Reads a numbered choice. Returns undefined (never prompts) when stdin is
+ * not a real terminal, or when the answer isn't one of the offered numbers —
+ * same fail-closed shape as confirm(). */
+async function promptChoice(question: string, options: string[]): Promise<number | undefined> {
+  if (!process.stdin.isTTY) return undefined;
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    console.log(question);
+    options.forEach((option, index) => console.log(`  [${index + 1}] ${option}`));
+    const answer = (await rl.question('> ')).trim();
+    const choice = Number(answer);
+    return Number.isInteger(choice) && choice >= 1 && choice <= options.length ? choice : undefined;
+  } finally {
+    rl.close();
+  }
+}
+
+const BILLING_PROMPT_OPTIONS: ReadonlyArray<{
+  label: string;
+  mode: Exclude<BillingMode, 'unknown'> | null;
+}> = [
+  { label: 'Included in my subscription', mode: 'subscription_included' },
+  { label: 'Usage credits / metered', mode: 'usage_credits' },
+  { label: 'API billing', mode: 'api_billing' },
+  { label: "I don't know", mode: null },
+];
+
+/**
+ * After a provider becomes authenticated, the minimum evidence Major needs to
+ * route it safely is its billing mode — never inferred, never defaulted to a
+ * paid mode. If there's nothing left with billingMode 'unknown', there is
+ * nothing to ask. If non-interactive (or the user picks "I don't know"),
+ * this reports what to run later rather than guessing or silently
+ * authorizing anything.
+ */
+async function promptBillingIfNeeded(providerName: AttestableProvider): Promise<void> {
+  const opened = openDb();
+  let modelRef: string | undefined;
+  try {
+    const info = loadPersistedProviderInfos(opened.db).find((p) => p.name === providerName);
+    modelRef = info?.models.find((m) => m.billingMode === 'unknown')?.modelRef;
+  } finally {
+    opened.sqlite.close();
+  }
+  if (!modelRef) return;
+  const choice = await promptChoice(
+    `How is this ${providerName} account used?`,
+    BILLING_PROMPT_OPTIONS.map((o) => o.label),
+  );
+  if (choice === undefined) {
+    console.log(
+      JSON.stringify(
+        {
+          provider: providerName,
+          status: 'billing-confirmation-required',
+          action: `major provider attest-billing --provider ${providerName} --model ${modelRef} --billing <mode> --evidence "<how you know>"`,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  const selected = BILLING_PROMPT_OPTIONS[choice - 1]!;
+  if (selected.mode === null) return; // "I don't know" — leave billingMode unknown, ask again later
+  const persisted = openDb();
+  try {
+    recordBillingObservation(persisted.db, {
+      providerName,
+      modelRef,
+      billingMode: selected.mode,
+      source: 'human',
+      note: 'confirmed interactively during major provider connect',
+    });
+  } finally {
+    persisted.sqlite.close();
+  }
+}
+
 const PROVIDER_HELP = `Usage: major provider <command> [options]
 
 Commands:
   status                                             list persisted provider/model state
-  connect --provider <name> [--yes|--no]             onboard a provider: reuse a host login if one exists, else report next steps
+  connect <name> [--yes|--no] [--relogin]             onboard a provider: reuse a host login if one exists and is
+                                                      version-compatible, else fall back to native sign-in
+                                                      (--provider <name> also accepted; --relogin re-authenticates
+                                                      even when already READY)
   probe --provider <name>                            re-check a provider through the isolated runner (e.g. after an account swap)
   attest-billing --provider <p> --model <m> --billing <mode> --evidence <text>
                                                       record the owner-confirmed billing mode for a model
@@ -179,103 +263,173 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     return true;
   }
   if (args[1] === 'connect') {
-    // The self-service onboarding path: reuse a login the user already has
-    // on this Mac. Requires no Workshop session, Secure Enclave lease, or
-    // M1 authority — the user already has read access to their own host
-    // credential and control of their own local worker, which is the whole
-    // trust boundary this needs. See docs/readiness-model.md.
-    const providerName = attestableProvider(required(args, '--provider'));
+    // Self-service onboarding, in priority order: (1) if already genuinely
+    // READY, do nothing; (2) reuse a host login if one exists AND is proven
+    // version-compatible with the worker's own copy; (3) otherwise fall
+    // back to the provider's own native login inside the isolated worker
+    // (currently verified only for Codex — see provider-profile.ts's
+    // loginArgs). None of this requires Workshop, a Secure Enclave lease,
+    // or M1 authority; see docs/readiness-model.md.
+    const providerArg =
+      flag(args, '--provider') ?? (args[2] && !args[2].startsWith('-') ? args[2] : undefined);
+    if (!providerArg)
+      throw new Error('missing required --provider (or: major provider connect <name>)');
+    const providerName = attestableProvider(providerArg);
     const host = PROVIDER_TO_HOST[providerName];
+    const executableName = ATTESTABLE_PROVIDERS[providerName];
     const assumeYes = args.includes('--yes') || args.includes('-y');
     const assumeNo = args.includes('--no');
+    const relogin = args.includes('--relogin') || args.includes('--force');
 
+    // Step 1: never touch a credential that's already genuinely working.
+    if (!relogin) {
+      const opened = openDb();
+      let currentState: string | undefined;
+      try {
+        const info = loadPersistedProviderInfos(opened.db).find((p) => p.name === providerName);
+        currentState = info ? computeProviderReadiness(info).state : undefined;
+      } finally {
+        opened.sqlite.close();
+      }
+      if (currentState === 'READY') {
+        const result = await probeAndPersist(providerName, 'connect: already ready, re-confirmed');
+        console.log(JSON.stringify({ ...result, status: 'already-ready' }, null, 2));
+        return true;
+      }
+    }
+
+    // Step 2: host-credential reuse, gated by proven version compatibility.
     const check = checkHostCredential(host);
+    let hostReuseSucceeded = false;
+    let fallbackReason: string | undefined;
     if (check.status === 'not-found') {
+      fallbackReason = `no host login found for ${providerName} (${check.detail})`;
+    } else if (check.status === 'unsafe') {
+      fallbackReason = check.detail;
+    } else {
+      let hostVersion: string | undefined;
+      try {
+        hostVersion = hostProviderVersion(
+          trustedExecutableRegistry(executableName).verify(executableName).spawnPath,
+        );
+      } catch {
+        hostVersion = undefined;
+      }
+      const guestProbe = isCapabilityAvailable('live-agent-execution')
+        ? await majorExecutionBackend().probeProvider(executableName)
+        : undefined;
+      const guestVersion = guestProbe?.version;
+      const compatibility =
+        hostVersion && guestVersion
+          ? hostVersion === guestVersion
+            ? 'compatible'
+            : 'not compatible'
+          : 'unknown';
       console.log(
         JSON.stringify(
           {
             provider: providerName,
-            status: 'no-host-credential',
-            detail: check.detail,
-            action: `sign in with ${providerName} using its normal CLI on this Mac, then re-run: major provider connect --provider ${providerName}`,
+            hostVersion: hostVersion ?? 'unknown',
+            majorVersion: guestVersion ?? 'unknown',
+            credentialReuse: compatibility,
           },
           null,
           2,
         ),
       );
-      return true;
+      if (compatibility === 'not compatible') {
+        fallbackReason = 'Host login cannot be safely reused.';
+      } else {
+        const fingerprint = fingerprintCredentialFile(check.path);
+        const opened = openDb();
+        let existingFingerprint: string | null;
+        try {
+          existingFingerprint = getCredentialFingerprint(opened.db, providerName);
+        } finally {
+          opened.sqlite.close();
+        }
+        if (existingFingerprint === fingerprint) {
+          hostReuseSucceeded = true;
+        } else {
+          const question = existingFingerprint
+            ? `A different ${providerName} credential is available on this Mac (${check.path}). Replace the active Major credential?`
+            : `${providerName} is already authenticated on this Mac (${check.path}). Reuse this login inside Major's isolated worker?`;
+          let proceed: boolean | undefined = assumeYes ? true : assumeNo ? false : undefined;
+          if (proceed === undefined) proceed = await confirm(question);
+          if (proceed === undefined) {
+            // Genuinely ambiguous (no --yes/--no, non-interactive): ask
+            // again rather than guess — this is the one case that does NOT
+            // fall through to native login automatically.
+            console.log(
+              JSON.stringify(
+                {
+                  provider: providerName,
+                  status: 'confirmation-required',
+                  path: check.path,
+                  changed: existingFingerprint !== null,
+                  action:
+                    'rerun with --yes to reuse this login, or --no to fall back to native sign-in',
+                },
+                null,
+                2,
+              ),
+            );
+            return true;
+          }
+          if (!proceed) {
+            fallbackReason = 'declined reusing the host login.';
+          } else {
+            const imported = await majorExecutionBackend().importProviderCredential(
+              host,
+              check.path,
+            );
+            if (imported.ok) {
+              const persisted = openDb();
+              try {
+                setCredentialFingerprint(persisted.db, providerName, fingerprint);
+              } finally {
+                persisted.sqlite.close();
+              }
+              hostReuseSucceeded = true;
+            } else {
+              fallbackReason = `host login import failed: ${imported.detail}`;
+            }
+          }
+        }
+      }
     }
-    if (check.status === 'unsafe') {
+
+    if (hostReuseSucceeded) {
+      const result = await probeAndPersist(providerName, 'connect: imported host credential');
+      if (result.authenticated) {
+        console.log(JSON.stringify(result, null, 2));
+        await promptBillingIfNeeded(providerName);
+        return true;
+      }
+      fallbackReason = 'the imported host credential did not result in a working connection.';
+    }
+
+    // Step 3: provider-native login. Never a dead end for a provider whose
+    // login flow is verified — see step 2's every path into fallbackReason.
+    console.log(
+      `${fallbackReason ?? 'starting native sign-in.'} Starting isolated ${providerName} login...`,
+    );
+    const login = await majorExecutionBackend().loginProviderNative(host, (line) =>
+      console.log(line),
+    );
+    if (!login.ok) {
       console.log(
         JSON.stringify(
-          { provider: providerName, status: 'blocked', detail: check.detail },
+          { provider: providerName, status: 'login-failed', detail: login.detail },
           null,
           2,
         ),
       );
       return true;
     }
-
-    const fingerprint = fingerprintCredentialFile(check.path);
-    const opened = openDb();
-    let existingFingerprint: string | null;
-    try {
-      existingFingerprint = getCredentialFingerprint(opened.db, providerName);
-    } finally {
-      opened.sqlite.close();
-    }
-    const unchanged = existingFingerprint === fingerprint;
-
-    if (!unchanged) {
-      const question = existingFingerprint
-        ? `A different ${providerName} credential is available on this Mac (${check.path}). Replace the active Major credential?`
-        : `${providerName} is already authenticated on this Mac (${check.path}). Reuse this login inside Major's isolated worker?`;
-      let proceed: boolean | undefined = assumeYes ? true : assumeNo ? false : undefined;
-      if (proceed === undefined) proceed = await confirm(question);
-      if (proceed === undefined) {
-        console.log(
-          JSON.stringify(
-            {
-              provider: providerName,
-              status: 'confirmation-required',
-              path: check.path,
-              changed: existingFingerprint !== null,
-              action: 'rerun with --yes to reuse this login, or --no to skip',
-            },
-            null,
-            2,
-          ),
-        );
-        return true;
-      }
-      if (!proceed) {
-        console.log(JSON.stringify({ provider: providerName, status: 'declined' }, null, 2));
-        return true;
-      }
-      const imported = await majorExecutionBackend().importProviderCredential(host, check.path);
-      if (!imported.ok) {
-        console.log(
-          JSON.stringify(
-            { provider: providerName, status: 'import-failed', detail: imported.detail },
-            null,
-            2,
-          ),
-        );
-        return true;
-      }
-      const persisted = openDb();
-      try {
-        setCredentialFingerprint(persisted.db, providerName, fingerprint);
-      } finally {
-        persisted.sqlite.close();
-      }
-    }
-
-    const result = await probeAndPersist(
-      providerName,
-      unchanged ? 'connect: credential unchanged, re-probed' : 'connect: imported host credential',
-    );
+    const result = await probeAndPersist(providerName, 'connect: provider-native login');
     console.log(JSON.stringify(result, null, 2));
+    await promptBillingIfNeeded(providerName);
     return true;
   }
   if (args[1] === 'probe') {
