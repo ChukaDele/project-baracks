@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -15,7 +15,8 @@
     "projectContextIntegrityRequired": true,
     "majorMainMustStayGreen": true,
     "singleCanonicalDesignDirectionLayer": true,
-    "workspaceLifecyclePolicy": true
+    "workspaceLifecyclePolicy": true,
+    "priorArtBeforeNewInfrastructure": true
   },
   "entries": [
     {"id":"project-start","source":"major-internal","availability":"all-projects","load":"project-start"},
@@ -39,6 +40,7 @@
     {"id":"knowledge-work","source":"major-internal","availability":"all-projects","load":"research-strategy-synthesis-comparison-decision-work"},
     {"id":"competitive-product-audit","source":"major-internal","availability":"all-projects","load":"project-start-or-material-product-work"},
     {"id":"open-source-leverage","source":"major-internal","availability":"all-projects","load":"project-start-or-commodity-build"},
+    {"id":"prior-art-discovery","source":"major-internal","availability":"all-projects","load":"new-subsystem-provider-integration-agent-runtime-sandbox-router-memory-auth-scraper-workflow-engine-browser-mcp-installation-deployment-major-dependency"},
     {"id":"simple-modular-code","source":"major-internal","availability":"all-projects","load":"architecture-or-implementation"},
     {"id":"vertical-slice-delivery","source":"major-internal","availability":"all-projects","load":"planning-or-implementation"},
     {"id":"nontechnical-ux","source":"major-internal","availability":"all-product-projects","load":"operator-or-user-workflow"},

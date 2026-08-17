@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 37
+## Major internal skills — 38
 
 These are canonical Major-owned skills.
 
@@ -31,6 +31,7 @@ These are canonical Major-owned skills.
 | `knowledge-work` | Research/strategy/synthesis with minimum credible evidence, independent angles and skeptic review where justified. |
 | `competitive-product-audit` | Learn direct/adjacent product patterns before reinventing workflows. |
 | `open-source-leverage` | Reuse/adapt/wrap maintained systems before commodity rebuilds. |
+| `prior-art-discovery` | Required gate before substantial new infrastructure: search existing Major/provider/MCP/OSS options, prefer ADOPT/WRAP/BORROW over BUILD, and record the decision. |
 | `simple-modular-code` | Small replaceable modules; stable contracts; simple code. |
 | `vertical-slice-delivery` | Build the smallest complete user/operational outcome. |
 | `nontechnical-ux` | Plain-language, low-friction workflows for non-technical users. |

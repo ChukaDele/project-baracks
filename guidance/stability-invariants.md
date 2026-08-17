@@ -81,3 +81,9 @@ Major is not an obedient patch generator. When an instruction conflicts with str
 - ask only when genuine ambiguity or an owner-only decision remains.
 
 Do not use "push back" as permission for bureaucracy. The goal is correct forward motion with fewer repeated mistakes.
+
+## 8. Prior art before new infrastructure
+
+Before building substantial new infrastructure, check existing Major capabilities, official provider tools, the MCP and ACP ecosystems, GitHub and the package ecosystems, then record an ADOPT, WRAP, BORROW or BUILD decision in `docs/prior-art-decisions.md`. BUILD is last, not the default.
+
+A violation looks like a new subsystem, provider integration, runtime, sandbox or similar landing without that record, or a BUILD proceeding because the implementation was already imagined. A BUILD decision without a recorded prior-art check is a process failure even if the code works.

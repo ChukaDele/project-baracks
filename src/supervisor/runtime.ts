@@ -22,7 +22,11 @@ import {
   validateDiscoveredCapability,
   type CapabilityRecord,
 } from '../capabilities/registry.js';
-import { discoverCapabilities, type DiscoveredCapability } from '../capabilities/discovery.js';
+import {
+  discoverCapabilities,
+  priorArtDiscoveryDirective,
+  type DiscoveredCapability,
+} from '../capabilities/discovery.js';
 import { isCapabilitySourceCurrent } from '../capabilities/verifier.js';
 import { captureLearning, listLearningCandidates } from '../learning/candidates.js';
 import { parseCapacityKey } from '../providers/account.js';
@@ -261,9 +265,15 @@ export function resolveGoalCapabilities(
         }
         if (plan.kind === 'blocked') {
           reasons.push(...plan.reasons);
+          const reason = `Toolsmith checkpoint for ${operation}: ${[...new Set(reasons)].join(
+            '; ',
+          )}`;
           return {
             kind: 'checkpoint',
-            reason: `Toolsmith checkpoint for ${operation}: ${[...new Set(reasons)].join('; ')}`,
+            reason:
+              remaining.length === 0
+                ? `${reason} ${priorArtDiscoveryDirective(operation)}`
+                : reason,
           };
         }
         const discoveredCandidate = remaining.find(

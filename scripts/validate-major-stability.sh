@@ -26,6 +26,13 @@ grep -Fq 'projectContextIntegrityRequired' guidance/skills.registry.json || fail
 grep -Fq 'majorMainMustStayGreen' guidance/skills.registry.json || fail "Major main-green policy flag missing"
 grep -Fq 'singleCanonicalDesignDirectionLayer' guidance/skills.registry.json || fail "single canonical design direction policy missing"
 grep -Fq 'workspaceLifecyclePolicy' guidance/skills.registry.json || fail "workspace lifecycle policy flag missing"
+grep -Fq 'priorArtBeforeNewInfrastructure' guidance/skills.registry.json || fail "prior-art infrastructure policy flag missing"
+
+grep -Fq "Prior art before new infrastructure" guidance/global-worker-rules.md || fail "prior-art infrastructure rule missing"
+grep -Fq '"id":"prior-art-discovery"' guidance/skills.registry.json || fail "prior-art-discovery skill not registered"
+[ -f skills/internal/prior-art-discovery/SKILL.md ] || fail "prior-art-discovery skill missing"
+[ -f docs/prior-art-decisions.md ] || fail "prior-art decision log missing"
+grep -Fq "Prior art before new infrastructure" guidance/stability-invariants.md || fail "prior-art stability invariant missing"
 
 grep -Fq 'smallest correct modular implementation' guidance/global-worker-rules.md || fail "global code-simplicity invariant missing"
 grep -Fq 'simple-modular-code' guidance/global-worker-rules.md || fail "global rules do not route modular-code guidance"

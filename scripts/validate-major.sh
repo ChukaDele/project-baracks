@@ -64,7 +64,7 @@ if registered_internal != actual_internal:
 for required_skill in [
     'source-ingestion', 'knowledge-work', 'skillify', 'tools-as-code',
     'learning-capture', 'remote-first-web-development', 'human-blocker-orchestration',
-    'dev-server-management'
+    'dev-server-management', 'prior-art-discovery'
 ]:
     if required_skill not in registered_internal:
         raise SystemExit(f"required Major skill missing: {required_skill}")
@@ -79,6 +79,7 @@ for key in [
     'skillifyReusableProcedures',
     'toolsAsCodeForRepeatedDeterministicWork',
     'captureExplicitCorrections',
+    'priorArtBeforeNewInfrastructure',
 ]:
     if policy.get(key) is not True:
         raise SystemExit(f"required skill policy not enabled: {key}")
@@ -89,6 +90,7 @@ for fixture in [
     'evals/skill-resolver/learning-capture.json',
     'evals/skill-resolver/remote-first-web-development.json',
     'evals/skill-resolver/dev-server-management.json',
+    'evals/skill-resolver/prior-art-discovery.json',
 ]:
     if not Path(fixture).is_file():
         raise SystemExit(f"resolver eval missing: {fixture}")
@@ -149,6 +151,11 @@ grep -Fq "MAJOR SHADOW PLAN" guidance/global-worker-rules.md || fail "observe-fi
 grep -Fq "Three consecutive passing shadow grades" guidance/global-worker-rules.md || fail "shadow promotion threshold missing"
 grep -Fq "Tools as Code" guidance/global-worker-rules.md || fail "Tools-as-Code rule missing"
 grep -Fq "skillify" guidance/global-worker-rules.md || fail "skillify rule missing"
+grep -Fq "Prior art before new infrastructure" guidance/global-worker-rules.md || fail "prior-art infrastructure rule missing"
+grep -Fq '"id":"prior-art-discovery"' guidance/skills.registry.json || fail "prior-art-discovery skill not registered"
+[ -f skills/internal/prior-art-discovery/SKILL.md ] || fail "prior-art-discovery skill missing"
+[ -f docs/prior-art-decisions.md ] || fail "prior-art decision log missing"
+grep -Fq "Prior art before new infrastructure" guidance/stability-invariants.md || fail "prior-art stability invariant missing"
 grep -Fq "major learn capture" guidance/global-worker-rules.md || fail "explicit correction capture rule missing"
 grep -Fq "remote-first-web-development" guidance/global-worker-rules.md || fail "remote-first web rule missing"
 grep -Fq "major web preflight" guidance/global-worker-rules.md || fail "remote browser-target guard missing"

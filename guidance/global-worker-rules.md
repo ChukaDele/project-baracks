@@ -73,6 +73,14 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Do not skillify trivial one-offs or pause an active P0 to build tooling.
 - **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it project-locally with `major learn capture`. Global promotion is a separate reviewed action that requires sanitized content and evidence. Do not rely on chat memory alone.
 
+## Prior art before new infrastructure
+
+- Before building a substantial new subsystem, provider integration, agent runtime, sandbox, router, memory mechanism, auth system, scraper, workflow engine, browser system, MCP integration, installation system, deployment mechanism, or major external dependency, check whether a mature implementation already exists.
+- Search existing Major capabilities, official provider tooling, the MCP and ACP ecosystems, GitHub and the package ecosystems.
+- Prefer ADOPT, WRAP or BORROW over BUILD when an existing solution satisfies most of the real requirement. BUILD is last, not the default.
+- Record the decision in `docs/prior-art-decisions.md` before the build starts, including when the decision is BUILD.
+- Load `prior-art-discovery` for the full ordered process. Ordinary feature work inside an existing subsystem does not require this gate.
+
 ## Remote-first web development
 
 - For every web project, use GitHub plus a Cloudflare preview before any browser preview, visual QA or acceptance testing. Load `remote-first-web-development` before UI work.
