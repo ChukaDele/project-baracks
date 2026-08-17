@@ -1,8 +1,8 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
+import { runSkillCli } from '../src/skills/cli.js';
 import { resolveSkills } from '../src/skills/resolver.js';
 
 const roots: string[] = [];
@@ -15,17 +15,14 @@ afterEach(() => {
 });
 
 describe('Major hot skill sync', () => {
-  it('validates and activates all current internal skills without a runtime reinstall', () => {
+  it('validates and activates all current internal skills without a runtime reinstall', async () => {
     const home = mkdtempSync(join(tmpdir(), 'major-skill-sync-home-'));
     roots.push(home);
     process.env.MAJOR_HOME = home;
 
-    const result = spawnSync('bash', ['scripts/sync-major-skills.sh', process.cwd()], {
-      cwd: process.cwd(),
-      env: { ...process.env, MAJOR_HOME: home },
-      encoding: 'utf8',
-    });
-    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    await expect(
+      runSkillCli(['skill', 'sync', '--source', process.cwd(), '--json']),
+    ).resolves.toBe(true);
 
     const current = join(home, 'skill-bundles', 'current');
     expect(existsSync(join(current, 'bundle.json'))).toBe(true);
@@ -39,7 +36,7 @@ describe('Major hot skill sync', () => {
       sha: string;
     };
     expect(marker.version).toBe(1);
-    expect(marker.sha).toMatch(/^[0-9a-f]{40}$/);
+    expect(marker.sha).toMatch(/^[0-9a-f]{64}$/);
 
     const resolved = resolveSkills({
       task: 'Turn this analysis into a board deck and make the argument airtight.',
