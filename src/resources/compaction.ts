@@ -74,14 +74,15 @@ export function alreadyCompacted(resource: ClassifiedResource): boolean {
 export function isCompactable(resource: ClassifiedResource): boolean {
   try {
     assertCompactable(resource);
-    // Idempotence. Without this the same cold releases were re-tarred on every
-    // reconcile, burning CPU and ADDING an archive each time while the original
-    // tree stayed in place -- compaction that grew the footprint it was meant
-    // to shrink.
-    return !alreadyCompacted(resource);
   } catch {
     return false;
   }
+  // Work remains while the original tree is still on disk, even if an archive
+  // already exists beside it: that is a half-finished compaction and the
+  // reclaim step still has to run. Idempotence belongs to the ARCHIVE step
+  // (see alreadyCompacted), not to compaction as a whole -- gating the whole
+  // operation on archive presence left archive+original pairs forever.
+  return Boolean(resource.path) && existsSync(resource.path!);
 }
 
 /** Archive a cold immutable tree with tar.gz. Original stays until the caller removes it. */

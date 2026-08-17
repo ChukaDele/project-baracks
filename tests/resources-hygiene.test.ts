@@ -238,6 +238,46 @@ describe('Major resource hygiene', () => {
     expect(asFailed?.reason).toMatch(/failed destination/);
   });
 
+  it('reclaims a worker superseded beyond the rollback window, not just an unknown one', () => {
+    const dir = home();
+    writeRoots(dir);
+    // OLD_SHA is in install-history but beyond ROLLBACK_GENERATIONS. Being
+    // present SOMEWHERE in history used to classify it `unknown` and therefore
+    // undeletable, so Major kept one VM per install SHA forever.
+    const superseded = workerInstanceForSha(OLD_SHA);
+    const classified = classifyResource(
+      { kind: 'lima-instance', identity: superseded, createdAtMs: 0 },
+      gcRoots(dir),
+      { byInstance: {}, complete: false },
+    );
+    expect(classified.class).toBe('orphan');
+    expect(classified.reason).toMatch(/superseded beyond the retained rollback generations/);
+    expect(classified.reclaimable).toBe(true);
+
+    const tools = fakeTools([superseded, workerInstanceForSha(ACTIVE_SHA)]);
+    applyCleanup({
+      home: dir,
+      limaInstances: [{ name: superseded }, { name: workerInstanceForSha(ACTIVE_SHA) }],
+      credentials: { byInstance: {}, complete: false },
+      tools,
+      measure: () => 1,
+    });
+    expect(tools.deleted).toContain(superseded);
+    expect(tools.deleted).not.toContain(workerInstanceForSha(ACTIVE_SHA));
+    expect(tools.deleted).not.toContain(workerInstanceForSha(ROLLBACK_SHA));
+
+    // With no active worker recorded we cannot claim credentials were migrated
+    // forward, so the worker must be kept.
+    const { activeWorkerInstance: _omitted, ...rootsWithoutActive } = gcRoots(dir);
+    const noActive = classifyResource(
+      { kind: 'lima-instance', identity: superseded, createdAtMs: 0 },
+      rootsWithoutActive,
+      { byInstance: {}, complete: false },
+    );
+    expect(noActive.class).toBe('unknown');
+    expect(noActive.reclaimable).toBe(false);
+  });
+
   it('removes an orphan worker', () => {
     const dir = home();
     writeRoots(dir);
@@ -618,6 +658,19 @@ describe('Major resource hygiene', () => {
       archiveTree,
     });
     expect(second.compacted).toEqual([]);
+    expect(archived).toEqual([coldDir]);
+
+    // Self-healing: an archive+original pair left by an earlier half-finished
+    // compaction must still get reclaimed, and must NOT be re-archived. Gating
+    // the whole operation on archive presence left such pairs on disk forever.
+    mkdirSync(coldDir, { recursive: true });
+    writeFileSync(join(coldDir, 'payload.txt'), 'resurrected original');
+    const third = applyCleanup({
+      ...depsFor(dir, [workerInstanceForSha(ACTIVE_SHA)]),
+      archiveTree,
+    });
+    expect(third.compacted.some((item) => item.id === `release-snapshot:${OLD_SHA}`)).toBe(true);
+    expect(existsSync(coldDir)).toBe(false);
     expect(archived).toEqual([coldDir]);
 
     // The active release is still untouched by any of this.

@@ -303,14 +303,22 @@ export function classifyResource(
         reclaimable: false,
       };
     }
-    if (
-      shaMatch &&
-      !roots.historyWorkerInstances.includes(identity) &&
-      identity !== roots.activeWorkerInstance
-    ) {
+    // A per-SHA worker that is neither active nor a retained rollback
+    // generation is reclaimable. Appearing SOMEWHERE in install-history must
+    // not protect it: history grows forever, so treating every historical
+    // worker as unclassifiable kept one VM per install SHA indefinitely -- the
+    // exact accumulation this policy exists to stop.
+    //
+    // This is only safe once an active worker exists, because the install that
+    // created it migrated provider credentials forward from its predecessor.
+    // With no active worker recorded we cannot make that claim, so we fall
+    // through to `unknown` and keep the worker.
+    if (shaMatch && roots.activeWorkerInstance) {
       return {
         class: 'orphan',
-        reason: 'per-SHA worker reachable from no install-history generation',
+        reason: roots.historyWorkerInstances.includes(identity)
+          ? 'per-SHA worker superseded beyond the retained rollback generations'
+          : 'per-SHA worker reachable from no install-history generation',
         reclaimable: true,
       };
     }

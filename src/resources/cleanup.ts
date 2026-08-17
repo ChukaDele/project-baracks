@@ -11,7 +11,12 @@ import {
   type InventoryDeps,
   type LeaseRoot,
 } from './inventory.js';
-import { archiveColdResource, isCompactable } from './compaction.js';
+import {
+  alreadyCompacted,
+  archiveColdResource,
+  compactionArchivePath,
+  isCompactable,
+} from './compaction.js';
 import { createReclaimTools, tarGzDirectory, type ReclaimTools } from './tools.js';
 import { clearUsageCache, formatBytes, measureReclaimed, type DiskPressure } from './usage.js';
 
@@ -158,7 +163,12 @@ export function applyCleanup(deps: CleanupDeps, aggressive = false): CleanupAppl
     if (deps.compact !== false) {
       for (const resource of plan.wouldCompact) {
         try {
-          const archive = archiveColdResource(resource, archiveTree);
+          // Skip only the expensive archive step when a good archive already
+          // exists; the reclaim below still runs, so a half-compacted
+          // archive+original pair self-heals instead of persisting forever.
+          const archive = alreadyCompacted(resource)
+            ? compactionArchivePath(resource.path!)
+            : archiveColdResource(resource, archiveTree);
           // Replace the tree with its archive. Keeping BOTH is not compaction:
           // it only adds bytes. Only remove once the archive is verifiably
           // present and non-empty, and only for cold resources -- the active

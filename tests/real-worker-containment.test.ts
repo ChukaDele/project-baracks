@@ -83,6 +83,24 @@ function shell(args: string[]): { code: number; stdout: string; stderr: string }
   }
 }
 
+/**
+ * Assert the guest shell actually works before trusting any containment result.
+ *
+ * Several checks here assert a NON-zero exit ("provider A cannot read provider
+ * B's home"). If `limactl shell` itself is broken -- Lima can report `Running`
+ * while its SSH forwarder refuses connections -- those checks pass for the
+ * wrong reason while their siblings fail. That is a false green in exactly the
+ * file meant to prevent one, so every test states this precondition first.
+ */
+function requireWorkingShell(): void {
+  const probe = shell(['true']);
+  expect(
+    probe.code,
+    `guest shell for ${INSTANCE} is unusable (exit ${probe.code}): ${probe.stderr.trim() || 'no stderr'}. ` +
+      'Containment results cannot be trusted until this succeeds; a stop/start cycle usually clears it.',
+  ).toBe(0);
+}
+
 describe.skipIf(!available)(`real worker containment (${INSTANCE})`, () => {
   beforeAll(() => {
     const status = execFileSync(LIMACTL, ['list', INSTANCE], { encoding: 'utf8' });
@@ -90,7 +108,15 @@ describe.skipIf(!available)(`real worker containment (${INSTANCE})`, () => {
       execFileSync(LIMACTL, ['start', INSTANCE], { encoding: 'utf8', timeout: 120_000 });
       startedHere = true;
     }
-  }, 130_000);
+    // Lima can report Running before (or without) a usable SSH forwarder. One
+    // bounded stop/start cycle is the known remedy; do it here so a transient
+    // state does not masquerade as a containment result.
+    if (shell(['true']).code !== 0) {
+      execFileSync(LIMACTL, ['stop', INSTANCE], { encoding: 'utf8', timeout: 60_000 });
+      execFileSync(LIMACTL, ['start', INSTANCE], { encoding: 'utf8', timeout: 120_000 });
+      startedHere = true;
+    }
+  }, 200_000);
 
   afterAll(() => {
     if (startedHere) {
@@ -99,6 +125,7 @@ describe.skipIf(!available)(`real worker containment (${INSTANCE})`, () => {
   }, 70_000);
 
   it('does not mount any host filesystem path into the guest', () => {
+    requireWorkingShell();
     const result = shell(['mount']);
     expect(result.code).toBe(0);
     // The hardened template pins mounts: [] — no /Users/... (host home),
@@ -110,6 +137,7 @@ describe.skipIf(!available)(`real worker containment (${INSTANCE})`, () => {
   });
 
   it("keeps each provider guest user from reading another provider's home", () => {
+    requireWorkingShell();
     const providers = ['claude', 'codex', 'cursor', 'antigravity'];
     for (const provider of providers) {
       for (const other of providers) {
@@ -129,6 +157,7 @@ describe.skipIf(!available)(`real worker containment (${INSTANCE})`, () => {
   });
 
   it('keeps provider-auth credential staging root-only, unreadable by any guest provider user', () => {
+    requireWorkingShell();
     for (const provider of ['claude', 'codex', 'cursor', 'antigravity']) {
       const result = shell([
         'sudo',
@@ -144,6 +173,7 @@ describe.skipIf(!available)(`real worker containment (${INSTANCE})`, () => {
   });
 
   it('has the canonical provider binary present and executable for every provider', () => {
+    requireWorkingShell();
     const binaries = [
       '/opt/major/providers/v1/claude/bin/claude',
       '/opt/major/providers/v1/codex/bin/codex-native',
@@ -157,6 +187,7 @@ describe.skipIf(!available)(`real worker containment (${INSTANCE})`, () => {
   });
 
   it('has the release marker present, root-owned and immutable-mode', () => {
+    requireWorkingShell();
     const result = shell(['sudo', 'stat', '-c', '%U:%G:%a', `/opt/major/releases/${RELEASE_SHA}`]);
     expect(result.code).toBe(0);
     expect(result.stdout.trim()).toBe('root:root:444');
