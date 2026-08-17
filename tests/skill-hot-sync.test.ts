@@ -30,9 +30,9 @@ describe('Major hot skill sync', () => {
     const current = join(home, 'skill-bundles', 'current');
     expect(existsSync(join(current, 'bundle.json'))).toBe(true);
     expect(existsSync(join(current, 'guidance', 'skills.registry.json'))).toBe(true);
-    expect(existsSync(join(current, 'skills', 'internal', 'presentation-storylining', 'SKILL.md'))).toBe(
-      true,
-    );
+    expect(
+      existsSync(join(current, 'skills', 'internal', 'presentation-storylining', 'SKILL.md')),
+    ).toBe(true);
 
     const marker = JSON.parse(readFileSync(join(current, 'bundle.json'), 'utf8')) as {
       version: number;
@@ -47,6 +47,8 @@ describe('Major hot skill sync', () => {
     });
     const presentation = resolved.skills.find((skill) => skill.id === 'presentation-storylining');
     expect(presentation).toBeDefined();
-    expect(presentation?.path).toContain('/skill-bundles/current/skills/internal/presentation-storylining/SKILL.md');
+    expect(presentation?.path).toContain(
+      '/skill-bundles/current/skills/internal/presentation-storylining/SKILL.md',
+    );
   });
 });
