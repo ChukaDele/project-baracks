@@ -269,4 +269,17 @@ fi
 grep -Fiq "migration is incomplete" docs/architecture.md || fail "runtime migration caveat missing"
 grep -Fq "DELETE after successor verification" docs/migrations/major-v2-legacy-receipt.md || fail "legacy deletion gate missing"
 
+[ -f src/resources/retention.ts ] || fail "resource retention policy missing"
+[ -f src/resources/inventory.ts ] || fail "resource inventory classifier missing"
+[ -f src/resources/usage.ts ] || fail "physical usage measurement missing"
+[ -f src/resources/preflight.ts ] || fail "disk-pressure preflight missing"
+grep -Fq "ROLLBACK_GENERATIONS" src/resources/retention.ts || fail "rollback generation bound missing from retention policy"
+grep -Fq "command('cleanup')" src/cli/index.ts || fail "major cleanup command missing"
+grep -Fq "estimated up to" src/resources/cleanup.ts || fail "cleanup dry-run upper-bound label missing"
+grep -Fq "df-delta" src/resources/cleanup.ts || fail "cleanup apply must report measured df delta"
+grep -Fq "major_clone_or_copy" scripts/build-major-runtime-snapshot.sh || fail "release snapshot clonefile helper unused"
+grep -Fq "cp -c" scripts/major-clone-tree.sh || fail "clonefile copy helper missing"
+grep -Fq "Resource hygiene" docs/architecture.md || fail "resource hygiene architecture section missing"
+grep -Fq "designed before creation" docs/architecture.md || fail "resource-efficiency lifecycle rule missing"
+
 echo "Major validation passed."

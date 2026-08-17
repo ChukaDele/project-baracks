@@ -55,6 +55,7 @@ import {
   type SupervisorGoal,
   type WorkerHost,
 } from './state.js';
+import { reconcileAfterCancel } from '../resources/reconcile.js';
 import { computeProviderReadiness } from '../doctor/readiness.js';
 import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integration.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
@@ -966,6 +967,11 @@ export async function runDaemon(): Promise<void> {
         unlinkSync(lockPath);
     } catch {
       // best effort
+    }
+    try {
+      reconcileAfterCancel();
+    } catch {
+      // best effort host reclaim on daemon cancel
     }
   };
   process.once('SIGTERM', () => {

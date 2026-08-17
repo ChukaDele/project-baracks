@@ -19,6 +19,7 @@ import {
   type MultiProviderReadiness,
   type ProviderReadiness,
 } from './readiness.js';
+import { buildStorageReport, type StorageReport } from '../resources/storage-report.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'missing';
 
@@ -61,6 +62,8 @@ export interface DoctorReport {
   liveExecution: LiveExecutionReadiness;
   multiProviderReady: boolean;
   multiProvider: MultiProviderReadiness;
+  /** Resource hygiene: disk pressure, worker classes and reclaimable upper bound. */
+  storage: StorageReport;
 }
 
 /**
@@ -81,6 +84,7 @@ export interface DoctorInputs {
   /** Injectable only for deterministic doctor tests; production uses the real OS detector. */
   detectContainment?: () => ContainmentStatus;
   inspectExecutionBackend?: () => Promise<BackendStatus>;
+  collectStorage?: () => StorageReport;
 }
 
 export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
@@ -291,6 +295,21 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     overnightExecutionReasons.push('caffeinate unavailable: machine may sleep mid-run');
   }
 
+  let storage: StorageReport;
+  try {
+    storage = inputs.collectStorage ? inputs.collectStorage() : buildStorageReport();
+  } catch {
+    storage = {
+      diskUsedBytes: 0,
+      diskPercentUsed: 0,
+      diskFreeBytes: 0,
+      majorPhysicalBytes: 0,
+      workers: { active: 0, rollback: 0, credentialSource: 0, orphan: 0 },
+      reclaimableBytes: 0,
+      hygiene: 'ATTENTION',
+    };
+  }
+
   return {
     os: `${platform()} ${release()}`,
     checks: checks.map((c) => ({ ...c, detail: redactText(c.detail) })),
@@ -309,5 +328,6 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     liveExecution,
     multiProviderReady: multiProvider.ready,
     multiProvider,
+    storage,
   };
 }

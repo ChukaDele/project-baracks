@@ -49,6 +49,15 @@ acquire_install_lock() {
 }
 cleanup() {
   local status=$?
+  if [ "$status" -ne 0 ] && [ -f "${INSTALL_STAGE:-}/runtime/dist/resources/reconcile.js" ]; then
+    MAJOR_HOME="$MAJOR_HOME" node --input-type=module - "$INSTALL_STAGE/runtime" <<'NODE' >/dev/null 2>&1 || true
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+const root = process.argv[2];
+const mod = await import(pathToFileURL(resolve(root, 'dist/resources/reconcile.js')).href);
+mod.reconcileAfterCancel(process.env.MAJOR_HOME);
+NODE
+  fi
   [ -z "$INSTALL_STAGE" ] || rm -rf "$INSTALL_STAGE"
   if [ -n "$BUILD_WORKTREE" ]; then
     git worktree remove --force "$BUILD_WORKTREE" >/dev/null 2>&1 || true
@@ -241,6 +250,21 @@ PY
     AUTH_SOURCE_SHA=""
   fi
 fi
+if [ -f "$INSTALL_STAGE/runtime/dist/resources/reconcile.js" ]; then
+  echo "Reconciling stale Major resources before creating a new worker..."
+  MAJOR_HOME="$MAJOR_HOME" node --input-type=module - "$INSTALL_STAGE/runtime" "$WORKER_INSTANCE" <<'NODE'
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+const root = process.argv[2];
+const identity = process.argv[3];
+const mod = await import(pathToFileURL(resolve(root, 'dist/resources/reconcile.js')).href);
+const plan = mod.prepareForLargeResource({ kind: 'worker', identity, home: process.env.MAJOR_HOME });
+if (plan.action === 'block') {
+  console.error(plan.reason);
+  process.exit(2);
+}
+NODE
+fi
 MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE="$AUTH_SOURCE_INSTANCE" \
 MAJOR_PROVIDER_AUTH_SOURCE_SHA="$AUTH_SOURCE_SHA" \
 MAJOR_WORKSHOP_AUTH_CWD="$WORKSHOP_AUTH_CWD" \
@@ -377,6 +401,20 @@ with history_path.open('a') as handle:
         "installedAt": record["installedAt"],
     }) + "\n")
 PY
+
+if [ -f "$RELEASE_DIR/dist/resources/reconcile.js" ]; then
+  MAJOR_HOME="$MAJOR_HOME" node --input-type=module - "$RELEASE_DIR" <<'NODE' >/dev/null 2>&1 || true
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+const root = process.argv[2];
+const mod = await import(pathToFileURL(resolve(root, 'dist/resources/reconcile.js')).href);
+mod.reconcileResources({
+  ...mod.productionCleanupDeps(process.env.MAJOR_HOME),
+  phase: 'after-success',
+  apply: true,
+});
+NODE
+fi
 
 # Pilot posture: no auto-start daemon. Never install or auto-start a global daemon.
 # The loaded-service postcondition was verified before activation so no

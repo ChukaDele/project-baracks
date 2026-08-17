@@ -50,6 +50,8 @@ import {
   type GuestProviderProfile,
 } from './provider-profile.js';
 import { pendingRunManifests, writeRunManifest, type LimaRunManifest } from './run-manifest.js';
+import { createReclaimTools } from '../resources/tools.js';
+import { productionCleanupDeps, reconcileResources } from '../resources/reconcile.js';
 import {
   hashWorkspaceTree,
   snapshotWorkspace,
@@ -1127,7 +1129,16 @@ export class LimaBackend implements ExecutionBackend {
     let manifestWritten = false;
     let guestPrepared = false;
     let transferPrepared = false;
+    let runSucceeded = false;
     try {
+      reconcileResources({
+        ...productionCleanupDeps(
+          majorHome(),
+          createReclaimTools({ limactlPath: this.config.limactlPath }),
+        ),
+        phase: 'before-create',
+        apply: true,
+      });
       await this.reconcileStaleRuns(stateRoot);
       mkdirSync(runRoot, { recursive: true, mode: 0o700 });
       writeRunManifest(stateRoot, manifest);
@@ -1569,6 +1580,15 @@ export class LimaBackend implements ExecutionBackend {
         await this.runContainedJssValidation(request.cwd, runRoot);
       }
       manifest = { ...manifest, result: 'succeeded' };
+      runSucceeded = true;
+      reconcileResources({
+        ...productionCleanupDeps(
+          majorHome(),
+          createReclaimTools({ limactlPath: this.config.limactlPath }),
+        ),
+        phase: 'after-success',
+        apply: true,
+      });
       return {
         status: 'succeeded' as const,
         runId,
@@ -1586,6 +1606,16 @@ export class LimaBackend implements ExecutionBackend {
     } finally {
       let cleanupError: unknown;
       try {
+        if (!runSucceeded) {
+          reconcileResources({
+            ...productionCleanupDeps(
+              majorHome(),
+              createReclaimTools({ limactlPath: this.config.limactlPath }),
+            ),
+            phase: 'after-failure',
+            apply: true,
+          });
+        }
         if (guestPrepared) await this.removeGuestRun(guestRun);
         if (transferPrepared) {
           await this.removeGuestTransfer(runId);

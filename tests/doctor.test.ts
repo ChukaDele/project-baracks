@@ -1,8 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
 import { runDoctor, type ExecutableResolver } from '../src/doctor/doctor.js';
 import { MockProvider } from '../src/providers/mock.js';
 import { detectContainment } from '../src/security/containment.js';
 import { model } from './helpers.js';
+
+// `runDoctor` now reports a Storage section derived from MAJOR_HOME. Point it at
+// an empty directory: otherwise every doctor test walks the developer's real
+// ~/.major (measured ~1.4s per call, which times these tests out under the
+// parallel suite) and its result would vary by machine.
+const storageHome = mkdtempSync(join(tmpdir(), 'major-doctor-home-'));
+process.env.MAJOR_HOME = storageHome;
+afterAll(() => rmSync(storageHome, { recursive: true, force: true }));
 
 // Resolution-only: maps a tool NAME to a resolved path (presence signal). No
 // process is ever run — the resolver only reports what is on PATH.
@@ -257,5 +268,30 @@ describe('major doctor', () => {
     expect(check?.status).toBe('ok');
     expect(check?.detail).toMatch(/contents not read/);
     expect(JSON.stringify(report)).not.toContain('BEGIN PRIVATE KEY');
+  });
+
+  it('emits the compact Storage section fields', async () => {
+    const report = await runDoctor({
+      providers: [healthyProvider()],
+      configuredProjects: [{ name: 'demo', repoPath: '/tmp/demo' }],
+      resolve: fullToolchain,
+      collectStorage: () => ({
+        diskUsedBytes: 80_000_000_000,
+        diskPercentUsed: 66.7,
+        diskFreeBytes: 40_000_000_000,
+        majorPhysicalBytes: 3_300_000_000,
+        workers: { active: 1, rollback: 1, credentialSource: 1, orphan: 2 },
+        reclaimableBytes: 1_800_000_000,
+        hygiene: 'ATTENTION',
+      }),
+    });
+    expect(report.storage.hygiene).toBe('ATTENTION');
+    expect(report.storage.workers).toEqual({
+      active: 1,
+      rollback: 1,
+      credentialSource: 1,
+      orphan: 2,
+    });
+    expect(report.storage.reclaimableBytes).toBe(1_800_000_000);
   });
 });
