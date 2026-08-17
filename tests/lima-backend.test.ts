@@ -2,9 +2,10 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LimaBackend } from '../src/execution/lima-backend.js';
+import { detectProviderOutcomeSignals, LimaBackend } from '../src/execution/lima-backend.js';
 import { openDb } from '../src/db/client.js';
 import { verifyProviderApprovalAuthority } from '../src/security/provider-approval-policy.js';
+import { EXHAUSTION_PATTERN, RATE_LIMIT_PATTERN } from '../src/providers/commands.js';
 import { tempDbPath } from './helpers.js';
 
 function fakeLima(version = 'limactl version 2.2.0'): string {
@@ -388,5 +389,62 @@ describe('Lima backend probe: materializes the canonical credential store into t
     const fake = fakeLimaLoggingShell(); // no store-has-credential file
     const result = await backend(fake.limactlPath).probeProvider('codex');
     expect(result.authenticated).toBe(false);
+  });
+});
+
+/**
+ * Found by real dogfooding against a genuinely usage-limited Codex account
+ * (not by design review): a real dispatch exited non-zero with the account's
+ * actual usage-limit message present only inside the JSON-mode stdout event
+ * stream --
+ *   {"type":"error","message":"You've hit your usage limit. ..."}
+ * -- while stderr held only unrelated CLI boilerplate ("Reading additional
+ * input from stdin..."). The exhaustion/rate-limit detectors scanned stderr
+ * only, so a real, confirmed exhaustion event was silently misclassified as
+ * exhausted:false. These tests use that captured real output verbatim.
+ */
+describe('Lima backend provider outcome classification: stdout-carried exhaustion', () => {
+  const realCodexExhaustionStdout = [
+    '{"type":"thread.started","thread_id":"01a00d5a-cb04-7543-a02c-7f196ab84c0a"}',
+    '{"type":"turn.started"}',
+    '{"type":"error","message":"You\'ve hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 20th, 2026 3:32 AM."}',
+    '{"type":"turn.failed","error":{"message":"You\'ve hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 20th, 2026 3:32 AM."}}',
+  ].join('\n');
+  const irrelevantStderr = 'Reading additional input from stdin...\n';
+  const detect = {
+    detectRateLimit: (text: string) => RATE_LIMIT_PATTERN.test(text),
+    detectExhaustion: (text: string) => EXHAUSTION_PATTERN.test(text),
+  };
+
+  it('classifies a real Codex usage-limit event carried only on stdout as exhausted', () => {
+    const result = detectProviderOutcomeSignals(
+      { stdout: realCodexExhaustionStdout, stderr: irrelevantStderr },
+      detect,
+    );
+    expect(result).toEqual({ rateLimited: false, exhausted: true });
+  });
+
+  it('still classifies a legacy stderr-only exhaustion message (no regression)', () => {
+    const result = detectProviderOutcomeSignals(
+      { stdout: '', stderr: 'quota exceeded for this account' },
+      detect,
+    );
+    expect(result).toEqual({ rateLimited: false, exhausted: true });
+  });
+
+  it('reports neither signal for an unrelated failure', () => {
+    const result = detectProviderOutcomeSignals(
+      { stdout: '{"type":"error","message":"unexpected token"}', stderr: 'Traceback...' },
+      detect,
+    );
+    expect(result).toEqual({ rateLimited: false, exhausted: false });
+  });
+
+  it('returns false for both when no detectors are supplied', () => {
+    const result = detectProviderOutcomeSignals(
+      { stdout: realCodexExhaustionStdout, stderr: '' },
+      {},
+    );
+    expect(result).toEqual({ rateLimited: false, exhausted: false });
   });
 });

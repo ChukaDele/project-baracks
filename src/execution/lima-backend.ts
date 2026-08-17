@@ -92,6 +92,30 @@ interface CommandResult {
   stderr: string;
 }
 
+/**
+ * Codex's JSON-mode usage-limit/rate-limit errors arrive as structured events
+ * on stdout (e.g. {"type":"error","message":"You've hit your usage
+ * limit..."}), never mirrored to stderr. Scanning stderr alone let a real,
+ * confirmed exhaustion event pass through as exhausted:false. Scan stdout
+ * first, then stderr, so a provider that does use stderr stays covered too.
+ */
+export function detectProviderOutcomeSignals(
+  provider: Pick<CommandResult, 'stdout' | 'stderr'>,
+  detect: {
+    detectRateLimit?: (text: string) => boolean;
+    detectExhaustion?: (text: string) => boolean;
+  },
+): { rateLimited: boolean; exhausted: boolean } {
+  return {
+    rateLimited:
+      (detect.detectRateLimit?.(provider.stdout) || detect.detectRateLimit?.(provider.stderr)) ??
+      false,
+    exhausted:
+      (detect.detectExhaustion?.(provider.stdout) || detect.detectExhaustion?.(provider.stderr)) ??
+      false,
+  };
+}
+
 function majorHome(): string {
   return process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
 }
@@ -1353,8 +1377,7 @@ export class LimaBackend implements ExecutionBackend {
           errorKind: workerInterrupted ? ('interrupted' as const) : ('provider_failed' as const),
           cleanup: 'complete' as const,
           exitCode: provider.code,
-          rateLimited: request.detectRateLimit?.(provider.stderr) ?? false,
-          exhausted: request.detectExhaustion?.(provider.stderr) ?? false,
+          ...detectProviderOutcomeSignals(provider, request),
           stderrTail: redactText(provider.stderr).slice(-2000),
           ...(provider.sessionRef ? { sessionRef: provider.sessionRef } : {}),
           ...(provider.usage !== undefined ? { usage: provider.usage } : {}),
