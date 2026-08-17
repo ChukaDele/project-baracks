@@ -29,6 +29,17 @@ export interface LiveWorkerClaim {
  * window. */
 const LIVE_WORKER_STALE_MS = 45 * 60 * 1000;
 
+/** Whether a live-worker claim's heartbeat is recent enough to still count
+ * as held. Shared by claimLiveWorker's reclaim check and by anything that
+ * reports a claim's freshness (e.g. `major status`) so the one staleness
+ * window can't drift between the two. */
+export function isLiveWorkerFresh(
+  claim: LiveWorkerClaim,
+  now: () => Date = () => new Date(),
+): boolean {
+  return now().getTime() - Date.parse(claim.heartbeatAt) <= LIVE_WORKER_STALE_MS;
+}
+
 export const GOAL_STATUSES = ['active', 'running', 'blocked', 'done', 'failed', 'paused'] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
 export const WORKER_HOSTS = ['claude', 'codex', 'cursor', 'antigravity'] as const;
@@ -358,9 +369,7 @@ export function claimLiveWorker(
     const nowIso = now().toISOString();
     const existing = goal.liveWorker;
     const sameSession = existing?.sessionId === input.sessionId && existing?.host === input.host;
-    const stale =
-      existing !== undefined &&
-      now().getTime() - Date.parse(existing.heartbeatAt) > LIVE_WORKER_STALE_MS;
+    const stale = existing !== undefined && !isLiveWorkerFresh(existing, now);
     if (existing && !sameSession && !stale) {
       return { claim: existing, owned: false };
     }

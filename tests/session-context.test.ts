@@ -355,3 +355,128 @@ describe('fresh session context', () => {
     expect(output).toMatch(/current worker capacity:.*claude \(not yet discovered\)/);
   });
 });
+
+/**
+ * Every host but Claude lacks an automatic SessionStart hook today; closing
+ * that gap means feeding `session hook`'s output through a host-specific
+ * JSON envelope instead of Claude's plain-text stdout. Antigravity has no
+ * dedicated session-start event at all -- PreInvocation is the closest
+ * substitute, but it fires on every model call, so it must attach and print
+ * the banner only on the conversation's first invocation and stay a silent
+ * no-op afterward, or the banner would repeat every turn.
+ */
+async function withStdin<T>(input: string, fn: () => Promise<T>): Promise<T> {
+  const priorIsTTY = process.stdin.isTTY;
+  const priorAsyncIterator = process.stdin[Symbol.asyncIterator];
+  Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+  process.stdin[Symbol.asyncIterator] = async function* () {
+    yield Buffer.from(input);
+  } as (typeof process.stdin)[typeof Symbol.asyncIterator];
+  try {
+    return await fn();
+  } finally {
+    Object.defineProperty(process.stdin, 'isTTY', { value: priorIsTTY, configurable: true });
+    process.stdin[Symbol.asyncIterator] = priorAsyncIterator;
+  }
+}
+
+describe('session hook: per-host JSON envelopes', () => {
+  it('wraps the banner as Codex SessionStart JSON (continue + additionalContext)', async () => {
+    const current = repo('codex-hook-project');
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    await withStdin(JSON.stringify({ cwd: current }), () =>
+      runSessionContextCli([
+        'session',
+        'hook',
+        '--host',
+        'codex',
+        '--envelope',
+        'codex-session-start',
+      ]),
+    );
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]!) as { continue: boolean; additionalContext: string };
+    expect(parsed.continue).toBe(true);
+    expect(parsed.additionalContext).toContain('MAJOR CONTROL PLANE: ACTIVE');
+  });
+
+  it('wraps the banner as Cursor SessionStart JSON (additionalContext + hookSpecificOutput)', async () => {
+    const current = repo('cursor-hook-project');
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    await withStdin(JSON.stringify({ cwd: current }), () =>
+      runSessionContextCli([
+        'session',
+        'hook',
+        '--host',
+        'cursor',
+        '--envelope',
+        'cursor-session-start',
+      ]),
+    );
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]!) as {
+      additionalContext: string;
+      hookSpecificOutput: { hookEventName: string; additionalContext: string };
+    };
+    expect(parsed.additionalContext).toContain('MAJOR CONTROL PLANE: ACTIVE');
+    expect(parsed.hookSpecificOutput).toEqual({
+      hookEventName: 'SessionStart',
+      additionalContext: parsed.additionalContext,
+    });
+  });
+
+  it('attaches and injects the banner on Antigravity PreInvocation invocationNum 1', async () => {
+    const current = repo('antigravity-hook-project');
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    await withStdin(JSON.stringify({ cwd: current, invocationNum: 1 }), () =>
+      runSessionContextCli([
+        'session',
+        'hook',
+        '--host',
+        'antigravity',
+        '--envelope',
+        'antigravity-pre-invocation',
+      ]),
+    );
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]!) as {
+      injectSteps: Array<{ ephemeralMessage: string }>;
+    };
+    expect(parsed.injectSteps).toHaveLength(1);
+    expect(parsed.injectSteps[0]!.ephemeralMessage).toContain('MAJOR CONTROL PLANE: ACTIVE');
+  });
+
+  it('stays a silent no-op on later Antigravity PreInvocation calls (no per-turn banner spam)', async () => {
+    const current = repo('antigravity-hook-project-2');
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    await withStdin(JSON.stringify({ cwd: current, invocationNum: 4 }), () =>
+      runSessionContextCli([
+        'session',
+        'hook',
+        '--host',
+        'antigravity',
+        '--envelope',
+        'antigravity-pre-invocation',
+      ]),
+    );
+    expect(lines).toEqual(['{}']);
+  });
+
+  it('still emits the plain-text banner when no envelope is given (Claude, unchanged)', async () => {
+    const current = repo('claude-hook-project');
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    await withStdin(JSON.stringify({ cwd: current }), () =>
+      runSessionContextCli(['session', 'hook', '--host', 'claude']),
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('MAJOR CONTROL PLANE: ACTIVE');
+    expect(() => {
+      JSON.parse(lines[0]!);
+    }).toThrow();
+  });
+});

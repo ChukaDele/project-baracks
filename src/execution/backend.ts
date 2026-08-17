@@ -49,6 +49,10 @@ export interface BackendProviderStatus {
   installed: boolean;
   authenticated: boolean;
   detail: string;
+  /** The provider CLI's own reported version inside the isolated worker, for
+   * the host/guest compatibility diagnostic in `major provider connect`.
+   * Undefined when it couldn't be determined -- never a guess. */
+  version?: string;
 }
 
 /** The sole execution boundary below Major's policy gateway. */

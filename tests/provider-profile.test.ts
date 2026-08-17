@@ -35,4 +35,11 @@ describe('Lima provider profiles', () => {
     expect(() => guestProviderProfile('/tmp/codex')).toThrow(/path-qualified/);
     expect(() => guestProviderProfile('node')).toThrow(/unsupported/);
   });
+
+  it('only codex has a verified native-login flow for now', () => {
+    expect(guestProviderProfile('codex').loginArgs).toEqual(['login', '--device-auth']);
+    expect(guestProviderProfile('claude').loginArgs).toBeUndefined();
+    expect(guestProviderProfile('cursor-agent').loginArgs).toBeUndefined();
+    expect(guestProviderProfile('agy').loginArgs).toBeUndefined();
+  });
 });

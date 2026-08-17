@@ -37,6 +37,7 @@ import { resolveSupervisedWorkshopAuthority } from '../security/supervised-works
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
 import {
+  majorStatusOverview,
   runDaemon,
   runForegroundGoal,
   runGoalCycle,
@@ -456,6 +457,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   }
 
   if (command === 'status') {
+    console.log(majorStatusOverview());
+    console.log('');
     console.log(supervisorSnapshot(args[1]));
     console.log(formatResourceTelemetry(resourceSnapshot().telemetry));
     return true;
