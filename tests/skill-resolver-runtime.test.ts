@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -53,7 +61,7 @@ describe('runtime skill resolver', () => {
     }
   });
 
-  it('prefers the immutable runtime skill over a mutable global copy', () => {
+  it('prefers the immutable runtime skill over an untrusted legacy mutable global copy', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-mutable-skills-'));
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -63,6 +71,75 @@ describe('runtime skill resolver', () => {
     const resolved = resolveSkills({ task: 'Use skill-resolver for this task.', limit: 1 });
     expect(resolved.skills[0]?.path).not.toBe(mutable);
     expect(resolved.skills[0]?.path).toContain('/skills/internal/skill-resolver/SKILL.md');
+  });
+
+  it('prefers a complete newer validated hot bundle over the immutable release', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-hot-skills-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    const bundle = join(home, 'skill-bundles', '0123456789abcdef0123456789abcdef01234567');
+    mkdirSync(join(bundle, 'guidance'), { recursive: true });
+    mkdirSync(join(bundle, 'skills', 'internal', 'hot-skill'), { recursive: true });
+    mkdirSync(join(bundle, 'evals', 'skill-resolver'), { recursive: true });
+    writeFileSync(
+      join(bundle, 'bundle.json'),
+      JSON.stringify({ version: 1, sha: '0123456789abcdef0123456789abcdef01234567' }),
+    );
+    writeFileSync(
+      join(bundle, 'guidance', 'skills.registry.json'),
+      JSON.stringify({
+        version: 999,
+        entries: [
+          {
+            id: 'hot-skill',
+            source: 'major-internal',
+            availability: 'all-projects',
+            load: 'hot skill immediate sync',
+          },
+        ],
+      }),
+    );
+    const hotSkill = join(bundle, 'skills', 'internal', 'hot-skill', 'SKILL.md');
+    writeFileSync(hotSkill, '---\nname: hot-skill\ndescription: hot\n---\n\n# Hot\n');
+    symlinkSync('0123456789abcdef0123456789abcdef01234567', join(home, 'skill-bundles', 'current'));
+
+    const resolved = resolveSkills({ task: 'Use hot-skill for this task.', limit: 1 });
+    expect(resolved.skills[0]?.id).toBe('hot-skill');
+    expect(resolved.skills[0]?.path).toBe(hotSkill);
+  });
+
+  it('ignores a stale hot bundle whose registry predates the immutable release', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-stale-hot-skills-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    const bundle = join(home, 'skill-bundles', 'fedcba9876543210fedcba9876543210fedcba98');
+    mkdirSync(join(bundle, 'guidance'), { recursive: true });
+    mkdirSync(join(bundle, 'skills', 'internal', 'stale-hot-skill'), { recursive: true });
+    writeFileSync(
+      join(bundle, 'bundle.json'),
+      JSON.stringify({ version: 1, sha: 'fedcba9876543210fedcba9876543210fedcba98' }),
+    );
+    writeFileSync(
+      join(bundle, 'guidance', 'skills.registry.json'),
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: 'stale-hot-skill',
+            source: 'major-internal',
+            availability: 'all-projects',
+            load: 'stale hot skill',
+          },
+        ],
+      }),
+    );
+    writeFileSync(
+      join(bundle, 'skills', 'internal', 'stale-hot-skill', 'SKILL.md'),
+      '---\nname: stale-hot-skill\ndescription: stale\n---\n',
+    );
+    symlinkSync('fedcba9876543210fedcba9876543210fedcba98', join(home, 'skill-bundles', 'current'));
+
+    expect(resolveSkills({ task: 'Use stale-hot-skill for this task.' }).skills).toEqual([]);
   });
 
   it('does not let a project shadow a registered Major-internal skill id', () => {
