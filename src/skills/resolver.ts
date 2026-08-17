@@ -21,6 +21,11 @@ const registrySchema = z.object({
   entries: z.array(registryEntrySchema),
 });
 
+const bundleSchema = z.object({
+  version: z.literal(1),
+  sha: z.string().regex(/^[0-9a-f]{40}$/),
+});
+
 export type SkillRegistryEntry = z.infer<typeof registryEntrySchema>;
 
 export interface ResolvedSkill {
@@ -60,14 +65,45 @@ function runtimeRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 }
 
+function readRegistry(path: string): z.infer<typeof registrySchema> {
+  return registrySchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+}
+
+/**
+ * Major's executable runtime is immutable, but reusable knowledge should not
+ * require a full runtime/Lima reinstall. A hot bundle is trusted only when it
+ * was activated through the skill-sync path (bundle marker + complete
+ * registry/skill tree) and its registry is at least as new as the immutable
+ * release registry. An older or partial bundle is ignored fail-closed.
+ */
+function hotSkillBundleRoot(): string | undefined {
+  const root = join(majorHome(), 'skill-bundles', 'current');
+  const marker = join(root, 'bundle.json');
+  const registry = join(root, 'guidance', 'skills.registry.json');
+  const internal = join(root, 'skills', 'internal');
+  if (!existsSync(marker) || !existsSync(registry) || !existsSync(internal)) return undefined;
+  try {
+    bundleSchema.parse(JSON.parse(readFileSync(marker, 'utf8')));
+    const hot = readRegistry(registry);
+    const immutable = readRegistry(join(runtimeRoot(), 'guidance', 'skills.registry.json'));
+    return hot.version >= immutable.version ? root : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function registryPath(): string {
-  return process.env.MAJOR_SKILLS_REGISTRY
-    ? resolve(process.env.MAJOR_SKILLS_REGISTRY)
+  if (process.env.MAJOR_SKILLS_REGISTRY) return resolve(process.env.MAJOR_SKILLS_REGISTRY);
+  const hot = hotSkillBundleRoot();
+  return hot
+    ? join(hot, 'guidance', 'skills.registry.json')
     : join(runtimeRoot(), 'guidance', 'skills.registry.json');
 }
 
 function resolverEvalPath(): string {
-  return join(runtimeRoot(), 'evals', 'skill-resolver');
+  const hot = hotSkillBundleRoot();
+  const hotPath = hot ? join(hot, 'evals', 'skill-resolver') : undefined;
+  return hotPath && existsSync(hotPath) ? hotPath : join(runtimeRoot(), 'evals', 'skill-resolver');
 }
 
 interface ResolverExamples {
@@ -97,7 +133,7 @@ function resolverExamples(): Map<string, ResolverExamples> {
 }
 
 export function loadSkillRegistry(): SkillRegistryEntry[] {
-  return registrySchema.parse(JSON.parse(readFileSync(registryPath(), 'utf8'))).entries;
+  return readRegistry(registryPath()).entries;
 }
 
 function words(value: string): string[] {
@@ -115,15 +151,18 @@ function normalizedText(value: string): string {
 
 function skillPath(id: string, cwd: string, source: string): string | undefined {
   const immutable = join(runtimeRoot(), 'skills', 'internal');
-  const mutableGlobal = join(majorHome(), 'skills', 'internal');
+  const legacyMutableGlobal = join(majorHome(), 'skills', 'internal');
+  const hot = hotSkillBundleRoot();
+  const hotInternal = hot ? join(hot, 'skills', 'internal') : undefined;
   const roots =
     source === 'major-internal'
-      ? [immutable, mutableGlobal]
+      ? [hotInternal, immutable, legacyMutableGlobal].filter((root): root is string => Boolean(root))
       : [
           join(cwd, '.agents', 'skills'),
           join(cwd, '.claude', 'skills'),
           join(cwd, '.codex', 'skills'),
-          mutableGlobal,
+          ...(hotInternal ? [hotInternal] : []),
+          legacyMutableGlobal,
           immutable,
         ];
   for (const root of roots) {
@@ -243,7 +282,10 @@ export function auditSkillReachability(cwd = process.cwd()): SkillAudit {
       return { id: entry.id, reachable: Boolean(path), ...(path ? { path } : {}) };
     });
   const registered = new Set(internal.map((entry) => entry.id));
-  const internalRoot = join(runtimeRoot(), 'skills', 'internal');
+  const hot = hotSkillBundleRoot();
+  const internalRoot = hot
+    ? join(hot, 'skills', 'internal')
+    : join(runtimeRoot(), 'skills', 'internal');
   const installed = existsSync(internalRoot)
     ? readdirSync(internalRoot, { withFileTypes: true })
         .filter((entry) => entry.isDirectory() && existsSync(join(internalRoot, entry.name, 'SKILL.md')))
