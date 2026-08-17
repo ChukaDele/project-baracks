@@ -23,7 +23,7 @@ const registrySchema = z.object({
 
 const bundleSchema = z.object({
   version: z.literal(1),
-  sha: z.string().regex(/^[0-9a-f]{40}$/),
+  sha: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
 });
 
 export type SkillRegistryEntry = z.infer<typeof registryEntrySchema>;
