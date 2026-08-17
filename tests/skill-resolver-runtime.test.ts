@@ -99,13 +99,16 @@ describe('runtime skill resolver', () => {
         ],
       }),
     );
-    const hotSkill = join(bundle, 'skills', 'internal', 'hot-skill', 'SKILL.md');
-    writeFileSync(hotSkill, '---\nname: hot-skill\ndescription: hot\n---\n\n# Hot\n');
-    symlinkSync('0123456789abcdef0123456789abcdef01234567', join(home, 'skill-bundles', 'current'));
+    writeFileSync(
+      join(bundle, 'skills', 'internal', 'hot-skill', 'SKILL.md'),
+      '---\nname: hot-skill\ndescription: hot\n---\n\n# Hot\n',
+    );
+    const current = join(home, 'skill-bundles', 'current');
+    symlinkSync('0123456789abcdef0123456789abcdef01234567', current);
 
     const resolved = resolveSkills({ task: 'Use hot-skill for this task.', limit: 1 });
     expect(resolved.skills[0]?.id).toBe('hot-skill');
-    expect(resolved.skills[0]?.path).toBe(hotSkill);
+    expect(resolved.skills[0]?.path).toBe(join(current, 'skills', 'internal', 'hot-skill', 'SKILL.md'));
   });
 
   it('ignores a stale hot bundle whose registry predates the immutable release', () => {
