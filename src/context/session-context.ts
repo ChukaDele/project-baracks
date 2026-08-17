@@ -3,6 +3,7 @@ import { resolve, join } from 'node:path';
 import { openDb } from '../db/client.js';
 import { listLearningCandidates } from '../learning/candidates.js';
 import { parseCapacityKey } from '../providers/account.js';
+import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { loadPersistedProviderInfos } from '../providers/discovery-store.js';
 import { getProjectPolicy } from '../supervisor/policy.js';
 import { formatResourceTelemetry, resourceSnapshot } from '../supervisor/resources.js';
@@ -304,6 +305,7 @@ policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} o
 foreground authority: ${foregroundAuthority}
 active goal: ${activeGoalSummary(project.project, project.repoPath)}
 current worker capacity: ${currentWorkerCapacity()}
+${formatCodexCapacityOverview(readCodexUsageReport())}
 
 ACTIVE GOAL STATE
 ${supervisorSnapshot(project.project)}

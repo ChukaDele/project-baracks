@@ -16,6 +16,15 @@ import {
   recordBillingObservation,
   setCredentialFingerprint,
 } from './discovery-store.js';
+import {
+  authenticatedCodexAccountLabels,
+  codexUsageReport,
+  formatCodexUsage,
+  redactCodexUsageText,
+  writeCodexUsageReport,
+  type CodexUsageAccount,
+} from './codex-usage.js';
+import { readApprovedCodexProfileUsage } from './codex-profile-reader.js';
 import { classifyModel, loadModelRegistry } from './registry.js';
 
 const ATTESTABLE_PROVIDERS = Object.freeze({
@@ -220,6 +229,8 @@ const PROVIDER_HELP = `Usage: major provider <command> [options]
 
 Commands:
   status                                             list persisted provider/model state
+  usage [--json]                                     read current capacity from existing Codex accounts;
+                                                      persists a masked snapshot for status/session attach
   connect <name> [--yes|--no] [--relogin]             onboard a provider: reuse a host login if one exists and is
                                                       version-compatible, else fall back to native sign-in
                                                       (--provider <name> also accepted; --relogin re-authenticates
@@ -260,6 +271,34 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     } finally {
       opened.sqlite.close();
     }
+    return true;
+  }
+  if (args[1] === 'usage') {
+    const approved = await readApprovedCodexProfileUsage();
+    if (approved) {
+      writeCodexUsageReport(approved);
+      if (args.includes('--json')) console.log(JSON.stringify(approved, null, 2));
+      else console.log(formatCodexUsage(approved));
+      return true;
+    }
+    const opened = openDb();
+    let labels: string[] = [];
+    try {
+      labels = authenticatedCodexAccountLabels(loadPersistedProviderInfos(opened.db));
+    } finally {
+      opened.sqlite.close();
+    }
+    let accounts: CodexUsageAccount[];
+    try {
+      accounts = labels.length === 0 ? [] : await majorExecutionBackend().readCodexUsage(labels);
+    } catch (error) {
+      const detail = redactCodexUsageText(error instanceof Error ? error.message : String(error));
+      accounts = labels.map((accountLabel) => ({ accountLabel, error: detail }));
+    }
+    const report = codexUsageReport(accounts);
+    writeCodexUsageReport(report);
+    if (args.includes('--json')) console.log(JSON.stringify(report, null, 2));
+    else console.log(formatCodexUsage(report));
     return true;
   }
   if (args[1] === 'connect') {

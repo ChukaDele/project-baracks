@@ -18,10 +18,13 @@ import {
 } from '../src/providers/discovery-store.js';
 
 /**
- * Integration tests against the COMPILED CLI (`dist/cli/index.js`, built in
- * beforeAll): exit codes, versioned JSON output, existence checks, and refusal
- * semantics. Running the compiled artifact — not `src` via tsx — is what makes
- * "compiled-CLI coverage" an accurate claim.
+ * Integration tests against the COMPILED CLI (built in beforeAll).
+ *
+ * `majorEnv` targets the inner Commander surface (`dist/cli/index.js`).
+ * Supervisor, session, and provider-lifecycle commands are reached only
+ * through `dist/entry.js` — the package `bin` — so those contracts use
+ * `entryEnv`. Running the compiled artifact, not `src` via tsx, is what
+ * makes "compiled-CLI coverage" an accurate claim.
  */
 
 const ROOT = join(import.meta.dirname, '..');
@@ -45,9 +48,9 @@ const storageHome = mkdtempSync(join(tmpdir(), 'major-cli-home-'));
 process.env.MAJOR_HOME = storageHome;
 afterAll(() => rmSync(storageHome, { recursive: true, force: true }));
 
-function majorEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
+function compiledCli(bin: string, env: NodeJS.ProcessEnv, args: string[]): CliResult {
   try {
-    const stdout = execFileSync(process.execPath, [CLI, ...args], {
+    const stdout = execFileSync(process.execPath, [bin, ...args], {
       cwd: ROOT,
       encoding: 'utf8',
       env,
@@ -59,6 +62,14 @@ function majorEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
     const e = error as { status?: number; stdout?: string; stderr?: string };
     return { status: e.status ?? -1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
   }
+}
+
+function majorEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
+  return compiledCli(CLI, env, args);
+}
+
+function entryEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
+  return compiledCli(ENTRY, env, args);
 }
 
 function major(...args: string[]): CliResult {
@@ -105,6 +116,7 @@ beforeAll(() => {
     timeout: 300_000,
   });
   if (!existsSync(CLI)) throw new Error(`compiled CLI not found after build: ${CLI}`);
+  if (!existsSync(ENTRY)) throw new Error(`compiled entrypoint not found after build: ${ENTRY}`);
 
   const scratch = mkdtempSync(join(tmpdir(), 'major-cli-'));
   dbPath = join(scratch, 'major.db');
@@ -633,29 +645,10 @@ describe('major CLI', () => {
     };
     mkdirSync(join(scratch, 'empty-bin'), { recursive: true });
 
-    // `session attach` and `hosts` are both reached only through entry.js's
-    // fallthrough chain (session-context, then supervisor CLI, then
-    // cli/index.js) -- not the inner Commander CLI majorEnv() targets.
-    function entry(...args: string[]): CliResult {
-      try {
-        const stdout = execFileSync(process.execPath, [ENTRY, ...args], {
-          cwd: ROOT,
-          encoding: 'utf8',
-          env,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          timeout: 60_000,
-        });
-        return { status: 0, stdout, stderr: '' };
-      } catch (error) {
-        const e = error as { status?: number; stdout?: string; stderr?: string };
-        return { status: e.status ?? -1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
-      }
-    }
-
-    const attach = entry('session', 'attach', '--host', 'claude', '--cwd', repoDir);
+    const attach = entryEnv(env, 'session', 'attach', '--host', 'claude', '--cwd', repoDir);
     expect(attach.status).toBe(0);
 
-    const result = entry('hosts', '--json');
+    const result = entryEnv(env, 'hosts', '--json');
     expect(result.status).toBe(0);
     const parsed = JSON.parse(result.stdout) as {
       data: {
@@ -686,9 +679,123 @@ describe('major CLI', () => {
       expect(row.project).toBeUndefined();
     }
 
-    const human = entry('hosts');
+    const human = entryEnv(env, 'hosts');
     expect(human.status).toBe(0);
     expect(human.stdout).toContain('MAJOR HOSTS');
     expect(human.stdout).toContain('major provider status');
+  });
+
+  it('compiled entrypoint status and session attach render persisted two-account Codex capacity', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'major-entry-codex-'));
+    const home = join(scratch, 'major-home');
+    const repo = join(scratch, 'project-baracks');
+    mkdirSync(home, { recursive: true });
+    mkdirSync(join(repo, '.git'), { recursive: true });
+    writeFileSync(
+      join(repo, '.git', 'config'),
+      '[remote "origin"]\n\turl = https://github.com/chukadele/project-baracks.git\n',
+    );
+    writeFileSync(
+      join(home, 'codex-usage.json'),
+      `${JSON.stringify(
+        {
+          fetchedAt: '2026-08-17T18:00:00.000Z',
+          methods: ['account/read', 'account/rateLimits/read'],
+          accounts: [
+            {
+              accountLabel: 'default',
+              planType: 'plus',
+              primary: { usedPercent: 42, windowDurationMins: 300 },
+              secondary: { usedPercent: 18, windowDurationMins: 10_080 },
+            },
+            {
+              accountLabel: 'work-b',
+              planType: 'plus',
+              primary: { usedPercent: 91, windowDurationMins: 300 },
+              secondary: { usedPercent: 8, windowDurationMins: 10_080 },
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const env = {
+      ...process.env,
+      HOME: join(scratch, 'user'),
+      MAJOR_HOME: home,
+      MAJOR_DB_PATH: join(scratch, 'major.db'),
+      MAJOR_STATE_PATH: join(scratch, 'supervisor-state.json'),
+      MAJOR_POLICY_PATH: join(scratch, 'policies.json'),
+      MAJOR_RESOURCE_PATH: join(scratch, 'resources.json'),
+    };
+    try {
+      const status = entryEnv(env, 'status');
+      expect(status.status, status.stderr).toBe(0);
+      expect(status.stdout).toContain('MAJOR: ACTIVE');
+      expect(status.stdout).toContain('Codex capacity:');
+      expect(status.stdout).toMatch(/default\s+plus\s+5h \[####\.{6}\] 42%/);
+      expect(status.stdout).toMatch(/work-b\s+plus\s+5h \[#{9}\.\] 91%/);
+      expect(status.stdout).toContain('live via account/read + account/rateLimits/read');
+      expect(status.stdout).toContain('refresh: major provider usage');
+      expect(status.stdout).not.toContain('no live snapshot');
+      for (const line of status.stdout.split('\n')) {
+        if (
+          line.includes('Codex capacity') ||
+          line.includes('[#') ||
+          line.includes('refresh: major provider usage')
+        ) {
+          expect(line.length, line).toBeLessThanOrEqual(80);
+        }
+      }
+
+      const attach = entryEnv(env, 'session', 'attach', '--host', 'codex', '--cwd', repo);
+      expect(attach.status, attach.stderr).toBe(0);
+      expect(attach.stdout).toContain('Codex capacity:');
+      expect(attach.stdout).toMatch(/default\s+plus\s+5h \[####\.{6}\] 42%/);
+      expect(attach.stdout).toMatch(/work-b\s+plus\s+5h \[#{9}\.\] 91%/);
+      expect(attach.stdout).toContain('refresh: major provider usage');
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('compiled entrypoint provider usage refreshes the snapshot that status rereads', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'major-entry-usage-'));
+    const home = join(scratch, 'major-home');
+    mkdirSync(home, { recursive: true });
+    const env = {
+      ...process.env,
+      HOME: join(scratch, 'user'),
+      MAJOR_HOME: home,
+      MAJOR_DB_PATH: join(scratch, 'major.db'),
+      MAJOR_STATE_PATH: join(scratch, 'supervisor-state.json'),
+      MAJOR_POLICY_PATH: join(scratch, 'policies.json'),
+      MAJOR_RESOURCE_PATH: join(scratch, 'resources.json'),
+    };
+    try {
+      const before = entryEnv(env, 'status');
+      expect(before.status, before.stderr).toBe(0);
+      expect(before.stdout).toContain('no live snapshot — run `major provider usage`');
+
+      const help = entryEnv(env, 'provider');
+      expect(help.status, help.stderr).toBe(0);
+      expect(help.stdout).toMatch(/usage \[--json\]/);
+
+      const usage = entryEnv(env, 'provider', 'usage');
+      expect(usage.status, usage.stderr).toBe(0);
+      expect(usage.stderr).not.toMatch(/unknown provider subcommand/);
+      expect(usage.stdout).toContain('CODEX CAPACITY');
+      expect(usage.stdout).toContain('No authenticated Codex accounts');
+      expect(existsSync(join(home, 'codex-usage.json'))).toBe(true);
+
+      const after = entryEnv(env, 'status');
+      expect(after.status, after.stderr).toBe(0);
+      expect(after.stdout).toContain('No authenticated Codex accounts');
+      expect(after.stdout).toContain('refresh: major provider usage');
+      expect(after.stdout).not.toContain('no live snapshot');
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });

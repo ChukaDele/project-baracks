@@ -37,6 +37,12 @@ import {
 } from '../providers/discovery-store.js';
 import type { ProviderInfo } from '../providers/types.js';
 import { route } from '../routing/router.js';
+import {
+  compareSubscriptionAccounts,
+  contextContinuity,
+  lastCapacityKey,
+  subscriptionAccountPool,
+} from '../routing/subscription-accounts.js';
 import { resolveSkills } from '../skills/resolver.js';
 import { observeSuccessfulWorkflow, recordSkillOutcome } from '../skills/lifecycle.js';
 import {
@@ -58,6 +64,7 @@ import {
 import { reconcileAfterCancel } from '../resources/reconcile.js';
 import { computeProviderReadiness } from '../doctor/readiness.js';
 import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integration.js';
+import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
 import { completedWorkflow, parseWorkerReport } from './worker-report.js';
 
@@ -135,10 +142,8 @@ export type CoordinatorSelection =
       provider: string;
       /** Which authenticated account/profile of the provider this is, when
        * more than one is configured. 'default' when only one exists.
-       * NOT YET used to select distinct execution credentials below this
-       * point — runWorker() dispatches by `host` alone, so every account of
-       * a provider currently runs through the same canonical CLI login.
-       * This field only distinguishes capacity/availability bookkeeping. */
+       * Passed through to runWorker and the Lima credential broker so a
+       * named Codex account uses its own isolated auth slot. */
       accountLabel: string;
       modelRef: string;
       reason: string;
@@ -169,24 +174,30 @@ export function selectCoordinator(
   providers: ProviderInfo[],
 ): CoordinatorSelection {
   const preferred = HOST_PROVIDERS[goal.preferredCoordinator];
-  const baseName = (providerKey: string) => parseCapacityKey(providerKey).providerName;
-  const ordered = [...providers].sort((left, right) => {
-    const leftPreferred = baseName(left.name) === preferred;
-    const rightPreferred = baseName(right.name) === preferred;
-    if (leftPreferred && !rightPreferred) return -1;
-    if (rightPreferred && !leftPreferred) return 1;
-    return left.name.localeCompare(right.name);
+  const stickyKey = lastCapacityKey({
+    preferredCoordinator: goal.preferredCoordinator,
+    hostProviders: HOST_PROVIDERS,
+    ...(goal.lastCoordinator ? { lastCoordinator: goal.lastCoordinator } : {}),
+    ...(goal.lastAccountLabel ? { lastAccountLabel: goal.lastAccountLabel } : {}),
   });
-  const failedProvider =
-    goal.consecutiveFailures >= 2 && goal.lastCoordinator
-      ? HOST_PROVIDERS[goal.lastCoordinator]
-      : undefined;
-  const alternatives = failedProvider
-    ? ordered.filter((provider) => baseName(provider.name) !== failedProvider)
-    : ordered;
-  let decision = route({ purpose: 'analysis', complexity: 'architectural' }, alternatives);
-  if (decision.kind === 'checkpoint' && alternatives.length !== ordered.length) {
-    decision = route({ purpose: 'analysis', complexity: 'architectural' }, ordered);
+  const pooled = subscriptionAccountPool({
+    providers,
+    consecutiveFailures: goal.consecutiveFailures,
+    ...(stickyKey ? { lastCapacityKey: stickyKey } : {}),
+  });
+  const ordered = [...pooled.providers].sort((left, right) =>
+    compareSubscriptionAccounts(left, right, preferred),
+  );
+  let decision = route({ purpose: 'analysis', complexity: 'architectural' }, ordered);
+  // Work-failure rotation may exclude the last key while another provider
+  // remains. Quota rotation must not fall back to the full list: that is the
+  // Codex failover bug (hopping to Claude and dropping vendor session/history).
+  if (
+    decision.kind === 'checkpoint' &&
+    pooled.reason?.startsWith('work-failure rotation') &&
+    pooled.providers.length !== providers.length
+  ) {
+    decision = route({ purpose: 'analysis', complexity: 'architectural' }, providers);
   }
   if (decision.kind === 'checkpoint') return decision;
   const parsed = parseCapacityKey(decision.provider);
@@ -198,7 +209,7 @@ export function selectCoordinator(
     provider: decision.provider,
     accountLabel: parsed.accountLabel,
     modelRef: decision.modelRef,
-    reason: decision.reason,
+    reason: pooled.reason ? `${pooled.reason}; ${decision.reason}` : decision.reason,
   };
 }
 
@@ -372,6 +383,7 @@ function trustContract(policy: ProjectPolicy): string {
 export function coordinatorPrompt(
   goal: SupervisorGoal,
   capabilities: readonly CapabilityRecord[] = [],
+  hop?: { accountLabel: string; continuityBlock: string },
 ): string {
   const context = readProjectContext(goal.repoPath);
   const learningContext = readLearningContext(goal.project, goal.repoPath);
@@ -421,6 +433,8 @@ ${
 Use only these already-validated capabilities for the operations they declare. Do not install, configure, or substitute a new capability. Report capability-specific evidence in the final result when you use one. A completed goal alone is not proof that a capability was used.
 Use this exact optional field for that evidence:
 "capabilityUse":[{"key":"capability-key","evidence":"specific operation and observed result"}].
+
+${formatCodexCapacityOverview(readCodexUsageReport())}
 
 Before any substantive mutation, verify that the current Git root/remote and the task's named or implied target agree with this canonical target. If the task clearly belongs to another known project, do not patch this repository. Use project-context-integrity and reroute to the correct repository when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong repository is a failed task.
 
@@ -473,6 +487,7 @@ ${skillContext}
 
 CURRENT PROJECT CONTEXT:
 ${context || '(No canonical project context files found. Inspect the repository directly.)'}
+${hop ? `\n${hop.continuityBlock}\nActive subscription account: ${hop.accountLabel}\n` : ''}
 `;
 }
 
@@ -733,18 +748,32 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     lastStartedAt: new Date().toISOString(),
     activePid: process.pid,
     lastCoordinator: host,
+    lastAccountLabel: selection.accountLabel,
     pendingCompletion: undefined,
   });
 
+  const continuity = contextContinuity({
+    nextHost: host,
+    nextAccountLabel: selection.accountLabel,
+    ...(goal.lastCoordinator ? { lastCoordinator: goal.lastCoordinator } : {}),
+    ...(goal.lastAccountLabel ? { lastAccountLabel: goal.lastAccountLabel } : {}),
+    ...(goal.lastSessionRef ? { lastSessionRef: goal.lastSessionRef } : {}),
+    ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
+  });
   const outcome = await runWorker({
     host,
-    prompt: coordinatorPrompt(goal, capabilityResolution.capabilities),
+    prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
+      accountLabel: selection.accountLabel,
+      continuityBlock: continuity.promptBlock,
+    }),
     cwd: goal.repoPath,
     // Clamped to whatever foreground continuation budget remains, so a
     // rotation across several exhausted providers cannot stack multiple
     // full maxRunMinutes allowances into a much longer total wall-clock.
     timeoutMs: Math.min(Math.max(1, policy.maxRunMinutes) * 60 * 1000, maxTimeoutMs ?? Infinity),
     modelRef: selection.modelRef,
+    accountLabel: selection.accountLabel,
+    ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
   try {
     recordSkillOutcome({
@@ -818,6 +847,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         ownerGate: report.ownerGate,
         pendingCompletion: undefined,
         retryImmediately: false,
+        lastSessionRef: outcome.sessionRef,
       });
       return;
     }
@@ -832,6 +862,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         nextRunAt: undefined,
         pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
         retryImmediately: false,
+        lastSessionRef: outcome.sessionRef,
       });
       return;
     }
@@ -846,6 +877,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
       pendingCompletion: undefined,
       retryImmediately: false,
+      lastSessionRef: outcome.sessionRef,
     });
   } else {
     const patch = nonSuccessCyclePatch({
@@ -862,7 +894,10 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       consecutiveFailures: patch.consecutiveFailures,
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
-      lastSummary: patch.lastSummary,
+      lastSummary:
+        patch.retryImmediately && after.lastSummary
+          ? trim(`${after.lastSummary}\n${patch.lastSummary}`)
+          : patch.lastSummary,
       nextRunAt: new Date(Date.now() + patch.nextRunDelayMs).toISOString(),
       pendingCompletion: undefined,
       retryImmediately: patch.retryImmediately,
@@ -1038,8 +1073,9 @@ export function supervisorSnapshot(project?: string): string {
 /**
  * Header block for `major status`: kill-switch state, per-host Major
  * integration (rules/hook installed -- distinct from whether that host's own
- * CLI is present, which `major hosts` covers), execution-provider health, and
- * fallback capacity. DB-only; never spawns or probes a live provider.
+ * CLI is present, which `major hosts` covers), execution-provider health,
+ * fallback capacity, and last persisted Codex capacity. DB/snapshot-only;
+ * never spawns or probes a live provider. Refresh is `major provider usage`.
  */
 export function majorStatusOverview(): string {
   const opened = openDb();
@@ -1074,5 +1110,6 @@ export function majorStatusOverview(): string {
     `Hosts:                ${hostsLine}`,
     `Execution providers:  ${providersLine}`,
     `Fallback capacity:    ${healthy.length} healthy provider${healthy.length === 1 ? '' : 's'}`,
+    formatCodexCapacityOverview(readCodexUsageReport()),
   ].join('\n');
 }

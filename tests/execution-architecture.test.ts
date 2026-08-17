@@ -65,6 +65,36 @@ describe('single execution boundary', () => {
     expect(packageJson.exports).toBeUndefined();
   });
 
+  it('keeps Codex usage polling off routing and auth mutation paths', () => {
+    const root = resolve(import.meta.dirname, '..');
+    const usage = readFileSync(join(root, 'src', 'providers', 'codex-usage.ts'), 'utf8');
+    const appServer = readFileSync(join(root, 'src', 'providers', 'codex-app-server.ts'), 'utf8');
+    const lima = readFileSync(join(root, 'src', 'execution', 'lima-backend.ts'), 'utf8');
+    expect(usage).not.toContain('routing/');
+    expect(usage).not.toContain('persistProviderDiscovery');
+    expect(usage).not.toContain('importProviderCredential');
+    expect(appServer).not.toContain('node:child_process');
+    expect(appServer).not.toContain('routing/');
+    expect(appServer).toContain('refreshToken: false');
+    expect(appServer).toContain("'account/read'");
+    expect(appServer).toContain("'account/rateLimits/read'");
+    expect(appServer).toContain('CODEX_APP_SERVER_READY_DELAY_MS');
+    expect(lima).toContain('CODEX_APP_SERVER_READY_DELAY_MS');
+    expect(lima).toContain('readCodexUsage');
+    const status = readFileSync(join(root, 'src', 'supervisor', 'runtime.ts'), 'utf8');
+    const session = readFileSync(join(root, 'src', 'context', 'session-context.ts'), 'utf8');
+    const backend = readFileSync(join(root, 'src', 'execution', 'backend.ts'), 'utf8');
+    expect(status).toContain('readCodexUsageReport');
+    expect(status).toContain('formatCodexCapacityOverview');
+    expect(status).toContain('${formatCodexCapacityOverview(readCodexUsageReport())}');
+    expect(status).not.toContain('readCodexUsage(');
+    expect(session).toContain('readCodexUsageReport');
+    expect(session).not.toContain('readCodexUsage(');
+    expect(session).not.toContain('persistProviderDiscovery');
+    expect(backend).toContain('readCodexUsage');
+    expect(backend).not.toContain('persistProviderDiscovery');
+  });
+
   it('does not convert PATH discovery into trust or expose the immutable runtime as writable', () => {
     const root = resolve(import.meta.dirname, '..');
     const gateway = readFileSync(join(root, 'src', 'security', 'major-gateway.ts'), 'utf8');

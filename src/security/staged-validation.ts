@@ -168,6 +168,7 @@ export function stagedValidationRequestDigest(request: StagedValidationRequestSh
       allowGuestMutation: intent.allowGuestMutation,
       modelRef: intent.modelRef ?? null,
       resumeSessionRefHash: intent.resumeSessionRef ? sha256(intent.resumeSessionRef) : null,
+      accountLabel: intent.accountLabel ?? 'default',
       approvalAuthority: intent.approvalAuthority,
     }),
   );

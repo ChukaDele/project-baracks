@@ -1,8 +1,9 @@
-import { appendFileSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import type { Readable, Writable } from 'node:stream';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
 import { providerWorkshopArgs } from '../providers/commands.js';
 import { assertCapabilityAvailable, isCapabilityAvailable } from './capabilities.js';
@@ -140,6 +141,43 @@ export function trustedExecutableRegistry(executable: string): TrustedExecutable
   }
   registry.pin(pinnedPath);
   return registry;
+}
+
+/**
+ * Starts the pinned local Codex App Server for a read-only account snapshot.
+ * The caller supplies a temporary CODEX_HOME containing only a symlink to an
+ * approved existing auth.json. This gateway is the sole host-process boundary
+ * for profile usage reads.
+ */
+export function spawnReadOnlyCodexAppServer(codexHome: string): {
+  stdin: Writable;
+  stdout: Readable;
+  stop(): void;
+} {
+  const expected = join(homedir(), '.codex', 'plugins', '.plugin-appserver', 'codex');
+  const resolvedHome = resolve(codexHome);
+  if (!resolvedHome.startsWith(resolve(tmpdir(), 'major-codex-read-'))) {
+    throw new Error('Codex usage read requires a Major-owned temporary home');
+  }
+  if (!existsSync(expected)) throw new Error('pinned Codex App Server is unavailable');
+  const child = spawn(expected, ['app-server'], {
+    env: { ...process.env, CODEX_HOME: resolvedHome },
+    stdio: ['pipe', 'pipe', 'pipe'],
+    shell: false,
+  });
+  if (!child.stdin || !child.stdout) throw new Error('Codex App Server transport is unavailable');
+  return {
+    stdin: child.stdin,
+    stdout: child.stdout,
+    stop: () => {
+      try {
+        child.stdin?.end();
+        child.kill('SIGTERM');
+      } catch {
+        // Process already exited.
+      }
+    },
+  };
 }
 
 /** Production adapter for the single canonical execution gateway. */

@@ -1,5 +1,6 @@
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
 import type { ProviderCommandHost } from '../providers/commands.js';
+import type { CodexUsageAccount } from '../providers/codex-usage.js';
 import type { VerifiedProviderApprovalAuthority } from '../security/provider-approval-policy.js';
 import type { BackendExecutionAuthority } from '../security/staged-validation.js';
 
@@ -14,6 +15,8 @@ export interface BackendProviderRequest {
   workshopMode?: boolean;
   modelRef?: string;
   resumeSessionRef?: string;
+  /** Named subscription account for this host. Omitted means the default account. */
+  accountLabel?: string;
 }
 
 export interface BackendExecuteRequest {
@@ -60,5 +63,7 @@ export interface ExecutionBackend {
   readonly kind: string;
   inspect(): Promise<BackendStatus>;
   probeProvider(executable: string): Promise<BackendProviderStatus>;
+  /** Read-only Codex quota snapshot. Must not mutate routing or credentials. */
+  readCodexUsage(accountLabels: readonly string[]): Promise<CodexUsageAccount[]>;
   execute(request: BackendExecuteRequest): ExecuteHandle;
 }

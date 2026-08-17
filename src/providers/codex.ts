@@ -76,6 +76,7 @@ export class CodexProvider implements ProviderAdapter {
         approvalAuthority: { decisions: [] },
         ...(request.modelRef ? { modelRef: request.modelRef } : {}),
         ...(request.resumeSessionRef ? { resumeSessionRef: request.resumeSessionRef } : {}),
+        ...(request.accountLabel ? { accountLabel: request.accountLabel } : {}),
       },
       detectRateLimit: (text) => RATE_LIMIT_PATTERN.test(text),
       detectExhaustion: (text) => EXHAUSTION_PATTERN.test(text),
