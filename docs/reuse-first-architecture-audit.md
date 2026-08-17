@@ -194,3 +194,20 @@ dependency.
 - Clean installation provisions and health-checks `major-worker` before user
   state activation. Provisioning is idempotent. A failure deletes only a worker
   created by that installation and never deletes a pre-existing worker.
+
+## 2026-08-17 consolidation refresh
+
+The original 2026-08-12 matrix is unchanged. This refresh records layers that
+audit did not cover, plus a re-check of the conclusions that still hold.
+
+Newly covered: goose, OpenHands, OpenCode, Aider, Subrouter, the ACP
+ecosystem's maturation, goal and session persistence, workflow orchestration,
+install/update/rollback, diagnostics and support bundle, memory, skills and
+Toolsmith.
+
+Per-capability decisions now live in `docs/prior-art-decisions.md`. The
+provider-runtime and sandbox conclusions were re-checked and still hold.
+
+Current dependency surface, as evidence of a reuse-first posture: 5 runtime
+dependencies (`@agentclientprotocol/sdk`, `better-sqlite3`, `commander`,
+`drizzle-orm`, `zod`) across about 21,000 lines of TypeScript.

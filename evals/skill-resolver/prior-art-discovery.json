@@ -1,0 +1,18 @@
+{
+  "skill": "prior-art-discovery",
+  "should_trigger": [
+    "Implement a new agent runtime sandbox with MCP integration.",
+    "Add a new provider integration and installation system.",
+    "Design a workflow engine and memory mechanism for the deployment system.",
+    "Build a new scraper and auth system as a major dependency."
+  ],
+  "should_not_trigger": [
+    "Fix a CSS spacing issue.",
+    "Add a filter to the existing billing table.",
+    "Rename this local helper function.",
+    "Update copy on the settings page."
+  ],
+  "conflicts": [
+    "prior-art-discovery is the stronger triggered infrastructure gate; open-source-leverage stays as the lighter commodity-build check."
+  ]
+}

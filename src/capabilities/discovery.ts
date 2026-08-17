@@ -5,6 +5,17 @@ export interface DiscoveredCapability {
   candidate: CapabilityCandidate;
 }
 
+/** Compact instruction for a Toolsmith checkpoint with no local candidate. */
+export function priorArtDiscoveryDirective(operation: string): string {
+  return (
+    `Before building ${operation}, run prior-art discovery in order ` +
+    '(DEFINE CAPABILITY -> CHECK EXISTING MAJOR -> CHECK GBRAIN/SKILLS -> ' +
+    'CHECK OFFICIAL PROVIDER TOOLS -> CHECK MCP/ACP ECOSYSTEM -> CHECK MATURE OSS -> ' +
+    'CHECK PACKAGE ECOSYSTEM -> COMPARE -> DECIDE) and record the decision in ' +
+    'docs/prior-art-decisions.md before building.'
+  );
+}
+
 /**
  * Bounded, process-free discovery. This is deliberately a catalogue, not
  * package search: it can return only an existing Major read-only adapter.
