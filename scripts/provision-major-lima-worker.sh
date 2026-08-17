@@ -11,6 +11,93 @@ AUTH_SOURCE_STARTED=0
 AUTH_SOURCE_INSTANCE="${MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE:-major-worker}"
 AUTH_SOURCE_SHA="${MAJOR_PROVIDER_AUTH_SOURCE_SHA:-}"
 
+# A previous-release worker used only as a credential source is not part of
+# release integrity: its Lima transport can be unhealthy (e.g. a broken vsock
+# forwarder retrying accept() in a tight, unbounded loop) independently of
+# whether the worker itself is "Running". Every call touching that worker
+# during migration is bounded, single-attempt (no hot retry), and has its
+# stdout+stderr fully redirected to files instead of this script's own
+# inherited descriptors.
+#
+# Redirecting stdout too (not just stderr) is required, not cosmetic: `limactl
+# start`/`shell` can leave an orphaned grandchild running past the point where
+# the tracked PID is killed (killing a process never kills its own children).
+# If that orphan still held a reference to this script's inherited stdout, an
+# EOF-waiting caller -- including a parent installer or a test harness reading
+# this script's output through a pipe -- would hang forever waiting for a
+# pipe close that an orphan neither triggers nor is capable of triggering.
+# Funneling everything through plain files, which no lingering process needs
+# to close for others to see EOF, sidesteps that regardless of what a broken
+# Lima transport's orphan does after being cut loose.
+AUTH_MIGRATION_LOG="$(mktemp "${TMPDIR:-/tmp}/major-auth-migration-log.XXXXXX")"
+AUTH_CALL_STDOUT="$(mktemp "${TMPDIR:-/tmp}/major-auth-call-stdout.XXXXXX")"
+AUTH_SOURCE_START_TIMEOUT_SECS="${MAJOR_AUTH_SOURCE_START_TIMEOUT_SECS:-60}"
+AUTH_SOURCE_CALL_TIMEOUT_SECS="${MAJOR_AUTH_SOURCE_CALL_TIMEOUT_SECS:-30}"
+BOUNDED_PID=""
+
+# Runs "$@" with a hard deadline. stdout is captured to $AUTH_CALL_STDOUT
+# (read it back with `cat "$AUTH_CALL_STDOUT"` when the caller needs the
+# value) and stderr is appended to $AUTH_MIGRATION_LOG. Exit 124 means
+# "timed out"; any other non-zero code is the command's own failure. Single
+# attempt only -- never retries.
+run_bounded() {
+  local timeout_secs="$1"
+  shift
+  : >"$AUTH_CALL_STDOUT"
+  "$@" >"$AUTH_CALL_STDOUT" 2>>"$AUTH_MIGRATION_LOG" &
+  BOUNDED_PID=$!
+  local pid=$BOUNDED_PID
+  # Polled in tenths of a second so a call that finishes in milliseconds
+  # (the overwhelmingly common case) doesn't pay a whole extra second of
+  # dead latency just because the first liveness check always sees the
+  # freshly-backgrounded process as still alive.
+  local waited_tenths=0
+  local limit_tenths=$((timeout_secs * 10))
+  while kill -0 "$pid" 2>/dev/null; do
+    if [[ $waited_tenths -ge $limit_tenths ]]; then
+      kill -TERM "$pid" 2>/dev/null || true
+      sleep 2
+      kill -KILL "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      BOUNDED_PID=""
+      echo "[run_bounded] timed out after ${timeout_secs}s: $*" >>"$AUTH_MIGRATION_LOG"
+      return 124
+    fi
+    sleep 0.1
+    waited_tenths=$((waited_tenths + 1))
+  done
+  local code=0
+  wait "$pid" || code=$?
+  BOUNDED_PID=""
+  return "$code"
+}
+
+# On Ctrl+C (or a signal from an owning process) mid-migration, kill any
+# in-flight bounded Lima call before the existing EXIT trap runs -- otherwise
+# that call's background process would survive as an orphan.
+on_interrupt() {
+  if [[ -n "$BOUNDED_PID" ]] && kill -0 "$BOUNDED_PID" 2>/dev/null; then
+    kill -TERM "$BOUNDED_PID" 2>/dev/null || true
+    sleep 1
+    kill -KILL "$BOUNDED_PID" 2>/dev/null || true
+    wait "$BOUNDED_PID" 2>/dev/null || true
+  fi
+  exit 130
+}
+trap on_interrupt INT TERM
+
+auth_migration_failed() {
+  local cause="$1"
+  echo "ERROR: previous Major worker failed to provide credentials for migration." >&2
+  echo "Worker: $AUTH_SOURCE_INSTANCE" >&2
+  echo "Cause: $cause" >&2
+  echo "Existing release was not changed." >&2
+  echo "Diagnostic log: $AUTH_MIGRATION_LOG" >&2
+  echo "--- last 20 diagnostic lines ---" >&2
+  tail -n 20 "$AUTH_MIGRATION_LOG" >&2 || true
+  echo "After a successful install, reconnect any provider with: major provider connect <provider>" >&2
+}
+
 case "$INSTANCE" in
   major-worker|major-worker-[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]) ;;
   *) echo "ERROR: unsupported Major Lima instance: $INSTANCE" >&2; exit 2 ;;
@@ -80,7 +167,8 @@ migrate_existing_auth() {
   [[ "$INSTANCE" == major-worker ]] && return 0
   local source_status provider relative authority_root workshop_authorized
   authority_root="${MAJOR_HOME:-$HOME/.major}/staged-validation/authorities/$RELEASE_SHA"
-  source_status="$({ "$LIMACTL_PATH" list --json | python3 -c '
+  check_source_status() {
+    "$LIMACTL_PATH" list --json | python3 -c '
 import json, sys
 name = sys.argv[1]
 status = ""
@@ -89,24 +177,45 @@ for line in sys.stdin:
     row = json.loads(line)
     if row.get("name") == name: status = row.get("status", "")
 print(status)
-' "$AUTH_SOURCE_INSTANCE"; } || true)"
+' "$AUTH_SOURCE_INSTANCE"
+  }
+  # A failed or timed-out status lookup is treated the same as "not found":
+  # nothing to migrate from, fail open rather than block the whole install.
+  run_bounded "$AUTH_SOURCE_CALL_TIMEOUT_SECS" check_source_status || true
+  source_status="$(cat "$AUTH_CALL_STDOUT")"
   [[ -z "$source_status" ]] && return 0
   if [[ "$source_status" == Broken ]]; then
     echo "ERROR: refusing credential migration from broken $AUTH_SOURCE_INSTANCE" >&2
     return 1
   fi
   if [[ "$source_status" != Running ]]; then
-    "$LIMACTL_PATH" start "$AUTH_SOURCE_INSTANCE"
+    # Marked BEFORE attempting the start, not after it succeeds: a start call
+    # that is killed by run_bounded's deadline (or by on_interrupt) may still
+    # have brought the VM up, so restore_auth_source must try to stop it
+    # either way rather than assuming an unconfirmed start never happened.
     AUTH_SOURCE_STARTED=1
+    if ! run_bounded "$AUTH_SOURCE_START_TIMEOUT_SECS" "$LIMACTL_PATH" start "$AUTH_SOURCE_INSTANCE"; then
+      restore_auth_source
+      auth_migration_failed "Lima transport failed while starting $AUTH_SOURCE_INSTANCE (timed out after ${AUTH_SOURCE_START_TIMEOUT_SECS}s or exited abnormally)."
+      return 1
+    fi
   fi
   if [[ -n "$AUTH_SOURCE_SHA" ]]; then
     source_marker="/opt/major/releases/$AUTH_SOURCE_SHA"
-    if ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo test \
-        -f "$source_marker" || \
-      ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo test \
-        ! -L "$source_marker" || \
-      [[ "$("$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo stat \
-        -c '%U:%G:%a' "$source_marker")" != "root:root:444" ]]; then
+    local marker_ok=1 marker_stat
+    run_bounded "$AUTH_SOURCE_CALL_TIMEOUT_SECS" "$LIMACTL_PATH" shell --tty=false \
+      "$AUTH_SOURCE_INSTANCE" sudo test -f "$source_marker" || marker_ok=0
+    if [[ $marker_ok -eq 1 ]]; then
+      run_bounded "$AUTH_SOURCE_CALL_TIMEOUT_SECS" "$LIMACTL_PATH" shell --tty=false \
+        "$AUTH_SOURCE_INSTANCE" sudo test ! -L "$source_marker" || marker_ok=0
+    fi
+    if [[ $marker_ok -eq 1 ]]; then
+      run_bounded "$AUTH_SOURCE_CALL_TIMEOUT_SECS" "$LIMACTL_PATH" shell --tty=false \
+        "$AUTH_SOURCE_INSTANCE" sudo stat -c '%U:%G:%a' "$source_marker" || marker_ok=0
+      marker_stat="$(cat "$AUTH_CALL_STDOUT")"
+      [[ "$marker_stat" == "root:root:444" ]] || marker_ok=0
+    fi
+    if [[ $marker_ok -ne 1 ]]; then
       restore_auth_source
       echo "ERROR: provider-auth source release marker is missing or unsafe" >&2
       return 1
@@ -139,16 +248,33 @@ print(status)
       "$RELEASE_SHA" credential-handoff "$provider" >/dev/null 2>&1; then
       continue
     fi
-    if ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo test \
-        -f "/var/lib/major/provider-auth/$relative" || \
-      ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo test \
-        ! -L "/var/lib/major/provider-auth/$relative"; then
+    local exists_code=0
+    run_bounded "$AUTH_SOURCE_CALL_TIMEOUT_SECS" "$LIMACTL_PATH" shell --tty=false \
+      "$AUTH_SOURCE_INSTANCE" sudo test -f "/var/lib/major/provider-auth/$relative" || exists_code=$?
+    if [[ $exists_code -eq 124 ]]; then
+      restore_auth_source
+      auth_migration_failed "Lima transport failed while checking for the $provider credential on $AUTH_SOURCE_INSTANCE."
+      return 1
+    elif [[ $exists_code -ne 0 ]]; then
       continue
     fi
-    if ! "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo tar \
-        -C /var/lib/major/provider-auth -cf - "$relative" 2>/dev/null | \
+    exists_code=0
+    run_bounded "$AUTH_SOURCE_CALL_TIMEOUT_SECS" "$LIMACTL_PATH" shell --tty=false \
+      "$AUTH_SOURCE_INSTANCE" sudo test ! -L "/var/lib/major/provider-auth/$relative" || exists_code=$?
+    if [[ $exists_code -eq 124 ]]; then
+      restore_auth_source
+      auth_migration_failed "Lima transport failed while checking for the $provider credential on $AUTH_SOURCE_INSTANCE."
+      return 1
+    elif [[ $exists_code -ne 0 ]]; then
+      continue
+    fi
+    stream_credential_tar() {
+      "$LIMACTL_PATH" shell --tty=false "$AUTH_SOURCE_INSTANCE" sudo tar \
+          -C /var/lib/major/provider-auth -cf - "$relative" 2>>"$AUTH_MIGRATION_LOG" | \
         "$LIMACTL_PATH" shell --tty=false "$INSTANCE" sudo tar \
-          -C /var/lib/major/provider-auth -xf -; then
+          -C /var/lib/major/provider-auth -xf -
+    }
+    if ! run_bounded "$AUTH_SOURCE_CALL_TIMEOUT_SECS" stream_credential_tar; then
       restore_auth_source
       echo "ERROR: exact $provider credential migration failed" >&2
       return 1
@@ -174,8 +300,11 @@ print(status)
 
 restore_auth_source() {
   if [[ $AUTH_SOURCE_STARTED -eq 1 ]]; then
-    if ! "$LIMACTL_PATH" stop "$AUTH_SOURCE_INSTANCE" >/dev/null 2>&1; then
+    # Bounded for the same reason every other auth-source call is: a broken
+    # transport can make `stop` itself hang or spew exactly like `start` did.
+    if ! run_bounded "$AUTH_SOURCE_CALL_TIMEOUT_SECS" "$LIMACTL_PATH" stop "$AUTH_SOURCE_INSTANCE"; then
       echo "CRITICAL: failed to restore provider-auth source $AUTH_SOURCE_INSTANCE to Stopped" >&2
+      echo "Diagnostic log: $AUTH_MIGRATION_LOG" >&2
       return 1
     fi
     AUTH_SOURCE_STARTED=0

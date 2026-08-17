@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const roots: string[] = [];
@@ -29,7 +29,24 @@ case "$1" in
     fi
   fi ;;
   create) printf 'Stopped' > "$state" ;;
-  start) [ "\${2:-}" = "$source_instance" ] || printf 'Running' > "$state" ;;
+  start)
+    if [ "\${2:-}" = "$source_instance" ]; then
+      if [ "\${MAJOR_FAKE_LIMA_SOURCE_START_FAILS:-0}" = 1 ]; then
+        exit 7
+      fi
+      if [ "\${MAJOR_FAKE_LIMA_SOURCE_START_HANGS:-0}" = 1 ]; then
+        if [ "\${MAJOR_FAKE_LIMA_SOURCE_START_SPEWS:-0}" = 1 ]; then
+          while true; do
+            echo '[hostagent] vsock forwarder accept error: accept tcp 127.0.0.1:0: accept: bad file descriptor' >&2
+          done
+        else
+          sleep 300
+        fi
+      fi
+    else
+      printf 'Running' > "$state"
+    fi
+    ;;
   stop)
     if [ "\${2:-}" = "$source_instance" ]; then
       [ "\${MAJOR_FAKE_LIMA_FAIL_SOURCE_STOP:-0}" = 1 ] && exit 38
@@ -409,6 +426,120 @@ describe('clean-install Lima provisioning', () => {
     expect(log).toMatch(/start major-worker/);
     expect(log.match(/stop major-worker/g)?.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('fails closed with an actionable message when the auth-source worker fails to start immediately', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-source-start-fails-'));
+    roots.push(root);
+    const result = run(
+      root,
+      {
+        MAJOR_FAKE_LIMA_AUTH_SOURCE: '1',
+        MAJOR_FAKE_LIMA_SOURCE_STATUS: 'Stopped',
+        MAJOR_FAKE_LIMA_SOURCE_START_FAILS: '1',
+      },
+      'major-worker-0123456789ab',
+      `0123456789ab${'0'.repeat(28)}`,
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('ERROR: previous Major worker failed to provide credentials');
+    expect(result.stderr).toContain('Worker: major-worker');
+    expect(result.stderr).toContain('Existing release was not changed.');
+    expect(result.stderr).toContain('Diagnostic log:');
+    expect(result.stderr).toContain('major provider connect <provider>');
+    // No orphaned destination worker: it was newly created by this run.
+    expect(() => readFileSync(join(root, 'state'))).toThrow();
+  });
+
+  it('does not hang when the auth-source worker start call never returns, and reports a timeout', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-source-start-hangs-'));
+    roots.push(root);
+    const started = Date.now();
+    const result = run(
+      root,
+      {
+        MAJOR_FAKE_LIMA_AUTH_SOURCE: '1',
+        MAJOR_FAKE_LIMA_SOURCE_STATUS: 'Stopped',
+        MAJOR_FAKE_LIMA_SOURCE_START_HANGS: '1',
+        MAJOR_AUTH_SOURCE_START_TIMEOUT_SECS: '1',
+      },
+      'major-worker-0123456789ab',
+      `0123456789ab${'0'.repeat(28)}`,
+    );
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('ERROR: previous Major worker failed to provide credentials');
+    // A single bounded attempt, not a hot retry loop.
+    const log = readFileSync(join(root, 'log'), 'utf8');
+    expect(log.match(/^start major-worker$/gm)).toHaveLength(1);
+    // The destination worker created by this run is rolled back, not left orphaned.
+    expect(() => readFileSync(join(root, 'state'))).toThrow();
+  }, 15_000);
+
+  it('captures a repeated-stderr auth-source start to the diagnostic log instead of flooding stderr', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-source-start-spews-'));
+    roots.push(root);
+    const result = run(
+      root,
+      {
+        MAJOR_FAKE_LIMA_AUTH_SOURCE: '1',
+        MAJOR_FAKE_LIMA_SOURCE_STATUS: 'Stopped',
+        MAJOR_FAKE_LIMA_SOURCE_START_HANGS: '1',
+        MAJOR_FAKE_LIMA_SOURCE_START_SPEWS: '1',
+        MAJOR_AUTH_SOURCE_START_TIMEOUT_SECS: '1',
+      },
+      'major-worker-0123456789ab',
+      `0123456789ab${'0'.repeat(28)}`,
+    );
+    expect(result.status).not.toBe(0);
+    // The installer's own stderr stays small and actionable...
+    expect(result.stderr.split('\n').length).toBeLessThan(40);
+    expect(result.stderr).toContain('vsock forwarder accept error');
+    // ...while the full spew is preserved on disk for real diagnosis.
+    const logPathMatch = /Diagnostic log: (\S+)/.exec(result.stderr);
+    expect(logPathMatch).not.toBeNull();
+    const diagnosticLog = readFileSync(logPathMatch![1]!, 'utf8');
+    expect(diagnosticLog.match(/vsock forwarder accept error/g)!.length).toBeGreaterThan(20);
+  }, 15_000);
+
+  it('kills the in-flight bounded call and restores the source on SIGTERM during credential migration', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-provision-source-start-sigterm-'));
+    roots.push(root);
+    const limactlPath = fakeLima(root, 'major-worker-0123456789ab');
+    const sha = `0123456789ab${'0'.repeat(28)}`;
+    const child = spawn('bash', [provisioner, limactlPath, 'major-worker-0123456789ab', sha], {
+      env: {
+        ...process.env,
+        MAJOR_FAKE_LIMA_STATE: join(root, 'state'),
+        MAJOR_FAKE_LIMA_LOG: join(root, 'log'),
+        MAJOR_FAKE_LIMA_AUTH_SOURCE: '1',
+        MAJOR_FAKE_LIMA_SOURCE_STATUS: 'Stopped',
+        MAJOR_FAKE_LIMA_SOURCE_START_HANGS: '1',
+        MAJOR_AUTH_SOURCE_START_TIMEOUT_SECS: '60',
+      },
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    const exitPromise = new Promise<number | null>((resolvePromise) => {
+      child.once('exit', (code) => resolvePromise(code));
+    });
+    // Give the script time to reach the hanging `start` call before signalling.
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_000));
+    child.kill('SIGTERM');
+    const code = await exitPromise;
+    expect(code).not.toBe(0);
+    expect(stderr).not.toContain('previous Major worker failed to provide credentials');
+    const log = readFileSync(join(root, 'log'), 'utf8');
+    // The auth source (default-named "major-worker", distinct from the
+    // release-specific destination) was started (attempting migration) and
+    // later stopped again (restored) even though the start call itself was
+    // killed mid-flight rather than completing or timing out on its own.
+    expect(log).toMatch(/^start major-worker$/m);
+    expect(log).toMatch(/^stop major-worker$/m);
+    // No orphaned destination worker left behind by the interrupted run.
+    expect(() => readFileSync(join(root, 'state'))).toThrow();
+  }, 15_000);
 
   it('refuses reuse when the effective VM isolation contract is unsafe', () => {
     const root = mkdtempSync(join(tmpdir(), 'major-provision-unsafe-'));
