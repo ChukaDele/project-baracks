@@ -1,0 +1,21 @@
+{
+  "skill": "presentation-storylining",
+  "should_trigger": [
+    "Turn this analysis into a board deck and make the argument airtight.",
+    "Build a McKinsey-style strategy presentation from these findings — I care about the thinking, not their branding.",
+    "Create a pitch deck where the slide titles alone tell the investment story.",
+    "Convert this proposal into an executive deck with clear recommendations and evidence.",
+    "Review my deck for storyline, action titles and whether each slide proves its point.",
+    "Make a ghost deck first, then build the slides only after the storyline works."
+  ],
+  "should_not_trigger": [
+    "Make a 5-slide photo montage from my holiday pictures.",
+    "Change the font and background colour on this already-final deck.",
+    "Export this existing presentation to PDF without changing content.",
+    "Generate one decorative Instagram carousel from this quote.",
+    "Research this market and tell me which segment to enter, but do not make slides."
+  ],
+  "conflicts": [
+    "presentation-storylining owns deck argument, governing thought, ghost deck, action titles and slide proof; knowledge-work owns underlying research and decision analysis; design-direction-and-taste owns visual art direction; rendering tooling owns slide file generation; pdf-reporting-qa owns PDF-specific output QA."
+  ]
+}
