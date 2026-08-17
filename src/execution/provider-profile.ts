@@ -9,6 +9,12 @@ export interface GuestProviderProfile {
   authenticated: RegExp;
   /** The only provider-owned state shared between projects. */
   authRelativePath: string;
+  /** Args that launch this provider's own native/interactive login flow
+   * inside the isolated worker (e.g. a device-code flow needing no local
+   * browser). Undefined for providers whose current onboarding path is host
+   * credential reuse only -- populated here only once that provider's own
+   * CLI login interface has actually been verified, not guessed at. */
+  loginArgs?: readonly string[];
 }
 
 export type GuestProviderHost = GuestProviderProfile['host'];
@@ -31,6 +37,12 @@ const profiles: Record<ProviderCommandHost, GuestProviderProfile> = {
     probeArgs: ['login', 'status'],
     authenticated: /logged in using chatgpt/i,
     authRelativePath: '.codex/auth.json',
+    // Verified directly against the real installed Codex CLI: `codex login
+    // --device-auth` prints a fixed URL and a one-time code, then blocks
+    // (polling) until the user completes it in a browser or it expires
+    // (~15 minutes) -- no local browser or callback port needed, which is
+    // exactly what makes it usable from inside a headless isolated worker.
+    loginArgs: ['login', '--device-auth'],
   },
   cursor: {
     host: 'cursor',

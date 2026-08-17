@@ -196,3 +196,114 @@ describe('Lima backend credential import: cross-provider path binding', () => {
     ).rejects.toThrow(/failed to start Lima instance/);
   });
 });
+
+/**
+ * A stateful fake limactl for loginProviderNative: real limactl subprocesses
+ * spawned by LimaBackend go through hostEnv(), a deliberately minimal,
+ * fixed environment (HOME/PATH/LANG only) -- so, unlike
+ * lima-provisioner.test.ts's fake (invoked directly, bypassing that
+ * restriction), THIS fake cannot be steered by env vars from the test
+ * process. It steers itself instead: every behavior toggle is a file next
+ * to the fake binary (found via `dirname "$0"`, always available regardless
+ * of environment), which the test writes before constructing the backend.
+ */
+function fakeLoginLima(
+  options: { loginExitCode?: number; producesCredential?: boolean } = {},
+): string {
+  const root = mkdtempSync(join(tmpdir(), 'major-fake-login-lima-'));
+  if (options.loginExitCode !== undefined) {
+    writeFileSync(join(root, 'login-exit'), String(options.loginExitCode));
+  }
+  if (options.producesCredential) {
+    writeFileSync(join(root, 'produces-credential'), '1');
+  }
+  const path = join(root, 'limactl');
+  writeFileSync(
+    path,
+    `#!/bin/sh
+set -u
+DIR="$(cd "$(dirname "$0")" && pwd)"
+STATUS_FILE="$DIR/vm-status"
+case "$1" in
+  --version) printf 'limactl version 2.2.0\\n' ;;
+  list)
+    status="$(cat "$STATUS_FILE" 2>/dev/null || echo Stopped)"
+    printf '{"name":"major-worker","status":"%s","vmType":"vz","arch":"aarch64","sshAddress":"127.0.0.1","config":{"plain":true,"mounts":[],"portForwards":[],"networks":[],"propagateProxyEnv":false,"containerd":{"system":false,"user":false},"ssh":{"forwardAgent":false,"forwardX11":false,"forwardX11Trusted":false,"loadDotSSHPubKeys":false},"user":{"name":"major-admin","home":"/home/major-admin"}}}\\n' "$status"
+    ;;
+  start) printf Running > "$STATUS_FILE"; exit 0 ;;
+  stop) printf Stopped > "$STATUS_FILE"; exit 0 ;;
+  copy) exit 0 ;;
+  shell)
+    line="$*"
+    case "$line" in
+      *login\\ --device-auth*)
+        printf 'Open this link in your browser and sign in to your account\\n'
+        printf 'https://auth.openai.com/codex/device\\n'
+        printf 'Enter this one-time code (expires in 15 minutes)\\n'
+        printf 'TEST-DEVICE-CODE\\n'
+        exit "$(cat "$DIR/login-exit" 2>/dev/null || echo 0)"
+        ;;
+      *"sudo test -f"*)
+        [ -f "$DIR/produces-credential" ] && exit 0 || exit 1
+        ;;
+      *"import.py codex"*)
+        printf 'imported codex credential -> /var/lib/major/provider-auth/codex/.codex/auth.json\\n'
+        exit 0
+        ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  *) exit 64 ;;
+esac
+`,
+  );
+  chmodSync(path, 0o755);
+  return path;
+}
+
+describe('Lima backend native login (Codex device-auth)', () => {
+  it('refuses immediately for a provider with no verified native-login flow, before any Lima operation', async () => {
+    const lines: string[] = [];
+    const result = await backend(fakeLima()).loginProviderNative('claude', (l) => lines.push(l));
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(
+        /native login inside the isolated worker is not yet supported for claude/,
+      ),
+    });
+    expect(lines).toEqual([]);
+  });
+
+  it('relays the device URL and code as they are printed, and reports success once the broker places the credential', async () => {
+    const lines: string[] = [];
+    const result = await backend(fakeLoginLima({ producesCredential: true })).loginProviderNative(
+      'codex',
+      (l) => lines.push(l),
+    );
+    expect(result).toMatchObject({ ok: true });
+    expect(lines.join('\n')).toContain('https://auth.openai.com/codex/device');
+    expect(lines.join('\n')).toContain('TEST-DEVICE-CODE');
+  });
+
+  it('reports a clean failure when the login process itself exits non-zero', async () => {
+    const result = await backend(fakeLoginLima({ loginExitCode: 1 })).loginProviderNative(
+      'codex',
+      () => undefined,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/did not complete successfully/),
+    });
+  });
+
+  it('reports a clean, non-alarming failure when the login exits cleanly but no credential appears (cancelled/expired)', async () => {
+    const result = await backend(fakeLoginLima({ loginExitCode: 0 })).loginProviderNative(
+      'codex',
+      () => undefined,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/cancelled or the code may have expired/),
+    });
+  });
+});

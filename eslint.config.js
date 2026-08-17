@@ -28,6 +28,7 @@ export default tseslint.config(
       'src/security/secure-enclave-attestation.ts',
       'src/providers/exec.ts',
       'src/providers/host-credential.ts',
+      'src/providers/host-provider-version.ts',
       'src/execution/lima-backend.ts',
       'src/execution/cursor-acp-runtime.ts',
       'src/cli/lifecycle-ops.ts',

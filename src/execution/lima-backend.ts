@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { providerExecutable } from '../providers/commands.js';
 import { hostCredentialPath as expectedHostCredentialPath } from '../providers/host-credential.js';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from '../providers/types.js';
 import { openDb } from '../db/client.js';
@@ -358,6 +359,27 @@ export class LimaBackend implements ExecutionBackend {
       const output = `${result.stdout}\n${result.stderr}`;
       const installed = result.code !== 127 && !/not found/i.test(output);
       const authenticated = result.code === 0 && profile.authenticated.test(output);
+      let version: string | undefined;
+      if (installed) {
+        const versionResult = await this.lima([
+          'shell',
+          '--tty=false',
+          this.config.instance,
+          'sudo',
+          '-n',
+          '-u',
+          profile.user,
+          'env',
+          '-i',
+          `HOME=${profile.home}`,
+          `USER=${profile.user}`,
+          `LOGNAME=${profile.user}`,
+          `PATH=${dirname(profile.executable)}:/usr/bin:/bin`,
+          profile.executable,
+          '--version',
+        ]);
+        version = `${versionResult.stdout}\n${versionResult.stderr}`.match(/\d+\.\d+\.\d+/)?.[0];
+      }
       return {
         executable: profile.executable,
         installed,
@@ -367,6 +389,7 @@ export class LimaBackend implements ExecutionBackend {
           : authenticated
             ? 'provider is installed and authenticated in the isolated worker'
             : 'provider is installed but authentication was not confirmed in the isolated worker',
+        ...(version !== undefined ? { version } : {}),
       };
     } finally {
       try {
@@ -451,36 +474,210 @@ export class LimaBackend implements ExecutionBackend {
             `technical detail: ${redactText(copiedCredential.stderr)}`,
         };
       }
-      const copiedScript = await this.lima([
-        'copy',
-        importScript,
-        `${this.config.instance}:${guestTmp}/import.py`,
-      ]);
-      if (copiedScript.code !== 0) {
-        return {
-          ok: false,
-          detail:
-            'could not prepare the isolated worker to receive this credential — try again; ' +
-            `technical detail: ${redactText(copiedScript.stderr)}`,
-        };
-      }
-      const placed = await this.lima([
+      return await this.placeStagedCredentialIntoStore(host, guestTmp, importScript);
+    } finally {
+      await this.lima([
         'shell',
         '--tty=false',
         this.config.instance,
         'sudo',
-        'python3',
-        `${guestTmp}/import.py`,
-        host,
+        'rm',
+        '-rf',
+        '--',
+        '/tmp/major-credential-import',
+      ]).catch(() => undefined);
+      try {
+        await this.stop();
+      } finally {
+        rmSync(lock, { recursive: true, force: true });
+      }
+    }
+  }
+
+  /**
+   * Shared tail of both host-import and native-login onboarding: the
+   * credential is already staged at `${guestTmp}/staged` inside the guest
+   * (from a host copy, or from a just-completed native login) — stage the
+   * already-audited broker script alongside it and invoke it to normalize
+   * the credential into the canonical, root-owned provider-auth store.
+   * Never a second credential architecture, just the one broker used from
+   * two different sources.
+   */
+  private async placeStagedCredentialIntoStore(
+    host: 'claude' | 'codex' | 'cursor' | 'antigravity',
+    guestTmp: string,
+    importScript: string,
+  ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
+    const copiedScript = await this.lima([
+      'copy',
+      importScript,
+      `${this.config.instance}:${guestTmp}/import.py`,
+    ]);
+    if (copiedScript.code !== 0) {
+      return {
+        ok: false,
+        detail:
+          'could not prepare the isolated worker to receive this credential — try again; ' +
+          `technical detail: ${redactText(copiedScript.stderr)}`,
+      };
+    }
+    const placed = await this.lima([
+      'shell',
+      '--tty=false',
+      this.config.instance,
+      'sudo',
+      'python3',
+      `${guestTmp}/import.py`,
+      host,
+    ]);
+    if (placed.code !== 0) {
+      return {
+        ok: false,
+        detail: `credential import broker refused: ${redactText(placed.stderr || placed.stdout)}`,
+      };
+    }
+    return { ok: true, detail: placed.stdout.trim() };
+  }
+
+  /**
+   * Provider-native login inside the isolated worker: runs the provider's
+   * OWN login flow (e.g. Codex's device-code auth) as the dedicated guest
+   * user, in a fresh scratch home never touching that user's shared static
+   * home -- so a cancelled/interrupted/failed attempt can never disturb an
+   * existing working credential. Every printed line is relayed to `onLine`
+   * as it arrives (already verified to contain only a URL/code/instruction,
+   * never a secret). On success, the resulting credential is normalized into
+   * the canonical store via the same broker host-import uses.
+   */
+  async loginProviderNative(
+    host: 'claude' | 'codex' | 'cursor' | 'antigravity',
+    onLine: (line: string) => void,
+  ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
+    if (!isCapabilityAvailable('live-agent-execution')) {
+      return {
+        ok: false,
+        detail: 'provider login is disabled while live-agent-execution is unavailable',
+      };
+    }
+    const profile = guestProviderProfile(providerExecutable(host));
+    if (!profile.loginArgs) {
+      return {
+        ok: false,
+        detail: `native login inside the isolated worker is not yet supported for ${host}`,
+      };
+    }
+    const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
+    const importScript = join(executingRoot, 'scripts', 'import-major-provider-credential.py');
+    const stateRoot = join(majorHome(), 'execution', 'lima');
+    const lock = join(stateRoot, 'backend.lock');
+    mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+    await this.acquireLock(lock);
+    const scratchHome = `/tmp/major-native-login-${randomUUID()}`;
+    try {
+      await this.start();
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'install',
+        '-d',
+        '-o',
+        profile.user,
+        '-g',
+        profile.user,
+        '-m',
+        '0700',
+        scratchHome,
       ]);
-      if (placed.code !== 0) {
+      const loginResult = await this.lima(
+        [
+          'shell',
+          '--tty=false',
+          this.config.instance,
+          'sudo',
+          '-n',
+          '-u',
+          profile.user,
+          'env',
+          '-i',
+          `HOME=${scratchHome}`,
+          `USER=${profile.user}`,
+          `LOGNAME=${profile.user}`,
+          `PATH=${dirname(profile.executable)}:/usr/bin:/bin`,
+          profile.executable,
+          ...profile.loginArgs,
+        ],
+        onLine,
+      );
+      const authPath = `${scratchHome}/${profile.authRelativePath}`;
+      const producedCredential = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'test',
+        '-f',
+        authPath,
+      ]);
+      if (producedCredential.code !== 0) {
         return {
           ok: false,
-          detail: `credential import broker refused: ${redactText(placed.stderr || placed.stdout)}`,
+          detail:
+            loginResult.code === 0
+              ? 'the login process finished without producing a credential — it may have been cancelled or the code may have expired'
+              : `the login process did not complete successfully (exit ${loginResult.code ?? 'unknown'})`,
         };
       }
-      return { ok: true, detail: placed.stdout.trim() };
+      const guestTmp = '/tmp/major-credential-import';
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        guestTmp,
+      ]);
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'install',
+        '-d',
+        '-m',
+        '0700',
+        guestTmp,
+      ]);
+      const staged = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'cp',
+        '--',
+        authPath,
+        `${guestTmp}/staged`,
+      ]);
+      if (staged.code !== 0) {
+        return {
+          ok: false,
+          detail: `could not stage the new credential for import: ${redactText(staged.stderr)}`,
+        };
+      }
+      return await this.placeStagedCredentialIntoStore(host, guestTmp, importScript);
     } finally {
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        scratchHome,
+      ]).catch(() => undefined);
       await this.lima([
         'shell',
         '--tty=false',

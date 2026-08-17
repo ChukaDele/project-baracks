@@ -30,6 +30,10 @@ describe('single execution boundary', () => {
       // never reads the stored secret) as part of host credential detection
       // for `major provider connect`. Narrow, single-purpose, audited here.
       'src/providers/host-credential.ts',
+      // Runs an already-resolved, trusted host provider binary with
+      // `--version` only, for the host/guest compatibility diagnostic in
+      // `major provider connect`. No other args, no shell, short timeout.
+      'src/providers/host-provider-version.ts',
       'src/security/major-gateway.ts',
       'src/security/secure-enclave-attestation.ts',
       'src/security/system-memory.ts',
