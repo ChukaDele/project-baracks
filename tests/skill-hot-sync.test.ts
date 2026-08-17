@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 describe('Major hot skill sync', () => {
-  it('validates and activates all current internal skills without a runtime reinstall', async () => {
+  it('activates all current internal skills without a runtime reinstall', async () => {
     const home = mkdtempSync(join(tmpdir(), 'major-skill-sync-home-'));
     roots.push(home);
     process.env.MAJOR_HOME = home;
