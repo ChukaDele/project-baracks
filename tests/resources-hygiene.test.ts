@@ -588,6 +588,43 @@ describe('Major resource hygiene', () => {
     ]);
   });
 
+  it('replaces a cold release with its archive and never compacts it twice', () => {
+    const dir = home();
+    writeRoots(dir);
+    const coldDir = join(dir, 'releases', OLD_SHA);
+    writeFileSync(join(coldDir, 'payload.txt'), 'cold release payload');
+    const archived: string[] = [];
+    const archiveTree = (path: string) => {
+      const target = `${path}.tar.gz`;
+      writeFileSync(target, 'archive-bytes');
+      archived.push(path);
+      return target;
+    };
+
+    const first = applyCleanup({
+      ...depsFor(dir, [workerInstanceForSha(ACTIVE_SHA)]),
+      archiveTree,
+    });
+    expect(first.compacted.some((item) => item.id === `release-snapshot:${OLD_SHA}`)).toBe(true);
+    // Compaction must REPLACE the tree. Keeping both the directory and the
+    // archive only adds bytes; that regression grew the footprint every cycle.
+    expect(existsSync(coldDir)).toBe(false);
+    expect(existsSync(`${coldDir}.tar.gz`)).toBe(true);
+    expect(archived).toEqual([coldDir]);
+
+    // Second pass: nothing left to compact, and no second archive written.
+    const second = applyCleanup({
+      ...depsFor(dir, [workerInstanceForSha(ACTIVE_SHA)]),
+      archiveTree,
+    });
+    expect(second.compacted).toEqual([]);
+    expect(archived).toEqual([coldDir]);
+
+    // The active release is still untouched by any of this.
+    expect(existsSync(join(dir, 'releases', ACTIVE_SHA))).toBe(true);
+    expect(existsSync(join(dir, 'releases', `${ACTIVE_SHA}.tar.gz`))).toBe(false);
+  });
+
   it('reuses an existing worker instead of creating another', () => {
     const plan = planLargeResource({
       kind: 'worker',

@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, rmSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createLogger } from '../logging/logger.js';
 import {
@@ -158,8 +158,15 @@ export function applyCleanup(deps: CleanupDeps, aggressive = false): CleanupAppl
     if (deps.compact !== false) {
       for (const resource of plan.wouldCompact) {
         try {
-          archiveColdResource(resource, archiveTree);
-          if (resource.path && aggressive) removeTree(resource.path);
+          const archive = archiveColdResource(resource, archiveTree);
+          // Replace the tree with its archive. Keeping BOTH is not compaction:
+          // it only adds bytes. Only remove once the archive is verifiably
+          // present and non-empty, and only for cold resources -- the active
+          // release, rollback generations, credentials and active VMs never
+          // reach here (assertCompactable refuses them).
+          if (resource.path && existsSync(archive) && statSync(archive).size > 0) {
+            removeTree(resource.path);
+          }
           const record = { id: resource.id, class: resource.class, reason: resource.reason };
           compacted.push(record);
           logger.info('cleanup compacted', record);

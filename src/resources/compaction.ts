@@ -1,3 +1,4 @@
+import { existsSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import type { ClassifiedResource } from './inventory.js';
 
@@ -59,10 +60,25 @@ export function assertCompactable(resource: ClassifiedResource): void {
   }
 }
 
+/** True when this resource already has a non-empty archive beside it. */
+export function alreadyCompacted(resource: ClassifiedResource): boolean {
+  if (!resource.path) return false;
+  const archive = compactionArchivePath(resource.path);
+  try {
+    return existsSync(archive) && statSync(archive).size > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function isCompactable(resource: ClassifiedResource): boolean {
   try {
     assertCompactable(resource);
-    return true;
+    // Idempotence. Without this the same cold releases were re-tarred on every
+    // reconcile, burning CPU and ADDING an archive each time while the original
+    // tree stayed in place -- compaction that grew the footprint it was meant
+    // to shrink.
+    return !alreadyCompacted(resource);
   } catch {
     return false;
   }

@@ -1,4 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -11,7 +14,46 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  */
 
 const LIMACTL = '/opt/homebrew/bin/limactl';
-const INSTANCE = 'major-worker-8b33feafe11b';
+
+/**
+ * Target the ACTIVE worker recorded in execution.json rather than a hardcoded
+ * release name. Resource-lifecycle cleanup reclaims per-SHA workers, so a
+ * pinned old instance made this real-containment coverage silently skip on
+ * maintainer machines — the exact "false green by omission" this file exists to
+ * avoid. Fall back to the historical name so nothing regresses where it is
+ * still the one present.
+ */
+function majorHomeDir(): string {
+  return process.env.MAJOR_HOME ?? join(homedir(), '.major');
+}
+
+function activeInstance(): string {
+  try {
+    const config = JSON.parse(readFileSync(join(majorHomeDir(), 'execution.json'), 'utf8')) as {
+      instance?: string;
+    };
+    if (typeof config.instance === 'string' && config.instance) return config.instance;
+  } catch {
+    // fall through
+  }
+  return 'major-worker-8b33feafe11b';
+}
+
+/** Full SHA of the installed release, used to locate its guest release marker. */
+function activeReleaseSha(): string {
+  try {
+    const record = JSON.parse(
+      readFileSync(join(majorHomeDir(), 'installed-release.json'), 'utf8'),
+    ) as { sha?: string };
+    if (typeof record.sha === 'string' && /^[0-9a-f]{40}$/.test(record.sha)) return record.sha;
+  } catch {
+    // fall through
+  }
+  return '8b33feafe11b8b5a4ebfd836b455f793a38bc22e';
+}
+
+const INSTANCE = activeInstance();
+const RELEASE_SHA = activeReleaseSha();
 
 function limactlAvailable(): boolean {
   try {
@@ -41,7 +83,7 @@ function shell(args: string[]): { code: number; stdout: string; stderr: string }
   }
 }
 
-describe.skipIf(!available)('real worker containment (major-worker-8b33feafe11b)', () => {
+describe.skipIf(!available)(`real worker containment (${INSTANCE})`, () => {
   beforeAll(() => {
     const status = execFileSync(LIMACTL, ['list', INSTANCE], { encoding: 'utf8' });
     if (!status.includes('Running')) {
@@ -115,13 +157,7 @@ describe.skipIf(!available)('real worker containment (major-worker-8b33feafe11b)
   });
 
   it('has the release marker present, root-owned and immutable-mode', () => {
-    const result = shell([
-      'sudo',
-      'stat',
-      '-c',
-      '%U:%G:%a',
-      '/opt/major/releases/8b33feafe11b8b5a4ebfd836b455f793a38bc22e',
-    ]);
+    const result = shell(['sudo', 'stat', '-c', '%U:%G:%a', `/opt/major/releases/${RELEASE_SHA}`]);
     expect(result.code).toBe(0);
     expect(result.stdout.trim()).toBe('root:root:444');
   });
