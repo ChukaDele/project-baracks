@@ -1,6 +1,3 @@
-import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { auditSkillReachability, resolveSkills } from './resolver.js';
 import {
   deprecateGeneratedSkill,
@@ -10,6 +7,7 @@ import {
   restoreGeneratedSkill,
   skillLifecycleMetrics,
 } from './lifecycle.js';
+import { syncMajorSkills } from './sync.js';
 import { resolveProject } from '../supervisor/state.js';
 
 function flag(args: string[], name: string): string | undefined {
@@ -17,21 +15,18 @@ function flag(args: string[], name: string): string | undefined {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
-function runtimeRoot(): string {
-  return join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-}
-
 export async function runSkillCli(args: string[]): Promise<boolean> {
   if (args[0] !== 'skill') return false;
   if (args[1] === 'sync') {
-    const script = join(runtimeRoot(), 'scripts', 'sync-major-skills.sh');
-    const source = flag(args, '--source');
-    const result = spawnSync('bash', source ? [script, source] : [script], {
-      stdio: 'inherit',
-      env: process.env,
-    });
-    if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error(`Major skill sync failed with exit ${result.status ?? 'unknown'}`);
+    const source = flag(args, '--source') ?? process.cwd();
+    const result = syncMajorSkills({ sourceRoot: source });
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
+    else {
+      console.log(`Major hot skills activated: ${result.internalSkillCount} internal skills`);
+      console.log(`bundle: ${result.bundleId}`);
+      console.log(`registry version: ${result.registryVersion}`);
+      console.log(`source: ${result.sourceRoot}`);
+    }
     return true;
   }
   if (args[1] === 'resolve') {
