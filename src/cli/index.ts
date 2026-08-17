@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { Command, Option } from 'commander';
 import { openDb, type Db } from '../db/client.js';
 import { SUGGESTION_SOURCE_TYPES, TASK_COMPLEXITIES, RUN_PURPOSES } from '../db/schema.js';
@@ -28,6 +29,7 @@ import { CodexProvider } from '../providers/codex.js';
 import { cursorProvider } from '../providers/cursor.js';
 import { antigravityProvider } from '../providers/antigravity.js';
 import { checkHostCredential } from '../providers/host-credential.js';
+import { runProviderLifecycleCli } from '../providers/lifecycle-cli.js';
 import { buildSupportBundle } from '../doctor/support-bundle.js';
 import { runRollbackScript } from './lifecycle-ops.js';
 import {
@@ -245,40 +247,96 @@ program
     if (!report.inspectionEnvironmentOk) process.exit(EXIT.unsafe);
   });
 
+const SETUP_PROVIDER_TO_HOST: Record<string, 'claude' | 'codex' | 'cursor' | 'antigravity'> = {
+  'claude-code': 'claude',
+  codex: 'codex',
+  cursor: 'cursor',
+  antigravity: 'antigravity',
+};
+
+async function buildSetupReport(database: Db) {
+  const gateway = probeGateway(database);
+  const freshReport = await runDoctor({
+    providers: providers(gateway),
+    configuredProjects: listProjects(database).map((p) => ({ name: p.name, repoPath: p.repoPath })),
+    resolve: (name) => gateway.resolveExecutable(name),
+    inspectExecutionBackend: () => majorExecutionBackend().inspect(),
+  });
+  for (const info of freshReport.providers) {
+    persistProviderDiscovery(database, info, { source: 'cli' });
+  }
+  const report = withPersistedReadiness(database, freshReport);
+  const hostLogins = report.providerReadiness.map((p) => {
+    const host = SETUP_PROVIDER_TO_HOST[p.provider];
+    const check = host ? checkHostCredential(host) : undefined;
+    return {
+      provider: p.provider,
+      hostLoginFound: check?.status === 'found' || check?.status === 'unsafe',
+    };
+  });
+  return { report, hostLogins };
+}
+
+function printSetupReport(report: DoctorReport): void {
+  console.log('MAJOR SETUP\n');
+  console.log('Core');
+  console.log(`  isolated runner       ${report.core.ready ? '✓' : '✗'}`);
+  if (!report.core.ready) {
+    for (const issue of report.core.issues) console.log(`  - ${issue}`);
+  }
+  console.log('\nProviders');
+  for (const p of report.providerReadiness) {
+    const host = SETUP_PROVIDER_TO_HOST[p.provider];
+    const hostCheck = host ? checkHostCredential(host) : undefined;
+    console.log(`\n${p.provider}`);
+    console.log(
+      `  host login            ${hostCheck?.status === 'found' ? 'found' : hostCheck?.status === 'unsafe' ? 'found (' + hostCheck.detail.split('.')[0] + ')' : 'not found'}`,
+    );
+    console.log(`  Major login           ${p.state === 'READY' ? 'READY' : p.state}`);
+    if (p.state !== 'READY') {
+      console.log(`  action                major provider connect ${p.provider}`);
+    }
+  }
+  console.log('\nMajor');
+  console.log(`  live execution        ${report.liveExecutionReady ? 'READY' : 'NOT READY'}`);
+  console.log(`  healthy providers     ${report.liveExecution.healthyProviders.length}`);
+  console.log(`  fallback available    ${report.multiProviderReady ? 'YES' : 'NO'}`);
+  console.log(
+    `  overnight execution   DISABLED (${report.overnightExecutionReasons[0] ?? 'see major doctor'})`,
+  );
+  if (!report.liveExecutionReady) {
+    console.log(`\nnot ready: ${report.liveExecution.blockers.join('; ')}`);
+  }
+  // Codex is the guaranteed self-service bootstrap provider (see
+  // docs/readiness-model.md) — a friend with no execution provider connected
+  // yet gets pointed at exactly one recommended next step, not a menu of
+  // four equally-weighted options.
+  if (report.liveExecution.healthyProviders.length === 0) {
+    console.log('\nNo execution provider is connected.\n');
+    console.log('Recommended:');
+    console.log('  major provider connect codex');
+  }
+}
+
+async function promptConnectCodexNow(): Promise<boolean> {
+  if (!process.stdin.isTTY) return false;
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question('Connect Codex now? [Y/n] ')).trim().toLowerCase();
+    return answer === '' || answer === 'y' || answer === 'yes';
+  } finally {
+    rl.close();
+  }
+}
+
 program
   .command('setup')
   .description('Friend-facing readiness check: core, providers, and what to do next')
   .option('--json', 'emit the full report as versioned JSON')
-  .action(async (opts: { json?: boolean }) => {
+  .option('--interactive', 'offer to connect Codex immediately when no provider is ready')
+  .action(async (opts: { json?: boolean; interactive?: boolean }) => {
     const database = db();
-    const gateway = probeGateway(database);
-    const freshReport = await runDoctor({
-      providers: providers(gateway),
-      configuredProjects: listProjects(database).map((p) => ({
-        name: p.name,
-        repoPath: p.repoPath,
-      })),
-      resolve: (name) => gateway.resolveExecutable(name),
-      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
-    });
-    for (const info of freshReport.providers) {
-      persistProviderDiscovery(database, info, { source: 'cli' });
-    }
-    const report = withPersistedReadiness(database, freshReport);
-    const providerToHost: Record<string, 'claude' | 'codex' | 'cursor' | 'antigravity'> = {
-      'claude-code': 'claude',
-      codex: 'codex',
-      cursor: 'cursor',
-      antigravity: 'antigravity',
-    };
-    const hostLogins = report.providerReadiness.map((p) => {
-      const host = providerToHost[p.provider];
-      const check = host ? checkHostCredential(host) : undefined;
-      return {
-        provider: p.provider,
-        hostLoginFound: check?.status === 'found' || check?.status === 'unsafe',
-      };
-    });
+    const { report, hostLogins } = await buildSetupReport(database);
     if (opts.json) {
       emitJson('setup-report', {
         core: report.core,
@@ -289,34 +347,15 @@ program
       });
       return;
     }
-    console.log('MAJOR SETUP\n');
-    console.log('Core');
-    console.log(`  isolated runner       ${report.core.ready ? '✓' : '✗'}`);
-    if (!report.core.ready) {
-      for (const issue of report.core.issues) console.log(`  - ${issue}`);
-    }
-    console.log('\nProviders');
-    for (const p of report.providerReadiness) {
-      const host = providerToHost[p.provider];
-      const hostCheck = host ? checkHostCredential(host) : undefined;
-      console.log(`\n${p.provider}`);
-      console.log(
-        `  host login            ${hostCheck?.status === 'found' ? 'found' : hostCheck?.status === 'unsafe' ? 'found (' + hostCheck.detail.split('.')[0] + ')' : 'not found'}`,
-      );
-      console.log(`  Major login           ${p.state === 'READY' ? 'READY' : p.state}`);
-      if (p.state !== 'READY') {
-        console.log(`  action                major provider connect --provider ${p.provider}`);
+    printSetupReport(report);
+    if (opts.interactive && report.liveExecution.healthyProviders.length === 0) {
+      if (await promptConnectCodexNow()) {
+        console.log();
+        await runProviderLifecycleCli(['provider', 'connect', 'codex', '--yes']);
+        console.log('\n---\n');
+        const after = await buildSetupReport(db());
+        printSetupReport(after.report);
       }
-    }
-    console.log('\nMajor');
-    console.log(`  live execution        ${report.liveExecutionReady ? 'READY' : 'NOT READY'}`);
-    console.log(`  healthy providers     ${report.liveExecution.healthyProviders.length}`);
-    console.log(`  fallback available    ${report.multiProviderReady ? 'YES' : 'NO'}`);
-    console.log(
-      `  overnight execution   DISABLED (${report.overnightExecutionReasons[0] ?? 'see major doctor'})`,
-    );
-    if (!report.liveExecutionReady) {
-      console.log(`\nnot ready: ${report.liveExecution.blockers.join('; ')}`);
     }
   });
 

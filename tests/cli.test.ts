@@ -334,6 +334,25 @@ describe('major CLI', () => {
     expect(result.stdout).not.toMatch(/overnightExecution.*"safe"/i);
   }, 90_000);
 
+  it('recommends major provider connect codex specifically when no execution provider is connected', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'major-setup-recommend-'));
+    const isoDb = join(scratch, 'major.db');
+    const result = majorEnv({ ...process.env, MAJOR_DB_PATH: isoDb }, 'setup');
+    expect(result.stdout).toMatch(/No execution provider is connected\./);
+    expect(result.stdout).toMatch(/Recommended:\n\s*major provider connect codex/);
+  }, 90_000);
+
+  it('--interactive does not hang or attempt a connection when stdin is not a real terminal', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'major-setup-interactive-'));
+    const isoDb = join(scratch, 'major.db');
+    const result = majorEnv({ ...process.env, MAJOR_DB_PATH: isoDb }, 'setup', '--interactive');
+    expect(result.stdout).toMatch(/No execution provider is connected\./);
+    // Non-interactive stdin means the prompt is skipped entirely -- no
+    // second "MAJOR SETUP" banner from a re-run after a (non-existent)
+    // connect attempt.
+    expect(result.stdout.match(/MAJOR SETUP/g)?.length).toBe(1);
+  }, 90_000);
+
   it("doctor and setup reflect a persisted probe+billing observation, not just this run's host resolution", () => {
     // runDoctor's OWN pass is resolution-only host discovery; the CLI must
     // reconcile with what `major provider probe` / `attest-billing` already
