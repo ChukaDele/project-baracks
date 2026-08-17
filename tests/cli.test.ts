@@ -456,6 +456,7 @@ describe('major CLI', () => {
       'capability',
       'doctor',
       'help',
+      'hosts',
       'project',
       'queue',
       'rollback',
@@ -587,5 +588,95 @@ describe('major CLI', () => {
     const claude = parsed.data.providers.find((p) => p.name === 'claude-code');
     expect(claude?.installed).toBe(false);
     expect(claude?.executableUnverified).toBe(true);
+  });
+
+  it('hosts reports per-host integration status separately from CLI presence and execution-provider health', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'major-hosts-'));
+    const home = join(scratch, 'home');
+    mkdirSync(join(home, '.claude'), { recursive: true });
+    writeFileSync(join(home, '.claude', 'major-global.md'), 'rules\n');
+    writeFileSync(
+      join(home, '.claude', 'CLAUDE.md'),
+      '# Major global worker rules\n@~/.claude/major-global.md\n',
+    );
+    writeFileSync(
+      join(home, '.claude', 'settings.json'),
+      JSON.stringify({
+        hooks: {
+          SessionStart: [{ hooks: [{ command: '"major" session hook --host claude' }] }],
+        },
+      }),
+    );
+    const env = {
+      ...process.env,
+      HOME: home,
+      CODEX_HOME: join(home, '.codex'),
+      MAJOR_STATE_PATH: join(scratch, 'supervisor-state.json'),
+      MAJOR_POLICY_PATH: join(scratch, 'policies.json'),
+      MAJOR_RESOURCE_PATH: join(scratch, 'resources.json'),
+      MAJOR_DB_PATH: join(scratch, 'major.db'),
+      // Deterministic "no CLI on PATH" for every host -- proves integration
+      // status and execution-provider health are reported independently.
+      PATH: join(scratch, 'empty-bin'),
+    };
+    mkdirSync(join(scratch, 'empty-bin'), { recursive: true });
+
+    // `session attach` and `hosts` are both reached only through entry.js's
+    // fallthrough chain (session-context, then supervisor CLI, then
+    // cli/index.js) -- not the inner Commander CLI majorEnv() targets.
+    function entry(...args: string[]): CliResult {
+      try {
+        const stdout = execFileSync(process.execPath, [ENTRY, ...args], {
+          cwd: ROOT,
+          encoding: 'utf8',
+          env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 60_000,
+        });
+        return { status: 0, stdout, stderr: '' };
+      } catch (error) {
+        const e = error as { status?: number; stdout?: string; stderr?: string };
+        return { status: e.status ?? -1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+      }
+    }
+
+    const attach = entry('session', 'attach', '--host', 'claude', '--cwd', repoDir);
+    expect(attach.status).toBe(0);
+
+    const result = entry('hosts', '--json');
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout) as {
+      data: {
+        hosts: {
+          host: string;
+          cliInstalled: boolean;
+          rulesInstalled: boolean;
+          hookInstalled: boolean;
+          attachedAt?: string;
+          project?: string;
+        }[];
+      };
+    };
+    const byHost = new Map(parsed.data.hosts.map((row) => [row.host, row]));
+    const claudeRow = byHost.get('claude')!;
+    expect(claudeRow.cliInstalled).toBe(false);
+    expect(claudeRow.rulesInstalled).toBe(true);
+    expect(claudeRow.hookInstalled).toBe(true);
+    expect(claudeRow.attachedAt).toBeTruthy();
+    expect(claudeRow.project).toBeTruthy();
+
+    for (const host of ['codex', 'cursor', 'antigravity']) {
+      const row = byHost.get(host)!;
+      expect(row.cliInstalled).toBe(false);
+      expect(row.rulesInstalled).toBe(false);
+      expect(row.hookInstalled).toBe(false);
+      expect(row.attachedAt).toBeUndefined();
+      expect(row.project).toBeUndefined();
+    }
+
+    const human = entry('hosts');
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain('MAJOR HOSTS');
+    expect(human.stdout).toContain('major provider status');
   });
 });

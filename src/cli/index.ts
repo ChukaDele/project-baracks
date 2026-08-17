@@ -29,7 +29,14 @@ import { CodexProvider } from '../providers/codex.js';
 import { cursorProvider } from '../providers/cursor.js';
 import { antigravityProvider } from '../providers/antigravity.js';
 import { checkHostCredential } from '../providers/host-credential.js';
+import { providerExecutable } from '../providers/commands.js';
 import { runProviderLifecycleCli } from '../providers/lifecycle-cli.js';
+import {
+  hostIntegrationStatus,
+  SUPPORTED_HOSTS,
+  type SupportedHost,
+} from '../context/host-integration.js';
+import { readSupervisorState } from '../supervisor/state.js';
 import { buildSupportBundle } from '../doctor/support-bundle.js';
 import { runRollbackScript } from './lifecycle-ops.js';
 import {
@@ -245,6 +252,69 @@ program
     }
     // Exit code reflects inspection health, not unattended authority.
     if (!report.inspectionEnvironmentOk) process.exit(EXIT.unsafe);
+  });
+
+interface HostReportRow {
+  host: SupportedHost;
+  cliInstalled: boolean;
+  rulesInstalled: boolean;
+  hookInstalled: boolean;
+  attachedAt: string | undefined;
+  project: string | undefined;
+}
+
+function buildHostsReport(gateway: ExecutionGateway): HostReportRow[] {
+  const sessions = readSupervisorState().sessions;
+  return SUPPORTED_HOSTS.map((host) => {
+    const cliInstalled = gateway.resolveExecutable(providerExecutable(host)) !== undefined;
+    const integration = hostIntegrationStatus(host);
+    const latest = sessions
+      .filter((session) => session.host === host)
+      .sort((a, b) => b.attachedAt.localeCompare(a.attachedAt))[0];
+    return {
+      host,
+      cliInstalled,
+      ...integration,
+      attachedAt: latest?.attachedAt,
+      project: latest?.project,
+    };
+  });
+}
+
+function printHostsReport(rows: HostReportRow[]): void {
+  console.log('MAJOR HOSTS\n');
+  for (const row of rows) {
+    const integrated =
+      row.rulesInstalled && row.hookInstalled
+        ? 'yes'
+        : row.rulesInstalled
+          ? 'rules only (no auto-attach hook)'
+          : 'no';
+    console.log(row.host);
+    console.log(`  CLI installed         ${row.cliInstalled ? 'yes' : 'no'}`);
+    console.log(`  Major integrated      ${integrated}`);
+    console.log(`  last attached         ${row.attachedAt ?? 'never'}`);
+    console.log(`  project               ${row.project ?? '-'}`);
+    console.log('');
+  }
+  console.log(
+    'Execution-provider health (READY/EXHAUSTED/...) is separate -- see `major provider status` or `major doctor`.',
+  );
+}
+
+program
+  .command('hosts')
+  .description('Per-host Major integration status: CLI presence, rules/hook install, last attach')
+  .option('--json', 'emit the full report as versioned JSON')
+  .action((opts: { json?: boolean }) => {
+    const database = db();
+    const gateway = probeGateway(database);
+    const rows = buildHostsReport(gateway);
+    if (opts.json) {
+      emitJson('hosts-report', { hosts: rows });
+    } else {
+      printHostsReport(rows);
+    }
   });
 
 const SETUP_PROVIDER_TO_HOST: Record<string, 'claude' | 'codex' | 'cursor' | 'antigravity'> = {
