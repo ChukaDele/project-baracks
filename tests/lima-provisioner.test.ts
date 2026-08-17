@@ -1,4 +1,12 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -524,8 +532,21 @@ describe('clean-install Lima provisioning', () => {
     const exitPromise = new Promise<number | null>((resolvePromise) => {
       child.once('exit', (code) => resolvePromise(code));
     });
-    // Give the script time to reach the hanging `start` call before signalling.
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_000));
+    // Wait until the script has actually reached the hanging `start` call, then
+    // signal. A fixed sleep here raced the script on a loaded machine: SIGTERM
+    // could arrive before `start` was invoked, so the log had no `start
+    // major-worker` line and this test failed intermittently (it blocked a real
+    // install once). Poll the log instead of guessing a duration.
+    const logPath = join(root, 'log');
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const seen = existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';
+      if (/^start major-worker$/m.test(seen)) break;
+      if (Date.now() > deadline) {
+        throw new Error(`provisioner never reached the auth-source start call; log was:\n${seen}`);
+      }
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+    }
     child.kill('SIGTERM');
     const code = await exitPromise;
     expect(code).not.toBe(0);
