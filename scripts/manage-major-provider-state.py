@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import shutil
 import stat
 import sys
 import tempfile
+
+ACCOUNT_LABEL_PATTERN = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 
 
 PROVIDERS = {
@@ -24,6 +27,27 @@ PROVIDERS = {
 
 def fail(message: str) -> None:
     raise SystemExit(message)
+
+
+def assert_account_label(account: str) -> str:
+    if account == "default":
+        return account
+    if ACCOUNT_LABEL_PATTERN.fullmatch(account) is None or account == "accounts":
+        fail(f"invalid account label: {account}")
+    return account
+
+
+def auth_store_path(auth_root: pathlib.Path, provider: str, auth_relative: pathlib.Path, account: str) -> pathlib.Path:
+    if account == "default":
+        return auth_root / provider / auth_relative
+    return auth_root / provider / "accounts" / account / auth_relative
+
+
+def project_home_path(projects_root: pathlib.Path, project_hash: str, provider: str, account: str) -> pathlib.Path:
+    base = projects_root / project_hash / provider
+    if account == "default":
+        return base / "home"
+    return base / "accounts" / account / "home"
 
 
 def safe_tree(root: pathlib.Path, excluded: set[pathlib.Path] | None = None) -> None:
@@ -96,16 +120,16 @@ def validate(provider: str, project_hash: str, run_home: pathlib.Path) -> pathli
     return pathlib.Path(PROVIDERS[provider][1])
 
 
-def prepare(auth_root: pathlib.Path, projects_root: pathlib.Path, provider: str, project_hash: str, run_home: pathlib.Path, uid: int, gid: int, auth_relative: pathlib.Path) -> None:
+def prepare(auth_root: pathlib.Path, projects_root: pathlib.Path, provider: str, project_hash: str, run_home: pathlib.Path, uid: int, gid: int, auth_relative: pathlib.Path, account: str) -> None:
     if run_home.exists():
         fail("refusing to overwrite provider run home")
-    project_home = projects_root / project_hash / provider / "home"
+    project_home = project_home_path(projects_root, project_hash, provider, account)
     copy_tree(project_home, run_home)
     for parent, dirs, files in os.walk(run_home):
         os.chown(parent, uid, gid)
         for name in [*dirs, *files]:
             os.chown(pathlib.Path(parent) / name, uid, gid)
-    auth_source = auth_root / provider / auth_relative
+    auth_source = auth_store_path(auth_root, provider, auth_relative, account)
     source_info = auth_source.lstat() if auth_source.exists() else None
     if source_info is None or not stat.S_ISREG(source_info.st_mode) or source_info.st_nlink != 1:
         fail(f"provider authentication is unavailable: {provider}")
@@ -121,7 +145,7 @@ def prepare(auth_root: pathlib.Path, projects_root: pathlib.Path, provider: str,
     os.chmod(auth_target, 0o600)
 
 
-def finalize(auth_root: pathlib.Path, projects_root: pathlib.Path, provider: str, project_hash: str, run_home: pathlib.Path, uid: int, gid: int, auth_relative: pathlib.Path) -> None:
+def finalize(auth_root: pathlib.Path, projects_root: pathlib.Path, provider: str, project_hash: str, run_home: pathlib.Path, uid: int, gid: int, auth_relative: pathlib.Path, account: str) -> None:
     volatile: set[pathlib.Path] = set()
     if provider == "antigravity":
         volatile.add(pathlib.Path(".gemini/antigravity-cli/cli.log"))
@@ -133,14 +157,14 @@ def finalize(auth_root: pathlib.Path, projects_root: pathlib.Path, provider: str
     refreshed_info = refreshed_auth.lstat()
     if not stat.S_ISREG(refreshed_info.st_mode) or refreshed_info.st_nlink != 1:
         fail("provider authentication refresh is not a regular file")
-    auth_destination = auth_root / provider / auth_relative
+    auth_destination = auth_store_path(auth_root, provider, auth_relative, account)
     auth_destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     auth_stage = auth_destination.with_name(auth_destination.name + ".next")
     shutil.copyfile(refreshed_auth, auth_stage, follow_symlinks=False)
     os.chown(auth_stage, 0 if os.environ.get("MAJOR_PROVIDER_STATE_TESTING") != "1" else uid, gid)
     os.chmod(auth_stage, 0o440)
     auth_stage.replace(auth_destination)
-    project_parent = projects_root / project_hash / provider
+    project_parent = project_home_path(projects_root, project_hash, provider, account).parent
     project_parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     stage = pathlib.Path(tempfile.mkdtemp(prefix="home.next-", dir=project_parent))
     try:
@@ -166,20 +190,32 @@ def finalize(auth_root: pathlib.Path, projects_root: pathlib.Path, provider: str
 
 
 def main() -> None:
-    if len(sys.argv) != 5 or sys.argv[1] not in {"prepare", "finalize", "reset"}:
-        fail("usage: manage-major-provider-state.py <prepare|finalize|reset> <provider> <project-hash> <run-home>")
+    if len(sys.argv) not in {5, 6} or sys.argv[1] not in {"prepare", "finalize", "reset"}:
+        fail("usage: manage-major-provider-state.py <prepare|finalize|reset> <provider> <project-hash> <run-home> [account]")
     action, provider, project_hash = sys.argv[1:4]
     run_home = pathlib.Path(sys.argv[4])
+    account = assert_account_label(sys.argv[5] if len(sys.argv) == 6 else "default")
     auth_relative = validate(provider, project_hash, run_home)
     auth_root, projects_root, uid, gid = roots()
     if action == "prepare":
-        prepare(auth_root, projects_root, provider, project_hash, run_home, uid, gid, auth_relative)
+        prepare(auth_root, projects_root, provider, project_hash, run_home, uid, gid, auth_relative, account)
     elif action == "finalize":
-        finalize(auth_root, projects_root, provider, project_hash, run_home, uid, gid, auth_relative)
+        finalize(auth_root, projects_root, provider, project_hash, run_home, uid, gid, auth_relative, account)
     else:
-        target = projects_root / project_hash / provider
+        target = (
+            projects_root / project_hash / provider / "home"
+            if account == "default"
+            else projects_root / project_hash / provider / "accounts" / account
+        )
+        old = (
+            projects_root / project_hash / provider / "home.old"
+            if account == "default"
+            else None
+        )
         if target.exists():
             shutil.rmtree(target)
+        if old is not None and old.exists():
+            shutil.rmtree(old)
 
 
 if __name__ == "__main__":

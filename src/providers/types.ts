@@ -50,6 +50,8 @@ export interface ExecuteRequest {
   timeoutMs?: number;
   /** Resume a previous session where the provider supports it. */
   resumeSessionRef?: string;
+  /** Named subscription account. Omitted means the default account. */
+  accountLabel?: string;
 }
 
 export interface ProviderEvent {

@@ -19,15 +19,20 @@ function run(
   provider: keyof typeof authPaths,
   hash: string,
   home: string,
+  account?: string,
 ) {
-  const result = spawnSync('python3', [broker, action, provider, hash, home], {
-    encoding: 'utf8',
-    env: {
-      PATH: '/usr/bin:/bin',
-      MAJOR_PROVIDER_STATE_TESTING: '1',
-      MAJOR_PROVIDER_STATE_TEST_ROOT: root,
+  const result = spawnSync(
+    'python3',
+    [broker, action, provider, hash, home, ...(account ? [account] : [])],
+    {
+      encoding: 'utf8',
+      env: {
+        PATH: '/usr/bin:/bin',
+        MAJOR_PROVIDER_STATE_TESTING: '1',
+        MAJOR_PROVIDER_STATE_TEST_ROOT: root,
+      },
     },
-  });
+  );
   if (result.status !== 0) throw new Error(result.stderr || result.stdout);
 }
 
@@ -152,5 +157,44 @@ describe('project-scoped provider state broker', () => {
     );
     expect(readFileSync(join(archive, 'session.log'), 'utf8')).toBe('persisted project state');
     expect(() => readFileSync(join(archive, 'latest.log'))).toThrow();
+  });
+
+  it('isolates a named Codex account from the default credential and project home', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-state-codex-account-'));
+    const defaultAuth = join(root, 'provider-auth', 'codex', authPaths.codex);
+    const namedAuth = join(root, 'provider-auth', 'codex', 'accounts', 'work-b', authPaths.codex);
+    mkdirSync(join(defaultAuth, '..'), { recursive: true, mode: 0o700 });
+    mkdirSync(join(namedAuth, '..'), { recursive: true, mode: 0o700 });
+    writeFileSync(defaultAuth, 'default-secret', { mode: 0o440 });
+    writeFileSync(namedAuth, 'work-b-secret', { mode: 0o440 });
+    const hash = 'f'.repeat(64);
+
+    const defaultHome = join(root, 'runs', 'default', 'home');
+    run(root, 'prepare', 'codex', hash, defaultHome);
+    expect(readFileSync(join(defaultHome, authPaths.codex), 'utf8')).toBe('default-secret');
+    writeFileSync(join(defaultHome, 'default-only.txt'), 'private-default');
+    run(root, 'finalize', 'codex', hash, defaultHome);
+
+    const namedHome = join(root, 'runs', 'named', 'home');
+    run(root, 'prepare', 'codex', hash, namedHome, 'work-b');
+    expect(readFileSync(join(namedHome, authPaths.codex), 'utf8')).toBe('work-b-secret');
+    expect(() => readFileSync(join(namedHome, 'default-only.txt'))).toThrow();
+    writeFileSync(join(namedHome, authPaths.codex), 'work-b-refreshed');
+    writeFileSync(join(namedHome, 'named-only.txt'), 'private-named');
+    run(root, 'finalize', 'codex', hash, namedHome, 'work-b');
+
+    expect(readFileSync(defaultAuth, 'utf8')).toBe('default-secret');
+    expect(readFileSync(namedAuth, 'utf8')).toBe('work-b-refreshed');
+
+    const dummyHome = join(root, 'runs', 'reset-default', 'home');
+    run(root, 'reset', 'codex', hash, dummyHome);
+    const namedAgain = join(root, 'runs', 'named-after-reset', 'home');
+    run(root, 'prepare', 'codex', hash, namedAgain, 'work-b');
+    expect(readFileSync(join(namedAgain, 'named-only.txt'), 'utf8')).toBe('private-named');
+    expect(readFileSync(join(namedAgain, authPaths.codex), 'utf8')).toBe('work-b-refreshed');
+
+    expect(() =>
+      run(root, 'prepare', 'codex', hash, join(root, 'runs', 'traversal', 'home'), '../etc'),
+    ).toThrow(/invalid account label/);
   });
 });

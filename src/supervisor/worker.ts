@@ -115,10 +115,16 @@ export function workerCommand(
   host: WorkerHost,
   prompt: string,
   modelRef?: string,
+  resumeSessionRef?: string,
 ): { command: string; args: string[] } {
   return {
     command: providerExecutable(host),
-    args: providerArgs(host, { prompt, modelRef, outputMode: 'batch' }),
+    args: providerArgs(host, {
+      prompt,
+      modelRef,
+      outputMode: 'batch',
+      ...(resumeSessionRef ? { resumeSessionRef } : {}),
+    }),
   };
 }
 
@@ -297,6 +303,8 @@ export async function runWorker(input: {
   cwd: string;
   timeoutMs?: number;
   modelRef?: string;
+  accountLabel?: string;
+  resumeSessionRef?: string;
   approvalAuthority?: ProviderApprovalAuthority;
 }): Promise<WorkerOutcome> {
   const started = Date.now();
@@ -327,7 +335,7 @@ export async function runWorker(input: {
       request.status === 'active'
         ? request.lease
         : await waitForResource(request.request, input.timeoutMs);
-    const spec = workerCommand(input.host, input.prompt, input.modelRef);
+    const spec = workerCommand(input.host, input.prompt, input.modelRef, input.resumeSessionRef);
     const outcome = await runGatewayCommand({
       executable: spec.command,
       args: spec.args,
@@ -342,6 +350,8 @@ export async function runWorker(input: {
         // worker runs therefore carry no sensitive-action authority.
         approvalAuthority: input.approvalAuthority ?? { decisions: [] },
         ...(input.modelRef ? { modelRef: input.modelRef } : {}),
+        ...(input.accountLabel ? { accountLabel: input.accountLabel } : {}),
+        ...(input.resumeSessionRef ? { resumeSessionRef: input.resumeSessionRef } : {}),
       },
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
     });

@@ -64,6 +64,10 @@ export interface SupervisorGoal {
   activePid?: number | undefined;
   nextRunAt?: string | undefined;
   lastCoordinator?: WorkerHost | undefined;
+  /** Subscription account last dispatched for lastCoordinator. */
+  lastAccountLabel?: string | undefined;
+  /** Vendor session id from the last successful hop on lastAccountLabel. */
+  lastSessionRef?: string | undefined;
   requiredOperations?: string[] | undefined;
   /** Set by the last cycle when it stopped on an authoritative provider
    * exhaustion/rate-limit (or a selected CLI turning out to be missing)

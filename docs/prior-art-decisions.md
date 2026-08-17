@@ -4,6 +4,17 @@ Future Major agents must consult this log before rebuilding a capability or addi
 
 Record format: Capability, Date, Candidates, Decision, Reason, Major-specific layer retained, Rejected alternatives, Evidence.
 
+## 2026-08-17 — compact live Codex usage monitor
+
+- **Capability:** compact live Codex usage for already-authenticated Major accounts
+- **Date:** 2026-08-17
+- **Candidates:** steipete/CodexBar (menu-bar + `codex app-server` RPC); ad-hoc `codex app-server` scripts; Subrouter quota scoring; Major-native read of persisted provider-auth slots
+- **Decision:** BUILD a thin `major provider usage` path. Do not wrap CodexBar or Subrouter.
+- **Reason:** CodexBar is a host menu-bar product with cookie/dashboard extras and many providers. Subrouter intercepts HTTP base URLs and stores OAuth tokens outside the vendor store. Major already has two authenticated Codex account slots, a root-owned provider-auth broker, and an isolated `codex-native app-server`. The missing piece is a read-only poll of official `account/read` and `account/rateLimits/read` that does not change routing or credentials (`refreshToken: false`, scratch HOME, no finalize).
+- **Major-specific layer retained:** persisted provider/account labels, Lima credential isolation, compact CLI/JSON
+- **Rejected alternatives:** wrap CodexBar; wrap Subrouter; scrape chatgpt.com usage; mutate availability/routing from a usage poll
+- **Evidence:** official app-server README documents both methods; live quota clients need a short post-`initialized` delay or `account/rateLimits/read` can return empty windows
+
 ## 2026-08-17 — subscription-backed coding-agent execution driven by a coordinator
 
 - **Capability:** subscription-backed coding-agent execution driven by a coordinator
@@ -25,7 +36,19 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Major-specific layer retained:** routing policy and billing evidence
 - **Rejected alternatives:** build a Major-native multi-account router
 - **Evidence:** Subrouter README documents openai_base_url and ANTHROPIC_BASE_URL interception with per-account credential substitution
-- **Status:** deferred, multi-account is explicitly frozen.
+- **Status:** superseded 2026-08-17. Subrouter intercepts HTTP `openai_base_url` / `ANTHROPIC_BASE_URL` and stores OAuth refresh tokens outside the vendor store. That does not wrap Codex CLI `auth.json` subscriptions, and the proxy credential model failed the security bar.
+
+## 2026-08-17 — Codex CLI multi-account subscription quota routing
+
+- **Capability:** secure, quota-aware multi-account Codex subscription routing beneath the existing provider router
+- **Date:** 2026-08-17
+- **Candidates:** manaflow-ai/subrouter; Major-native account slots under the existing provider-auth broker
+- **Decision:** BUILD a thin native account router. Do not WRAP Subrouter for this axis.
+- **Reason:** Codex failover was hopping to a different provider (losing vendor session and Major history) because account bookkeeping never selected distinct credentials. Subrouter's HTTP base-URL substitution cannot drive `codex exec` login slots. Major already had per-account capacity keys, exhaustion backoff, and a root-owned provider-auth broker; the missing piece is routing and materializing those slots, plus refusing cross-account session resume.
+- **Major-specific layer retained:** provider/class ladder, billing evidence, Lima credential isolation, durable goal history
+- **Rejected alternatives:** WRAP Subrouter; a second Lima guest user per account; swapping the default auth.json in place without isolated slots
+- **Evidence:** exhausted default Codex + usable `codex#work-b` stays on Codex; vendor session ids resume only on the same account; named credentials live under `provider-auth/<host>/accounts/<label>/` and cannot overwrite default
+- **Status:** active, Codex-first. Other providers share the same slot layout but are not required for the P0 proof.
 
 ## 2026-08-17 — isolated local runtime for coding agents with provider credential separation
 

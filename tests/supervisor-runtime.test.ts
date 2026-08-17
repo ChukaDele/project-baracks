@@ -21,6 +21,7 @@ import {
 } from '../src/supervisor/worker-report.js';
 import type { ProviderInfo } from '../src/providers/types.js';
 import type { CapabilityRecord } from '../src/capabilities/registry.js';
+import { writeCodexUsageReport } from '../src/providers/codex-usage.js';
 import { model } from './helpers.js';
 
 const roots: string[] = [];
@@ -177,6 +178,127 @@ describe('Major coordinator contract', () => {
     expect(selection).toMatchObject({ kind: 'route', provider: 'codex' });
   });
 
+  it('does not hop to Claude when the exhausted Codex account has an unroutable sibling', () => {
+    const current = goal('/tmp/project');
+    current.preferredCoordinator = 'codex';
+    current.lastCoordinator = 'codex';
+    current.lastAccountLabel = 'default';
+    const selection = selectCoordinator(current, [
+      {
+        name: 'codex',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            availability: 'exhausted',
+          }),
+        ],
+      },
+      {
+        name: 'codex#work-b',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            billingMode: 'unknown',
+          }),
+        ],
+      },
+      {
+        name: 'claude-code',
+        installed: true,
+        models: [model({ modelRef: 'opus', routingClass: 'opus' })],
+      },
+    ]);
+    expect(selection).toMatchObject({ kind: 'checkpoint' });
+  });
+
+  it('fails over to a second Codex account on first dispatch before lastCoordinator is recorded', () => {
+    const current = goal('/tmp/project');
+    current.preferredCoordinator = 'codex';
+    const selection = selectCoordinator(current, [
+      {
+        name: 'codex',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            availability: 'exhausted',
+          }),
+        ],
+      },
+      {
+        name: 'codex#work-b',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            billingMode: 'subscription_included',
+          }),
+        ],
+      },
+      {
+        name: 'claude-code',
+        installed: true,
+        models: [model({ modelRef: 'opus', routingClass: 'opus' })],
+      },
+    ]);
+    expect(selection).toMatchObject({
+      kind: 'route',
+      host: 'codex',
+      provider: 'codex#work-b',
+      accountLabel: 'work-b',
+    });
+  });
+
+  it('fails over to a second Codex account before leaving Codex', () => {
+    const current = goal('/tmp/project');
+    current.preferredCoordinator = 'codex';
+    current.lastCoordinator = 'codex';
+    current.lastAccountLabel = 'default';
+    current.lastSummary = 'wired the provider router';
+    current.lastSessionRef = 'codex-sess-1';
+    const selection = selectCoordinator(current, [
+      {
+        name: 'codex',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            availability: 'exhausted',
+          }),
+        ],
+      },
+      {
+        name: 'codex#work-b',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            billingMode: 'subscription_included',
+          }),
+        ],
+      },
+      {
+        name: 'claude-code',
+        installed: true,
+        models: [model({ modelRef: 'opus', routingClass: 'opus' })],
+      },
+    ]);
+    expect(selection).toMatchObject({
+      kind: 'route',
+      host: 'codex',
+      provider: 'codex#work-b',
+      accountLabel: 'work-b',
+    });
+  });
+
   it('resolves a second account of the same provider to its worker host and accountLabel', () => {
     const current = goal('/tmp/project');
     current.preferredCoordinator = 'codex';
@@ -223,6 +345,7 @@ describe('Major coordinator contract', () => {
   it('keeps the product goal while loading durable project and correction learnings', () => {
     const repo = mkdtempSync(join(tmpdir(), 'major-runtime-'));
     roots.push(repo);
+    process.env.MAJOR_HOME = join(repo, '.major');
     process.env.MAJOR_POLICY_PATH = join(repo, 'policies.json');
     process.env.MAJOR_LEARNING_ROOT = join(repo, 'learning');
     mkdirSync(join(repo, '.git'));
@@ -329,6 +452,62 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('PROMOTED 1x [project/user-correction]');
     expect(prompt).toContain('RESOLVED MAJOR SKILLS');
     expect(prompt).toContain('mvp-speed-prioritisation');
+    expect(prompt).toContain('Codex capacity:');
+  });
+
+  it('renders persisted two-account Codex capacity in the supervisor runtime prompt', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'major-runtime-capacity-'));
+    roots.push(repo);
+    process.env.MAJOR_HOME = join(repo, '.major');
+    process.env.MAJOR_POLICY_PATH = join(repo, 'policies.json');
+    mkdirSync(join(repo, '.git'));
+    writeCodexUsageReport({
+      fetchedAt: '2026-08-17T18:00:00.000Z',
+      methods: ['account/read', 'account/rateLimits/read'],
+      accounts: [
+        {
+          accountLabel: 'default',
+          planType: 'plus',
+          primary: { usedPercent: 42, windowDurationMins: 300 },
+          secondary: { usedPercent: 18, windowDurationMins: 10_080 },
+        },
+        {
+          accountLabel: 'work-b',
+          planType: 'plus',
+          primary: { usedPercent: 91, windowDurationMins: 300 },
+          secondary: { usedPercent: 8, windowDurationMins: 10_080 },
+        },
+      ],
+    });
+    const prompt = coordinatorPrompt(goal(repo));
+    expect(prompt).toContain('Codex capacity:');
+    expect(prompt).toMatch(/default\s+plus\s+5h \[####\.{6}\] 42%/);
+    expect(prompt).toMatch(/work-b\s+plus\s+5h \[#{9}\.\] 91%/);
+    expect(prompt).toContain('live via account/read + account/rateLimits/read');
+    expect(prompt).toContain('refresh: major provider usage');
+    expect(prompt).not.toContain('no live snapshot');
+    for (const line of prompt.split('\n')) {
+      if (
+        line.includes('Codex capacity') ||
+        line.includes('[#') ||
+        line.includes('refresh: major provider usage')
+      ) {
+        expect(line.length, line).toBeLessThanOrEqual(80);
+      }
+    }
+  });
+
+  it('injects prior cycle history into the prompt for account handoff', () => {
+    const current = goal('/tmp/project');
+    current.lastSummary = 'implemented the quota router';
+    const prompt = coordinatorPrompt(current, [], {
+      accountLabel: 'work-b',
+      continuityBlock:
+        'CONTEXT CONTINUITY:\nPrevious account default is no longer the active subscription.\nPrior cycle summary:\nimplemented the quota router',
+    });
+    expect(prompt).toContain('implemented the quota router');
+    expect(prompt).toContain('Active subscription account: work-b');
+    expect(prompt).toContain('CONTEXT CONTINUITY:');
   });
 
   it('accepts only a bounded final worker report and requires an owner gate when blocked', () => {

@@ -13,6 +13,14 @@ import {
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { providerExecutable } from '../providers/commands.js';
+import { accountAuthStoreRelativePath, providerStateAccountArgs } from '../providers/account.js';
+import {
+  CODEX_APP_SERVER_READY_DELAY_MS,
+  CODEX_APP_SERVER_STARTUP_DELAY_MS,
+  queryCodexAppServer,
+  type CodexAppServerSnapshot,
+} from '../providers/codex-app-server.js';
+import { redactCodexUsageText, type CodexUsageAccount } from '../providers/codex-usage.js';
 import { hostCredentialPath as expectedHostCredentialPath } from '../providers/host-credential.js';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from '../providers/types.js';
 import { openDb } from '../db/client.js';
@@ -154,6 +162,20 @@ function errorText(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
   return 'unknown backend error';
+}
+
+function usageScratchHome(runId: string): string {
+  if (!/^[a-f0-9-]{36}$/.test(runId)) throw new Error('unsafe Codex usage scratch id');
+  return `/tmp/major-codex-usage-${runId}`;
+}
+
+function canonicalCodexAuthPath(accountLabel: string): string {
+  const relative = accountAuthStoreRelativePath('.codex/auth.json', accountLabel);
+  const path = `/var/lib/major/provider-auth/codex/${relative}`;
+  if (path.includes('..') || !path.startsWith('/var/lib/major/provider-auth/codex/')) {
+    throw new Error('unsafe Codex credential path');
+  }
+  return path;
 }
 
 export class LimaBackend implements ExecutionBackend {
@@ -428,6 +450,184 @@ export class LimaBackend implements ExecutionBackend {
       } finally {
         rmSync(lock, { recursive: true, force: true });
       }
+    }
+  }
+
+  /**
+   * Live Codex usage for already-imported accounts. Reuses the canonical
+   * provider-auth slots and the isolated Codex CLI; does not probe routing
+   * state, rewrite credentials, or touch the guest user's static home.
+   */
+  async readCodexUsage(accountLabels: readonly string[]): Promise<CodexUsageAccount[]> {
+    if (!isCapabilityAvailable('live-agent-execution')) {
+      return accountLabels.map((accountLabel) => ({
+        accountLabel,
+        error: 'Codex usage is disabled while live-agent-execution is unavailable',
+      }));
+    }
+    const profile = guestProviderProfile('codex');
+    const stateRoot = join(majorHome(), 'execution', 'lima');
+    const lock = join(stateRoot, 'backend.lock');
+    mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+    await this.acquireLock(lock);
+    const accounts: CodexUsageAccount[] = [];
+    try {
+      await this.start();
+      for (const accountLabel of accountLabels) {
+        const scratchHome = usageScratchHome(randomUUID());
+        try {
+          accounts.push(await this.readOneCodexAccount(profile, accountLabel, scratchHome));
+        } catch (error) {
+          accounts.push({
+            accountLabel,
+            error: redactCodexUsageText(redactText(errorText(error))),
+          });
+        } finally {
+          await this.lima([
+            'shell',
+            '--tty=false',
+            this.config.instance,
+            'sudo',
+            'rm',
+            '-rf',
+            '--',
+            scratchHome,
+          ]).catch(() => undefined);
+        }
+      }
+      return accounts;
+    } finally {
+      try {
+        await this.stop();
+      } finally {
+        rmSync(lock, { recursive: true, force: true });
+      }
+    }
+  }
+
+  private async readOneCodexAccount(
+    profile: GuestProviderProfile,
+    accountLabel: string,
+    scratchHome: string,
+  ): Promise<CodexUsageAccount> {
+    const canonicalPath = canonicalCodexAuthPath(accountLabel);
+    const present = await this.lima([
+      'shell',
+      '--tty=false',
+      this.config.instance,
+      'sudo',
+      'test',
+      '-f',
+      canonicalPath,
+    ]);
+    if (present.code !== 0) {
+      return {
+        accountLabel,
+        error: `no Codex credential in the provider-auth store for ${accountLabel}`,
+      };
+    }
+    const targetPath = `${scratchHome}/${profile.authRelativePath}`;
+    const targetDir = dirname(targetPath);
+    const staged = await this.lima([
+      'shell',
+      '--tty=false',
+      this.config.instance,
+      'sudo',
+      'sh',
+      '-c',
+      `install -d -o '${profile.user}' -g '${profile.user}' -m 0700 ` +
+        `'${scratchHome}' '${scratchHome}/tmp' '${targetDir}' && ` +
+        `cp -- '${canonicalPath}' '${targetPath}' && ` +
+        `chown '${profile.user}:${profile.user}' '${targetPath}' && chmod 600 '${targetPath}'`,
+    ]);
+    if (staged.code !== 0) {
+      return {
+        accountLabel,
+        error: redactCodexUsageText(
+          `could not stage Codex credentials for ${accountLabel}: ${redactText(
+            staged.stderr || staged.stdout,
+          )}`,
+        ),
+      };
+    }
+    const snapshot = await this.runCodexAppServerSession(profile, scratchHome);
+    return { accountLabel, ...snapshot };
+  }
+
+  private async runCodexAppServerSession(
+    profile: GuestProviderProfile,
+    scratchHome: string,
+  ): Promise<CodexAppServerSnapshot> {
+    const trusted = this.registry.verify(basename(this.config.limactlPath));
+    const child = spawn(
+      trusted.spawnPath,
+      [
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        '-n',
+        '-u',
+        profile.user,
+        'env',
+        '-i',
+        `HOME=${scratchHome}`,
+        `USER=${profile.user}`,
+        `LOGNAME=${profile.user}`,
+        `TMPDIR=${scratchHome}/tmp`,
+        `PATH=${dirname(profile.executable)}:/usr/bin:/bin`,
+        profile.executable,
+        'app-server',
+      ],
+      { env: this.hostEnv(), stdio: ['pipe', 'pipe', 'pipe'], shell: false, detached: true },
+    );
+    this.activeChild = child;
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+      if (stderr.length > 200_000) stderr = stderr.slice(-200_000);
+    });
+    const signal = (sig: NodeJS.Signals) => {
+      try {
+        if (typeof child.pid === 'number') process.kill(-child.pid, sig);
+        else child.kill(sig);
+      } catch {
+        // The app-server may already have exited.
+      }
+    };
+    try {
+      if (!child.stdin || !child.stdout) {
+        throw new Error('Codex app-server transport is unavailable');
+      }
+      return await queryCodexAppServer(child.stdin, child.stdout, {
+        startupDelayMs: CODEX_APP_SERVER_STARTUP_DELAY_MS,
+        readyDelayMs: CODEX_APP_SERVER_READY_DELAY_MS,
+      });
+    } catch (error) {
+      const detail = redactText(stderr).trim();
+      throw new Error(detail ? `${errorText(error)} (${detail})` : errorText(error));
+    } finally {
+      try {
+        child.stdin?.end();
+      } catch {
+        // Ignore a transport that already closed.
+      }
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          signal('SIGKILL');
+          finish();
+        }, 1000);
+        child.once('close', finish);
+        signal('SIGTERM');
+      });
+      if (this.activeChild === child) this.activeChild = undefined;
     }
   }
 
@@ -1187,6 +1387,7 @@ export class LimaBackend implements ExecutionBackend {
         profile.host,
         manifest.projectHash,
         guestHome,
+        ...providerStateAccountArgs(request.providerRequest?.accountLabel),
       ]);
       if (preparedState.code !== 0) {
         throw new Error(`provider state preparation failed: ${redactText(preparedState.stderr)}`);
@@ -1441,6 +1642,7 @@ export class LimaBackend implements ExecutionBackend {
         profile.host,
         manifest.projectHash,
         guestHome,
+        ...providerStateAccountArgs(request.providerRequest?.accountLabel),
       ]);
       if (finalizedState.code !== 0) {
         throw new Error(`provider state finalization failed: ${redactText(finalizedState.stderr)}`);

@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -455,4 +455,121 @@ describe('Lima backend provider outcome classification: stdout-carried exhaustio
     );
     expect(result).toEqual({ rateLimited: false, exhausted: false });
   });
+});
+
+function usageLima(): { limactlPath: string; logPath: string; root: string } {
+  const root = mkdtempSync(join(tmpdir(), 'major-codex-usage-lima-'));
+  const limactlPath = join(root, 'limactl');
+  const logPath = join(root, 'log');
+  const statePath = join(root, 'state');
+  writeFileSync(statePath, 'Stopped');
+  writeFileSync(
+    limactlPath,
+    `#!${process.execPath}
+const fs = require('fs');
+const readline = require('readline');
+const logPath = ${JSON.stringify(logPath)};
+const statePath = ${JSON.stringify(statePath)};
+const args = process.argv.slice(process.argv.findIndex((arg) =>
+  arg === '--version' || arg === 'list' || arg === 'start' || arg === 'stop' || arg === 'shell'
+));
+fs.appendFileSync(logPath, args.join(' ') + '\\n');
+const instance = (status) => JSON.stringify({
+  name: 'major-worker',
+  status,
+  vmType: 'vz',
+  arch: 'aarch64',
+  sshAddress: '127.0.0.1',
+  config: {
+    plain: true,
+    mounts: [],
+    portForwards: [],
+    networks: [],
+    propagateProxyEnv: false,
+    containerd: { system: false, user: false },
+    ssh: {
+      forwardAgent: false,
+      forwardX11: false,
+      forwardX11Trusted: false,
+      loadDotSSHPubKeys: false,
+    },
+    user: { name: 'major-admin', home: '/home/major-admin' },
+  },
+});
+if (args[0] === '--version') { process.stdout.write('limactl version 2.2.0\\n'); process.exit(0); }
+if (args[0] === 'list') {
+  process.stdout.write(instance(fs.readFileSync(statePath, 'utf8').trim()) + '\\n');
+  process.exit(0);
+}
+if (args[0] === 'start') { fs.writeFileSync(statePath, 'Running'); process.exit(0); }
+if (args[0] === 'stop') { fs.writeFileSync(statePath, 'Stopped'); process.exit(0); }
+if (args[0] === 'shell' && args.includes('app-server')) {
+  const rl = readline.createInterface({ input: process.stdin });
+  process.stdin.on('end', () => process.exit(0));
+  rl.on('line', (line) => {
+    let message;
+    try { message = JSON.parse(line); } catch { return; }
+    fs.appendFileSync(logPath, 'rpc ' + String(message.method || '') + ' ' + JSON.stringify(message.params ?? null) + '\\n');
+    if (message.id === undefined) return;
+    let result = {};
+    if (message.method === 'initialize') result = { protocolVersion: 1 };
+    if (message.method === 'account/read') result = { account: { type: 'chatgpt', planType: 'plus' } };
+    if (message.method === 'account/rateLimits/read') {
+      result = {
+        rateLimits: {
+          primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: Math.floor(Date.now() / 1000) + 7200 },
+          secondary: { usedPercent: 18, windowDurationMins: 10080, resetsAt: Math.floor(Date.now() / 1000) + 345600 },
+        },
+      };
+    }
+    process.stdout.write(JSON.stringify({ id: message.id, result }) + '\\n');
+  });
+  return;
+}
+process.exit(0);
+`,
+  );
+  chmodSync(limactlPath, 0o755);
+  return { limactlPath, logPath, root };
+}
+
+describe('Lima Codex usage monitor', () => {
+  it('queries both account slots through app-server without using static home', async () => {
+    const priorHome = process.env.MAJOR_HOME;
+    const home = mkdtempSync(join(tmpdir(), 'major-usage-home-'));
+    process.env.MAJOR_HOME = home;
+    const fake = usageLima();
+    try {
+      const accounts = await backend(fake.limactlPath).readCodexUsage(['default', 'work-b']);
+      expect(accounts).toHaveLength(2);
+      expect(accounts[0]).toMatchObject({
+        accountLabel: 'default',
+        planType: 'plus',
+        accountKind: 'chatgpt',
+        primary: expect.objectContaining({ usedPercent: 42, windowDurationMins: 300 }),
+      });
+      expect(accounts[1]).toMatchObject({
+        accountLabel: 'work-b',
+        planType: 'plus',
+        primary: expect.objectContaining({ usedPercent: 42 }),
+      });
+      const log = readFileSync(fake.logPath, 'utf8');
+      expect(log).toMatch(/\/var\/lib\/major\/provider-auth\/codex\/\.codex\/auth\.json/);
+      expect(log).toMatch(
+        /\/var\/lib\/major\/provider-auth\/codex\/accounts\/work-b\/\.codex\/auth\.json/,
+      );
+      expect(log.match(/app-server/g)).toHaveLength(2);
+      expect(log).toMatch(/HOME=\/tmp\/major-codex-usage-/);
+      expect(log).not.toMatch(/HOME=\/home\/major-codex/);
+      expect(log.match(/rpc initialize /g)).toHaveLength(2);
+      expect(log.match(/rpc initialized /g)).toHaveLength(2);
+      expect(log.match(/rpc account\/read \{"refreshToken":false\}/g)).toHaveLength(2);
+      expect(log.match(/rpc account\/rateLimits\/read null/g)).toHaveLength(2);
+    } finally {
+      if (priorHome === undefined) delete process.env.MAJOR_HOME;
+      else process.env.MAJOR_HOME = priorHome;
+      rmSync(home, { recursive: true, force: true });
+      rmSync(fake.root, { recursive: true, force: true });
+    }
+  }, 20_000);
 });

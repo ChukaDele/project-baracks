@@ -9,6 +9,7 @@ import {
   persistProviderDiscovery,
   recordBillingObservation,
 } from '../src/providers/discovery-store.js';
+import { writeCodexUsageReport } from '../src/providers/codex-usage.js';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
 import { readSupervisorState, startGoal } from '../src/supervisor/state.js';
 import {
@@ -353,6 +354,54 @@ describe('fresh session context', () => {
     expect(output).toContain('current worker capacity:');
     expect(output).toMatch(/current worker capacity:.*\bcodex\b/);
     expect(output).toMatch(/current worker capacity:.*claude \(not yet discovered\)/);
+    expect(output).toContain('no live snapshot — run `major provider usage`');
+  });
+
+  it('surfaces persisted live Codex capacity for both authenticated accounts in the banner', async () => {
+    const current = repo('codex-capacity-project');
+    configureProjectPolicy({
+      project: 'github.com/example/codex-capacity-project',
+      repoPath: current,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    writeCodexUsageReport({
+      fetchedAt: '2026-08-17T18:00:00.000Z',
+      methods: ['account/read', 'account/rateLimits/read'],
+      accounts: [
+        {
+          accountLabel: 'default',
+          planType: 'plus',
+          primary: { usedPercent: 42, windowDurationMins: 300 },
+        },
+        {
+          accountLabel: 'work-b',
+          planType: 'plus',
+          primary: { usedPercent: 91, windowDurationMins: 300 },
+        },
+      ],
+    });
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    expect(
+      await runSessionContextCli(['session', 'attach', '--host', 'codex', '--cwd', current]),
+    ).toBe(true);
+    const output = lines.join('\n');
+    expect(output).toContain('Codex capacity:');
+    expect(output).toMatch(/default\s+plus\s+5h \[####\.{6}\] 42%/);
+    expect(output).toMatch(/work-b\s+plus\s+5h \[#{9}\.\] 91%/);
+    expect(output).toContain('refresh: major provider usage');
+    expect(output).not.toContain('no live snapshot');
+    for (const line of output.split('\n')) {
+      if (
+        line.includes('Codex capacity') ||
+        line.includes('[#') ||
+        line.includes('refresh: major provider usage')
+      ) {
+        expect(line.length, line).toBeLessThanOrEqual(80);
+      }
+    }
   });
 });
 
