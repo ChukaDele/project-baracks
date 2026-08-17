@@ -132,14 +132,18 @@ Path(sys.argv[1]).write_text(json.dumps({
 PY
 
 # Activation is pointer-based: the complete validated bundle is installed first,
-# then one symlink rename changes what every new Major resolution sees.
+# then one atomic symlink replacement changes what every new Major resolution sees.
 if [ -e "$DEST" ]; then
   rm -rf "$DEST"
 fi
 mv "$STAGED" "$DEST"
 NEXT="$BUNDLES/.current-$$"
 ln -s "$SHA" "$NEXT"
-mv -f "$NEXT" "$BUNDLES/current"
+python3 - "$NEXT" "$BUNDLES/current" <<'PY'
+import os
+import sys
+os.replace(sys.argv[1], sys.argv[2])
+PY
 
 # Keep the active bundle plus the two most recent rollback bundles. Skill bundles
 # are small, but Major still owns their lifecycle and should converge in space.
