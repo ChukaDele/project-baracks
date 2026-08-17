@@ -1,3 +1,6 @@
+import { spawnSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { auditSkillReachability, resolveSkills } from './resolver.js';
 import {
   deprecateGeneratedSkill,
@@ -14,8 +17,23 @@ function flag(args: string[], name: string): string | undefined {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+function runtimeRoot(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+}
+
 export async function runSkillCli(args: string[]): Promise<boolean> {
   if (args[0] !== 'skill') return false;
+  if (args[1] === 'sync') {
+    const script = join(runtimeRoot(), 'scripts', 'sync-major-skills.sh');
+    const source = flag(args, '--source');
+    const result = spawnSync('bash', source ? [script, source] : [script], {
+      stdio: 'inherit',
+      env: process.env,
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(`Major skill sync failed with exit ${result.status ?? 'unknown'}`);
+    return true;
+  }
   if (args[1] === 'resolve') {
     const task = flag(args, '--task');
     if (!task) throw new Error('missing required --task');
