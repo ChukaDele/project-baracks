@@ -77,10 +77,15 @@ cat <<EOF
 Major global worker rules installed transactionally for:
 - Claude Code: $HOME/.claude/major-global.md imported by $HOME/.claude/CLAUDE.md
 - Codex: ${CODEX_HOME:-$HOME/.codex}/AGENTS.md
-- Antigravity: $HOME/.gemini/GEMINI.md
-- Cursor local global rule: $HOME/.cursor/rules/major-global/RULE.md
+- Antigravity: $HOME/.gemini/GEMINI.md (fallback; not confirmed to be read) plus a
+  registered plugin at $HOME/.major/gemini-plugin (the real, documented mechanism)
+- Cursor local global rule: $HOME/.cursor/rules/major-global/RULE.mdc
 - Canonical Major internal skills: $GLOBAL_SKILLS_DEST ($SKILL_COUNT skills)
 - Stability invariants: $STABILITY_SRC
+
+This script installs rule files only. Automatic SessionStart/sessionStart/
+PreInvocation attach hooks for Codex, Cursor and Antigravity require
+--major-bin and are installed by install-major-runtime.sh instead.
 
 Cursor note:
 - This terminal-installed rule is local to this Mac.

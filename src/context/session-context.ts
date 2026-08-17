@@ -209,6 +209,7 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
   if (args[1] !== 'attach' && args[1] !== 'hook') return false;
 
   const host = flag(args, '--host') ?? 'unknown';
+  const envelope = flag(args, '--envelope');
   let cwd = flag(args, '--cwd') ?? process.cwd();
   let sessionId =
     flag(args, '--session-id') ?? (host === 'codex' ? process.env.CODEX_THREAD_ID : undefined);
@@ -217,12 +218,50 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
     const input = await readStdin();
     if (input) {
       try {
-        const parsed = JSON.parse(input) as { cwd?: string; session_id?: string };
+        const parsed = JSON.parse(input) as {
+          cwd?: string;
+          session_id?: string;
+          invocationNum?: number;
+        };
         cwd = parsed.cwd ?? cwd;
         sessionId = parsed.session_id ?? sessionId;
+        // Antigravity's PreInvocation event fires on every model call, not
+        // just session start (there is no dedicated session-start event for
+        // it). Only the first invocation of a conversation should attach and
+        // surface the banner -- every later call must be a silent no-op, or
+        // the banner would repeat on every single turn.
+        if (
+          envelope === 'antigravity-pre-invocation' &&
+          typeof parsed.invocationNum === 'number' &&
+          parsed.invocationNum !== 1
+        ) {
+          console.log('{}');
+          return true;
+        }
       } catch {
         // Hook context is advisory; use command/process defaults when malformed.
       }
+    }
+  }
+
+  function emit(banner: string): void {
+    switch (envelope) {
+      case 'codex-session-start':
+        console.log(JSON.stringify({ continue: true, additionalContext: banner }));
+        return;
+      case 'cursor-session-start':
+        console.log(
+          JSON.stringify({
+            additionalContext: banner,
+            hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: banner },
+          }),
+        );
+        return;
+      case 'antigravity-pre-invocation':
+        console.log(JSON.stringify({ injectSteps: [{ ephemeralMessage: banner }] }));
+        return;
+      default:
+        console.log(banner);
     }
   }
 
@@ -235,7 +274,7 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
   });
 
   if (!project) {
-    console.log(
+    emit(
       `MAJOR CONTROL PLANE: ACTIVE\nhost: ${host}\ncwd: ${resolve(cwd)}\nNo git project detected in this session.\n\nBefore project work, enter or resolve the intended repository. Do not create/fix files in an unrelated workspace merely because it is open.`,
     );
     return true;
@@ -256,7 +295,7 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
       ? 'ready — `major goal admit` activates it automatically for substantive work'
       : `not applicable (trust=${policy.trust}${policy.ownerApprovedBuild ? '' : ', not owner-approved build'})`;
   const resources = formatResourceTelemetry(resourceSnapshot().telemetry);
-  console.log(`MAJOR CONTROL PLANE: ACTIVE
+  const banner = `MAJOR CONTROL PLANE: ACTIVE
 host: ${host}
 cwd: ${resolve(cwd)}
 project: ${project.project}
@@ -298,6 +337,7 @@ ${
 - For MCP/connectors/plugins, load mcp-integration-ops and prove the actual integration state.
 - For substantial UI/website creation, redesign, or "generic/AI-looking/too safe" feedback, load design-direction-and-taste first. It is the single Major taste authority; do not stack competing generic taste skills.
 - For customer-facing website QA, load website-design-qa; add responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js work.
-- Owner-approved build projects may continue ordinary reversible engineering without permission ceremony. Client/PII data remains project-local.`);
+- Owner-approved build projects may continue ordinary reversible engineering without permission ceremony. Client/PII data remains project-local.`;
+  emit(banner);
   return true;
 }

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -97,6 +99,122 @@ def claude_settings(path: Path, major_bin: str) -> str:
         filtered.append(item)
     filtered.append(entry)
     hooks["SessionStart"] = filtered
+    return json.dumps(data, indent=2) + "\n"
+
+
+def _merge_command_hook(
+    path: Path,
+    *,
+    versioned: bool,
+    event: str,
+    matcher: str | None,
+    command: str,
+    marker: str,
+    extra_handler_fields: dict | None = None,
+) -> str:
+    raw = read_text(path)
+    if not raw.strip():
+        data: dict = {}
+    else:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"refusing to overwrite malformed hooks JSON: {path}") from exc
+    if not isinstance(data, dict):
+        raise SystemExit(f"hooks root must be a JSON object: {path}")
+
+    if versioned:
+        data.setdefault("version", 1)
+    hooks_root = data.setdefault("hooks", {})
+    if not isinstance(hooks_root, dict):
+        raise SystemExit(f"hooks.{event} container must be a JSON object: {path}")
+
+    existing = hooks_root.get(event)
+    if existing is None:
+        existing = []
+    elif not isinstance(existing, list):
+        raise SystemExit(f"hooks.{event} must be a JSON array: {path}")
+
+    filtered = [item for item in existing if marker not in json.dumps(item, sort_keys=True)]
+    handler = {"type": "command", "command": command, **(extra_handler_fields or {})}
+    entry = {"matcher": matcher, "hooks": [handler]} if matcher is not None else handler
+    filtered.append(entry)
+    hooks_root[event] = filtered
+    return json.dumps(data, indent=2) + "\n"
+
+
+def codex_hooks(path: Path, major_bin: str) -> str:
+    command = f'"{major_bin}" session hook --host codex --envelope codex-session-start'
+    return _merge_command_hook(
+        path,
+        versioned=False,
+        event="SessionStart",
+        matcher="startup|resume|clear|compact",
+        command=command,
+        marker="session hook --host codex",
+        # Default additionalContextLimit is 2500 tokens; Major's banner
+        # (goal state, learnings, resolved skills, resource guard) regularly
+        # exceeds that and would otherwise be silently truncated.
+        extra_handler_fields={"additionalContextLimit": 8000},
+    )
+
+
+def cursor_hooks(path: Path, major_bin: str) -> str:
+    command = f'"{major_bin}" session hook --host cursor --envelope cursor-session-start'
+    return _merge_command_hook(
+        path,
+        versioned=True,
+        event="sessionStart",
+        matcher=None,
+        command=command,
+        marker="session hook --host cursor",
+    )
+
+
+def antigravity_plugin_hooks(major_bin: str) -> str:
+    command = f'"{major_bin}" session hook --host antigravity --envelope antigravity-pre-invocation'
+    data = {
+        "major-attach": {
+            "PreInvocation": [{"type": "command", "command": command, "timeout": 10}],
+        }
+    }
+    return json.dumps(data, indent=2) + "\n"
+
+
+def cursor_mdc_rule(rules: str) -> str:
+    return (
+        "---\n"
+        "description: Major global worker rules\n"
+        "alwaysApply: true\n"
+        "---\n\n" + rules.strip() + "\n"
+    )
+
+
+def gemini_plugins_json(path: Path, plugin_path: str) -> str:
+    raw = read_text(path)
+    if not raw.strip():
+        data: dict = {}
+    else:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"refusing to overwrite malformed Antigravity plugins JSON: {path}") from exc
+    if not isinstance(data, dict):
+        raise SystemExit(f"Antigravity plugins.json root must be a JSON object: {path}")
+
+    entries = data.get("entries")
+    if entries is None:
+        entries = []
+    elif not isinstance(entries, list):
+        raise SystemExit(f"Antigravity plugins.json entries must be a JSON array: {path}")
+
+    filtered = [
+        item
+        for item in entries
+        if not (isinstance(item, dict) and item.get("path") == plugin_path)
+    ]
+    filtered.append({"path": plugin_path})
+    data["entries"] = filtered
     return json.dumps(data, indent=2) + "\n"
 
 
@@ -377,12 +495,16 @@ def main() -> None:
     )
     add_file(entries, gemini_stage, home / ".gemini" / "GEMINI.md")
 
-    cursor_stage = write_stage_file(stage, "cursor-rule.md", rules)
+    # Cursor rules require the .mdc extension with YAML frontmatter
+    # (description/globs/alwaysApply); a bare .md file is silently not
+    # loaded. Clean up the earlier, incorrectly-formatted file on upgrade.
+    cursor_stage = write_stage_file(stage, "cursor-rule.mdc", cursor_mdc_rule(rules))
     add_file(
         entries,
         cursor_stage,
-        home / ".cursor" / "rules" / "major-global" / "RULE.md",
+        home / ".cursor" / "rules" / "major-global" / "RULE.mdc",
     )
+    add_absent(entries, home / ".cursor" / "rules" / "major-global" / "RULE.md")
 
     if args.major_bin:
         settings_stage = write_stage_file(
@@ -398,6 +520,57 @@ def main() -> None:
             zshrc_with_path(read_text(home / ".zshrc")),
         )
         add_file(entries, zsh_stage, home / ".zshrc")
+
+        # Only Claude has an automatic SessionStart hook out of the box.
+        # Codex and Cursor both have real, documented, user-level (global)
+        # hook mechanisms of their own -- close the gap the same way.
+        codex_hooks_stage = write_stage_file(
+            stage,
+            "codex-hooks.json",
+            codex_hooks(codex_home / "hooks.json", args.major_bin),
+        )
+        add_file(entries, codex_hooks_stage, codex_home / "hooks.json")
+
+        cursor_hooks_stage = write_stage_file(
+            stage,
+            "cursor-hooks.json",
+            cursor_hooks(home / ".cursor" / "hooks.json", args.major_bin),
+        )
+        add_file(entries, cursor_hooks_stage, home / ".cursor" / "hooks.json")
+
+        # Antigravity has no global markdown-rule mechanism at all -- rules
+        # are only discovered by walking from cwd up to a repo root, and its
+        # documented global location (~/.gemini/config/) is for skills.json
+        # /plugins.json, not GEMINI.md. A globally-registered plugin bundling
+        # a rule and a PreInvocation hook is the real, documented mechanism
+        # that reaches every project on this machine.
+        plugin_root = home / ".major" / "gemini-plugin"
+        add_file(
+            entries,
+            write_stage_file(stage, "gemini-plugin-manifest.json", json.dumps({"name": "major-global"}, indent=2) + "\n"),
+            plugin_root / "plugin.json",
+        )
+        add_file(
+            entries,
+            write_stage_file(stage, "gemini-plugin-rule.md", rules),
+            plugin_root / "rules" / "major-global.md",
+        )
+        add_file(
+            entries,
+            write_stage_file(stage, "gemini-plugin-hooks.json", antigravity_plugin_hooks(args.major_bin)),
+            plugin_root / "hooks.json",
+        )
+        add_file(
+            entries,
+            write_stage_file(
+                stage,
+                "gemini-plugins-registry.json",
+                gemini_plugins_json(
+                    home / ".gemini" / "config" / "plugins.json", str(plugin_root)
+                ),
+            ),
+            home / ".gemini" / "config" / "plugins.json",
+        )
 
     for label, source_arg, target in (
         ("execution-config", args.execution_config, home / ".major" / "execution.json"),

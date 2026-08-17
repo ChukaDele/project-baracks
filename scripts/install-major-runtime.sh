@@ -455,9 +455,9 @@ State:      $MAJOR_HOME/supervisor-state.json
 Policies:   $MAJOR_HOME/project-policies.json
 Kill switch:$MAJOR_HOME/STOP
 Claude:     deterministic SessionStart attach installed
-Codex:      global Major rules installed
-Cursor:     global Major rules installed
-Antigravity:global Major rules installed
+Codex:      global rules (AGENTS.md) + SessionStart hook installed (run '/hooks' once in Codex to trust it)
+Cursor:     global rules (RULE.mdc) + sessionStart hook installed
+Antigravity:global rules + PreInvocation attach hook installed via a registered plugin (~/.major/gemini-plugin)
 
 RUNTIME INTEGRITY:
 - The active CLI runs from an immutable release snapshot under ~/.major/releases.
