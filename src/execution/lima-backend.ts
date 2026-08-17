@@ -44,7 +44,11 @@ import type { AgentRuntimeResult } from './agent-runtime.js';
 import { CursorAcpRuntime } from './cursor-acp-runtime.js';
 import type { LimaExecutionConfig } from './lima-config.js';
 import { validateResolvedLimaInstance, type ValidatedLimaInstance } from './lima-invariants.js';
-import { guestProjectHome, guestProviderProfile } from './provider-profile.js';
+import {
+  guestProjectHome,
+  guestProviderProfile,
+  type GuestProviderProfile,
+} from './provider-profile.js';
 import { pendingRunManifests, writeRunManifest, type LimaRunManifest } from './run-manifest.js';
 import {
   hashWorkspaceTree,
@@ -339,6 +343,7 @@ export class LimaBackend implements ExecutionBackend {
     await this.acquireLock(lock);
     try {
       await this.start();
+      await this.materializeCredentialIntoStaticHome(profile);
       const result = await this.lima([
         'shell',
         '--tty=false',
@@ -398,6 +403,34 @@ export class LimaBackend implements ExecutionBackend {
         rmSync(lock, { recursive: true, force: true });
       }
     }
+  }
+
+  /**
+   * Found by real end-to-end testing, not by design review: the canonical
+   * provider-auth store (written by both host-credential import and
+   * provider-native login) is never otherwise read from anywhere — a
+   * credential could be imported/logged in successfully and the provider
+   * would still probe as not-authenticated forever, because probeProvider
+   * checks the dedicated guest user's STATIC home
+   * (`/home/major-<provider>`), which nothing had ever synced from the
+   * store. This makes the canonical store the actual source of truth for
+   * that static home too, refreshed before every probe — a no-op when
+   * nothing has been connected yet (checked first; the static home is left
+   * exactly as-is), and correctly picking up a changed credential after a
+   * manual account swap.
+   */
+  private async materializeCredentialIntoStaticHome(profile: GuestProviderProfile): Promise<void> {
+    const canonicalPath = `/var/lib/major/provider-auth/${profile.host}/${profile.authRelativePath}`;
+    const targetPath = `${profile.home}/${profile.authRelativePath}`;
+    const targetDir = dirname(targetPath);
+    const script =
+      `if [ -f '${canonicalPath}' ]; then ` +
+      `install -d -o '${profile.user}' -g '${profile.user}' -m 0700 '${targetDir}' && ` +
+      `cp -- '${canonicalPath}' '${targetPath}' && ` +
+      `chown '${profile.user}:${profile.user}' '${targetPath}' && ` +
+      `chmod 600 '${targetPath}'; ` +
+      `fi`;
+    await this.lima(['shell', '--tty=false', this.config.instance, 'sudo', 'sh', '-c', script]);
   }
 
   /**

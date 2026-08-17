@@ -1,6 +1,6 @@
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { LimaBackend } from '../src/execution/lima-backend.js';
 import { openDb } from '../src/db/client.js';
@@ -305,5 +305,88 @@ describe('Lima backend native login (Codex device-auth)', () => {
       ok: false,
       detail: expect.stringMatching(/cancelled or the code may have expired/),
     });
+  });
+});
+
+/**
+ * Found by real end-to-end testing (not by design review): probeProvider
+ * checked the dedicated guest user's static home for a credential, but
+ * neither host-credential import nor native login ever wrote anything
+ * there -- both only wrote the canonical provider-auth store, which nothing
+ * read from again. A provider could be successfully imported/logged in and
+ * still probe as not-authenticated forever. These tests prove the fix: a
+ * sync step now runs before every probe, materializing the canonical
+ * store's credential into the static home when one exists, and leaving the
+ * static home untouched when the store is empty.
+ */
+function fakeLimaLoggingShell(): { limactlPath: string; readLog: () => string[] } {
+  const root = mkdtempSync(join(tmpdir(), 'major-fake-lima-materialize-'));
+  const path = join(root, 'limactl');
+  writeFileSync(
+    path,
+    `#!/bin/sh
+set -u
+DIR="$(cd "$(dirname "$0")" && pwd)"
+LOG="$DIR/calls.log"
+STATUS_FILE="$DIR/vm-status"
+case "$1" in
+  --version) printf 'limactl version 2.2.0\\n' ;;
+  list)
+    status="$(cat "$STATUS_FILE" 2>/dev/null || echo Stopped)"
+    printf '{"name":"major-worker","status":"%s","vmType":"vz","arch":"aarch64","sshAddress":"127.0.0.1","config":{"plain":true,"mounts":[],"portForwards":[],"networks":[],"propagateProxyEnv":false,"containerd":{"system":false,"user":false},"ssh":{"forwardAgent":false,"forwardX11":false,"forwardX11Trusted":false,"loadDotSSHPubKeys":false},"user":{"name":"major-admin","home":"/home/major-admin"}}}\\n' "$status"
+    ;;
+  start) printf Running > "$STATUS_FILE"; exit 0 ;;
+  stop) printf Stopped > "$STATUS_FILE"; exit 0 ;;
+  copy) exit 0 ;;
+  shell)
+    shift
+    printf '%s\\n' "$*" >> "$LOG"
+    line="$*"
+    case "$line" in
+      *"provider-auth/codex"*"test -f"*) [ -f "$DIR/store-has-credential" ] && exit 0 || exit 1 ;;
+      *"sh -c"*"provider-auth/codex"*) exit 0 ;;
+      *login\\ status*)
+        [ -f "$DIR/store-has-credential" ] && printf 'Logged in using ChatGPT\\n' || printf 'Not logged in\\n'
+        exit 0
+        ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  *) exit 64 ;;
+esac
+`,
+  );
+  chmodSync(path, 0o755);
+  return {
+    limactlPath: path,
+    readLog: () => {
+      try {
+        return readFileSync(join(root, 'calls.log'), 'utf8').split('\n').filter(Boolean);
+      } catch {
+        return [];
+      }
+    },
+  };
+}
+
+describe('Lima backend probe: materializes the canonical credential store into the static home', () => {
+  it('syncs the canonical store into the static home BEFORE probing, when a credential exists', async () => {
+    const fake = fakeLimaLoggingShell();
+    writeFileSync(join(dirname(fake.limactlPath), 'store-has-credential'), '1');
+    const result = await backend(fake.limactlPath).probeProvider('codex');
+    expect(result.authenticated).toBe(true);
+    const log = fake.readLog();
+    const syncIndex = log.findIndex(
+      (l) => l.includes('sh -c') && l.includes('provider-auth/codex'),
+    );
+    const probeIndex = log.findIndex((l) => l.includes('login status'));
+    expect(syncIndex).toBeGreaterThanOrEqual(0);
+    expect(probeIndex).toBeGreaterThan(syncIndex);
+  });
+
+  it('leaves the static home untouched (reports not-authenticated) when nothing has been stored yet', async () => {
+    const fake = fakeLimaLoggingShell(); // no store-has-credential file
+    const result = await backend(fake.limactlPath).probeProvider('codex');
+    expect(result.authenticated).toBe(false);
   });
 });
