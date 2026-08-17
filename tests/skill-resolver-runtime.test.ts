@@ -108,7 +108,9 @@ describe('runtime skill resolver', () => {
 
     const resolved = resolveSkills({ task: 'Use hot-skill for this task.', limit: 1 });
     expect(resolved.skills[0]?.id).toBe('hot-skill');
-    expect(resolved.skills[0]?.path).toBe(join(current, 'skills', 'internal', 'hot-skill', 'SKILL.md'));
+    expect(resolved.skills[0]?.path).toBe(
+      join(current, 'skills', 'internal', 'hot-skill', 'SKILL.md'),
+    );
   });
 
   it('ignores a stale hot bundle whose registry predates the immutable release', () => {
