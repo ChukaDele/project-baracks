@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { hostCredentialPath as expectedHostCredentialPath } from '../providers/host-credential.js';
 import type { ExecuteHandle, ExecuteOutcome, ProviderEvent } from '../providers/types.js';
 import { openDb } from '../db/client.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
@@ -368,6 +369,128 @@ export class LimaBackend implements ExecutionBackend {
             : 'provider is installed but authentication was not confirmed in the isolated worker',
       };
     } finally {
+      try {
+        await this.stop();
+      } finally {
+        rmSync(lock, { recursive: true, force: true });
+      }
+    }
+  }
+
+  /**
+   * Moves the user's OWN host provider credential into their OWN local
+   * worker's canonical provider-auth store — the self-service onboarding
+   * operation (`major provider connect`). Requires no Workshop/staged
+   * authority: the caller already has read access to the host file and
+   * control of this local worker. Scope is fixed and narrow (one exact
+   * provider, one exact host path, this worker) — never arbitrary transfer.
+   * All process spawning stays inside this already-audited module; the
+   * actual host-side symlink/hardlink/mode checks happen twice — once here
+   * as defense in depth, and once already in the caller
+   * (src/providers/host-credential.ts) before this is ever invoked.
+   */
+  async importProviderCredential(
+    host: 'claude' | 'codex' | 'cursor' | 'antigravity',
+    hostCredentialPath: string,
+  ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
+    if (!isCapabilityAvailable('live-agent-execution')) {
+      return {
+        ok: false,
+        detail: 'credential import is disabled while live-agent-execution is unavailable',
+      };
+    }
+    // This invariant otherwise holds only because the single current caller
+    // (lifecycle-cli.ts's `connect`) derives both `host` and this path from
+    // the same map — re-verify it structurally so a future caller can't
+    // import provider A's credential under provider B's identity by mistake.
+    if (hostCredentialPath !== expectedHostCredentialPath(host)) {
+      return {
+        ok: false,
+        detail: `refusing to import: the given path does not match ${host}'s known host credential location`,
+      };
+    }
+    const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
+    const importScript = join(executingRoot, 'scripts', 'import-major-provider-credential.py');
+    const stateRoot = join(majorHome(), 'execution', 'lima');
+    const lock = join(stateRoot, 'backend.lock');
+    mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+    await this.acquireLock(lock);
+    try {
+      await this.start();
+      const guestTmp = '/tmp/major-credential-import';
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        guestTmp,
+      ]);
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'install',
+        '-d',
+        '-m',
+        '0700',
+        guestTmp,
+      ]);
+      const copiedCredential = await this.lima([
+        'copy',
+        hostCredentialPath,
+        `${this.config.instance}:${guestTmp}/staged`,
+      ]);
+      if (copiedCredential.code !== 0) {
+        return {
+          ok: false,
+          detail:
+            'could not send this credential to the isolated worker — try again; ' +
+            `technical detail: ${redactText(copiedCredential.stderr)}`,
+        };
+      }
+      const copiedScript = await this.lima([
+        'copy',
+        importScript,
+        `${this.config.instance}:${guestTmp}/import.py`,
+      ]);
+      if (copiedScript.code !== 0) {
+        return {
+          ok: false,
+          detail:
+            'could not prepare the isolated worker to receive this credential — try again; ' +
+            `technical detail: ${redactText(copiedScript.stderr)}`,
+        };
+      }
+      const placed = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'python3',
+        `${guestTmp}/import.py`,
+        host,
+      ]);
+      if (placed.code !== 0) {
+        return {
+          ok: false,
+          detail: `credential import broker refused: ${redactText(placed.stderr || placed.stdout)}`,
+        };
+      }
+      return { ok: true, detail: placed.stdout.trim() };
+    } finally {
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        '/tmp/major-credential-import',
+      ]).catch(() => undefined);
       try {
         await this.stop();
       } finally {

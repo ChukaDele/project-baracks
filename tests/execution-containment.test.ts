@@ -14,7 +14,6 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { darwinSeatbeltContainment, detectContainment } from '../src/security/containment.js';
 import type { Containment } from '../src/security/containment.js';
-import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
@@ -350,12 +349,15 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
   }, 30_000);
 });
 
-describe('M1-disabled execution remains fail-closed', () => {
+describe('execution remains fail-closed on other safety checks with M1 active', () => {
+  // live-agent-execution now gates core isolated-runner safety and is active,
+  // so these no longer refuse at the capability gate — they refuse at the
+  // roots/containment checks that fire independently of that flag.
   it('refuses argv paths outside the allowed roots', () => {
     const { gateway, decisions, root } = makeGateway();
     expect(() =>
       gateway.execute({ executable: NODE, args: ['-e', '1', '/etc/shadow'], cwd: root }),
-    ).toThrow(CapabilityUnavailableError);
+    ).toThrow(/escapes the allowed roots/);
     expect(decisions.at(-1)?.allowed).toBe(false);
   });
 
@@ -371,7 +373,7 @@ describe('M1-disabled execution remains fail-closed', () => {
       recordDecision: () => undefined,
     });
     expect(() => gateway.execute({ executable: NODE, args: ['-e', '1'], cwd: root })).toThrow(
-      CapabilityUnavailableError,
+      /trusted filesystem and network isolation is not configured or unavailable/,
     );
   });
 });

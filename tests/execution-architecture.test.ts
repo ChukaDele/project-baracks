@@ -19,9 +19,17 @@ describe('single execution boundary', () => {
       return [relative(root, path)];
     });
     expect(offenders.sort()).toEqual([
+      // Execs an existing, already-audited lifecycle script (rollback) that
+      // must run outside the currently-loaded process. No logic here beyond
+      // that one exec — see the module doc comment.
+      'src/cli/lifecycle-ops.ts',
       'src/execution/cursor-acp-runtime.ts',
       'src/execution/lima-backend.ts',
       'src/providers/exec.ts',
+      // Checks only for the EXISTENCE of a macOS Keychain entry (no `-w`,
+      // never reads the stored secret) as part of host credential detection
+      // for `major provider connect`. Narrow, single-purpose, audited here.
+      'src/providers/host-credential.ts',
       'src/security/major-gateway.ts',
       'src/security/secure-enclave-attestation.ts',
       'src/security/system-memory.ts',

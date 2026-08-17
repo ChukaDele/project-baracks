@@ -169,6 +169,19 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
         pid: process.pid,
       });
     }
+  } else if (!staged && request.providerRequest) {
+    // Plain supervised provider execution must be as lease-accounted as the
+    // Workshop and staged-validation paths: this is now the ordinary,
+    // default authority for real provider work, not a rare pre-activation
+    // exception, so it must be visible to Major's global resource ledger too.
+    if (!request.resourceLeaseId) {
+      throw new Error('supervised provider execution requires a worker resource lease');
+    }
+    assertActiveResourceLeaseForProcess({
+      leaseId: request.resourceLeaseId,
+      kind: 'worker',
+      pid: process.pid,
+    });
   }
   const backendEnabled =
     (isCapabilityAvailable('live-agent-execution') || Boolean(staged) || Boolean(workshop)) &&

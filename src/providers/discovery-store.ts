@@ -99,7 +99,18 @@ function selectProviderByCapacityKey(db: DbConn, key: string) {
 export function persistProviderDiscovery(
   db: Db,
   info: ProviderInfo,
-  options: { source: ObservationSource; note?: string; now?: () => Date },
+  options: {
+    source: ObservationSource;
+    note?: string;
+    now?: () => Date;
+    /** An explicit, human-triggered re-probe (e.g. `major provider probe`)
+     * may observe a materially changed auth state — a credential refresh or
+     * account swap — sooner than the passive backoff window would otherwise
+     * allow. Automatic/background discovery must never set this: it exists
+     * to record an intentional owner action, not to let routine polling
+     * defeat the backoff that prevents hot-looping a real provider. */
+    bypassBackoff?: boolean;
+  },
 ) {
   return db.transaction(
     (tx) => {
@@ -115,6 +126,7 @@ export function persistProviderDiscovery(
           )
           .get();
         const backingOff =
+          !options.bypassBackoff &&
           existing &&
           (existing.availability === 'rate_limited' || existing.availability === 'exhausted') &&
           existing.nextProbeAt !== null &&
@@ -407,4 +419,39 @@ export function loadPersistedProviderInfos(
     if (provider.version !== null) info.version = provider.version;
     return info;
   });
+}
+
+/** The fingerprint of the credential currently imported for this provider,
+ * or null if none has been imported (or the provider is unknown). Never the
+ * credential itself — see `fingerprintCredentialFile` in host-credential.ts. */
+export function getCredentialFingerprint(db: DbConn, providerName: string): string | null {
+  return selectProviderByCapacityKey(db, providerName)?.credentialFingerprint ?? null;
+}
+
+/** Records which credential (by fingerprint only) is currently imported for
+ * a provider. Called only after a successful import — never speculatively. */
+export function setCredentialFingerprint(db: Db, providerName: string, fingerprint: string): void {
+  const { providerName: name, accountLabel } = parseCapacityKey(providerName);
+  const now = new Date().toISOString();
+  const existing = db
+    .select()
+    .from(agentProviders)
+    .where(and(eq(agentProviders.name, name), eq(agentProviders.accountLabel, accountLabel)))
+    .get();
+  if (existing) {
+    db.update(agentProviders)
+      .set({ credentialFingerprint: fingerprint })
+      .where(eq(agentProviders.id, existing.id))
+      .run();
+    return;
+  }
+  db.insert(agentProviders)
+    .values({
+      id: newId('aprov'),
+      name,
+      accountLabel,
+      credentialFingerprint: fingerprint,
+      lastDiscoveredAt: now,
+    })
+    .run();
 }

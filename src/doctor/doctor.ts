@@ -9,6 +9,16 @@ import {
 import { detectContainment, type ContainmentStatus } from '../security/containment.js';
 import { redactText } from '../security/redact.js';
 import type { BackendStatus } from '../execution/backend.js';
+import {
+  computeCoreReadiness,
+  computeLiveExecutionReadiness,
+  computeMultiProviderReadiness,
+  computeProviderReadiness,
+  type CoreReadiness,
+  type LiveExecutionReadiness,
+  type MultiProviderReadiness,
+  type ProviderReadiness,
+} from './readiness.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'missing';
 
@@ -40,6 +50,17 @@ export interface DoctorReport {
   liveExecutionBlockers: string[];
   /** Immutable build capability status (hard-coded, not configurable). */
   capabilities: CapabilityStatus[];
+  /** Core platform safety: isolated runner containment + required prerequisites.
+   * Independent of any single provider's auth/billing state. */
+  core: CoreReadiness;
+  /** Per-provider actionable status. One provider's failure never changes
+   * another provider's entry. */
+  providerReadiness: ProviderReadiness[];
+  /** liveExecutionReady restated with the providers that make it true and how
+   * much fallback capacity exists. */
+  liveExecution: LiveExecutionReadiness;
+  multiProviderReady: boolean;
+  multiProvider: MultiProviderReadiness;
 }
 
 /**
@@ -87,7 +108,26 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
 
   const providerInfos: ProviderInfo[] = [];
   for (const provider of inputs.providers) {
-    const info = await provider.discover();
+    // One provider's discover() throwing must never take down the whole
+    // report — every other provider's evidence still has to come back.
+    let info: ProviderInfo;
+    try {
+      info = await provider.discover();
+    } catch (error) {
+      providerInfos.push({
+        name: provider.name,
+        installed: false,
+        authenticated: false,
+        models: [],
+      });
+      checks.push({
+        name: `provider:${provider.name}`,
+        required: false,
+        status: 'missing',
+        detail: `discovery failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      continue;
+    }
     providerInfos.push(info);
     const unverified = info.executableUnverified === true;
     checks.push({
@@ -146,10 +186,27 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
   // Descendant/process containment and the immutable M1 activation gate are
   // reported separately.
   const liveExecutionCapabilityAvailable = isCapabilityAvailable('live-agent-execution');
-  const backendStatus =
-    liveExecutionCapabilityAvailable && inputs.inspectExecutionBackend
-      ? await inputs.inspectExecutionBackend()
-      : undefined;
+  let backendStatus: BackendStatus | undefined;
+  if (liveExecutionCapabilityAvailable && inputs.inspectExecutionBackend) {
+    // A missing/malformed ~/.major/execution.json, or a stale limactl path,
+    // throws before inspect()'s own try/catch ever runs (config loading and
+    // LimaBackend construction both happen synchronously first). That must
+    // degrade to "core not ready" with a clear reason, never crash the whole
+    // report — this is exactly the fresh-machine / stale-config case a
+    // friend hits before Lima is fully set up.
+    try {
+      backendStatus = await inputs.inspectExecutionBackend();
+    } catch (error) {
+      backendStatus = {
+        kind: 'lima',
+        available: false,
+        filesystemIsolation: false,
+        networkIsolation: false,
+        lifecycleIsolation: false,
+        detail: `execution backend unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
   const containment = backendStatus
     ? {
         platform: 'lima',
@@ -171,21 +228,27 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     status: containment.liveExecutionReady ? 'ok' : 'warn',
     detail: containment.detail,
   });
-  const liveExecutionBlockers: string[] = [];
-  if (!liveExecutionCapabilityAvailable) {
-    liveExecutionBlockers.push(
-      'live-agent-execution capability remains disabled pending M1 review',
-    );
-  }
-  if (!containment.liveExecutionReady) {
-    liveExecutionBlockers.push(`descendant containment insufficient: ${containment.detail}`);
-  }
 
   const missingPrerequisites = checks
     .filter((c) => c.required && c.status === 'missing')
     .map((c) => c.name);
 
   const capabilities = capabilityStatuses();
+
+  // Core platform safety is independent of any single provider's state.
+  const core = computeCoreReadiness({
+    runnerCapabilityAvailable: liveExecutionCapabilityAvailable,
+    containmentReady: containment.liveExecutionReady,
+    containmentDetail: containment.detail,
+    missingRequiredPrerequisites: missingPrerequisites,
+  });
+
+  // Provider health is computed independently per provider: one provider's
+  // failure never changes another provider's entry or blocks its evidence.
+  const providerReadiness = providerInfos.map((info) => computeProviderReadiness(info));
+  const liveExecution = computeLiveExecutionReadiness(core, providerReadiness);
+  const multiProvider = computeMultiProviderReadiness(liveExecution);
+  const liveExecutionBlockers = liveExecution.blockers;
 
   // Inspection health is independent of foreground execution readiness.
   const inspectionEnvironmentIssues: string[] = [];
@@ -238,8 +301,13 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     overnightExecutionReasons,
     inspectionEnvironmentOk: inspectionEnvironmentIssues.length === 0,
     inspectionEnvironmentIssues,
-    liveExecutionReady: liveExecutionCapabilityAvailable && containment.liveExecutionReady,
+    liveExecutionReady: liveExecution.ready,
     liveExecutionBlockers,
     capabilities,
+    core,
+    providerReadiness,
+    liveExecution,
+    multiProviderReady: multiProvider.ready,
+    multiProvider,
   };
 }

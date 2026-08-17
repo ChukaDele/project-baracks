@@ -141,6 +141,13 @@
       "when": 1786847428993,
       "tag": "0019_flaky_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1786912646818,
+      "tag": "0020_nasty_fat_cobra",
+      "breakpoints": true
     }
   ]
 }

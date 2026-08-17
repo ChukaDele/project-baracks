@@ -1,7 +1,17 @@
 /**
  * Build-level capability availability. The five v0.5.1 capability boundaries
- * remain immutable code gates. M2-M5 are implemented, but M1 remains closed
- * until the isolated provider runner passes every release field gate.
+ * remain immutable code gates.
+ *
+ * `live-agent-execution` gates CORE PLATFORM SAFETY ONLY: is the isolated
+ * Lima runner mechanism itself (containment, credential broker, guest user
+ * isolation, release/runtime integrity) sound enough to let ANY provider
+ * execute inside it. It is deliberately NOT "have all providers passed
+ * field validation" — that would conflate a build-wide safety property with
+ * per-provider auth/billing/quota health, which changes constantly (account
+ * swaps, OAuth refreshes, quota resets) and must never force a new release.
+ * Per-provider readiness is computed independently in
+ * src/doctor/readiness.ts and never mutates this flag. See
+ * docs/readiness-model.md.
  *
  * These are CODE CONSTANTS, deliberately not configuration: no config file,
  * environment variable, CLI flag, database row or constructor option is
@@ -13,9 +23,12 @@
 
 export const CAPABILITY_DEFINITIONS = Object.freeze({
   'live-agent-execution': Object.freeze({
-    available: false,
-    reason: 'isolated provider runner has not passed all provider and lifecycle field gates',
-    milestone: 'M1 — release recovery pending',
+    available: true,
+    reason:
+      'isolated Lima runner mechanism (containment, credential broker, guest isolation, ' +
+      'release integrity) independently verified safe; per-provider auth/billing/field ' +
+      'health is tracked separately in src/doctor/readiness.ts and never gates this flag',
+    milestone: 'M1 — core runner activated for v0.5.2',
   }),
   'paid-provider-execution': Object.freeze({
     available: true,

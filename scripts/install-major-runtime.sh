@@ -358,6 +358,26 @@ rm -f "$LEARNING_MIGRATION_LOCK" || \
   echo "WARN: remove the completed Major learning migration lock: $LEARNING_MIGRATION_LOCK" >&2
 LEARNING_LOCK_HELD=0
 
+# Append-only install history so `major rollback` can identify the prior
+# installed release without guessing from directory mtimes. Only written
+# after activation actually committed — a failed/aborted install must never
+# record a history entry for a release that never became active.
+python3 - "$MAJOR_HOME/install-history.jsonl" "$RECORD_TMP" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+history_path = Path(sys.argv[1])
+record = json.loads(Path(sys.argv[2]).read_text())
+with history_path.open('a') as handle:
+    handle.write(json.dumps({
+        "sha": record["sha"],
+        "version": record["version"],
+        "releaseDir": record["releaseDir"],
+        "installedAt": record["installedAt"],
+    }) + "\n")
+PY
+
 # Pilot posture: no auto-start daemon. Never install or auto-start a global daemon.
 # The loaded-service postcondition was verified before activation so no
 # fallible check remains after the user-state transaction commits.
@@ -367,6 +387,62 @@ LEARNING_LOCK_HELD=0
 if [ "${MAJOR_INSTALL_ANTIGRAVITY:-0}" = "1" ]; then
   echo "WARN: MAJOR_INSTALL_ANTIGRAVITY is retired. Install the official 'agy' CLI and complete Google OAuth interactively."
 fi
+
+# Copying files into place is not evidence the install actually works. Verify
+# the now-active runtime's own content-hash manifest, then run a contained
+# health check through the wrapper a user will actually invoke — not the
+# build-time smoke test, the real installed CLI.
+#
+# installed-release.json and install-history.jsonl were already written by
+# the point this runs (activation itself must complete before a live doctor
+# check can even be attempted). A failure here must correct that record
+# in place, not just exit — otherwise a support bundle or a maintainer
+# reading installed-release.json afterward would see releaseGate: "passed"
+# for a release this very script just refused to vouch for.
+mark_release_gate_failed() {
+  python3 "$SNAPSHOT_ROOT/scripts/mark-major-release-gate.py" "$RELEASE_RECORD" "$1"
+}
+echo
+echo "Verifying the installed runtime..."
+if ! node "$RELEASE_DIR/scripts/major-runtime-manifest.mjs" verify "$RELEASE_DIR"; then
+  echo "ERROR: installed runtime failed its content manifest immediately after activation." >&2
+  echo "Files were copied but the resulting runtime cannot be trusted; do not use this install." >&2
+  mark_release_gate_failed "failed-content-manifest"
+  exit 1
+fi
+POSTINSTALL_DOCTOR_STDERR="$(mktemp "${TMPDIR:-/tmp}/major-postinstall-doctor.XXXXXX")"
+set +e
+DOCTOR_JSON="$("$BIN_DIR/major" doctor --json 2>"$POSTINSTALL_DOCTOR_STDERR")"
+DOCTOR_STATUS=$?
+set -e
+if [ "$DOCTOR_STATUS" -ne 0 ] && [ "$DOCTOR_STATUS" -ne 5 ]; then
+  echo "ERROR: the installed major CLI failed its post-install health check (exit $DOCTOR_STATUS)." >&2
+  cat "$POSTINSTALL_DOCTOR_STDERR" >&2
+  rm -f "$POSTINSTALL_DOCTOR_STDERR"
+  echo "Files were copied but the resulting runtime does not run cleanly; do not use this install." >&2
+  mark_release_gate_failed "failed-post-install-health-check"
+  exit 1
+fi
+rm -f "$POSTINSTALL_DOCTOR_STDERR"
+CORE_READY="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['data']['core']['ready'])" "$DOCTOR_JSON" 2>/dev/null || echo "unknown")"
+DB_OK="$(python3 -c "
+import json, sys
+data = json.loads(sys.argv[1])['data']
+print('ok' if any(c['name']=='sqlite' and c['status']=='ok' for c in data['checks']) else 'FAILED')
+" "$DOCTOR_JSON" 2>/dev/null || echo "unknown")"
+
+cat <<EOF
+Installed Major v${INSTALL_VERSION} ($INSTALL_SHA)
+
+✓ release integrity  (content manifest verified)
+✓ worker              (isolated runner core ready: $CORE_READY)
+✓ database            ($DB_OK)
+✓ provider setup available
+
+Run:
+  major setup
+
+EOF
 
 cat <<EOF
 Major v${INSTALL_VERSION} control plane installed from validated main.

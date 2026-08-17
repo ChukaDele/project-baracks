@@ -17,12 +17,23 @@ import {
 } from '../domain/task-service.js';
 import { loadProjectConfig, resolveRepoPath } from '../config/project-config.js';
 import { addProject, getProjectByName, listProjects } from '../config/project-service.js';
-import { runDoctor } from '../doctor/doctor.js';
+import { runDoctor, type DoctorReport } from '../doctor/doctor.js';
+import {
+  computeLiveExecutionReadiness,
+  computeMultiProviderReadiness,
+  computeProviderReadiness,
+} from '../doctor/readiness.js';
 import { ClaudeCodeProvider } from '../providers/claude-code.js';
 import { CodexProvider } from '../providers/codex.js';
 import { cursorProvider } from '../providers/cursor.js';
 import { antigravityProvider } from '../providers/antigravity.js';
-import { persistProviderDiscovery } from '../providers/discovery-store.js';
+import { checkHostCredential } from '../providers/host-credential.js';
+import { buildSupportBundle } from '../doctor/support-bundle.js';
+import { runRollbackScript } from './lifecycle-ops.js';
+import {
+  loadPersistedProviderInfos,
+  persistProviderDiscovery,
+} from '../providers/discovery-store.js';
 import { route, type RoutingRequest } from '../routing/router.js';
 import { dbDecisionRecorder } from '../security/audit.js';
 import { ExecutionGateway } from '../security/gateway.js';
@@ -125,6 +136,54 @@ function providers(gateway: ExecutionGateway) {
   ];
 }
 
+/**
+ * runDoctor's own providerReadiness/liveExecution reflect only THIS run's
+ * fresh, resolution-only host discovery — never the persisted, authoritative
+ * state from an isolated probe or a billing attestation (both recorded only
+ * after runDoctor returns). Recompute readiness from the persisted state so
+ * `major doctor`/`major setup` reflect what `major provider probe` and
+ * `major provider attest-billing` actually observed, not just this run's
+ * PATH resolution.
+ */
+function withPersistedReadiness(database: Db, report: DoctorReport): DoctorReport {
+  const persisted = loadPersistedProviderInfos(database);
+  const providerReadiness = persisted.map((info) => computeProviderReadiness(info));
+  const liveExecution = computeLiveExecutionReadiness(report.core, providerReadiness);
+  const multiProvider = computeMultiProviderReadiness(liveExecution);
+  // overnightExecutionReasons embeds two provider-derived lines built from
+  // THIS run's fresh discovery (the stale "no provider is READY: ..." from
+  // liveExecutionBlockers, and the separate usable-provider check below) —
+  // both must be replaced with the same reconciled data used above, or the
+  // human-readable report can show a provider as e.g. AUTH_REQUIRED in one
+  // section and NOT_CONFIGURED in another within the same run.
+  const usableProvider = providerReadiness.some((p) => p.state === 'READY');
+  const overnightExecutionReasons = report.overnightExecutionReasons
+    .filter(
+      (reason) =>
+        !reason.startsWith('no provider is READY') &&
+        !reason.startsWith('no verified+authenticated'),
+    )
+    .concat(
+      liveExecution.blockers.filter((reason) => reason.startsWith('no provider is READY')),
+      usableProvider
+        ? []
+        : [
+            'no verified+authenticated agent provider (resolution-only discovery is not a provider ' +
+              'lifecycle probe)',
+          ],
+    );
+  return {
+    ...report,
+    providerReadiness,
+    liveExecution,
+    liveExecutionReady: liveExecution.ready,
+    liveExecutionBlockers: liveExecution.blockers,
+    multiProviderReady: multiProvider.ready,
+    multiProvider,
+    overnightExecutionReasons,
+  };
+}
+
 program
   .command('doctor')
   .description('Check prerequisites, providers, models and overnight-execution safety')
@@ -132,7 +191,7 @@ program
   .action(async (opts: { json?: boolean }) => {
     const database = db();
     const gateway = probeGateway(database);
-    const report = await runDoctor({
+    const freshReport = await runDoctor({
       providers: providers(gateway),
       configuredProjects: listProjects(database).map((p) => ({
         name: p.name,
@@ -141,9 +200,10 @@ program
       resolve: (name) => gateway.resolveExecutable(name),
       inspectExecutionBackend: () => majorExecutionBackend().inspect(),
     });
-    for (const info of report.providers) {
+    for (const info of freshReport.providers) {
       persistProviderDiscovery(database, info, { source: 'cli' });
     }
+    const report = withPersistedReadiness(database, freshReport);
     if (opts.json) {
       emitJson('doctor-report', report);
     } else {
@@ -183,6 +243,143 @@ program
     }
     // Exit code reflects inspection health, not unattended authority.
     if (!report.inspectionEnvironmentOk) process.exit(EXIT.unsafe);
+  });
+
+program
+  .command('setup')
+  .description('Friend-facing readiness check: core, providers, and what to do next')
+  .option('--json', 'emit the full report as versioned JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const database = db();
+    const gateway = probeGateway(database);
+    const freshReport = await runDoctor({
+      providers: providers(gateway),
+      configuredProjects: listProjects(database).map((p) => ({
+        name: p.name,
+        repoPath: p.repoPath,
+      })),
+      resolve: (name) => gateway.resolveExecutable(name),
+      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
+    });
+    for (const info of freshReport.providers) {
+      persistProviderDiscovery(database, info, { source: 'cli' });
+    }
+    const report = withPersistedReadiness(database, freshReport);
+    const providerToHost: Record<string, 'claude' | 'codex' | 'cursor' | 'antigravity'> = {
+      'claude-code': 'claude',
+      codex: 'codex',
+      cursor: 'cursor',
+      antigravity: 'antigravity',
+    };
+    const hostLogins = report.providerReadiness.map((p) => {
+      const host = providerToHost[p.provider];
+      const check = host ? checkHostCredential(host) : undefined;
+      return {
+        provider: p.provider,
+        hostLoginFound: check?.status === 'found' || check?.status === 'unsafe',
+      };
+    });
+    if (opts.json) {
+      emitJson('setup-report', {
+        core: report.core,
+        providerReadiness: report.providerReadiness,
+        hostLogins,
+        liveExecution: report.liveExecution,
+        multiProvider: report.multiProvider,
+      });
+      return;
+    }
+    console.log('MAJOR SETUP\n');
+    console.log('Core');
+    console.log(`  isolated runner       ${report.core.ready ? '✓' : '✗'}`);
+    if (!report.core.ready) {
+      for (const issue of report.core.issues) console.log(`  - ${issue}`);
+    }
+    console.log('\nProviders');
+    for (const p of report.providerReadiness) {
+      const host = providerToHost[p.provider];
+      const hostCheck = host ? checkHostCredential(host) : undefined;
+      console.log(`\n${p.provider}`);
+      console.log(
+        `  host login            ${hostCheck?.status === 'found' ? 'found' : hostCheck?.status === 'unsafe' ? 'found (' + hostCheck.detail.split('.')[0] + ')' : 'not found'}`,
+      );
+      console.log(`  Major login           ${p.state === 'READY' ? 'READY' : p.state}`);
+      if (p.state !== 'READY') {
+        console.log(`  action                major provider connect --provider ${p.provider}`);
+      }
+    }
+    console.log('\nMajor');
+    console.log(`  live execution        ${report.liveExecutionReady ? 'READY' : 'NOT READY'}`);
+    console.log(`  healthy providers     ${report.liveExecution.healthyProviders.length}`);
+    console.log(`  fallback available    ${report.multiProviderReady ? 'YES' : 'NO'}`);
+    console.log(
+      `  overnight execution   DISABLED (${report.overnightExecutionReasons[0] ?? 'see major doctor'})`,
+    );
+    if (!report.liveExecutionReady) {
+      console.log(`\nnot ready: ${report.liveExecution.blockers.join('; ')}`);
+    }
+  });
+
+program
+  .command('rollback')
+  .description('Activate the release installed immediately before the current one')
+  .action(() => {
+    try {
+      runRollbackScript();
+    } catch (error) {
+      fail(
+        `rollback failed: ${error instanceof Error ? error.message : String(error)}`,
+        EXIT.error,
+      );
+    }
+  });
+
+program
+  .command('support-bundle')
+  .description('Sanitized diagnostic bundle for sharing when asking for help')
+  .option('--json', 'emit the full bundle as versioned JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const database = db();
+    const gateway = probeGateway(database);
+    const freshReport = await runDoctor({
+      providers: providers(gateway),
+      configuredProjects: listProjects(database).map((p) => ({
+        name: p.name,
+        repoPath: p.repoPath,
+      })),
+      resolve: (name) => gateway.resolveExecutable(name),
+      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
+    });
+    for (const info of freshReport.providers) {
+      persistProviderDiscovery(database, info, { source: 'cli' });
+    }
+    const report = withPersistedReadiness(database, freshReport);
+    const bundle = buildSupportBundle(report);
+    if (opts.json) {
+      emitJson('support-bundle', bundle);
+      return;
+    }
+    console.log('MAJOR SUPPORT BUNDLE\n');
+    console.log(`generated       ${bundle.generatedAt}`);
+    console.log(`os              ${bundle.os.platform} ${bundle.os.release} (${bundle.os.arch})`);
+    console.log(
+      `major           ${bundle.major.version ?? 'unknown'} sha=${bundle.major.installedSha ?? 'unknown'} gate=${bundle.major.releaseGateAtInstall ?? 'unknown'}`,
+    );
+    console.log(`worker          ${bundle.worker.instance ?? 'not configured'}`);
+    console.log(`core ready      ${bundle.core.ready ? 'yes' : 'no'}`);
+    console.log(
+      `live execution  ${bundle.liveExecution.ready ? 'READY' : 'NOT READY'} (${bundle.liveExecution.healthyProviderCount} healthy provider(s))`,
+    );
+    for (const p of bundle.providers) {
+      console.log(`  provider:${p.provider}  ${p.state}  ${p.detail}`);
+    }
+    if (bundle.errorChecks.length > 0) {
+      console.log('\nissues:');
+      for (const c of bundle.errorChecks) {
+        console.log(`  ${c.status}  ${c.name}: ${c.detail}`);
+      }
+    }
+    console.log('\n(share this output, or --json for the full sanitized bundle)');
   });
 
 const project = program.command('project').description('Manage supervised projects');

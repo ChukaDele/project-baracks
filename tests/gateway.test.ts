@@ -1,9 +1,35 @@
 import { chmodSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { checkArgv } from '../src/security/commands.js';
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
+
+// 'M1 execution gateway release gate' and the capability-gate assertion in
+// 'policy decision audit trail' below exercise ExecutionGateway's own
+// pre-activation defense-in-depth ordering, independent of this build's real
+// (now active) live-agent-execution state — see
+// tests/activated-capabilities.test.ts for the real-value assertion.
+vi.mock('../src/security/capabilities.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/security/capabilities.js')>();
+  const isCapabilityAvailable = (capability: string) =>
+    capability === 'live-agent-execution'
+      ? false
+      : actual.isCapabilityAvailable(capability as never);
+  return {
+    ...actual,
+    isCapabilityAvailable,
+    // Reimplemented against the override above: assertCapabilityAvailable's
+    // real body closes over the real module's own isCapabilityAvailable, so
+    // spreading actual.assertCapabilityAvailable here would silently ignore
+    // this mock.
+    assertCapabilityAvailable: (capability: string) => {
+      if (!isCapabilityAvailable(capability)) {
+        throw new actual.CapabilityUnavailableError(capability as never);
+      }
+    },
+  };
+});
 import type { Containment } from '../src/security/containment.js';
 import { BILLING_ENV_NAMES, sanitizeEnv } from '../src/security/env.js';
 import {

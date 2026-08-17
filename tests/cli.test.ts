@@ -10,6 +10,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { openDb } from '../src/db/client.js';
+import {
+  persistProviderDiscovery,
+  recordBillingObservation,
+} from '../src/providers/discovery-store.js';
 
 /**
  * Integration tests against the COMPILED CLI (`dist/cli/index.js`, built in
@@ -274,7 +279,7 @@ describe('major CLI', () => {
     expect(suppressed.stderr).toMatch(/suppressed/);
   });
 
-  it('doctor emits versioned JSON, strict exit codes, and the closed M1 gate', () => {
+  it('doctor emits versioned JSON, strict exit codes, and all five build capabilities available', () => {
     const result = major('doctor', '--json');
     expect([0, 5]).toContain(result.status);
     const parsed = JSON.parse(result.stdout) as {
@@ -291,14 +296,133 @@ describe('major CLI', () => {
       'paid-provider-execution',
       'worker-owned-downstream-mutations',
     ]);
-    expect(
-      parsed.data.capabilities.find((c) => c.capability === 'live-agent-execution')?.available,
-    ).toBe(false);
-    expect(
-      parsed.data.capabilities
-        .filter((c) => c.capability !== 'live-agent-execution')
-        .every((c) => c.available),
-    ).toBe(true);
+    // live-agent-execution gates core isolated-runner safety, not per-provider
+    // field-test outcome, so it stays available regardless of which providers
+    // are authenticated on the machine running this test.
+    expect(parsed.data.capabilities.every((c) => c.available)).toBe(true);
+  }, 90_000);
+
+  it('setup reports core, per-provider readiness, and never requires unattended authority', () => {
+    const result = major('setup', '--json');
+    expect([0, 1]).toContain(result.status);
+    const parsed = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      kind: string;
+      data: {
+        core: { ready: boolean; issues: string[] };
+        providerReadiness: { provider: string; state: string }[];
+        liveExecution: { ready: boolean; healthyProviders: string[]; fallbackCount: number };
+        multiProvider: { ready: boolean; healthyCount: number };
+      };
+    };
+    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.kind).toBe('setup-report');
+    expect(typeof parsed.data.core.ready).toBe('boolean');
+    expect(Array.isArray(parsed.data.providerReadiness)).toBe(true);
+    for (const provider of parsed.data.providerReadiness) {
+      expect([
+        'READY',
+        'AUTH_REQUIRED',
+        'RATE_LIMITED',
+        'EXHAUSTED',
+        'UNAVAILABLE',
+        'UNSUPPORTED_VERSION',
+        'NOT_CONFIGURED',
+      ]).toContain(provider.state);
+    }
+    // No JSON envelope from setup ever claims unattended/overnight authority.
+    expect(result.stdout).not.toMatch(/overnightExecution.*"safe"/i);
+  }, 90_000);
+
+  it("doctor and setup reflect a persisted probe+billing observation, not just this run's host resolution", () => {
+    // runDoctor's OWN pass is resolution-only host discovery; the CLI must
+    // reconcile with what `major provider probe` / `attest-billing` already
+    // recorded (see withPersistedReadiness), so a real isolated-probe result
+    // is not discarded by the next doctor/setup run's fresh discovery.
+    const scratch = mkdtempSync(join(tmpdir(), 'major-persisted-readiness-'));
+    const isoDb = join(scratch, 'major.db');
+    const opened = openDb(isoDb);
+    try {
+      const persisted = persistProviderDiscovery(
+        opened.db,
+        {
+          name: 'codex',
+          executable: '/opt/major/providers/v1/codex/bin/codex-native',
+          installed: true,
+          authenticated: true,
+          models: [
+            {
+              modelRef: 'auto',
+              routingClass: 'codex',
+              visible: true,
+              authenticated: true,
+              availability: 'available',
+              billingMode: 'unknown',
+              prohibited: false,
+              source: 'probe',
+            },
+          ],
+        },
+        { source: 'probe', note: 'authenticated in the isolated worker' },
+      );
+      recordBillingObservation(opened.db, {
+        providerName: 'codex',
+        modelRef: 'auto',
+        billingMode: 'subscription_included',
+        source: 'human',
+        note: 'ChatGPT Plus subscription confirmed by owner',
+      });
+      expect(persisted.models[0]?.modelRef).toBe('auto');
+    } finally {
+      opened.sqlite.close();
+    }
+
+    const result = majorEnv({ ...process.env, MAJOR_DB_PATH: isoDb }, 'setup', '--json');
+    expect(result.status).toBe(0);
+    const parsed = JSON.parse(result.stdout) as {
+      data: {
+        core: { ready: boolean };
+        providerReadiness: { provider: string; state: string }[];
+        liveExecution: { ready: boolean; healthyProviders: string[] };
+      };
+    };
+    expect(parsed.data.providerReadiness).toEqual(
+      expect.arrayContaining([expect.objectContaining({ provider: 'codex', state: 'READY' })]),
+    );
+    expect(parsed.data.liveExecution.healthyProviders).toContain('codex');
+    // liveExecutionReady also requires CORE safety (a working isolated-worker
+    // backend), which depends on whatever Lima installation this specific
+    // machine happens to have -- unrelated to what this test proves
+    // (persisted provider+billing reconciliation). Assert the implication,
+    // not an environment-dependent absolute, so this passes identically on
+    // a maintainer Mac with Lima configured and on a clean CI runner with
+    // none.
+    if (parsed.data.core.ready) {
+      expect(parsed.data.liveExecution.ready).toBe(true);
+    }
+
+    // doctor's overnightExecutionReasons must not still claim "no
+    // verified+authenticated provider"/"no provider is READY" once the
+    // reconciled provider state (just proven above) says codex is READY —
+    // that self-contradiction is exactly what a friend would see otherwise.
+    const doctorResult = majorEnv({ ...process.env, MAJOR_DB_PATH: isoDb }, 'doctor', '--json');
+    // Exit 5 here reflects inspection health (no projects configured in this
+    // isolated fixture db), not live-execution readiness — see the EXIT enum
+    // in src/cli/index.ts.
+    expect([0, 5]).toContain(doctorResult.status);
+    const doctorParsed = JSON.parse(doctorResult.stdout) as {
+      data: {
+        overnightExecutionReasons: string[];
+        liveExecutionReady: boolean;
+        core: { ready: boolean };
+      };
+    };
+    if (doctorParsed.data.core.ready) {
+      expect(doctorParsed.data.liveExecutionReady).toBe(true);
+    }
+    expect(doctorParsed.data.overnightExecutionReasons.join('; ')).not.toMatch(
+      /no verified\+authenticated|no provider is READY/,
+    );
   }, 90_000);
 
   it('keeps the legacy task-ledger CLI free of execution and downstream-write commands', () => {
@@ -315,7 +439,10 @@ describe('major CLI', () => {
       'help',
       'project',
       'queue',
+      'rollback',
       'route',
+      'setup',
+      'support-bundle',
       'task',
     ]);
 

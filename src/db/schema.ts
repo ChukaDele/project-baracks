@@ -210,6 +210,11 @@ export const agentProviders = sqliteTable(
     accountLabel: text('account_label').notNull().default('default'),
     executable: text('executable'),
     version: text('version'),
+    /** SHA-256 of the currently-imported credential's bytes, never the bytes
+     * themselves. Lets `major provider connect` detect "the host credential
+     * changed since we last imported it" (a manual account swap) without
+     * ever persisting secret material. Null until a credential is imported. */
+    credentialFingerprint: text('credential_fingerprint'),
     lastDiscoveredAt: text('last_discovered_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
