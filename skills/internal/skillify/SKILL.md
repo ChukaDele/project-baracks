@@ -75,6 +75,22 @@ Before promotion to the recurring Major skill library:
 
 A successful real procedure can remain a **candidate skill** until these checks pass.
 
+## Immediate availability after promotion
+
+A skill that exists in git but is not visible to the active resolver is not finished.
+
+For a global/internal skill change that lands on `main`:
+
+1. keep the executable Major release immutable;
+2. activate the current validated skill bundle with `major skill sync`;
+3. rerun `major skill audit --strict`;
+4. resolve at least one positive trigger for the new/changed skill;
+5. do not require a Lima/runtime reinstall merely to make markdown knowledge current.
+
+The hot bundle is the mutable knowledge layer. It must contain the registry, internal skill tree and resolver evals from one exact commit and activate as a unit. Never copy a single `SKILL.md` into a live global directory and call it installed.
+
+If hot sync is unavailable because the installed Major predates that capability, perform one normal validated Major runtime install; subsequent skill-only updates should use hot sync.
+
 ## Automatic lifecycle
 
 1. Emit a bounded `workflow` object only after the procedure succeeds.
@@ -84,8 +100,9 @@ A successful real procedure can remain a **candidate skill** until these checks 
 5. Synthesize the smallest Agent Skills compatible `SKILL.md`.
 6. Validate its name, description and operational sections before activation.
 7. Route active project skills through the canonical resolver.
-8. Record success, failure, duration and cost when available.
-9. Repeated poor outcomes deprecate the skill from default routing without deleting provenance.
+8. For a global/internal promotion merged to `main`, hot-sync the validated bundle and prove resolver reachability before declaring the promotion usable.
+9. Record success, failure, duration and cost when available.
+10. Repeated poor outcomes deprecate the skill from default routing without deleting provenance.
 
 Automatic promotion is project-local. Global promotion still uses Major's existing sanitized learning review and cross-project policy.
 
