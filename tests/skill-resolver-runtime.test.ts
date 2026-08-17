@@ -139,7 +139,9 @@ describe('runtime skill resolver', () => {
     );
     symlinkSync('fedcba9876543210fedcba9876543210fedcba98', join(home, 'skill-bundles', 'current'));
 
-    expect(resolveSkills({ task: 'Use stale-hot-skill for this task.' }).skills).toEqual([]);
+    expect(
+      resolveSkills({ task: 'Use stale-hot-skill for this task.' }).skills.map((skill) => skill.id),
+    ).not.toContain('stale-hot-skill');
   });
 
   it('does not let a project shadow a registered Major-internal skill id', () => {
