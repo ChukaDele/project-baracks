@@ -20,9 +20,8 @@ describe('Major hot skill sync', () => {
     roots.push(home);
     process.env.MAJOR_HOME = home;
 
-    await expect(
-      runSkillCli(['skill', 'sync', '--source', process.cwd(), '--json']),
-    ).resolves.toBe(true);
+    const synced = await runSkillCli(['skill', 'sync', '--source', process.cwd(), '--json']);
+    expect(synced).toBe(true);
 
     const current = join(home, 'skill-bundles', 'current');
     expect(existsSync(join(current, 'bundle.json'))).toBe(true);
