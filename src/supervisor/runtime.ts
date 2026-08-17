@@ -44,12 +44,15 @@ import {
 import {
   activeGoals,
   getGoal,
+  isLiveWorkerFresh,
   majorHome,
   readSupervisorState,
   updateGoal,
   type SupervisorGoal,
   type WorkerHost,
 } from './state.js';
+import { computeProviderReadiness } from '../doctor/readiness.js';
+import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integration.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
 import { completedWorkflow, parseWorkerReport } from './worker-report.js';
 
@@ -996,6 +999,14 @@ export function supervisorSnapshot(project?: string): string {
         `shadow=${policy.shadowPasses}/3 consecutive passes (${policy.shadowRuns} total)`,
         `goal=${goal.id} cycle=${goal.cycle} failures=${goal.consecutiveFailures}`,
       ];
+      if (goal.liveWorker) {
+        const fresh = isLiveWorkerFresh(goal.liveWorker);
+        const ageMin = Math.round((Date.now() - Date.parse(goal.liveWorker.heartbeatAt)) / 60_000);
+        lines.push(
+          `live worker: ${goal.liveWorker.host}@${goal.liveWorker.sessionId} ` +
+            (fresh ? `(heartbeat ${ageMin}m ago)` : '(stale, reclaimable)'),
+        );
+      }
       if (goal.lastSummary) lines.push(`last: ${trim(goal.lastSummary, 1_500)}`);
       if (goal.pendingCompletion) {
         lines.push(
@@ -1006,4 +1017,46 @@ export function supervisorSnapshot(project?: string): string {
       return lines.join('\n');
     })
     .join('\n\n');
+}
+
+/**
+ * Header block for `major status`: kill-switch state, per-host Major
+ * integration (rules/hook installed -- distinct from whether that host's own
+ * CLI is present, which `major hosts` covers), execution-provider health, and
+ * fallback capacity. DB-only; never spawns or probes a live provider.
+ */
+export function majorStatusOverview(): string {
+  const opened = openDb();
+  let infos: ProviderInfo[];
+  try {
+    infos = loadPersistedProviderInfos(opened.db);
+  } finally {
+    opened.sqlite.close();
+  }
+  const readiness = infos.map((info) => computeProviderReadiness(info));
+  const healthy = readiness.filter((r) => r.state === 'READY');
+
+  const hostsLine = SUPPORTED_HOSTS.map((host) => {
+    const status = hostIntegrationStatus(host);
+    const label =
+      status.rulesInstalled && status.hookInstalled
+        ? 'integrated'
+        : status.rulesInstalled
+          ? 'rules only'
+          : 'not integrated';
+    return `${host}(${label})`;
+  }).join(' ');
+
+  const providersLine =
+    readiness.length > 0
+      ? readiness.map((r) => `${r.provider}=${r.state}`).join(' ')
+      : 'none discovered';
+
+  return [
+    `MAJOR: ${globalStopRequested() ? 'STOPPED (kill switch active)' : 'ACTIVE'}`,
+    '',
+    `Hosts:                ${hostsLine}`,
+    `Execution providers:  ${providersLine}`,
+    `Fallback capacity:    ${healthy.length} healthy provider${healthy.length === 1 ? '' : 's'}`,
+  ].join('\n');
 }
