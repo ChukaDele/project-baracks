@@ -4,8 +4,9 @@ import { resourceTestFiles } from './vitest.resource-test-files.js';
 
 export default defineConfig({
   test: {
-    include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
-    exclude: resourceTestFiles,
+    include: resourceTestFiles,
     environment: 'node',
+    maxWorkers: 1,
+    fileParallelism: false,
   },
 });
