@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateResolvedLimaInstance } from '../src/execution/lima-invariants.js';
 
@@ -27,6 +29,13 @@ function validInstance() {
 }
 
 describe('resolved Lima isolation invariants', () => {
+  it('pins the Ubuntu 26.04 netplan readiness compatibility parameter', () => {
+    const template = readFileSync(
+      resolve(import.meta.dirname, '../templates/lima/major-worker.yaml'),
+      'utf8',
+    );
+    expect(template).toContain('internal_netplanOptional: "true"');
+  });
   it('accepts the effective isolated configuration', () => {
     expect(validateResolvedLimaInstance(validInstance(), 'major-worker')).toEqual({
       name: 'major-worker',
