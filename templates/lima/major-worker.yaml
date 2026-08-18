@@ -29,3 +29,6 @@ ssh:
   forwardX11Trusted: false
 video:
   display: none
+param:
+  # Ubuntu 26.04 VZ guests otherwise defer network readiness for about two minutes.
+  internal_netplanOptional: "true"
