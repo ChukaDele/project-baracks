@@ -15,6 +15,14 @@ CODEX_ACCOUNT_POLICY="${MAJOR_CODEX_ACCOUNT_POLICY:-$MAJOR_HOME/codex-account-po
 KERNEL_SOURCE="$ROOT/distribution/deepseek-harness/bundles/major-kernel"
 KERNEL_DEST="$DSH_HOME/bundles/major-kernel"
 MAJOR_PRESET_SOURCE="$ROOT/distribution/deepseek-harness/agent-presets/major"
+APP_DIR="${MAJOR_APP_DIR:-$HOME/Applications}"
+APP_DEST="$APP_DIR/Major.app"
+APP_MARKER_REL="Contents/Resources/major-dsh-installer-owned"
+APP_MARKER_VALUE="major-dsh-workstation-app-v1"
+APP_TRANSACTION_BACKUP=""
+APP_EXISTED_BEFORE_TRANSACTION=0
+APP_BACKED_UP=0
+APP_ACTIVATED=0
 DRY_RUN=0
 TRANSACTION_DIR=""
 TRANSACTION_ACTIVE=0
@@ -141,6 +149,15 @@ disk_preflight() {
 
 begin_managed_transaction() {
   [[ "$DRY_RUN" -eq 0 ]] || return 0
+  if [[ -e "$APP_DEST" || -L "$APP_DEST" ]]; then
+    [[ -d "$APP_DEST" && ! -L "$APP_DEST" ]] || \
+      fail "refusing to transact unmarked app: $APP_DEST"
+    [[ -f "$APP_DEST/$APP_MARKER_REL" ]] || \
+      fail "refusing to transact unmarked app: $APP_DEST"
+    [[ "$(cat "$APP_DEST/$APP_MARKER_REL")" == "$APP_MARKER_VALUE" ]] || \
+      fail "refusing to transact unmarked app: $APP_DEST"
+    APP_EXISTED_BEFORE_TRANSACTION=1
+  fi
   mkdir -p "$DSH_HOME"
   TRANSACTION_DIR="$(mktemp -d "$DSH_HOME/.install-rollback.XXXXXX")"
   mkdir -p "$TRANSACTION_DIR/backup"
@@ -157,6 +174,14 @@ begin_managed_transaction() {
       mv "$DSH_HOME/$relative" "$TRANSACTION_DIR/backup/$relative"
     fi
   done
+  if [[ "$APP_EXISTED_BEFORE_TRANSACTION" -eq 1 ]]; then
+    mkdir -p "$APP_DIR"
+    APP_TRANSACTION_BACKUP="$APP_DIR/.Major.app.install-rollback.$$"
+    [[ ! -e "$APP_TRANSACTION_BACKUP" && ! -L "$APP_TRANSACTION_BACKUP" ]] || \
+      fail "app rollback path already exists: $APP_TRANSACTION_BACKUP"
+    mv "$APP_DEST" "$APP_TRANSACTION_BACKUP"
+    APP_BACKED_UP=1
+  fi
 }
 
 rollback_managed_transaction() {
@@ -167,6 +192,12 @@ rollback_managed_transaction() {
   for relative in "${MANAGED_PATHS[@]}"; do
     rm -rf "$DSH_HOME/$relative"
   done
+  if [[ "$APP_BACKED_UP" -eq 1 ]]; then
+    rm -rf "$APP_DEST"
+    mv "$APP_TRANSACTION_BACKUP" "$APP_DEST"
+  elif [[ "$APP_ACTIVATED" -eq 1 ]]; then
+    rm -rf "$APP_DEST"
+  fi
   while IFS= read -r relative; do
     mkdir -p "$DSH_HOME/$(dirname "$relative")"
     mv "$TRANSACTION_DIR/backup/$relative" "$DSH_HOME/$relative"
@@ -179,6 +210,9 @@ rollback_managed_transaction() {
 commit_managed_transaction() {
   [[ "$TRANSACTION_ACTIVE" -eq 1 ]] || return 0
   TRANSACTION_ACTIVE=0
+  if [[ "$APP_BACKED_UP" -eq 1 ]]; then
+    rm -rf "$APP_TRANSACTION_BACKUP"
+  fi
   rm -rf "$TRANSACTION_DIR"
   trap - EXIT
 }
@@ -515,7 +549,11 @@ if [[ "${MAJOR_DSH_TEST_FAIL_AFTER_COMPOSITION:-0}" == "1" ]]; then
   fail "injected failure after web profile composition"
 fi
 verify_profile_composition major-workstation-headless
+APP_ACTIVATED=1
 stage_workstation_app
+if [[ "${MAJOR_DSH_TEST_FAIL_AFTER_APP_ACTIVATION:-0}" == "1" ]]; then
+  fail "injected failure after app activation"
+fi
 write_install_record
 commit_managed_transaction
 

@@ -134,10 +134,9 @@ export function codexRefreshHealth(
   account: CodexUsageAccount,
 ): 'healthy' | 'exhausted' | 'unknown' | 'error' {
   if (account.error) return 'error';
-  if (account.primary?.usedPercent !== undefined && account.primary.usedPercent >= 100) {
-    return 'exhausted';
-  }
-  return account.primary ? 'healthy' : 'unknown';
+  const usedPercent = account.primary?.usedPercent;
+  if (usedPercent === undefined || !Number.isFinite(usedPercent)) return 'unknown';
+  return usedPercent >= 100 ? 'exhausted' : 'healthy';
 }
 
 export function formatCodexCapacityRows(
@@ -213,15 +212,16 @@ function parsePersistedAccount(value: unknown): CodexUsageAccount | undefined {
   const accountKind = typeof value.accountKind === 'string' ? value.accountKind : undefined;
   const primary = parseRateLimitWindow(value.primary);
   const secondary = parseRateLimitWindow(value.secondary);
-  const suppliedPrimaryUsedPercent =
-    isRecord(value.primary) && Object.prototype.hasOwnProperty.call(value.primary, 'usedPercent');
-  if (
-    value.primary !== undefined &&
-    (!primary ||
-      (suppliedPrimaryUsedPercent &&
-        (typeof primary.usedPercent !== 'number' || !Number.isFinite(primary.usedPercent))))
-  ) {
-    return undefined;
+  for (const [supplied, parsed] of [
+    [value.primary, primary],
+    [value.secondary, secondary],
+  ] as const) {
+    if (supplied === undefined) continue;
+    if (!parsed || !isRecord(supplied)) return undefined;
+    for (const key of ['usedPercent', 'used_percent'] as const) {
+      if (!Object.prototype.hasOwnProperty.call(supplied, key)) continue;
+      if (typeof supplied[key] !== 'number' || !Number.isFinite(supplied[key])) return undefined;
+    }
   }
   return {
     accountLabel: value.accountLabel,

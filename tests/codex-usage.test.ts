@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +6,7 @@ import {
   authenticatedCodexAccountLabels,
   CODEX_CAPACITY_MAX_LINE_WIDTH,
   collectCodexUsage,
+  codexRefreshHealth,
   formatCodexCapacityOverview,
   formatCodexUsage,
   readCodexUsageReport,
@@ -46,6 +47,18 @@ function provider(name: string, overrides: Partial<ProviderInfo> = {}): Provider
 }
 
 describe('Codex usage monitor selection and formatting', () => {
+  it('does not mark a primary window routable without numeric quota evidence', () => {
+    expect(
+      codexRefreshHealth({
+        accountLabel: 'default',
+        primary: { windowDurationMins: 300 },
+      }),
+    ).toBe('unknown');
+    expect(codexRefreshHealth({ accountLabel: 'default', primary: { usedPercent: 100 } })).toBe(
+      'exhausted',
+    );
+  });
+
   it('reads only authenticated Codex accounts from persisted state, default first', () => {
     expect(
       authenticatedCodexAccountLabels([
@@ -238,6 +251,22 @@ describe('Codex usage monitor selection and formatting', () => {
         ],
       });
       expect(readCodexUsageReport()?.accounts[0]?.primary).toEqual({ windowDurationMins: 300 });
+
+      writeFileSync(
+        join(home, 'codex-usage.json'),
+        JSON.stringify({
+          fetchedAt: '2026-08-17T19:06:00.000Z',
+          methods: ['account/read', 'account/rateLimits/read'],
+          accounts: [
+            {
+              accountLabel: 'default',
+              primary: { usedPercent: 10 },
+              secondary: { usedPercent: 'invalid', windowDurationMins: 10_080 },
+            },
+          ],
+        }),
+      );
+      expect(readCodexUsageReport()).toBeUndefined();
     } finally {
       if (priorHome === undefined) delete process.env.MAJOR_HOME;
       else process.env.MAJOR_HOME = priorHome;

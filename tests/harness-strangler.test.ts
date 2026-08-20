@@ -340,12 +340,19 @@ describe('DeepSeek Harness cutover install plan', () => {
     }
   });
 
-  it('restores prior managed state byte-for-byte after a late composition failure', () => {
+  it('restores DSH state and installer-owned Major.app after a post-activation failure', () => {
+    const installerSource = readFileSync(
+      resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh'),
+      'utf8',
+    );
+    expect(installerSource).toContain('APP_ACTIVATED=1\nstage_workstation_app');
     const root = mkdtempSync(join(tmpdir(), 'major-dsh-rollback-'));
     const home = join(root, 'major-home');
     const dshHome = join(home, 'dsh-harness');
     const codexHome = join(root, 'codex');
     const fakeBin = join(root, 'bin');
+    const appDir = join(root, 'Applications');
+    const app = join(appDir, 'Major.app');
     const runtimeMarker = join(dshHome, 'runtime/rollback-runtime.txt');
     const profileMarker = join(dshHome, 'profiles/major-workstation-web/prior-profile.txt');
     const sessionMarker = join(dshHome, 'sessions/preserved.txt');
@@ -358,6 +365,7 @@ describe('DeepSeek Harness cutover install plan', () => {
         join(dshHome, 'chrome-profile'),
         codexHome,
         fakeBin,
+        join(app, 'Contents/Resources'),
       ]) {
         mkdirSync(path, { recursive: true });
       }
@@ -365,6 +373,11 @@ describe('DeepSeek Harness cutover install plan', () => {
       writeFileSync(profileMarker, 'prior managed profile\n');
       writeFileSync(sessionMarker, 'session state\n');
       writeFileSync(chromeMarker, 'chrome state\n');
+      writeFileSync(
+        join(app, 'Contents/Resources/major-dsh-installer-owned'),
+        'major-dsh-workstation-app-v1\n',
+      );
+      writeFileSync(join(app, 'prior-app.txt'), 'exact prior app\n');
       writeFileSync(join(codexHome, 'auth.json'), '{}\n');
       writeFileSync(
         join(fakeBin, 'npm'),
@@ -397,19 +410,46 @@ describe('DeepSeek Harness cutover install plan', () => {
             MAJOR_HOME: home,
             MAJOR_DSH_HOME: dshHome,
             MAJOR_DSH_CODEX_PROFILE_HOME: codexHome,
+            MAJOR_APP_DIR: appDir,
             MAJOR_TEST_PIN: resolve(REPO_ROOT, 'distribution/deepseek-harness/pin.json'),
-            MAJOR_DSH_TEST_FAIL_AFTER_COMPOSITION: '1',
+            MAJOR_DSH_TEST_FAIL_AFTER_APP_ACTIVATION: '1',
           },
         },
       );
       expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain('injected failure after web profile composition');
+      expect(result.stderr).toContain('injected failure after app activation');
       expect(result.stderr).toContain('prior installer-managed state restored');
       expect(readFileSync(runtimeMarker, 'utf8')).toBe('installed rollback runtime\n');
       expect(readFileSync(profileMarker, 'utf8')).toBe('prior managed profile\n');
       expect(readFileSync(sessionMarker, 'utf8')).toBe('session state\n');
       expect(readFileSync(chromeMarker, 'utf8')).toBe('chrome state\n');
+      expect(readFileSync(join(app, 'prior-app.txt'), 'utf8')).toBe('exact prior app\n');
+      expect(existsSync(join(app, 'Contents/MacOS/Major'))).toBe(false);
       expect(existsSync(join(dshHome, 'major-install.json'))).toBe(false);
+
+      rmSync(app, { recursive: true, force: true });
+      const absentResult = spawnSync(
+        '/bin/bash',
+        [resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh')],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${fakeBin}:${process.env.PATH ?? ''}`,
+            MAJOR_HOME: home,
+            MAJOR_DSH_HOME: dshHome,
+            MAJOR_DSH_CODEX_PROFILE_HOME: codexHome,
+            MAJOR_APP_DIR: appDir,
+            MAJOR_TEST_PIN: resolve(REPO_ROOT, 'distribution/deepseek-harness/pin.json'),
+            MAJOR_DSH_TEST_FAIL_AFTER_APP_ACTIVATION: '1',
+          },
+        },
+      );
+      expect(absentResult.status).not.toBe(0);
+      expect(absentResult.stderr).toContain('injected failure after app activation');
+      expect(existsSync(app)).toBe(false);
+      expect(readFileSync(runtimeMarker, 'utf8')).toBe('installed rollback runtime\n');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
