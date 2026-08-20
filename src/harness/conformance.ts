@@ -46,8 +46,6 @@ export interface HarnessConformanceReport {
   phase: typeof CURRENT_HARNESS_MIGRATION_PHASE;
   executionBackend: typeof DEFAULT_EXECUTION_BACKEND;
   pinVersion: string;
-  liveDshInstalled: false;
-  ready: false;
   checks: ConformanceCheck[];
 }
 
@@ -402,8 +400,6 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
     phase: CURRENT_HARNESS_MIGRATION_PHASE,
     executionBackend: DEFAULT_EXECUTION_BACKEND,
     pinVersion: pin.npm.version,
-    liveDshInstalled: false,
-    ready: false,
     checks,
   };
 }
@@ -416,9 +412,7 @@ export function formatHarnessConformance(report: HarnessConformanceReport): stri
   const failed = report.checks.filter((item) => !item.ok);
   const lines = [
     `DeepSeek Harness distribution ${report.pinVersion} (${report.phase})`,
-    `live execution backend: ${report.executionBackend}`,
-    `live dsh installed: ${report.liveDshInstalled}`,
-    `ready: ${report.ready}`,
+    `configured execution backend: ${report.executionBackend}`,
     ...report.checks.map((item) => `${item.ok ? 'PASS' : 'FAIL'} ${item.id}: ${item.detail}`),
   ];
   if (failed.length > 0) lines.push(`${failed.length} conformance check(s) failed`);

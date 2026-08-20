@@ -85,7 +85,7 @@ export const CAPABILITY_REUSE: readonly CapabilityReuseRecord[] = [
     capability: 'lima-isolation',
     decision: 'KEEP',
     owner: 'lima',
-    note: 'Default live backend. WRAP as a dsh sandbox provider only after a seam proof.',
+    note: 'Optional high-isolation and legacy compatibility backend for DSH execution.',
   },
 ];
 

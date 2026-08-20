@@ -506,7 +506,7 @@ RUNTIME INTEGRITY:
 NORMAL WORK MODE:
 - Major is present by default across supported agent tools.
 - The owner can explicitly fast-track trusted projects to foreground build mode.
-- build = one concurrent worker on the shared v0.5.1 Lima runtime, 120-minute coordinator ceiling, no repeated shadow/assist ceremony.
+- build = one concurrent DSH worker using the local environment by default, with Lima available for optional isolation; 120-minute coordinator ceiling and no repeated shadow/assist ceremony.
 - --allow-external-writes authorizes normal project writes such as branches, PRs, previews and already-authorized integrations.
 - client projects remain isolated from cross-project/global memory even in build mode.
 - no new paid spend, destructive production-data changes, credential/ownership/DNS changes, or production security-policy changes without explicit authority.

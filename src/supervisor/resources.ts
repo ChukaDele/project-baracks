@@ -29,7 +29,7 @@ export interface ResourceLimits {
 
 export const GLOBAL_RESOURCE_LIMITS: ResourceLimits = {
   total: 6,
-  // v0.5.1 has one shared Lima instance and therefore one safe worker slot.
+  // The configured DSH concurrency policy permits one worker slot.
   workers: 1,
   browsers: 2,
   builds: 1,

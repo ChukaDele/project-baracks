@@ -12,7 +12,7 @@ import { join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CAPABILITY_REUSE, missingRetainedCapabilities } from '../src/harness/capabilities.js';
-import { runHarnessCli } from '../src/harness/cli.js';
+import { liveDshStatus, runHarnessCli } from '../src/harness/cli.js';
 import {
   CURRENT_HARNESS_MIGRATION_PHASE,
   DEFAULT_EXECUTION_BACKEND,
@@ -29,6 +29,31 @@ import { buildHarnessInstallPlan } from '../src/harness/install-plan.js';
 import { DEEPSEEK_HARNESS_PIN, deepSeekHarnessPinSchema } from '../src/harness/pin.js';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
+
+function writeReadyDshInstallation(dshHome: string): void {
+  mkdirSync(join(dshHome, 'runtime/node_modules/.bin'), { recursive: true });
+  writeFileSync(
+    join(dshHome, 'major-install.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      pinVersion: DEEPSEEK_HARNESS_PIN.npm.version,
+      attestedCommit: DEEPSEEK_HARNESS_PIN.git.attestedCommit,
+      dshHome,
+      phase: 'cutover',
+      defaultRuntime: 'dsh-local',
+    }),
+  );
+  const executable = join(dshHome, 'runtime/node_modules/.bin/dsh');
+  writeFileSync(executable, '#!/usr/bin/env node\n');
+  chmodSync(executable, 0o755);
+  for (const profile of ['major-workstation-web', 'major-workstation-headless']) {
+    const profileDirectory = join(dshHome, 'profiles', profile);
+    mkdirSync(profileDirectory, { recursive: true });
+    for (const file of ['package.json', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
+      writeFileSync(join(profileDirectory, file), '{}\n');
+    }
+  }
+}
 
 describe('DeepSeek Harness strangler pin', () => {
   it('pins an exact RC and refuses range or dist-tag resolution', () => {
@@ -230,14 +255,14 @@ describe('DeepSeek Harness cutover install plan', () => {
 });
 
 describe('DeepSeek Harness cutover conformance', () => {
-  it('passes the distribution contract without claiming live dsh or cleanup', () => {
+  it('reports only static distribution conformance', () => {
     const report = runHarnessConformance(REPO_ROOT);
     expect(report.checks.filter((item) => !item.ok)).toEqual([]);
     expect(conformancePassed(report)).toBe(true);
     expect(report.phase).toBe('cutover');
     expect(report.executionBackend).toBe('dsh');
-    expect(report.liveDshInstalled).toBe(false);
-    expect(report.ready).toBe(false);
+    expect(report).not.toHaveProperty('liveDshInstalled');
+    expect(report).not.toHaveProperty('ready');
     expect(CURRENT_HARNESS_MIGRATION_PHASE).toBe('cutover');
   });
 });
@@ -267,6 +292,96 @@ describe('major harness CLI', () => {
     expect(await runHarnessCli(['provider', 'status'])).toBe(false);
   });
 
+  it('derives installation from the attested receipt and readiness from required paths', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-status-'));
+    const dshHome = join(root, 'dsh-harness');
+    try {
+      mkdirSync(dshHome, { recursive: true });
+      writeFileSync(
+        join(dshHome, 'major-install.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          pinVersion: DEEPSEEK_HARNESS_PIN.npm.version,
+          attestedCommit: DEEPSEEK_HARNESS_PIN.git.attestedCommit,
+          dshHome,
+          phase: 'cutover',
+          defaultRuntime: 'dsh-local',
+        }),
+      );
+
+      expect(liveDshStatus({ MAJOR_DSH_HOME: dshHome })).toEqual({
+        liveDshInstalled: true,
+        ready: false,
+      });
+
+      mkdirSync(join(dshHome, 'runtime/node_modules/.bin'), { recursive: true });
+      const dshExecutable = join(dshHome, 'runtime/node_modules/.bin/dsh');
+      writeFileSync(dshExecutable, '#!/usr/bin/env node\n');
+      chmodSync(dshExecutable, 0o755);
+      for (const path of [
+        'profiles/major-workstation-web',
+        'profiles/major-workstation-headless',
+      ]) {
+        mkdirSync(join(dshHome, path), { recursive: true });
+        for (const file of ['package.json', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
+          writeFileSync(join(dshHome, path, file), '{}\n');
+        }
+      }
+      expect(liveDshStatus({ MAJOR_DSH_HOME: dshHome })).toEqual({
+        liveDshInstalled: true,
+        ready: true,
+      });
+
+      writeFileSync(
+        join(dshHome, 'major-install.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          pinVersion: DEEPSEEK_HARNESS_PIN.npm.version,
+          attestedCommit: 'stale',
+          dshHome,
+          phase: 'cutover',
+          defaultRuntime: 'dsh-local',
+        }),
+      );
+      expect(liveDshStatus({ MAJOR_DSH_HOME: dshHome })).toEqual({
+        liveDshInstalled: false,
+        ready: false,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('is not ready when the installed dsh file is not executable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-status-'));
+    const dshHome = join(root, 'dsh-harness');
+    try {
+      writeReadyDshInstallation(dshHome);
+      chmodSync(join(dshHome, 'runtime/node_modules/.bin/dsh'), 0o644);
+      expect(liveDshStatus({ MAJOR_DSH_HOME: dshHome })).toEqual({
+        liveDshInstalled: true,
+        ready: false,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('is not ready when an installed profile is missing a composition file', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-status-'));
+    const dshHome = join(root, 'dsh-harness');
+    try {
+      writeReadyDshInstallation(dshHome);
+      rmSync(join(dshHome, 'profiles/major-workstation-web/cordis.patch.yml'));
+      expect(liveDshStatus({ MAJOR_DSH_HOME: dshHome })).toEqual({
+        liveDshInstalled: true,
+        ready: false,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('prints pin, composition and passing conformance', async () => {
     capture();
     expect(await runHarnessCli(['harness', 'status'])).toBe(true);
@@ -279,6 +394,7 @@ describe('major harness CLI', () => {
     );
     logs.length = 0;
     expect(await runHarnessCli(['harness', 'conformance'])).toBe(true);
+    expect(logs.join('\n')).toMatch(/configured execution backend: dsh/);
     expect(logs.join('\n')).toMatch(/PASS pin.exact/);
     logs.length = 0;
     expect(await runHarnessCli(['harness', 'install-plan'])).toBe(true);

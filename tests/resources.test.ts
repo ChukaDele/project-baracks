@@ -63,7 +63,7 @@ function concurrentRequest(owner: string): Promise<string> {
 }
 
 describe('Major global resource guard', () => {
-  it('serializes concurrent workers through the one shared Lima slot', async () => {
+  it('serializes concurrent workers through the configured DSH worker slot', async () => {
     const results = await Promise.all(
       Array.from({ length: 20 }, (_, index) => concurrentRequest(`qa-${index}`)),
     );
