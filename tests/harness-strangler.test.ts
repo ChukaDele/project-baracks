@@ -145,6 +145,7 @@ describe('DeepSeek Harness strangle install plan', () => {
     expect(output).toContain('write exact runtime manifest');
     expect(output).toContain('link shared runtime');
     expect(output).toContain('compose pinned profile major-workstation-web');
+    expect(output).toContain('Major.app');
     expect(output).toContain('Live Major execution remains on Lima');
     expect(output).toContain('MAJOR_SESSION_HOST');
   });
@@ -208,5 +209,9 @@ describe('major harness CLI', () => {
     expect(await runHarnessCli(['harness', 'shadow-task'])).toBe(true);
     expect(logs.join('\n')).toMatch(/opt-in default: false/);
     expect(logs.join('\n')).toMatch(/--dump-config/);
+    logs.length = 0;
+    expect(await runHarnessCli(['harness', 'workstation-app'])).toBe(true);
+    expect(logs.join('\n')).toMatch(/profile: major-workstation-web/);
+    expect(logs.join('\n')).toMatch(/listen: 127.0.0.1:3080/);
   });
 });

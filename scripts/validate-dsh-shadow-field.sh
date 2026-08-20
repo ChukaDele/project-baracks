@@ -23,7 +23,7 @@ echo "[1/5] Major static harness gate"
 bash scripts/validate-major.sh
 
 echo "[2/5] Harness strangler unit tests"
-pnpm vitest run tests/harness-strangler.test.ts tests/dsh-major-kernel.test.ts
+pnpm vitest run tests/harness-strangler.test.ts tests/dsh-major-kernel.test.ts tests/harness-workstation-app.test.ts
 
 echo "[3/5] major harness conformance"
 MAJOR_HARNESS_ROOT="$ROOT" pnpm major harness conformance
@@ -41,9 +41,10 @@ Live workers remain on Lima + official CLI/ACP.
 
 Next field proof (Mac workstation, not claimed by this script):
   1. bash scripts/install-deepseek-harness-pin.sh
-  2. export MAJOR_SESSION_HOST=cursor   # or claude|codex|antigravity
-  3. Run the smoke command from `major harness shadow-task`
-  4. Inside Lima: one representative project task via /major
-  5. Independent leaf review (exact-head-pr-review)
+  2. bash scripts/start-major-workstation.sh --project /path/to/real/repo
+  3. export MAJOR_SESSION_HOST=cursor   # or claude|codex|antigravity
+  4. Run the smoke command from `major harness shadow-task`
+  5. Inside Lima: one representative project task via /major
+  6. Independent leaf review (exact-head-pr-review)
 
 EOF

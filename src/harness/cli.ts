@@ -15,6 +15,7 @@ import {
 import { buildHarnessInstallPlan, formatHarnessInstallPlan } from './install-plan.js';
 import { DEEPSEEK_HARNESS_PIN } from './pin.js';
 import { buildHarnessShadowTask, formatHarnessShadowTask } from './shadow-task.js';
+import { buildWorkstationAppPlan, formatWorkstationAppPlan } from './workstation-app.js';
 
 const HARNESS_HELP = `major harness — DeepSeek Harness distribution (shadow strangler)
 
@@ -23,6 +24,7 @@ const HARNESS_HELP = `major harness — DeepSeek Harness distribution (shadow st
   harness conformance [--json]
   harness install-plan [--json]
   harness shadow-task [--json]
+  harness workstation-app [--json]
 `;
 
 function repoRootFromCwd(): string {
@@ -79,6 +81,11 @@ export async function runHarnessCli(args: string[]): Promise<boolean> {
   if (command === 'shadow-task') {
     const task = buildHarnessShadowTask();
     console.log(json ? JSON.stringify(task, null, 2) : formatHarnessShadowTask(task));
+    return true;
+  }
+  if (command === 'workstation-app') {
+    const plan = buildWorkstationAppPlan();
+    console.log(json ? JSON.stringify(plan, null, 2) : formatWorkstationAppPlan(plan));
     return true;
   }
   throw new Error(`unknown harness command: ${command}`);

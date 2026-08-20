@@ -326,5 +326,12 @@ fi
 [ -f scripts/validate-dsh-shadow-field.sh ] || fail "DeepSeek Harness shadow field validator missing"
 grep -Fq "validate:dsh-shadow" package.json || fail "package.json must expose validate:dsh-shadow"
 grep -Fq "sessionHostEnv" scripts/install-deepseek-harness-pin.sh || fail "install record must record MAJOR_SESSION_HOST"
+[ -f scripts/start-major-workstation.sh ] || fail "Major workstation launcher missing"
+[ -f scripts/stage-major-workstation-app.sh ] || fail "Major.app stager missing"
+[ -f distribution/deepseek-harness/macos/Major.app/Contents/Info.plist ] || fail "Major.app Info.plist missing"
+grep -Fq "stage_workstation_app" scripts/install-deepseek-harness-pin.sh || fail "pin installer must stage the reversible Major.app launcher"
+grep -Fq -- '--app=' scripts/start-major-workstation.sh || fail "workstation launcher must open Chrome app-mode"
+grep -Fq 'LISTEN_HOST="127.0.0.1"' scripts/start-major-workstation.sh || fail "workstation launcher must bind loopback only"
+grep -Fq "WRAP the existing \`major-workstation-web\` profile" docs/prior-art-decisions.md || fail "Mac workstation prior-art decision missing"
 
 echo "Major validation passed."

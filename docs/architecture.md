@@ -304,7 +304,11 @@ install-plan` and `scripts/install-deepseek-harness-pin.sh` stage the attested
 pin into an isolated harness home for strangle prep without changing the live
 backend. One shared runtime owns the pinned packages; profiles symlink that
 closure. The installer refuses a full disk and proves both profiles with
-`--dump-config`. `major harness shadow-task` is the planned first Lima-hosted
+`--dump-config`. `major harness workstation-app` is the installer-managed
+`Major.app` launcher: an installer-marked bundle in `~/Applications` (or
+`MAJOR_APP_DIR`) points to one loopback DSH web process, Chrome `--app` for a real
+project, logs and lock under the DSH home, no Electron/Tauri/login daemon, live
+`major` PATH unchanged. `major harness shadow-task` is the planned first Lima-hosted
 composition smoke; it is not live-worker cutover. `/major` takes
 `MAJOR_SESSION_HOST` so `goal admit` can attach, then `major run` routes the
 worker. DSH Claude Code is only the independent reviewer. `pnpm

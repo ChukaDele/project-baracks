@@ -64,8 +64,14 @@ Claude Code providers, then the local `@major/dsh-kernel` bundle. One shared
 runtime owns the exact attested DSH packages and React 18.3.1 peers. Both
 installer-owned profiles share that dependency closure and the local kernel
 through symlinks. The installer proves both composed profiles with
-`--dump-config`. Neither profile auto-starts a login daemon nor attaches Ruflo
-globally. Hot workspace policy stays in `workspace-lifecycle-management`.
+`--dump-config`, then stages a reversible, installer-marked `Major.app` under
+`${MAJOR_APP_DIR:-$HOME/Applications}` with a pointer back to the DSH home.
+It refuses to replace or remove an unmarked bundle. The launcher starts one loopback-only pinned web process, refuses a
+second live instance, opens a Chrome `--app` window for a real project
+directory, logs under the DSH home, and stops on SIGTERM. It does not install
+Electron, Tauri, a login daemon, or rewrite the live `major` PATH. Neither
+profile auto-starts a login daemon nor attaches Ruflo globally. Hot workspace
+policy stays in `workspace-lifecycle-management`.
 
 ## Evidence so far
 
@@ -76,7 +82,9 @@ globally. Hot workspace policy stays in `workspace-lifecycle-management`.
 - Installer disk preflight matches Major's 10%/20GiB block before npm or Lima cycling
 - `/major` admits with `MAJOR_SESSION_HOST` (required by `goal admit`) and leaves worker routing to `major run`; DSH Claude Code remains the independent reviewer
 - `major harness shadow-task` records the first Lima-hosted `--dump-config` smoke; it does not opt live workers into dsh
+- `major harness workstation-app` records the reversible `Major.app` + Chrome app-mode launcher contract
 - `pnpm validate:dsh-shadow` runs the deterministic source gate (validate-major, harness tests, conformance, install dry-run)
+- Isolated-home tests stage/remove `Major.app` and prove single-instance start/stop with fakes; they are not a Mac field proof
 - Default execution backend remains `LimaBackend`
 - A reproducible Mac field-install receipt is still required before promotion; disposable local observations are diagnostic only
 - Live dsh install inside Lima is **not** claimed

@@ -81,6 +81,7 @@ export function buildHarnessInstallPlan(
   const commands = [
     `bash scripts/install-deepseek-harness-pin.sh`,
     `# stages ${profiles.map((p) => p.id).join(' and ')} under ${dshHome}`,
+    `# stages reversible Major.app launcher (loopback web + Chrome app-mode) under ${dshHome}`,
     `# installs exact npm packages: ${exactArgs}`,
     `# live Major traffic remains on ${DEFAULT_EXECUTION_BACKEND} + official CLI/ACP until strangle proof`,
   ];

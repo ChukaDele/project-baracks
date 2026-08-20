@@ -20,9 +20,12 @@ install-deepseek-harness-pin.sh — stage attested DeepSeek Harness profiles (st
   --dry-run    Print the planned actions without mutating DSH_HOME
   --help       Show this help
 
+Also stages a reversible Major.app launcher (loopback DSH web + Chrome app-mode).
+
 Environment:
   MAJOR_HOME      Major state root (default: ~/.major)
   MAJOR_DSH_HOME  Isolated harness home (default: $MAJOR_HOME/dsh-harness)
+  MAJOR_APP_DIR   Major.app parent directory (default: ~/Applications)
 EOF
 }
 
@@ -243,6 +246,15 @@ verify_profile_composition() {
     --profile "$profile_id" --dump-config >/dev/null
 }
 
+stage_workstation_app() {
+  local args=()
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    args+=(--dry-run)
+  fi
+  MAJOR_HOME="$MAJOR_HOME" MAJOR_DSH_HOME="$DSH_HOME" \
+    bash "$ROOT/scripts/stage-major-workstation-app.sh" "${args[@]}"
+}
+
 write_install_record() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[dry-run] write $INSTALL_RECORD"
@@ -285,6 +297,7 @@ link_shared_runtime major-workstation-web
 link_shared_runtime major-workstation-headless
 verify_profile_composition major-workstation-web
 verify_profile_composition major-workstation-headless
+stage_workstation_app
 write_install_record
 
 echo "DeepSeek Harness pin staged. Live Major execution remains on Lima + official CLI/ACP."

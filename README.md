@@ -82,6 +82,12 @@ This installs:
 
 It does **not** auto-start a Mac login daemon and does **not** attach Ruflo globally.
 
+The optional pinned DSH workstation launcher is staged by
+`scripts/install-deepseek-harness-pin.sh` as `${MAJOR_APP_DIR:-$HOME/Applications}/Major.app`;
+its launcher and runtime state remain under `$MAJOR_HOME/dsh-harness`.
+Start it with `bash scripts/start-major-workstation.sh --project /path/to/repo`.
+That path stays on Lima for live workers until strangle proof.
+
 ## Recommended working mode for trusted projects
 
 JSS:
