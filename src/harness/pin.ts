@@ -19,6 +19,7 @@ const pinnedDshPackagesSchema = z
     '@deepseek-ai/dsh': exactNpmVersion,
     '@deepseek-ai/dsh-base': exactNpmVersion,
     '@deepseek-ai/dsh-headless': exactNpmVersion,
+    '@deepseek-ai/dsh-subprocess-local': exactNpmVersion,
     '@deepseek-ai/dsh-subagent-claude-code': exactNpmVersion,
     '@deepseek-ai/dsh-subagent-codex': exactNpmVersion,
     '@deepseek-ai/dsh-web-app': exactNpmVersion,
@@ -30,6 +31,7 @@ const pinnedDshIntegritiesSchema = z
     '@deepseek-ai/dsh': npmIntegrity,
     '@deepseek-ai/dsh-base': npmIntegrity,
     '@deepseek-ai/dsh-headless': npmIntegrity,
+    '@deepseek-ai/dsh-subprocess-local': npmIntegrity,
     '@deepseek-ai/dsh-subagent-claude-code': npmIntegrity,
     '@deepseek-ai/dsh-subagent-codex': npmIntegrity,
     '@deepseek-ai/dsh-web-app': npmIntegrity,
@@ -121,6 +123,7 @@ export const DEEPSEEK_HARNESS_PIN: DeepSeekHarnessPin = deepSeekHarnessPinSchema
       '@deepseek-ai/dsh': '0.1.0-rc.8',
       '@deepseek-ai/dsh-base': '0.1.0-rc.8',
       '@deepseek-ai/dsh-headless': '0.1.0-rc.8',
+      '@deepseek-ai/dsh-subprocess-local': '0.1.0-rc.8',
       '@deepseek-ai/dsh-subagent-claude-code': '0.1.0-rc.8',
       '@deepseek-ai/dsh-subagent-codex': '0.1.0-rc.8',
       '@deepseek-ai/dsh-web-app': '0.1.0-rc.8',
@@ -132,6 +135,8 @@ export const DEEPSEEK_HARNESS_PIN: DeepSeekHarnessPin = deepSeekHarnessPinSchema
         'sha512-aMjXT6d5t8SGQg24geOSX6O0ky+hJLijhzZklDcICrBvGSKXvuS8jxLOcL5u4s4pFCODXhuOpvTfFuUhN2RK3Q==',
       '@deepseek-ai/dsh-headless':
         'sha512-SfjPjyLeno7iScndgFI3s9s8focqXADLNgIxkFbsL0BdAY7v3A6TOe+iSxnYX0fMhDqFC1jT3FVYlEzbJBg0Kg==',
+      '@deepseek-ai/dsh-subprocess-local':
+        'sha512-2QMd6Nwjd+ARor4g+GSZ3dNyTvEf2IPOje47nQwa3UCmltLxn8K8gjDAN/5sGr/IF56P14FeF4xFag7tMK+Zdg==',
       '@deepseek-ai/dsh-subagent-claude-code':
         'sha512-Yw4gUki+9UWIDRuDe3mH2KNah6e+dg3Q2IIOOkRkINM0EgvOvfOgIZ7kBjp0ugI7fHoLKFZEVGFkxGUHsvH2JA==',
       '@deepseek-ai/dsh-subagent-codex':

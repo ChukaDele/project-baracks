@@ -103,7 +103,8 @@ describe('Major DSH workstation app', () => {
     expect(plan.chromeCommand).toContain('--app=http://localhost:3080');
     expect(plan.autoStartDaemon).toBe(false);
     expect(plan.preservesMajorPath).toBe(true);
-    expect(plan.liveTrafficRemains).toBe('lima-cli-acp');
+    expect(plan.defaultRuntime).toBe('dsh-local');
+    expect(plan.compatibilityRuntimes).toEqual(['dsh-lima', 'legacy-major-lima']);
     expect(buildHarnessInstallPlan(REPO_ROOT).commands.join('\n')).toContain('Major.app');
   });
 
@@ -154,7 +155,7 @@ describe('Major DSH workstation app', () => {
     expect(removed.status).toBe(0);
     expect(existsSync(app)).toBe(false);
     expect(existsSync(join(home, 'runtime', 'keep-pin'))).toBe(true);
-    expect(removed.stdout).toContain('live Major execution remains on Lima');
+    expect(removed.stdout).toContain('normal trusted repository execution defaults to DSH local');
   });
 
   it('refuses to overwrite or remove a pre-existing unmarked Major.app', () => {
@@ -379,7 +380,7 @@ describe('major harness workstation-app CLI', () => {
     }
   });
 
-  it('keeps shadow conformance including the workstation app', () => {
+  it('keeps cutover conformance including the workstation app', () => {
     const report = runHarnessConformance(REPO_ROOT);
     expect(report.checks.filter((item) => !item.ok)).toEqual([]);
     expect(conformancePassed(report)).toBe(true);

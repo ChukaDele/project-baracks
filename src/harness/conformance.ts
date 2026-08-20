@@ -8,6 +8,7 @@ import {
 import {
   CURRENT_HARNESS_MIGRATION_PHASE,
   DEFAULT_EXECUTION_BACKEND,
+  DEFAULT_EXECUTION_ENVIRONMENT,
   DSH_BASE_BUNDLE,
   HARNESS_MIGRATION_PHASES,
   MAJOR_KERNEL_BUNDLE,
@@ -92,9 +93,9 @@ function assertProfileComposition(profile: DshProfile): ConformanceCheck[] {
         : `${profile.id} missing capabilities: ${missing.join(', ')}`,
     ),
     check(
-      `${profile.id}.lima-default`,
-      DEFAULT_EXECUTION_BACKEND === 'lima',
-      `${profile.id} live traffic must remain on ${DEFAULT_EXECUTION_BACKEND}`,
+      `${profile.id}.dsh-local-default`,
+      DEFAULT_EXECUTION_BACKEND === 'dsh' && DEFAULT_EXECUTION_ENVIRONMENT === 'local',
+      `${profile.id} must default to DSH with the local execution environment`,
     ),
   ];
 }
@@ -114,6 +115,17 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
     repoRoot,
     'distribution/deepseek-harness/bundles/major-kernel/client.js',
   );
+  const runtimeCheckpoint = JSON.parse(
+    readRepoFile(repoRoot, 'distribution/deepseek-harness/runtime-checkpoint.json'),
+  ) as {
+    defaultEnvironment?: string;
+    defaultPath?: string;
+    nativeRoutes?: Array<{
+      environment?: string;
+      providerAuthority?: string;
+      hostAdapters?: { codex?: string; claude?: string };
+    }>;
+  };
   const webManifest = JSON.parse(
     readRepoFile(
       repoRoot,
@@ -159,6 +171,26 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
         kernelClient.includes("kind: 'command-input'") &&
         kernelClient.includes('anchorSeq: context.state.seq - 0.1'),
       '/major must reuse the upstream command-input renderer before the generic result after replay',
+    ),
+    check(
+      'runtime.local-major-routed-checkpoint',
+      runtimeCheckpoint.defaultEnvironment === 'local' &&
+        runtimeCheckpoint.defaultPath === 'dsh-native' &&
+        runtimeCheckpoint.nativeRoutes?.some(
+          (route) =>
+            route.environment === 'local' &&
+            route.providerAuthority === 'major-router' &&
+            route.hostAdapters?.codex === 'codex' &&
+            route.hostAdapters?.claude === 'claude-review',
+        ) === true &&
+        runtimeCheckpoint.nativeRoutes?.some(
+          (route) =>
+            route.environment === 'lima' &&
+            route.providerAuthority === 'major-router' &&
+            route.hostAdapters?.codex === 'codex-lima' &&
+            route.hostAdapters?.claude === 'claude-review',
+        ) === true,
+      'DSH local is default and the same Major routing authority selects optional DSH Lima',
     ),
     check(
       'web.patch-matches-runtime',
@@ -323,14 +355,14 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
         : `unexpected live dsh dependency: ${dshDepNames.join(', ')}`,
     ),
     check(
-      'execution.lima-default',
+      'execution.legacy-lima-available',
       gateway.includes('export function majorExecutionBackend') &&
         gateway.includes('return new LimaBackend'),
-      'majorExecutionBackend still returns LimaBackend',
+      'the explicit legacy compatibility path still exposes LimaBackend',
     ),
     check(
-      'phase.shadow',
-      CURRENT_HARNESS_MIGRATION_PHASE === 'shadow' &&
+      'phase.cutover',
+      CURRENT_HARNESS_MIGRATION_PHASE === 'cutover' &&
         HARNESS_MIGRATION_PHASES.includes(CURRENT_HARNESS_MIGRATION_PHASE),
       `migration phase is ${CURRENT_HARNESS_MIGRATION_PHASE}`,
     ),
@@ -343,12 +375,22 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
       'kernel.subscription-routing',
       kernelSource.includes('MAJOR_SESSION_HOST') &&
         kernelSource.includes('MAJOR_FOREGROUND_DISPATCH') &&
+        kernelSource.includes('MAJOR_DSH_EXECUTION_ENVIRONMENT') &&
+        kernelSource.includes("'route-execution'") &&
+        kernelSource.includes("'--environment'") &&
+        kernelSource.includes('withRoutedExecutionContext') &&
+        !kernelSource.includes('process.env.MAJOR_DSH_ROUTE_') &&
+        kernelSource.includes('RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT') &&
+        kernelSource.includes(
+          "return accountLabel === 'default' ? 'codex' : `codex-${accountLabel}`",
+        ) &&
+        kernelSource.includes("if (host === 'claude') return 'claude-review'") &&
         !kernelSource.includes('NO_CYCLE_MESSAGE') &&
         !kernelSource.includes("'--host', 'codex'") &&
         !kernelSource.includes("'--host', 'claude'") &&
         !kernelSource.includes("'--host', 'cursor'") &&
         !kernelSource.includes("'--host', 'antigravity'"),
-      '/major must take MAJOR_SESSION_HOST for admit/attach; Major run still routes the worker',
+      '/major admits through Major; DSH-native providers are the default and legacy is explicit',
     ),
     ...assertProfileComposition(majorWorkstationWebProfile()),
     ...assertProfileComposition(majorWorkstationHeadlessProfile()),

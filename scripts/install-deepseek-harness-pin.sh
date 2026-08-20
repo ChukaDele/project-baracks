@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Install the attested DeepSeek Harness pin into an isolated DSH_HOME for strangle-phase
-# shadow runs inside Lima. Live Major workers remain on Lima + official CLI/ACP.
+# Install the attested DeepSeek Harness pin into an isolated DSH_HOME.
+# Normal trusted repository work runs through native DSH providers on the Mac.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,13 +9,16 @@ DSH_HOME="${MAJOR_DSH_HOME:-$MAJOR_HOME/dsh-harness}"
 PIN_FILE="$ROOT/distribution/deepseek-harness/pin.json"
 INSTALL_RECORD="$DSH_HOME/major-install.json"
 RUNTIME_DIR="$DSH_HOME/runtime"
+CODEX_PROFILE_HOME="${MAJOR_DSH_CODEX_PROFILE_HOME:-$HOME/.codex}"
+DSH_CODEX_HOME="$DSH_HOME/providers/codex/default"
+CODEX_ACCOUNT_POLICY="${MAJOR_CODEX_ACCOUNT_POLICY:-$MAJOR_HOME/codex-account-policy.json}"
 KERNEL_SOURCE="$ROOT/distribution/deepseek-harness/bundles/major-kernel"
 KERNEL_DEST="$DSH_HOME/bundles/major-kernel"
 DRY_RUN=0
 
 usage() {
   cat <<'EOF'
-install-deepseek-harness-pin.sh — stage attested DeepSeek Harness profiles (strangle prep)
+install-deepseek-harness-pin.sh — install attested DeepSeek Harness profiles
 
   --dry-run    Print the planned actions without mutating DSH_HOME
   --help       Show this help
@@ -25,6 +28,8 @@ Also stages a reversible Major.app launcher (loopback DSH web + Chrome app-mode)
 Environment:
   MAJOR_HOME      Major state root (default: ~/.major)
   MAJOR_DSH_HOME  Isolated harness home (default: $MAJOR_HOME/dsh-harness)
+  MAJOR_DSH_CODEX_PROFILE_HOME  Existing authenticated Codex profile (default: ~/.codex)
+  MAJOR_CODEX_ACCOUNT_POLICY  Owner-approved named Codex profiles (default: ~/.major/codex-account-policy.json)
   MAJOR_APP_DIR   Major.app parent directory (default: ~/Applications)
 EOF
 }
@@ -158,10 +163,126 @@ stage_kernel_bundle() {
   cp -f "$KERNEL_SOURCE/package.json" "$KERNEL_DEST/package.json"
   cp -f "$KERNEL_SOURCE/index.js" "$KERNEL_DEST/index.js"
   cp -f "$KERNEL_SOURCE/client.js" "$KERNEL_DEST/client.js"
+  cp -f "$KERNEL_SOURCE/lima-subprocess.js" "$KERNEL_DEST/lima-subprocess.js"
+  cp -f "$KERNEL_SOURCE/route-context.js" "$KERNEL_DEST/route-context.js"
   # Remove the superseded raw-ESM split module on upgrade. The browser entry
   # is one self-contained lazy-CJS factory, as required by DSH client-modules.
   rm -f "$KERNEL_DEST/command-input.js"
   cp -f "$KERNEL_SOURCE/cordis.patch.yml" "$KERNEL_DEST/cordis.patch.yml"
+}
+
+link_kernel_runtime() {
+  local destination="$KERNEL_DEST/node_modules"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] link shared runtime dependencies into $destination"
+    return 0
+  fi
+  if [[ -L "$destination" ]]; then
+    [[ "$(readlink "$destination")" == "$RUNTIME_DIR/node_modules" ]] || \
+      fail "refusing to replace a kernel dependency link with a different target: $destination"
+  elif [[ -e "$destination" ]]; then
+    fail "refusing to replace existing kernel dependency directory: $destination"
+  else
+    ln -s "$RUNTIME_DIR/node_modules" "$destination"
+  fi
+}
+
+stage_codex_worker_home() {
+  local source_auth="$CODEX_PROFILE_HOME/auth.json"
+  local dest_auth="$DSH_CODEX_HOME/auth.json"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] stage isolated Codex worker home $DSH_CODEX_HOME from existing auth $source_auth"
+    return 0
+  fi
+  [[ -f "$source_auth" ]] || fail "authenticated Codex profile missing: $source_auth"
+  mkdir -p "$DSH_CODEX_HOME"
+  chmod 700 "$DSH_CODEX_HOME"
+  if [[ -L "$dest_auth" ]]; then
+    [[ "$(readlink "$dest_auth")" == "$source_auth" ]] || \
+      fail "refusing to replace a Codex auth symlink with a different target: $dest_auth"
+  elif [[ -e "$dest_auth" ]]; then
+    fail "refusing to replace existing Codex worker auth: $dest_auth"
+  else
+    ln -s "$source_auth" "$dest_auth"
+  fi
+}
+
+stage_named_codex_worker_homes() {
+  if [[ ! -f "$CODEX_ACCOUNT_POLICY" ]]; then
+    echo "No owner-approved named Codex profile policy; default Codex profile only."
+    return 0
+  fi
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] stage owner-approved named Codex homes and official DSH adapters from $CODEX_ACCOUNT_POLICY"
+    return 0
+  fi
+  python3 - "$CODEX_ACCOUNT_POLICY" "$DSH_HOME/providers/codex" "$KERNEL_DEST/cordis.patch.yml" <<'PY'
+import json, os, re, sys
+from pathlib import Path
+
+policy_path, providers_root, patch_path = map(Path, sys.argv[1:4])
+policy = json.loads(policy_path.read_text(encoding="utf-8"))
+rows = policy.get("accounts")
+if not isinstance(rows, list):
+    raise SystemExit("invalid Codex account policy: accounts must be an array")
+
+def label(policy_id):
+    value = re.sub(r"[^a-z0-9]+", "-", policy_id.strip().lower()).strip("-")
+    if not value or not value[0].isalpha():
+        value = f"p-{value or 'profile'}".strip("-")
+    value = value[:32].rstrip("-")
+    if not re.fullmatch(r"[a-z][a-z0-9-]{0,31}", value) or value == "accounts":
+        raise SystemExit(f"invalid normalized Codex account label for {policy_id}")
+    return value
+
+active = []
+seen = set()
+for row in rows:
+    if not isinstance(row, dict) or row.get("role") != "active":
+        continue
+    policy_id, home = row.get("id"), row.get("home")
+    if not isinstance(policy_id, str) or not re.fullmatch(r"COD-\d{2}", policy_id):
+        raise SystemExit("invalid active Codex policy id")
+    if not isinstance(home, str):
+        raise SystemExit(f"missing home for {policy_id}")
+    account_label = label(policy_id)
+    if account_label in seen:
+        raise SystemExit(f"duplicate normalized Codex account label: {account_label}")
+    seen.add(account_label)
+    source_auth = Path(home).expanduser().resolve() / "auth.json"
+    if not source_auth.is_file():
+        raise SystemExit(f"approved Codex profile credential is unavailable: {policy_id}")
+    active.append((account_label, source_auth))
+
+patch = []
+for account_label, source_auth in active:
+    worker_home = providers_root / account_label
+    worker_home.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(worker_home, 0o700)
+    dest_auth = worker_home / "auth.json"
+    if dest_auth.is_symlink():
+        if dest_auth.resolve() != source_auth:
+            raise SystemExit(f"refusing to replace named Codex auth symlink: {account_label}")
+    elif dest_auth.exists():
+        raise SystemExit(f"refusing to replace named Codex worker auth: {account_label}")
+    else:
+        dest_auth.symlink_to(source_auth)
+    patch.extend([
+        "- insert:",
+        f"    - id: subagent-codex-account-{account_label}",
+        "      name: '@deepseek-ai/dsh-subagent-codex'",
+        "      config:",
+        f"        providerName: codex-{account_label}",
+        "        permissionMode: approve-for-me",
+        "        env:",
+        f"          CODEX_HOME: !!js dshHomePath('providers/codex/{account_label}')",
+    ])
+
+if patch:
+    with patch_path.open("a", encoding="utf-8") as handle:
+        handle.write("\n" + "\n".join(patch) + "\n")
+print(f"Staged {len(active)} owner-approved named Codex DSH adapter(s).")
+PY
 }
 
 write_runtime_manifest() {
@@ -274,8 +395,9 @@ payload = {
     "pinVersion": version,
     "attestedCommit": commit,
     "dshHome": home,
-    "phase": "strangle-prep",
-    "liveTrafficRemains": "lima-cli-acp",
+    "phase": "cutover",
+    "defaultRuntime": "dsh-local",
+    "compatibilityRuntimes": ["dsh-lima", "legacy-major-lima"],
     "sessionHostEnv": "MAJOR_SESSION_HOST",
     "sessionHosts": ["claude", "codex", "cursor", "antigravity"],
 }
@@ -294,8 +416,11 @@ disk_preflight
 stage_profile major-workstation-web
 stage_profile major-workstation-headless
 stage_kernel_bundle
+stage_codex_worker_home
+stage_named_codex_worker_homes
 write_runtime_manifest
 install_runtime_packages
+link_kernel_runtime
 link_kernel_bundle
 link_shared_runtime major-workstation-web
 link_shared_runtime major-workstation-headless
@@ -304,5 +429,6 @@ verify_profile_composition major-workstation-headless
 stage_workstation_app
 write_install_record
 
-echo "DeepSeek Harness pin staged. Live Major execution remains on Lima + official CLI/ACP."
+echo "DeepSeek Harness pin staged. Normal trusted repository execution defaults to DSH local."
+echo "DSH Lima and the legacy Major/Lima pipeline remain explicit compatibility choices."
 echo "Before /major, set MAJOR_SESSION_HOST to the attaching host (claude|codex|cursor|antigravity)."

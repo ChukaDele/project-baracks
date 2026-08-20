@@ -213,6 +213,69 @@ export function selectCoordinator(
   };
 }
 
+/** Resolve and persist the one provider/model/account decision used by every
+ * live execution backend. Retry-eligible capacity is consumed here so the
+ * hidden DSH bridge and the legacy Lima cycle cannot diverge. */
+export function routeGoalExecution(
+  goal: SupervisorGoal,
+  options: { eligibleHosts?: readonly WorkerHost[] } = {},
+): CoordinatorSelection {
+  assertExecutionAllowed(getProjectPolicy(goal.project, goal.repoPath));
+  const providerState = openDb();
+  let selection: CoordinatorSelection;
+  try {
+    const providerInfos = loadPersistedProviderInfos(providerState.db);
+    const eligibleHosts = options.eligibleHosts ? new Set(options.eligibleHosts) : undefined;
+    const eligibleProviderInfos = eligibleHosts
+      ? providerInfos.filter((provider) => {
+          const host = PROVIDER_HOSTS[parseCapacityKey(provider.name).providerName];
+          return host !== undefined && eligibleHosts.has(host);
+        })
+      : providerInfos;
+    selection = selectCoordinator(goal, eligibleProviderInfos);
+    if (selection.kind === 'route') {
+      const routedSelection = selection;
+      const selectedModel = providerInfos
+        .find((provider) => provider.name === routedSelection.provider)
+        ?.models.find((model) => model.modelRef === routedSelection.modelRef);
+      if (
+        selectedModel?.retryEligible &&
+        !consumeModelRetry(providerState.db, {
+          providerName: routedSelection.provider,
+          modelRef: routedSelection.modelRef,
+        })
+      ) {
+        selection = {
+          kind: 'checkpoint',
+          reason: `retry for ${routedSelection.provider}/${routedSelection.modelRef} was already consumed`,
+        };
+      }
+    }
+  } finally {
+    providerState.sqlite.close();
+  }
+  if (selection.kind === 'route') {
+    updateGoal(goal.id, routingDecisionGoalPatch(selection));
+  }
+  return selection;
+}
+
+export function routingDecisionGoalPatch(
+  selection: Extract<CoordinatorSelection, { kind: 'route' }>,
+  now: () => Date = () => new Date(),
+): Pick<SupervisorGoal, 'lastRoutingDecision'> {
+  return {
+    lastRoutingDecision: {
+      host: selection.host,
+      provider: selection.provider,
+      accountLabel: selection.accountLabel,
+      modelRef: selection.modelRef,
+      reason: selection.reason,
+      selectedAt: now().toISOString(),
+    },
+  };
+}
+
 export interface ToolsmithDependencies {
   discover(input: { operation: string; repoPath: string }): DiscoveredCapability[];
   sourceCurrent(capability: CapabilityRecord, repoPath: string): boolean;
@@ -658,34 +721,7 @@ export async function runForegroundGoal(
 
 async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): Promise<void> {
   const policy = getProjectPolicy(goal.project, goal.repoPath);
-  assertExecutionAllowed(policy);
-
-  const providerState = openDb();
-  let selection: CoordinatorSelection;
-  try {
-    const providerInfos = loadPersistedProviderInfos(providerState.db);
-    selection = selectCoordinator(goal, providerInfos);
-    if (selection.kind === 'route') {
-      const routedSelection = selection;
-      const selectedModel = providerInfos
-        .find((provider) => provider.name === routedSelection.provider)
-        ?.models.find((model) => model.modelRef === routedSelection.modelRef);
-      if (
-        selectedModel?.retryEligible &&
-        !consumeModelRetry(providerState.db, {
-          providerName: routedSelection.provider,
-          modelRef: routedSelection.modelRef,
-        })
-      ) {
-        selection = {
-          kind: 'checkpoint',
-          reason: `retry for ${routedSelection.provider}/${routedSelection.modelRef} was already consumed`,
-        };
-      }
-    }
-  } finally {
-    providerState.sqlite.close();
-  }
+  const selection = routeGoalExecution(goal);
   if (selection.kind === 'checkpoint') {
     // No eligible capacity remains anywhere in the pool: a genuine stop, not
     // a hop the foreground continuation loop should chase further.
@@ -701,17 +737,18 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     console.error(summary);
     return;
   }
-  if (!hostAvailable(selection.host)) {
-    const executable = workerCommand(selection.host, '').command;
+  const routedSelection = selection;
+  if (!hostAvailable(routedSelection.host)) {
+    const executable = workerCommand(routedSelection.host, '').command;
     const summary =
-      `Provider routing checkpoint: ${selection.provider}/${selection.modelRef} is persisted as ` +
+      `Provider routing checkpoint: ${routedSelection.provider}/${routedSelection.modelRef} is persisted as ` +
       `available but the canonical CLI is missing at ${resolve(majorHome(), '..', '.local', 'bin', executable)}. ` +
       'Marking it unavailable and rerouting to the next candidate instead of selecting it again.';
     const unavailableState = openDb();
     try {
       recordModelOutcome(unavailableState.db, {
-        providerName: selection.provider,
-        modelRef: selection.modelRef,
+        providerName: routedSelection.provider,
+        modelRef: routedSelection.modelRef,
         outcome: 'unknown',
       });
     } finally {
@@ -731,7 +768,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     console.error(summary);
     return;
   }
-  const host = selection.host;
+  const host = routedSelection.host;
   const capabilityResolution = resolveGoalCapabilities(goal);
   if (capabilityResolution.kind === 'checkpoint') {
     updateGoal(goal.id, {
@@ -761,13 +798,13 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     lastStartedAt: new Date().toISOString(),
     activePid: process.pid,
     lastCoordinator: host,
-    lastAccountLabel: selection.accountLabel,
+    lastAccountLabel: routedSelection.accountLabel,
     pendingCompletion: undefined,
   });
 
   const continuity = contextContinuity({
     nextHost: host,
-    nextAccountLabel: selection.accountLabel,
+    nextAccountLabel: routedSelection.accountLabel,
     ...(goal.lastCoordinator ? { lastCoordinator: goal.lastCoordinator } : {}),
     ...(goal.lastAccountLabel ? { lastAccountLabel: goal.lastAccountLabel } : {}),
     ...(goal.lastSessionRef ? { lastSessionRef: goal.lastSessionRef } : {}),
@@ -776,7 +813,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
   const outcome = await runWorker({
     host,
     prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
-      accountLabel: selection.accountLabel,
+      accountLabel: routedSelection.accountLabel,
       continuityBlock: continuity.promptBlock,
     }),
     cwd: goal.repoPath,
@@ -784,8 +821,8 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     // rotation across several exhausted providers cannot stack multiple
     // full maxRunMinutes allowances into a much longer total wall-clock.
     timeoutMs: Math.min(Math.max(1, policy.maxRunMinutes) * 60 * 1000, maxTimeoutMs ?? Infinity),
-    modelRef: selection.modelRef,
-    accountLabel: selection.accountLabel,
+    modelRef: routedSelection.modelRef,
+    accountLabel: routedSelection.accountLabel,
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
   try {
@@ -803,8 +840,8 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     const outcomeState = openDb();
     try {
       recordModelOutcome(outcomeState.db, {
-        providerName: selection.provider,
-        modelRef: selection.modelRef,
+        providerName: routedSelection.provider,
+        modelRef: routedSelection.modelRef,
         outcome: modelOutcome,
       });
     } finally {
@@ -904,8 +941,8 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       modelOutcome,
       stderr: outcome.stderr,
       stdout: outcome.stdout,
-      provider: selection.provider,
-      modelRef: selection.modelRef,
+      provider: routedSelection.provider,
+      modelRef: routedSelection.modelRef,
       host,
       consecutiveFailures: after.consecutiveFailures,
     });

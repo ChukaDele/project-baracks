@@ -14,7 +14,8 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
-import { providerExecutable } from '../providers/commands.js';
+import type { Readable, Writable } from 'node:stream';
+import { providerExecutable, type ProviderCommandHost } from '../providers/commands.js';
 import {
   accountAuthStoreRelativePath,
   assertAccountLabel,
@@ -48,7 +49,10 @@ import {
   assertActiveResourceLease,
   assertActiveResourceLeaseForProcess,
 } from '../supervisor/resources.js';
-import { assertSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
+import {
+  assertSupervisedWorkshopAuthority,
+  type SupervisedWorkshopExecutionAuthority,
+} from '../security/supervised-workshop.js';
 import { assertGuestMutationPolicy } from '../security/guest-mutation.js';
 import type {
   BackendExecuteRequest,
@@ -184,6 +188,42 @@ function canonicalCodexAuthPath(accountLabel: string): string {
     throw new Error('unsafe Codex credential path');
   }
   return path;
+}
+
+export interface LimaNativeEnvironmentRequest {
+  cwd: string;
+  provider: ProviderCommandHost;
+  accountLabel: string;
+  goalId: string;
+  guestArgv: readonly string[];
+  resourceLeaseId: string;
+  resourceLeasePid: number;
+  executionAuthority: SupervisedWorkshopExecutionAuthority;
+  signal: AbortSignal;
+  input: Readable;
+  output: Writable;
+  error: Writable;
+}
+
+/** Rewrite only the official App Server thread workspace. All other JSON-RPC
+ * fields and frames remain byte-equivalent JSON values. */
+export function rewriteNativeEnvironmentFrame(
+  line: string,
+  hostWorkspace: string,
+  guestWorkspace: string,
+): string {
+  const frame = JSON.parse(line) as {
+    method?: unknown;
+    params?: { cwd?: unknown; [key: string]: unknown };
+    [key: string]: unknown;
+  };
+  if (frame.method === 'thread/start') {
+    if (!frame.params || frame.params.cwd !== hostWorkspace) {
+      throw new Error('native App Server thread/start did not use the admitted host workspace');
+    }
+    frame.params = { ...frame.params, cwd: guestWorkspace };
+  }
+  return JSON.stringify(frame);
 }
 
 export class LimaBackend implements ExecutionBackend {
@@ -1223,6 +1263,440 @@ export class LimaBackend implements ExecutionBackend {
         result: stale.result ?? 'failed',
         terminalAt: stale.terminalAt ?? new Date().toISOString(),
       });
+    }
+  }
+
+  /**
+   * Provider-independent DSH execution-environment bridge. DSH keeps the live
+   * App Server protocol and session; this method supplies only an isolated
+   * workspace, process world, credential slot, and validated returned delta.
+   */
+  async runNativeEnvironmentSubprocess(request: LimaNativeEnvironmentRequest): Promise<{
+    runId: string;
+    workspaceMutated: boolean;
+  }> {
+    if (globalStopRequested()) throw new Error('Major global kill switch is active');
+    assertAccountLabel(request.accountLabel);
+    assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd);
+    assertActiveResourceLeaseForProcess({
+      leaseId: request.resourceLeaseId,
+      kind: 'worker',
+      pid: request.resourceLeasePid,
+    });
+    const profile = guestProviderProfile(providerExecutable(request.provider));
+    if (
+      request.guestArgv.length !== 3 ||
+      request.guestArgv[0] !== profile.executable ||
+      request.guestArgv[1] !== 'app-server' ||
+      request.guestArgv[2] !== '--stdio'
+    ) {
+      throw new Error('unsupported native Lima adapter command');
+    }
+    const source = realpathSync(request.cwd);
+    const runId = randomUUID();
+    const stateRoot = join(majorHome(), 'execution', 'lima');
+    const runRoot = join(stateRoot, 'runs', runId);
+    const inputWorkspace = join(runRoot, 'input', 'workspace');
+    const resultRoot = join(runRoot, 'result');
+    const liveWorkspace = join(runRoot, 'live', 'workspace');
+    const patchPath = join(runRoot, 'workspace.patch');
+    const lock = join(stateRoot, 'backend.lock');
+    const guestRun = safeGuestRunPath(this.config.guestRunRoot, profile.host, runId);
+    const guestHome = guestProjectHome(guestRun);
+    const guestWorkspace = `${guestRun}/workspace`;
+    const guestTransfer = `/var/lib/major/transfer/${runId}`;
+    mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+    await this.acquireLock(lock);
+    let manifest: LimaRunManifest = {
+      runId,
+      provider: profile.host,
+      projectHash: createHash('sha256').update(source).digest('hex'),
+      guestRun,
+      state: 'preparing',
+      cleanup: 'pending',
+      startedAt: new Date().toISOString(),
+      resourceLeaseId: request.resourceLeaseId,
+    };
+    let manifestWritten = false;
+    let guestPrepared = false;
+    let transferPrepared = false;
+    let succeeded = false;
+    let forceStop = false;
+    try {
+      reconcileResources({
+        ...productionCleanupDeps(
+          majorHome(),
+          createReclaimTools({ limactlPath: this.config.limactlPath }),
+        ),
+        phase: 'before-create',
+        apply: true,
+      });
+      await this.reconcileStaleRuns(stateRoot);
+      mkdirSync(runRoot, { recursive: true, mode: 0o700 });
+      writeRunManifest(stateRoot, manifest);
+      manifestWritten = true;
+      snapshotWorkspace(source, inputWorkspace);
+      const baselineHash = hashWorkspaceTree(inputWorkspace);
+      const instance = await this.start();
+      const prepared = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'install',
+        '-d',
+        '-m',
+        '0710',
+        '-o',
+        'root',
+        '-g',
+        profile.user,
+        guestRun,
+      ]);
+      if (prepared.code !== 0)
+        throw new Error(`guest preparation failed: ${redactText(prepared.stderr)}`);
+      guestPrepared = true;
+      const preparedState = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        '/opt/major/manage-provider-state',
+        'prepare',
+        profile.host,
+        manifest.projectHash,
+        guestHome,
+        ...providerStateAccountArgs(request.accountLabel),
+      ]);
+      if (preparedState.code !== 0) {
+        throw new Error(`provider state preparation failed: ${redactText(preparedState.stderr)}`);
+      }
+      const preparedTransfer = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'install',
+        '-d',
+        '-m',
+        '0700',
+        guestTransfer,
+      ]);
+      if (preparedTransfer.code !== 0) {
+        throw new Error(
+          `guest transfer preparation failed: ${redactText(preparedTransfer.stderr)}`,
+        );
+      }
+      transferPrepared = true;
+      const copied = await this.lima([
+        'copy',
+        '--backend=scp',
+        '--recursive',
+        inputWorkspace,
+        `${this.config.instance}:${guestTransfer}/`,
+      ]);
+      if (copied.code !== 0)
+        throw new Error(`workspace copy-in failed: ${redactText(copied.stderr)}`);
+      const installedWorkspace = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'mv',
+        '--',
+        `${guestTransfer}/workspace`,
+        guestWorkspace,
+      ]);
+      if (installedWorkspace.code !== 0) {
+        throw new Error(`workspace installation failed: ${redactText(installedWorkspace.stderr)}`);
+      }
+      const owned = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'chown',
+        '-R',
+        `${profile.user}:${profile.user}`,
+        guestWorkspace,
+      ]);
+      if (owned.code !== 0) throw new Error(`guest ownership failed: ${redactText(owned.stderr)}`);
+      const initialized = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        '-n',
+        '-u',
+        profile.user,
+        '/usr/bin/git',
+        '-C',
+        guestWorkspace,
+        'init',
+        '--initial-branch=major-run',
+      ]);
+      if (initialized.code !== 0) {
+        throw new Error(
+          `guest repository initialization failed: ${redactText(initialized.stderr)}`,
+        );
+      }
+      manifest = { ...manifest, state: 'running' };
+      writeRunManifest(stateRoot, manifest);
+
+      const trusted = this.registry.verify(basename(this.config.limactlPath));
+      const child = spawn(
+        trusted.spawnPath,
+        [
+          'shell',
+          '--tty=false',
+          this.config.instance,
+          'sudo',
+          '-n',
+          '-u',
+          profile.user,
+          'env',
+          '-i',
+          `HOME=${guestHome}`,
+          `USER=${profile.user}`,
+          `LOGNAME=${profile.user}`,
+          `PATH=${dirname(profile.executable)}:/usr/local/bin:/usr/bin:/bin`,
+          `TMPDIR=${guestHome}/tmp`,
+          `XDG_CACHE_HOME=${guestHome}/.cache`,
+          `XDG_CONFIG_HOME=${guestHome}/.config`,
+          `XDG_DATA_HOME=${guestHome}/.local/share`,
+          ...request.guestArgv,
+        ],
+        {
+          env: this.hostEnv(),
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: false,
+          detached: true,
+        },
+      );
+      this.activeChild = child;
+      if (!child.stdin || !child.stdout || !child.stderr) {
+        child.kill();
+        throw new Error('native Lima subprocess pipes are unavailable');
+      }
+      child.stdout.pipe(request.output, { end: false });
+      child.stderr.pipe(request.error, { end: false });
+      const terminate = () => {
+        forceStop = true;
+        if (!child.pid) return;
+        try {
+          process.kill(-child.pid, 'SIGTERM');
+        } catch {
+          // The App Server already exited.
+        }
+      };
+      request.signal.addEventListener('abort', terminate, { once: true });
+      const inputForward = (async () => {
+        let pending = '';
+        for await (const chunk of request.input) {
+          pending += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+          const lines = pending.split('\n');
+          pending = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line) continue;
+            child.stdin.write(`${rewriteNativeEnvironmentFrame(line, source, guestWorkspace)}\n`);
+          }
+        }
+        if (pending.trim()) {
+          child.stdin.write(`${rewriteNativeEnvironmentFrame(pending, source, guestWorkspace)}\n`);
+        }
+        child.stdin.end();
+      })();
+      const processResult = await new Promise<{
+        code: number | null;
+        signal: NodeJS.Signals | null;
+      }>((resolveProcess, rejectProcess) => {
+        child.once('error', rejectProcess);
+        child.once('close', (code, signal) => resolveProcess({ code, signal }));
+      });
+      request.signal.removeEventListener('abort', terminate);
+      if (this.activeChild === child) this.activeChild = undefined;
+      await inputForward.catch((error) => {
+        if (!request.signal.aborted) throw error;
+      });
+      if (!request.signal.aborted && processResult.code !== 0) {
+        throw new Error(
+          `native Lima subprocess exited before DSH disposal (exit ${String(processResult.code)}, signal ${String(processResult.signal)})`,
+        );
+      }
+
+      const finalizedState = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        '/opt/major/manage-provider-state',
+        'finalize',
+        profile.host,
+        manifest.projectHash,
+        guestHome,
+        ...providerStateAccountArgs(request.accountLabel),
+      ]);
+      if (finalizedState.code !== 0) {
+        throw new Error(`provider state finalization failed: ${redactText(finalizedState.stderr)}`);
+      }
+      manifest = { ...manifest, state: 'copying_back' };
+      writeRunManifest(stateRoot, manifest);
+      const removedGit = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        `${guestWorkspace}/.git`,
+      ]);
+      if (removedGit.code !== 0)
+        throw new Error(`guest Git cleanup failed: ${redactText(removedGit.stderr)}`);
+      const stagedReturn = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'mv',
+        '--',
+        guestWorkspace,
+        `${guestTransfer}/workspace`,
+      ]);
+      if (stagedReturn.code !== 0)
+        throw new Error(`return staging failed: ${redactText(stagedReturn.stderr)}`);
+      const returnedOwner = await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'chown',
+        '-R',
+        `${instance.guestUser}:${instance.guestUser}`,
+        guestTransfer,
+      ]);
+      if (returnedOwner.code !== 0)
+        throw new Error(`return ownership failed: ${redactText(returnedOwner.stderr)}`);
+      mkdirSync(resultRoot, { recursive: true, mode: 0o700 });
+      const returned = await this.lima([
+        'copy',
+        '--backend=scp',
+        '--recursive',
+        `${this.config.instance}:${guestTransfer}/workspace`,
+        resultRoot,
+      ]);
+      if (returned.code !== 0)
+        throw new Error(`workspace copy-back failed: ${redactText(returned.stderr)}`);
+      const resultWorkspace = join(resultRoot, 'workspace');
+      validateWorkspaceTree(resultWorkspace);
+      snapshotWorkspace(source, liveWorkspace);
+      if (hashWorkspaceTree(liveWorkspace) !== baselineHash) {
+        throw new Error(
+          'host workspace changed during DSH Lima execution; result remains quarantined',
+        );
+      }
+      manifest = { ...manifest, state: 'applying' };
+      writeRunManifest(stateRoot, manifest);
+      const diff = await this.runToFile(
+        '/usr/bin/git',
+        [
+          'diff',
+          '--no-index',
+          '--binary',
+          '--full-index',
+          '--src-prefix=a/',
+          '--dst-prefix=b/',
+          'input/workspace',
+          'result/workspace',
+        ],
+        patchPath,
+        runRoot,
+      );
+      const workspaceMutated = workspaceMutatedFromDiffExit(diff.code, diff.stderr);
+      if (workspaceMutated) {
+        assertActiveResourceLeaseForProcess({
+          leaseId: request.resourceLeaseId,
+          kind: 'worker',
+          pid: request.resourceLeasePid,
+        });
+        assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd);
+        assertGuestMutationPolicy({
+          host: profile.host,
+          allowGuestMutation: true,
+          workspaceHash: baselineHash,
+          executionAuthorityKind: request.executionAuthority.kind,
+          isolatedBackend: true,
+        });
+        const check = await this.run('/usr/bin/git', [
+          '-C',
+          source,
+          'apply',
+          '--check',
+          '-p3',
+          patchPath,
+        ]);
+        if (check.code !== 0)
+          throw new Error(`returned delta was rejected: ${redactText(check.stderr)}`);
+        const applied = await this.run('/usr/bin/git', ['-C', source, 'apply', '-p3', patchPath]);
+        if (applied.code !== 0)
+          throw new Error(`validated delta could not be applied: ${redactText(applied.stderr)}`);
+      }
+      manifest = { ...manifest, result: 'succeeded' };
+      succeeded = true;
+      reconcileResources({
+        ...productionCleanupDeps(
+          majorHome(),
+          createReclaimTools({ limactlPath: this.config.limactlPath }),
+        ),
+        phase: 'after-success',
+        apply: true,
+      });
+      return { runId, workspaceMutated };
+    } finally {
+      let cleanupError: unknown;
+      try {
+        if (!succeeded) {
+          reconcileResources({
+            ...productionCleanupDeps(
+              majorHome(),
+              createReclaimTools({ limactlPath: this.config.limactlPath }),
+            ),
+            phase: 'after-failure',
+            apply: true,
+          });
+        }
+        if (guestPrepared) await this.removeGuestRun(guestRun);
+        if (transferPrepared) await this.removeGuestTransfer(runId);
+        if (manifestWritten) {
+          manifest = {
+            ...manifest,
+            state: 'terminal',
+            cleanup: 'complete',
+            result: manifest.result ?? 'failed',
+            terminalAt: new Date().toISOString(),
+          };
+          writeRunManifest(stateRoot, manifest);
+        }
+      } catch (error) {
+        cleanupError = error;
+        if (manifestWritten) {
+          writeRunManifest(stateRoot, {
+            ...manifest,
+            state: 'terminal',
+            cleanup: 'failed',
+            result: manifest.result ?? 'failed',
+            terminalAt: new Date().toISOString(),
+          });
+        }
+      }
+      try {
+        await this.stop(forceStop || cleanupError !== undefined);
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      rmSync(lock, { recursive: true, force: true });
+      if (cleanupError) {
+        throw new Error(`cleanup failed: ${redactText(errorText(cleanupError))}`);
+      }
     }
   }
 

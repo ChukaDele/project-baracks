@@ -68,6 +68,19 @@ export interface SupervisorGoal {
   lastAccountLabel?: string | undefined;
   /** Vendor session id from the last successful hop on lastAccountLabel. */
   lastSessionRef?: string | undefined;
+  /** Most recent provider/account/model decision made by Major's router.
+   * This is persisted before either the Lima worker or a provider-native DSH
+   * adapter starts, so both runtimes have the same control-plane provenance. */
+  lastRoutingDecision?:
+    | {
+        host: WorkerHost;
+        provider: string;
+        accountLabel: string;
+        modelRef: string;
+        reason: string;
+        selectedAt: string;
+      }
+    | undefined;
   requiredOperations?: string[] | undefined;
   /** Set by the last cycle when it stopped on an authoritative provider
    * exhaustion/rate-limit (or a selected CLI turning out to be missing)

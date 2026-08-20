@@ -8,6 +8,7 @@ import {
   realpathSync,
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { withRoutedExecutionContext } from './route-context.js';
 
 export const name = 'major-workstation';
 export const inject = ['commands', 'subagents', 'subprocess'];
@@ -22,6 +23,9 @@ const GIT_CONTROL_NAMES = ['HEAD', 'index', 'config', 'packed-refs', 'commondir'
 const REVIEW_HASH_MAX_ENTRIES = 100_000;
 const REVIEW_HASH_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 const REVIEW_HASH_MAX_DEPTH = 64;
+const LEASE_POLL_INITIAL_MS = 1_000;
+const LEASE_POLL_MAX_MS = 5_000;
+const LEASE_RELEASE_ATTEMPTS = 3;
 
 /** Bind the independent review to one immutable workspace view. The upstream
  * Claude provider runs in plan mode; this second boundary detects any file,
@@ -202,7 +206,140 @@ export function foregroundDispatchHops(stdout) {
   return receipt.hops;
 }
 
-async function executeMajor(ctx, cwd, task, signal) {
+export function configuredRuntimeRoute(env = process.env) {
+  const environment = env.MAJOR_DSH_EXECUTION_ENVIRONMENT;
+  if (environment === undefined || environment === '' || environment === 'local') {
+    return { environment: 'local' };
+  }
+  if (environment === 'legacy') return undefined;
+  if (environment !== 'local' && environment !== 'lima') {
+    throw new Error(`major-workstation: unsupported DSH execution environment: ${environment}`);
+  }
+  return { environment };
+}
+
+export function dshAdapterForMajorHost(host, environment = 'local', accountLabel = 'default') {
+  if (host === 'codex') {
+    if (environment === 'lima') return 'codex-lima';
+    return accountLabel === 'default' ? 'codex' : `codex-${accountLabel}`;
+  }
+  if (host === 'claude') return 'claude-review';
+  throw new Error(
+    `major-workstation: Major selected ${String(host)}, which has no live DSH adapter`,
+  );
+}
+
+async function acquireWorkerLease(ctx, major, goal, maxRunMinutes, signal) {
+  const owner = `dsh-goal-${goal.id}`;
+  let pollMs = LEASE_POLL_INITIAL_MS;
+  for (;;) {
+    signal.throwIfAborted();
+    const result = parseJson(
+      await runProcess(
+        ctx,
+        goal.repoPath,
+        [
+          major,
+          'resource',
+          'acquire',
+          '--kind',
+          'worker',
+          '--owner',
+          owner,
+          '--project',
+          goal.project,
+          '--pid',
+          String(process.pid),
+          '--ttl-minutes',
+          String(maxRunMinutes + 5),
+        ],
+        signal,
+      ),
+      'resource acquire',
+    );
+    if (result.status === 'active' && typeof result.lease?.id === 'string') {
+      return result.lease;
+    }
+    if (result.status !== 'queued') {
+      throw new Error(
+        `major-workstation: worker resource refused: ${String(result.reason ?? 'unknown reason')}`,
+      );
+    }
+    await new Promise((resolveWait, rejectWait) => {
+      const complete = () => {
+        signal.removeEventListener('abort', abort);
+        resolveWait();
+      };
+      const timer = setTimeout(complete, pollMs);
+      const abort = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
+        rejectWait(signal.reason ?? new Error('major-workstation: resource wait aborted'));
+      };
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+      timer.unref?.();
+    });
+    pollMs = Math.min(pollMs * 2, LEASE_POLL_MAX_MS);
+  }
+}
+
+function withRoutedContext(selection, goalId, lease, callback) {
+  return withRoutedExecutionContext(
+    {
+      goalId,
+      accountLabel: selection.accountLabel,
+      modelRef: selection.modelRef,
+      leaseId: lease.id,
+      leasePid: String(process.pid),
+    },
+    callback,
+  );
+}
+
+async function releaseWorkerLease(ctx, major, cwd, lease) {
+  let lastError;
+  for (let attempt = 1; attempt <= LEASE_RELEASE_ATTEMPTS; attempt += 1) {
+    try {
+      await runProcess(
+        ctx,
+        cwd,
+        [major, 'resource', 'release', '--lease', lease.id, '--json'],
+        undefined,
+      );
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < LEASE_RELEASE_ATTEMPTS) {
+        await new Promise((resolveWait) => setTimeout(resolveWait, attempt * 250));
+      }
+    }
+  }
+  throw lastError;
+}
+
+export function nativeWorkerTask(task, resolvedSkills = [], skillResolutionDegraded = false) {
+  const skillContext = skillResolutionDegraded
+    ? 'Major skill and GBrain resolution is temporarily unavailable. Continue without it and report the degraded context if material.'
+    : resolvedSkills.length === 0
+      ? 'No existing Major or GBrain-generated skill matched this task.'
+      : resolvedSkills
+          .map(
+            (skill) =>
+              `--- MAJOR SKILL ${String(skill.id)} (${String(skill.source)}) ---\n${String(skill.content)}`,
+          )
+          .join('\n\n');
+  return `MAJOR LEAF WORKER CONTRACT:
+Major has already admitted this goal and selected you through the DSH runtime. You are the leased leaf worker, not the control-plane coordinator. Do not run Major CLI commands, admit or dispatch another goal, or delegate to another worker. Perform the task directly in the current workspace, run its verification, and report the observed result.
+
+RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT:
+${skillContext}
+
+TASK:
+${task}`;
+}
+
+async function admitMajorTask(ctx, cwd, task, signal) {
   const major = majorExecutable();
   const host = sessionHost();
   await runProcess(ctx, cwd, [major, 'session', 'attach', '--cwd', cwd, '--host', host], signal);
@@ -221,6 +358,11 @@ async function executeMajor(ctx, cwd, task, signal) {
   if (admitted.ownLiveWork !== true) {
     throw new Error('major-workstation: another Major session owns live work for this goal');
   }
+  return { major, host, admitted };
+}
+
+async function executeMajor(ctx, cwd, task, signal) {
+  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal);
   const beforeGoal = parseJson(
     await runProcess(ctx, cwd, [major, 'goal', 'show', '--id', admitted.goalId], signal),
     'goal show before run',
@@ -256,6 +398,128 @@ async function executeMajor(ctx, cwd, task, signal) {
   };
 }
 
+async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
+  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal);
+  const goal = parseJson(
+    await runProcess(ctx, cwd, [major, 'goal', 'show', '--id', admitted.goalId], signal),
+    'goal show before native run',
+  );
+  if (
+    goal.id !== admitted.goalId ||
+    goal.repoPath !== cwd ||
+    typeof goal.project !== 'string' ||
+    !goal.project
+  ) {
+    throw new Error('major-workstation: admitted goal does not match the DSH project directory');
+  }
+  const selection = parseJson(
+    await runProcess(
+      ctx,
+      cwd,
+      [
+        major,
+        'goal',
+        'route-execution',
+        '--id',
+        admitted.goalId,
+        '--environment',
+        route.environment,
+      ],
+      signal,
+    ),
+    'goal route-execution',
+  );
+  if (selection.kind !== 'route') {
+    throw new Error(
+      `major-workstation: provider routing checkpoint: ${String(selection.reason ?? 'no eligible route')}`,
+    );
+  }
+  if (!Number.isInteger(selection.maxRunMinutes) || selection.maxRunMinutes <= 0) {
+    throw new Error('major-workstation: Major returned an invalid native run limit');
+  }
+  const dshProviderName = dshAdapterForMajorHost(
+    selection.host,
+    route.environment,
+    selection.accountLabel,
+  );
+  const lease = await acquireWorkerLease(ctx, major, goal, selection.maxRunMinutes, signal);
+  const executionSignal = AbortSignal.any([
+    signal,
+    AbortSignal.timeout(selection.maxRunMinutes * 60 * 1_000),
+  ]);
+  let executionError;
+  let completedResult;
+  try {
+    const run = await withRoutedContext(selection, admitted.goalId, lease, () =>
+      settleSubagent(
+        ctx,
+        dshProviderName,
+        nativeWorkerTask(task, selection.resolvedSkills, selection.skillResolutionDegraded),
+        parent,
+        executionSignal,
+      ),
+    );
+    if (run.stopReason !== 'completed') {
+      throw new Error(
+        `major-workstation: ${dshProviderName} ended with ${run.stopReason}` +
+          (run.diagnostic ? `: ${run.diagnostic}` : ''),
+      );
+    }
+    const summary = textContent(run.output) || `${dshProviderName} completed without text output`;
+    await runProcess(
+      ctx,
+      cwd,
+      [
+        major,
+        'goal',
+        'report',
+        '--id',
+        admitted.goalId,
+        '--status',
+        'active',
+        '--summary',
+        clip(
+          `DSH ${route.environment}/${selection.provider}/${selection.modelRef} completed: ${summary}`,
+          12_000,
+        ),
+      ],
+      signal,
+    );
+    completedResult = {
+      goalId: admitted.goalId,
+      status: 'active',
+      coordinator: selection.host,
+      account: selection.accountLabel,
+      runtime: 'dsh',
+      provider: selection.provider,
+      model: selection.modelRef,
+      environment: route.environment,
+      summary,
+    };
+  } catch (error) {
+    executionError = error;
+    throw error;
+  } finally {
+    try {
+      await releaseWorkerLease(ctx, major, cwd, lease);
+    } catch (releaseError) {
+      if (executionError) {
+        throw new AggregateError(
+          [executionError, releaseError],
+          'major-workstation: native execution failed and its worker lease could not be released',
+        );
+      }
+      completedResult.summary = clip(
+        `${completedResult.summary}\n\nInfrastructure warning: the task completed, but Major could not ` +
+          `release worker lease ${lease.id} after ${LEASE_RELEASE_ATTEMPTS} attempts; ` +
+          'the lease remains bounded by its configured TTL.',
+        12_000,
+      );
+    }
+  }
+  return completedResult;
+}
+
 export function createMajorProvider(ctx) {
   return {
     name: 'major',
@@ -268,18 +532,30 @@ export function createMajorProvider(ctx) {
       if (!task) throw new Error('major-workstation: a non-empty text task is required');
       const localAbort = new AbortController();
       const signal = AbortSignal.any([request.signal, localAbort.signal]);
-      const result = executeMajor(ctx, cwd, task, signal).then(
-        (run) => ({
-          output: [
-            {
-              type: 'text',
-              text:
-                `Major goal ${run.goalId} finished this increment with ${run.coordinator}` +
-                ` account ${run.account}; goal status ${run.status}.`,
-            },
-          ],
-          stopReason: 'completed',
-        }),
+      const route = configuredRuntimeRoute();
+      const execution = route
+        ? executeNativeDsh(ctx, cwd, task, request.parent, signal, route)
+        : executeMajor(ctx, cwd, task, signal);
+      const result = execution.then(
+        (run) => {
+          const route =
+            run.runtime === 'dsh'
+              ? ` DSH runtime route: provider=${run.provider}; model=${run.model};` +
+                ` account=${run.account}; environment=${run.environment}.` +
+                ` Worker result: ${run.summary}`
+              : '';
+          return {
+            output: [
+              {
+                type: 'text',
+                text:
+                  `Major goal ${run.goalId} finished this increment with ${run.coordinator}` +
+                  ` account ${run.account}; goal status ${run.status}.${route}`,
+              },
+            ],
+            stopReason: 'completed',
+          };
+        },
         (error) => ({
           output: [],
           stopReason: signal.aborted ? 'aborted' : 'error',

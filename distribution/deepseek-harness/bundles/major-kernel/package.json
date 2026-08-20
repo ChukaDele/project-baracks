@@ -6,14 +6,20 @@
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
+    "./lima-subprocess": "./lima-subprocess.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
     "client.js",
+    "lima-subprocess.js",
+    "route-context.js",
     "cordis.patch.yml"
   ],
-  "version": "0.0.0-shadow",
+  "version": "0.0.0-cutover",
+  "dependencies": {
+    "@deepseek-ai/dsh-subprocess-local": "0.1.0-rc.8"
+  },
   "dsh": {
     "client": {
       "inject": [

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "phase": "cutover",
+  "defaultEnvironment": "local",
+  "defaultPath": "dsh-native",
+  "nativeRoutes": [
+    {
+      "environment": "local",
+      "providerAuthority": "major-router",
+      "hostAdapters": {
+        "codex": "codex",
+        "claude": "claude-review"
+      }
+    },
+    {
+      "environment": "lima",
+      "providerAuthority": "major-router",
+      "hostAdapters": {
+        "codex": "codex-lima",
+        "claude": "claude-review"
+      }
+    }
+  ],
+  "compatibilityRoutes": [{ "environment": "legacy", "path": "major-run" }]
+}

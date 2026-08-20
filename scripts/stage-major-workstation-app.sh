@@ -75,7 +75,7 @@ if [[ "$REMOVE" -eq 1 ]]; then
   rm -rf "$DSH_HOME/bin/start-major-workstation.sh" \
     "$DSH_HOME/run/workstation.lock" "$DSH_HOME/chrome-profile"
   echo "removed installer-owned Major.app launcher from $APP_DEST"
-  echo "live Major execution remains on Lima + official CLI/ACP"
+  echo "normal trusted repository execution defaults to DSH local"
   exit 0
 fi
 
@@ -118,4 +118,4 @@ trap - EXIT INT TERM
 cp -f "$LAUNCHER_SOURCE" "$LAUNCHER_DEST"
 chmod +x "$LAUNCHER_DEST"
 echo "staged reversible Major.app launcher at $APP_DEST"
-echo "live Major execution remains on Lima + official CLI/ACP"
+echo "normal trusted repository execution defaults to DSH local"

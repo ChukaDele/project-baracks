@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { allocateDevPort, listDevPorts } from '../dev/ports.js';
@@ -36,11 +36,13 @@ import {
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
+import { resolveSkills } from '../skills/resolver.js';
 import {
   majorStatusOverview,
   runDaemon,
   runForegroundGoal,
   runGoalCycle,
+  routeGoalExecution,
   supervisorSnapshot,
   tryAcquireRepoCycleLock,
 } from './runtime.js';
@@ -573,6 +575,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       lastFinishedAt: new Date().toISOString(),
       ownerGate: ownerGate ? redactText(ownerGate).slice(0, 4_000) : undefined,
       pendingCompletion: undefined,
+      activePid: undefined,
       // An external report supersedes whatever the last automatic cycle left
       // behind; it must not leave a stale immediate-retry flag pointing at a
       // capacity rotation this report just overrode.
@@ -580,6 +583,48 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     };
     updateGoal(id, patch);
     console.log(`goal ${id}: ${statusRaw}`);
+    return true;
+  }
+
+  // Internal bridge for compositional runtimes. It deliberately accepts no
+  // provider override: Major remains the provider/model/account authority.
+  if (command === 'goal' && args[1] === 'route-execution') {
+    const id = requireFlag(args, '--id');
+    const goal = getGoal(id);
+    if (!goal) throw new Error(`unknown goal: ${id}`);
+    const environment = requireFlag(args, '--environment');
+    if (environment !== 'local' && environment !== 'lima') {
+      throw new Error(`unsupported native execution environment: ${environment}`);
+    }
+    const policy = getProjectPolicy(goal.project, goal.repoPath);
+    const selection = routeGoalExecution(goal, { eligibleHosts: ['codex'] });
+    let resolvedSkills: Array<{ id: string; source: string; content: string }> = [];
+    let skillResolutionDegraded = false;
+    if (selection.kind === 'route') {
+      try {
+        resolvedSkills = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills.map(
+          (skill) => ({
+            id: skill.id,
+            source: skill.source,
+            content: readFileSync(skill.path, 'utf8').slice(0, 32_000),
+          }),
+        );
+      } catch {
+        skillResolutionDegraded = true;
+      }
+    }
+    console.log(
+      JSON.stringify(
+        {
+          ...selection,
+          maxRunMinutes: policy.maxRunMinutes,
+          resolvedSkills,
+          skillResolutionDegraded,
+        },
+        null,
+        2,
+      ),
+    );
     return true;
   }
 

@@ -40,9 +40,9 @@ Major is the standalone cross-project engineering harness for Bredge, client, pe
 
 ## Remaining runtime work
 
-1. Attest the DeepSeek Harness pin (git commit + npm integrity) and install that exact version inside Lima; keep live traffic on the current CLI/ACP path until that shadow run is green (`docs/migrations/deepseek-harness-strangler.md`).
+1. Keep the attested DeepSeek Harness pin current and verify the local-default workstation plus the optional Lima environment (`docs/migrations/deepseek-harness-strangler.md`).
 2. Integrate Ruflo as optional orchestration/memory substrate. It is not the agent loop; DeepSeek Harness is.
-3. Implement/verify live worker adapters for Claude Code, Codex, Antigravity and Cursor, including as dsh model plugins when subscription auth is proved.
+3. Extend provider-native DSH adapters only when official subscription-backed integrations are proved.
 4. Enable bounded real execution, adaptive worktrees and continue-until loops.
 5. Import/index approved Major/project memories with namespace boundaries.
 6. Run the global communication/style installer on the development Mac and configure Cursor global User Rules.

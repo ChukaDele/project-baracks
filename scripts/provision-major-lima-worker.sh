@@ -350,7 +350,9 @@ if [[ $CREATED -eq 0 ]]; then
       -a -x /opt/major/providers/v1/cursor/bin/cursor-agent \
       -a -x /opt/major/providers/v1/antigravity/bin/agy \
       -a -r /opt/major/runner-version \
-      -a -r "/opt/major/releases/$RELEASE_SHA"; then
+      -a -r "/opt/major/releases/$RELEASE_SHA" && \
+    "$LIMACTL_PATH" shell --tty=false "$INSTANCE" command -v node >/dev/null && \
+    "$LIMACTL_PATH" shell --tty=false "$INSTANCE" command -v npm >/dev/null; then
     if [[ "$ORIGINAL_STATUS" != Running ]]; then
       "$LIMACTL_PATH" stop "$INSTANCE"
     fi
@@ -397,6 +399,8 @@ else
 fi
 "$LIMACTL_PATH" shell --tty=false "$INSTANCE" sudo rm -rf -- /tmp/major-bootstrap
 "$LIMACTL_PATH" shell --tty=false "$INSTANCE" test -r /opt/major/runner-version
+"$LIMACTL_PATH" shell --tty=false "$INSTANCE" command -v node >/dev/null
+"$LIMACTL_PATH" shell --tty=false "$INSTANCE" command -v npm >/dev/null
 "$LIMACTL_PATH" shell --tty=false "$INSTANCE" sudo install -d -m 0755 /opt/major/releases
 "$LIMACTL_PATH" shell --tty=false "$INSTANCE" sudo touch "/opt/major/releases/$RELEASE_SHA"
 "$LIMACTL_PATH" shell --tty=false "$INSTANCE" sudo chmod 0444 "/opt/major/releases/$RELEASE_SHA"

@@ -153,6 +153,34 @@ describe('Major resource hygiene', () => {
     expect(classified.reclaimable).toBe(false);
   });
 
+  it('protects the worker selected by an explicit execution config', () => {
+    const dir = home();
+    writeRoots(dir);
+    const selected = workerInstanceForSha(ORPHAN_SHA);
+    const executionConfigPath = join(dir, 'feature-execution.json');
+    writeFileSync(
+      executionConfigPath,
+      JSON.stringify({
+        backend: 'lima',
+        instance: selected,
+        limactlPath: '/usr/bin/limactl',
+        isolationScope: 'shared-workshop',
+        guestRunRoot: '/var/lib/major/runs',
+      }),
+    );
+    const tools = fakeTools([selected, workerInstanceForSha(ACTIVE_SHA)]);
+    const result = applyCleanup({
+      ...depsFor(dir, [selected, workerInstanceForSha(ACTIVE_SHA)]),
+      executionConfigPath,
+      tools,
+    });
+
+    expect(tools.deleted).not.toContain(selected);
+    expect(result.refused).toContainEqual(
+      expect.objectContaining({ id: `lima-instance:${selected}`, class: 'active' }),
+    );
+  });
+
   it('preserves the rollback worker', () => {
     const dir = home();
     writeRoots(dir);
