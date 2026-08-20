@@ -6,6 +6,7 @@ import { loadLimaExecutionConfig } from '../execution/lima-config.js';
 import type { ProviderCommandHost } from '../providers/commands.js';
 import { assertExecutionAllowed, getProjectPolicy } from '../supervisor/policy.js';
 import { getGoal } from '../supervisor/state.js';
+import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import {
   CURRENT_HARNESS_MIGRATION_PHASE,
   DEFAULT_EXECUTION_BACKEND,
@@ -83,6 +84,7 @@ export async function runHarnessCli(args: string[]): Promise<boolean> {
       throw new Error('native execution environment goal does not match the requested workspace');
     }
     assertExecutionAllowed(getProjectPolicy(goal.project, goal.repoPath));
+    const executionAuthority = resolveSupervisedWorkshopAuthority(cwd);
     const provider = requiredFlag(args, '--provider') as ProviderCommandHost;
     const accountLabel = requiredFlag(args, '--account-label');
     if (
@@ -116,6 +118,7 @@ export async function runHarnessCli(args: string[]): Promise<boolean> {
         guestArgv,
         resourceLeaseId: requiredFlag(args, '--resource-lease-id'),
         resourceLeasePid,
+        executionAuthority,
         signal: abort.signal,
         input: process.stdin,
         output: process.stdout,

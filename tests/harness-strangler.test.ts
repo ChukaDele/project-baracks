@@ -111,6 +111,7 @@ describe('DeepSeek Harness workstation composition', () => {
       './lima-subprocess.js',
     );
     expect(bundleManifest(majorKernelBundle()).exports['./package.json']).toBe('./package.json');
+    expect(bundleManifest(majorKernelBundle()).files).toContain('route-context.js');
     expect(bundleManifest(majorKernelBundle()).files).not.toContain('command-input.js');
     expect(
       profileManifest(majorWorkstationHeadlessProfile()).dependencies['@major/dsh-kernel'],

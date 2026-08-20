@@ -8,6 +8,7 @@ import {
   realpathSync,
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { withRoutedExecutionContext } from './route-context.js';
 
 export const name = 'major-workstation';
 export const inject = ['commands', 'subagents', 'subprocess'];
@@ -22,6 +23,9 @@ const GIT_CONTROL_NAMES = ['HEAD', 'index', 'config', 'packed-refs', 'commondir'
 const REVIEW_HASH_MAX_ENTRIES = 100_000;
 const REVIEW_HASH_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 const REVIEW_HASH_MAX_DEPTH = 64;
+const LEASE_POLL_INITIAL_MS = 1_000;
+const LEASE_POLL_MAX_MS = 5_000;
+const LEASE_RELEASE_ATTEMPTS = 3;
 
 /** Bind the independent review to one immutable workspace view. The upstream
  * Claude provider runs in plan mode; this second boundary detects any file,
@@ -227,7 +231,9 @@ export function dshAdapterForMajorHost(host, environment = 'local', accountLabel
 
 async function acquireWorkerLease(ctx, major, goal, signal) {
   const owner = `dsh-goal-${goal.id}`;
+  let pollMs = LEASE_POLL_INITIAL_MS;
   for (;;) {
+    signal.throwIfAborted();
     const result = parseJson(
       await runProcess(
         ctx,
@@ -260,37 +266,56 @@ async function acquireWorkerLease(ctx, major, goal, signal) {
       );
     }
     await new Promise((resolveWait, rejectWait) => {
-      const timer = setTimeout(resolveWait, 250);
+      const complete = () => {
+        signal.removeEventListener('abort', abort);
+        resolveWait();
+      };
+      const timer = setTimeout(complete, pollMs);
       const abort = () => {
         clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
         rejectWait(signal.reason ?? new Error('major-workstation: resource wait aborted'));
       };
       signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
       timer.unref?.();
     });
+    pollMs = Math.min(pollMs * 2, LEASE_POLL_MAX_MS);
   }
 }
 
-function withRoutedEnvironment(selection, goalId, lease, callback) {
-  const entries = {
-    MAJOR_DSH_ROUTE_GOAL_ID: goalId,
-    MAJOR_DSH_ROUTE_ACCOUNT_LABEL: selection.accountLabel,
-    MAJOR_DSH_ROUTE_MODEL_REF: selection.modelRef,
-    MAJOR_DSH_ROUTE_LEASE_ID: lease.id,
-    MAJOR_DSH_ROUTE_LEASE_PID: String(process.pid),
-  };
-  const previous = Object.fromEntries(
-    Object.keys(entries).map((name) => [name, process.env[name]]),
+function withRoutedContext(selection, goalId, lease, callback) {
+  return withRoutedExecutionContext(
+    {
+      goalId,
+      accountLabel: selection.accountLabel,
+      modelRef: selection.modelRef,
+      leaseId: lease.id,
+      leasePid: String(process.pid),
+    },
+    callback,
   );
-  for (const [name, value] of Object.entries(entries)) process.env[name] = value;
-  return Promise.resolve()
-    .then(callback)
-    .finally(() => {
-      for (const [name, value] of Object.entries(previous)) {
-        if (value === undefined) delete process.env[name];
-        else process.env[name] = value;
+}
+
+async function releaseWorkerLease(ctx, major, cwd, lease) {
+  let lastError;
+  for (let attempt = 1; attempt <= LEASE_RELEASE_ATTEMPTS; attempt += 1) {
+    try {
+      await runProcess(
+        ctx,
+        cwd,
+        [major, 'resource', 'release', '--lease', lease.id, '--json'],
+        undefined,
+      );
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < LEASE_RELEASE_ATTEMPTS) {
+        await new Promise((resolveWait) => setTimeout(resolveWait, attempt * 250));
       }
-    });
+    }
+  }
+  throw lastError;
 }
 
 export function nativeWorkerTask(task, resolvedSkills = [], skillResolutionDegraded = false) {
@@ -396,20 +421,28 @@ async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
       `major-workstation: provider routing checkpoint: ${String(selection.reason ?? 'no eligible route')}`,
     );
   }
+  if (!Number.isInteger(selection.maxRunMinutes) || selection.maxRunMinutes <= 0) {
+    throw new Error('major-workstation: Major returned an invalid native run limit');
+  }
+  const executionSignal = AbortSignal.any([
+    signal,
+    AbortSignal.timeout(selection.maxRunMinutes * 60 * 1_000),
+  ]);
   const dshProviderName = dshAdapterForMajorHost(
     selection.host,
     route.environment,
     selection.accountLabel,
   );
-  const lease = await acquireWorkerLease(ctx, major, goal, signal);
+  const lease = await acquireWorkerLease(ctx, major, goal, executionSignal);
+  let executionError;
   try {
-    const run = await withRoutedEnvironment(selection, admitted.goalId, lease, () =>
+    const run = await withRoutedContext(selection, admitted.goalId, lease, () =>
       settleSubagent(
         ctx,
         dshProviderName,
         nativeWorkerTask(task, selection.resolvedSkills, selection.skillResolutionDegraded),
         parent,
-        signal,
+        executionSignal,
       ),
     );
     if (run.stopReason !== 'completed') {
@@ -449,13 +482,21 @@ async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
       environment: route.environment,
       summary,
     };
+  } catch (error) {
+    executionError = error;
+    throw error;
   } finally {
-    await runProcess(
-      ctx,
-      cwd,
-      [major, 'resource', 'release', '--lease', lease.id, '--json'],
-      undefined,
-    );
+    try {
+      await releaseWorkerLease(ctx, major, cwd, lease);
+    } catch (releaseError) {
+      if (executionError) {
+        throw new AggregateError(
+          [executionError, releaseError],
+          'major-workstation: native execution failed and its worker lease could not be released',
+        );
+      }
+      throw releaseError;
+    }
   }
 }
 

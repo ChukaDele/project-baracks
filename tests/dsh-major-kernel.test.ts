@@ -84,6 +84,16 @@ async function loadKernel(): Promise<{
   };
 }
 
+async function loadRouteContext(): Promise<{
+  withRoutedExecutionContext<T>(context: Record<string, string>, callback: () => T): T;
+  routedExecutionContext(): Record<string, string>;
+}> {
+  const url = pathToFileURL(
+    resolve('distribution/deepseek-harness/bundles/major-kernel/route-context.js'),
+  ).href;
+  return (await import(url)) as never;
+}
+
 function loadKernelClient(): {
   inject: string[];
   apply(ctx: { conversationEvents: { register(definition: unknown): void } }): void;
@@ -626,6 +636,8 @@ describe('Major DSH workstation kernel', () => {
     process.env.MAJOR_SESSION_HOST = 'codex';
     process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT = 'local';
     const argv: string[][] = [];
+    let acquireAttempts = 0;
+    let releaseAttempts = 0;
     let registered: KernelProvider | undefined;
     const ctx = {
       subprocess: {
@@ -644,6 +656,7 @@ describe('Major DSH workstation kernel', () => {
                 provider: 'codex#work-b',
                 accountLabel: 'work-b',
                 modelRef: 'gpt-5.6-codex',
+                maxRunMinutes: 1,
                 resolvedSkills: [
                   { id: 'safe-edit', source: 'internal', content: '# Safe edit\nVerify the diff.' },
                 ],
@@ -661,9 +674,17 @@ describe('Major DSH workstation kernel', () => {
             );
           }
           if (spec.argv[1] === 'resource' && spec.argv[2] === 'acquire') {
+            acquireAttempts += 1;
+            if (acquireAttempts === 1) {
+              return processHandle(JSON.stringify({ status: 'queued' }));
+            }
             return processHandle(
               JSON.stringify({ status: 'active', lease: { id: 'lease-native' } }),
             );
+          }
+          if (spec.argv[1] === 'resource' && spec.argv[2] === 'release') {
+            releaseAttempts += 1;
+            return processHandle('', releaseAttempts === 1 ? 1 : 0);
           }
           return processHandle('goal goal-native: active');
         },
@@ -716,14 +737,44 @@ describe('Major DSH workstation kernel', () => {
       ['goal', 'show', '--id'],
       ['goal', 'route-execution', '--id'],
       ['resource', 'acquire', '--kind'],
+      ['resource', 'acquire', '--kind'],
       ['goal', 'report', '--id'],
+      ['resource', 'release', '--lease'],
       ['resource', 'release', '--lease'],
     ]);
     expect(argv.flat()).not.toContain('run');
-    expect(argv[5]).toContain(
+    expect(argv[6]).toContain(
       'DSH local/codex#work-b/gpt-5.6-codex completed: ' +
         'mutated the requested file and tests passed',
     );
+    expect(acquireAttempts).toBe(2);
+    expect(releaseAttempts).toBe(2);
+  });
+
+  it('keeps overlapping routed execution metadata isolated per async task', async () => {
+    const context = await loadRouteContext();
+    let releaseFirst: (() => void) | undefined;
+    const firstBlocked = new Promise<void>((resolveFirst) => {
+      releaseFirst = resolveFirst;
+    });
+
+    const first = context.withRoutedExecutionContext(
+      { goalId: 'goal-a', accountLabel: 'account-a', leaseId: 'lease-a', leasePid: '101' },
+      async () => {
+        await firstBlocked;
+        return context.routedExecutionContext();
+      },
+    );
+    const second = context.withRoutedExecutionContext(
+      { goalId: 'goal-b', accountLabel: 'account-b', leaseId: 'lease-b', leasePid: '202' },
+      async () => context.routedExecutionContext(),
+    );
+    const secondResult = await second;
+    releaseFirst?.();
+    const firstResult = await first;
+
+    expect(firstResult).toMatchObject({ goalId: 'goal-a', leaseId: 'lease-a' });
+    expect(secondResult).toMatchObject({ goalId: 'goal-b', leaseId: 'lease-b' });
   });
 
   it('maps routed Claude to the composed adapter and fails closed for unsupported hosts', async () => {

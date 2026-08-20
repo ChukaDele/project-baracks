@@ -168,7 +168,7 @@ export function bundleManifest(bundle: DshBundle): {
     './lima-subprocess': './lima-subprocess.js';
     './package.json': './package.json';
   };
-  files: ['index.js', 'client.js', 'lima-subprocess.js', 'cordis.patch.yml'];
+  files: ['index.js', 'client.js', 'lima-subprocess.js', 'route-context.js', 'cordis.patch.yml'];
   version: '0.0.0-cutover';
   dependencies: { '@deepseek-ai/dsh-subprocess-local': typeof DEEPSEEK_HARNESS_PIN.npm.version };
   dsh: {
@@ -190,7 +190,7 @@ export function bundleManifest(bundle: DshBundle): {
       './lima-subprocess': './lima-subprocess.js',
       './package.json': './package.json',
     },
-    files: ['index.js', 'client.js', 'lima-subprocess.js', 'cordis.patch.yml'],
+    files: ['index.js', 'client.js', 'lima-subprocess.js', 'route-context.js', 'cordis.patch.yml'],
     version: '0.0.0-cutover',
     dependencies: {
       '@deepseek-ai/dsh-subprocess-local': DEEPSEEK_HARNESS_PIN.npm.version,

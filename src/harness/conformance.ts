@@ -377,6 +377,8 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
         kernelSource.includes('MAJOR_FOREGROUND_DISPATCH') &&
         kernelSource.includes('MAJOR_DSH_EXECUTION_ENVIRONMENT') &&
         kernelSource.includes("[major, 'goal', 'route-execution'") &&
+        kernelSource.includes('withRoutedExecutionContext') &&
+        !kernelSource.includes('process.env.MAJOR_DSH_ROUTE_') &&
         kernelSource.includes('RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT') &&
         kernelSource.includes(
           "return accountLabel === 'default' ? 'codex' : `codex-${accountLabel}`",

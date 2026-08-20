@@ -592,6 +592,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const id = requireFlag(args, '--id');
     const goal = getGoal(id);
     if (!goal) throw new Error(`unknown goal: ${id}`);
+    const policy = getProjectPolicy(goal.project, goal.repoPath);
     const selection = routeGoalExecution(goal);
     let resolvedSkills: Array<{ id: string; source: string; content: string }> = [];
     let skillResolutionDegraded = false;
@@ -608,7 +609,18 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         skillResolutionDegraded = true;
       }
     }
-    console.log(JSON.stringify({ ...selection, resolvedSkills, skillResolutionDegraded }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          ...selection,
+          maxRunMinutes: policy.maxRunMinutes,
+          resolvedSkills,
+          skillResolutionDegraded,
+        },
+        null,
+        2,
+      ),
+    );
     return true;
   }
 

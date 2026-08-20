@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { LocalSubprocessRuntime } from '@deepseek-ai/dsh-subprocess-local';
+import { routedExecutionContext } from './route-context.js';
 
 const CONTROL_ENV = new Set(['MAJOR_DSH_GUEST_PROVIDER', 'MAJOR_DSH_GUEST_ARGV_JSON']);
 
@@ -42,13 +43,11 @@ export class LimaSubprocessRuntime extends LocalSubprocessRuntime {
   spawn(spec) {
     const provider = required(spec.env?.MAJOR_DSH_GUEST_PROVIDER, 'guest provider');
     const argv = guestArgv(spec.env?.MAJOR_DSH_GUEST_ARGV_JSON);
-    const goalId = required(process.env.MAJOR_DSH_ROUTE_GOAL_ID, 'routed goal id');
-    const accountLabel = required(
-      process.env.MAJOR_DSH_ROUTE_ACCOUNT_LABEL,
-      'routed account label',
-    );
-    const leaseId = required(process.env.MAJOR_DSH_ROUTE_LEASE_ID, 'worker lease id');
-    const leasePid = required(process.env.MAJOR_DSH_ROUTE_LEASE_PID, 'worker lease pid');
+    const route = routedExecutionContext();
+    const goalId = required(route.goalId, 'routed goal id');
+    const accountLabel = required(route.accountLabel, 'routed account label');
+    const leaseId = required(route.leaseId, 'worker lease id');
+    const leasePid = required(route.leasePid, 'worker lease pid');
     const env = Object.fromEntries(
       Object.entries(spec.env ?? {}).filter(([name]) => !CONTROL_ENV.has(name)),
     );

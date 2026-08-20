@@ -49,7 +49,10 @@ import {
   assertActiveResourceLease,
   assertActiveResourceLeaseForProcess,
 } from '../supervisor/resources.js';
-import { assertSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
+import {
+  assertSupervisedWorkshopAuthority,
+  type SupervisedWorkshopExecutionAuthority,
+} from '../security/supervised-workshop.js';
 import { assertGuestMutationPolicy } from '../security/guest-mutation.js';
 import type {
   BackendExecuteRequest,
@@ -195,6 +198,7 @@ export interface LimaNativeEnvironmentRequest {
   guestArgv: readonly string[];
   resourceLeaseId: string;
   resourceLeasePid: number;
+  executionAuthority: SupervisedWorkshopExecutionAuthority;
   signal: AbortSignal;
   input: Readable;
   output: Writable;
@@ -1273,6 +1277,7 @@ export class LimaBackend implements ExecutionBackend {
   }> {
     if (globalStopRequested()) throw new Error('Major global kill switch is active');
     assertAccountLabel(request.accountLabel);
+    assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd);
     assertActiveResourceLeaseForProcess({
       leaseId: request.resourceLeaseId,
       kind: 'worker',
@@ -1608,11 +1613,17 @@ export class LimaBackend implements ExecutionBackend {
       );
       const workspaceMutated = workspaceMutatedFromDiffExit(diff.code, diff.stderr);
       if (workspaceMutated) {
+        assertActiveResourceLeaseForProcess({
+          leaseId: request.resourceLeaseId,
+          kind: 'worker',
+          pid: request.resourceLeasePid,
+        });
+        assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd);
         assertGuestMutationPolicy({
           host: profile.host,
           allowGuestMutation: true,
           workspaceHash: baselineHash,
-          executionAuthorityKind: 'supervised_workshop',
+          executionAuthorityKind: request.executionAuthority.kind,
           isolatedBackend: true,
         });
         const check = await this.run('/usr/bin/git', [
