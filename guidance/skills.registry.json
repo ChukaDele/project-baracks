@@ -1,5 +1,5 @@
 {
-  "version": 13,
+  "version": 14,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -32,6 +32,7 @@
     {"id":"design-direction-and-taste","source":"major-internal","availability":"ui-projects","load":"substantial-ui-website-creation-redesign-art-direction-generic-ai-design-too-safe-too-loud-taste"},
     {"id":"remote-first-web-development","source":"major-internal","availability":"web-projects","load":"all-web-project-ui-work-browser-preview-visual-qa-acceptance"},
     {"id":"website-design-qa","source":"major-internal","availability":"web-projects","load":"website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"},
+    {"id":"seo-os","source":"major-internal","availability":"web-projects","load":"seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking"},
     {"id":"responsive-motion-systems","source":"major-internal","availability":"web-projects","load":"gsap-scrolltrigger-sticky-pinned-scrollytelling-card-stacking-hero-video-parallax-threejs-zoom-motion"},
     {"id":"human-blocker-orchestration","source":"major-internal","availability":"all-projects","load":"authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"},
     {"id":"dev-server-management","source":"major-internal","availability":"web-projects","load":"explicit-owner-approved-localhost-exception-only"},
