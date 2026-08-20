@@ -8,6 +8,8 @@ import {
   writeSupervisorState,
   type SupervisorGoal,
 } from '../src/supervisor/state.js';
+import { codexMutationClaimRefusal } from '../src/supervisor/runtime.js';
+import type { WorkerReport } from '../src/supervisor/worker-report.js';
 
 let root: string;
 let priorStatePath: string | undefined;
@@ -49,6 +51,32 @@ afterEach(() => {
 });
 
 describe('independent goal completion', () => {
+  it('rejects Codex BUILT and completion claims when Lima observed no returned delta', () => {
+    const done: WorkerReport = { status: 'done', summary: 'acceptance task passed' };
+    const built: WorkerReport = { status: 'active', summary: 'BUILT provider route' };
+    expect(codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, done)).toMatch(
+      /observed no project delta/,
+    );
+    expect(codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, built)).toMatch(
+      /observed no project delta/,
+    );
+  });
+
+  it('does not invent mutation evidence or reject non-Codex and non-claim reports', () => {
+    const done: WorkerReport = { status: 'done', summary: 'acceptance task passed' };
+    const active: WorkerReport = { status: 'active', summary: 'inspection complete' };
+    expect(codexMutationClaimRefusal({ host: 'codex' }, done)).toBeUndefined();
+    expect(
+      codexMutationClaimRefusal({ host: 'claude', workspaceMutated: false }, done),
+    ).toBeUndefined();
+    expect(
+      codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, active),
+    ).toBeUndefined();
+    expect(
+      codexMutationClaimRefusal({ host: 'codex', workspaceMutated: true }, done),
+    ).toBeUndefined();
+  });
+
   it('marks a pending completion done only after a different provider passes it', () => {
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',

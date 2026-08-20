@@ -75,6 +75,9 @@ export interface ExecuteOutcome {
     | 'cancelled'
     | 'cleanup_failed';
   cleanup?: 'complete' | 'failed';
+  /** Backend-observed workspace result. False is authoritative only when an
+   * isolated backend compared the returned tree with its input snapshot. */
+  workspaceMutated?: boolean;
   exitCode: number | null;
   sessionRef?: string;
   /** Raw usage payload captured from the provider's result event, if any. */

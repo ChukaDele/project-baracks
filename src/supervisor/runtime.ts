@@ -820,6 +820,21 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
 
   if (outcome.status === 'succeeded') {
     const report = parseWorkerReport(outcome.stdout);
+    const mutationClaimRefusal = codexMutationClaimRefusal(outcome, report);
+    if (mutationClaimRefusal) {
+      updateGoal(goal.id, {
+        status: 'active',
+        consecutiveFailures: after.consecutiveFailures + 1,
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary: mutationClaimRefusal,
+        nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+        pendingCompletion: undefined,
+        retryImmediately: false,
+        lastSessionRef: outcome.sessionRef,
+      });
+      return;
+    }
     recordReportedCapabilityUses(capabilityResolution.capabilities, report?.capabilityUse);
     let learningWarning = '';
     if (report?.learning) {
@@ -916,6 +931,21 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       retryImmediately: patch.retryImmediately,
     });
   }
+}
+
+/** A provider report is never proof that files changed. Lima's returned-tree
+ * comparison is the authority: when it explicitly observed no delta, Codex
+ * may neither advance a completion claim nor label the implementation BUILT. */
+export function codexMutationClaimRefusal(
+  outcome: Pick<WorkerOutcome, 'host' | 'workspaceMutated'>,
+  report: ReturnType<typeof parseWorkerReport>,
+): string | undefined {
+  if (outcome.host !== 'codex' || outcome.workspaceMutated !== false || !report) return undefined;
+  if (report.status !== 'done' && !/\bBUILT\b/.test(report.summary)) return undefined;
+  return (
+    'Rejected Codex mutation claim: the isolated backend compared the returned workspace ' +
+    'with its input and observed no project delta. The task remains active.'
+  );
 }
 
 /**

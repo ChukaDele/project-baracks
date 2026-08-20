@@ -1982,6 +1982,7 @@ export class LimaBackend implements ExecutionBackend {
         status: 'succeeded' as const,
         runId,
         cleanup: 'complete' as const,
+        workspaceMutated: diff.code === 1,
         exitCode: 0,
         ...(provider.sessionRef ? { sessionRef: provider.sessionRef } : {}),
         ...(provider.usage !== undefined ? { usage: provider.usage } : {}),
