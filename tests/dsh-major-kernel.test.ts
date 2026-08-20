@@ -632,7 +632,7 @@ describe('Major DSH workstation kernel', () => {
     ).resolves.toEqual({ kind: 'error', text: 'Usage: /major <task>' });
   });
 
-  it('gets the local provider route from Major before invoking the DSH adapter', async () => {
+  it('keeps completed local provider work successful when lease release exhausts retries', async () => {
     process.env.MAJOR_SESSION_HOST = 'codex';
     process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT = 'local';
     const argv: string[][] = [];
@@ -684,7 +684,7 @@ describe('Major DSH workstation kernel', () => {
           }
           if (spec.argv[1] === 'resource' && spec.argv[2] === 'release') {
             releaseAttempts += 1;
-            return processHandle('', releaseAttempts === 1 ? 1 : 0);
+            return processHandle('', 1);
           }
           return processHandle('goal goal-native: active');
         },
@@ -741,7 +741,18 @@ describe('Major DSH workstation kernel', () => {
       ['goal', 'report', '--id'],
       ['resource', 'release', '--lease'],
       ['resource', 'release', '--lease'],
+      ['resource', 'release', '--lease'],
     ]);
+    await expect(run.result).resolves.toMatchObject({
+      stopReason: 'completed',
+      output: [
+        {
+          text: expect.stringContaining(
+            'Infrastructure warning: the task completed, but Major could not release worker lease lease-native after 3 attempts',
+          ),
+        },
+      ],
+    });
     expect(argv.flat()).not.toContain('run');
     expect(argv[3]).toContain('--environment');
     expect(argv[3]).toContain('local');
@@ -752,7 +763,7 @@ describe('Major DSH workstation kernel', () => {
         'mutated the requested file and tests passed',
     );
     expect(acquireAttempts).toBe(2);
-    expect(releaseAttempts).toBe(2);
+    expect(releaseAttempts).toBe(3);
   });
 
   it('keeps overlapping routed execution metadata isolated per async task', async () => {

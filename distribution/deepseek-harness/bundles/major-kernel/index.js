@@ -448,6 +448,7 @@ async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
     AbortSignal.timeout(selection.maxRunMinutes * 60 * 1_000),
   ]);
   let executionError;
+  let completedResult;
   try {
     const run = await withRoutedContext(selection, admitted.goalId, lease, () =>
       settleSubagent(
@@ -484,7 +485,7 @@ async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
       ],
       signal,
     );
-    return {
+    completedResult = {
       goalId: admitted.goalId,
       status: 'active',
       coordinator: selection.host,
@@ -508,9 +509,15 @@ async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
           'major-workstation: native execution failed and its worker lease could not be released',
         );
       }
-      throw releaseError;
+      completedResult.summary = clip(
+        `${completedResult.summary}\n\nInfrastructure warning: the task completed, but Major could not ` +
+          `release worker lease ${lease.id} after ${LEASE_RELEASE_ATTEMPTS} attempts; ` +
+          'the lease remains bounded by its configured TTL.',
+        12_000,
+      );
     }
   }
+  return completedResult;
 }
 
 export function createMajorProvider(ctx) {
