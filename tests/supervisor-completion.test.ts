@@ -8,7 +8,10 @@ import {
   writeSupervisorState,
   type SupervisorGoal,
 } from '../src/supervisor/state.js';
-import { codexMutationClaimRefusal } from '../src/supervisor/runtime.js';
+import {
+  codexMutationClaimRefusal,
+  mutationClaimRefusalGoalPatch,
+} from '../src/supervisor/runtime.js';
 import type { WorkerReport } from '../src/supervisor/worker-report.js';
 
 let root: string;
@@ -51,15 +54,28 @@ afterEach(() => {
 });
 
 describe('independent goal completion', () => {
-  it('rejects Codex BUILT and completion claims when Lima observed no returned delta', () => {
+  it('rejects only the canonical Codex BUILT claim when Lima observed no returned delta', () => {
     const done: WorkerReport = { status: 'done', summary: 'acceptance task passed' };
     const built: WorkerReport = { status: 'active', summary: 'BUILT provider route' };
-    expect(codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, done)).toMatch(
-      /observed no project delta/,
-    );
+    expect(
+      codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, done),
+    ).toBeUndefined();
     expect(codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, built)).toMatch(
       /observed no project delta/,
     );
+  });
+
+  it('keeps a refused BUILT claim active and clears pending completion', () => {
+    const patch = mutationClaimRefusalGoalPatch(pendingGoal(), 'Rejected Codex mutation claim', {
+      sessionRef: 'session-2',
+    });
+    expect(patch).toMatchObject({
+      status: 'active',
+      pendingCompletion: undefined,
+      retryImmediately: false,
+      consecutiveFailures: 1,
+      lastSessionRef: 'session-2',
+    });
   });
 
   it('does not invent mutation evidence or reject non-Codex and non-claim reports', () => {

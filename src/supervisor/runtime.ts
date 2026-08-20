@@ -822,17 +822,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     const report = parseWorkerReport(outcome.stdout);
     const mutationClaimRefusal = codexMutationClaimRefusal(outcome, report);
     if (mutationClaimRefusal) {
-      updateGoal(goal.id, {
-        status: 'active',
-        consecutiveFailures: after.consecutiveFailures + 1,
-        activePid: undefined,
-        lastFinishedAt: new Date().toISOString(),
-        lastSummary: mutationClaimRefusal,
-        nextRunAt: new Date(Date.now() + 10_000).toISOString(),
-        pendingCompletion: undefined,
-        retryImmediately: false,
-        lastSessionRef: outcome.sessionRef,
-      });
+      updateGoal(goal.id, mutationClaimRefusalGoalPatch(after, mutationClaimRefusal, outcome));
       return;
     }
     recordReportedCapabilityUses(capabilityResolution.capabilities, report?.capabilityUse);
@@ -935,17 +925,36 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
 
 /** A provider report is never proof that files changed. Lima's returned-tree
  * comparison is the authority: when it explicitly observed no delta, Codex
- * may neither advance a completion claim nor label the implementation BUILT. */
+ * may not label the implementation with the canonical BUILT readiness claim.
+ * Read-only work may still legitimately report done without a project delta. */
 export function codexMutationClaimRefusal(
   outcome: Pick<WorkerOutcome, 'host' | 'workspaceMutated'>,
   report: ReturnType<typeof parseWorkerReport>,
 ): string | undefined {
   if (outcome.host !== 'codex' || outcome.workspaceMutated !== false || !report) return undefined;
-  if (report.status !== 'done' && !/\bBUILT\b/.test(report.summary)) return undefined;
+  if (!/\bBUILT\b/.test(report.summary)) return undefined;
   return (
     'Rejected Codex mutation claim: the isolated backend compared the returned workspace ' +
     'with its input and observed no project delta. The task remains active.'
   );
+}
+
+export function mutationClaimRefusalGoalPatch(
+  goal: Pick<SupervisorGoal, 'consecutiveFailures'>,
+  refusal: string,
+  outcome: Pick<WorkerOutcome, 'sessionRef'>,
+): Partial<SupervisorGoal> {
+  return {
+    status: 'active',
+    consecutiveFailures: goal.consecutiveFailures + 1,
+    activePid: undefined,
+    lastFinishedAt: new Date().toISOString(),
+    lastSummary: refusal,
+    nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+    pendingCompletion: undefined,
+    retryImmediately: false,
+    lastSessionRef: outcome.sessionRef,
+  };
 }
 
 /**

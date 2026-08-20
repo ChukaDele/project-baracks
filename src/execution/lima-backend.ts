@@ -1902,8 +1902,7 @@ export class LimaBackend implements ExecutionBackend {
         patchPath,
         runRoot,
       );
-      if (diff.code !== 0 && diff.code !== 1)
-        throw new Error(`delta creation failed: ${redactText(diff.stderr)}`);
+      const workspaceMutated = workspaceMutatedFromDiffExit(diff.code, diff.stderr);
       if (diff.code === 1 && !providerIntent.allowGuestMutation) {
         manifest = { ...manifest, result: 'failed' };
         return {
@@ -1982,7 +1981,7 @@ export class LimaBackend implements ExecutionBackend {
         status: 'succeeded' as const,
         runId,
         cleanup: 'complete' as const,
-        workspaceMutated: diff.code === 1,
+        workspaceMutated,
         exitCode: 0,
         ...(provider.sessionRef ? { sessionRef: provider.sessionRef } : {}),
         ...(provider.usage !== undefined ? { usage: provider.usage } : {}),
@@ -2044,4 +2043,12 @@ export class LimaBackend implements ExecutionBackend {
       }
     }
   }
+}
+
+/** git diff --no-index uses 0 for equal trees and 1 for a delta. Every other
+ * exit is an inability to establish evidence and must fail closed. */
+export function workspaceMutatedFromDiffExit(code: number | null, stderr = ''): boolean {
+  if (code === 0) return false;
+  if (code === 1) return true;
+  throw new Error(`delta creation failed: ${redactText(stderr)}`);
 }

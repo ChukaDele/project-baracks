@@ -11,11 +11,30 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { detectProviderOutcomeSignals, LimaBackend } from '../src/execution/lima-backend.js';
+import {
+  detectProviderOutcomeSignals,
+  LimaBackend,
+  workspaceMutatedFromDiffExit,
+} from '../src/execution/lima-backend.js';
 import { openDb } from '../src/db/client.js';
 import { verifyProviderApprovalAuthority } from '../src/security/provider-approval-policy.js';
 import { EXHAUSTION_PATTERN, RATE_LIMIT_PATTERN } from '../src/providers/commands.js';
 import { tempDbPath } from './helpers.js';
+
+describe('returned workspace diff evidence', () => {
+  it('maps exit 0 to unchanged and exit 1 to mutated', () => {
+    expect(workspaceMutatedFromDiffExit(0)).toBe(false);
+    expect(workspaceMutatedFromDiffExit(1)).toBe(true);
+  });
+
+  it('fails closed for every other diff exit', () => {
+    expect(() => workspaceMutatedFromDiffExit(2, 'fatal: comparison failed')).toThrow(
+      /delta creation failed: fatal: comparison failed/,
+    );
+    expect(() => workspaceMutatedFromDiffExit(128)).toThrow(/delta creation failed/);
+    expect(() => workspaceMutatedFromDiffExit(null)).toThrow(/delta creation failed/);
+  });
+});
 
 function fakeLima(version = 'limactl version 2.2.0'): string {
   const root = mkdtempSync(join(tmpdir(), 'major-fake-lima-'));
