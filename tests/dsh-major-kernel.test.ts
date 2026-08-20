@@ -1,4 +1,6 @@
-import { resolve } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -32,6 +34,7 @@ interface KernelCommand {
 async function loadKernel(): Promise<{
   apply(ctx: unknown): void;
   foregroundDispatchHops(stdout: string): number;
+  hashReviewWorkspace(root: string): string;
 }> {
   const url = pathToFileURL(
     resolve('distribution/deepseek-harness/bundles/major-kernel/index.js'),
@@ -39,6 +42,7 @@ async function loadKernel(): Promise<{
   return (await import(url)) as {
     apply(ctx: unknown): void;
     foregroundDispatchHops(stdout: string): number;
+    hashReviewWorkspace(root: string): string;
   };
 }
 
@@ -54,14 +58,21 @@ function processHandle(stdout: string, exitCode = 0) {
 
 describe('Major DSH workstation kernel', () => {
   const previousHost = process.env.MAJOR_SESSION_HOST;
+  const temporaryRoots: string[] = [];
 
   afterEach(() => {
     if (previousHost === undefined) delete process.env.MAJOR_SESSION_HOST;
     else process.env.MAJOR_SESSION_HOST = previousHost;
+    for (const root of temporaryRoots.splice(0)) {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('admits through the attaching session host, then records an independent Claude review', async () => {
     process.env.MAJOR_SESSION_HOST = 'cursor';
+    const projectRoot = mkdtempSync(join(tmpdir(), 'major-dsh-kernel-project-'));
+    temporaryRoots.push(projectRoot);
+    writeFileSync(join(projectRoot, 'reviewed.txt'), 'stable');
     const argv: string[][] = [];
     let goalShowCalls = 0;
     let majorProvider: KernelProvider | undefined;
@@ -122,7 +133,7 @@ describe('Major DSH workstation kernel', () => {
 
     const result = await majorCommand.handler({
       rawInput: 'implement the acceptance change',
-      agent: { session: { header: { cwd: '/tmp/project' } } },
+      agent: { session: { header: { cwd: projectRoot } } },
       signal: new AbortController().signal,
     });
 
@@ -203,6 +214,78 @@ describe('Major DSH workstation kernel', () => {
     expect(result.text).toContain('Major ended with error');
     expect(result.text).toContain('without dispatching a cycle');
     expect(providersStarted).toEqual(['major']);
+  });
+
+  it('fails the command if the plan-mode Claude reviewer changes the workspace', async () => {
+    process.env.MAJOR_SESSION_HOST = 'cursor';
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-review-boundary-'));
+    const target = join(root, 'reviewed.txt');
+    writeFileSync(target, 'before');
+    let majorProvider: KernelProvider | undefined;
+    let majorCommand: KernelCommand | undefined;
+    let goalShowCalls = 0;
+    const subprocess = {
+      spawn(spec: { argv: string[] }) {
+        if (spec.argv[1] === 'goal' && spec.argv[2] === 'admit') {
+          return processHandle(
+            JSON.stringify({ admitted: true, goalId: 'goal-1', ownLiveWork: true }),
+          );
+        }
+        if (spec.argv[1] === 'goal' && spec.argv[2] === 'show') {
+          goalShowCalls += 1;
+          return processHandle(
+            JSON.stringify({
+              project: 'github.com/example/project',
+              status: 'active',
+              lastCoordinator: 'codex',
+              lastAccountLabel: 'work-b',
+              cycle: goalShowCalls === 1 ? 1 : 2,
+            }),
+          );
+        }
+        if (spec.argv[1] === 'run') {
+          return processHandle('MAJOR_FOREGROUND_DISPATCH: {"hops":1}\n');
+        }
+        return processHandle('');
+      },
+    };
+    const kernel = await loadKernel();
+    try {
+      kernel.apply({
+        subprocess,
+        subagents: {
+          registerProvider(provider: KernelProvider) {
+            majorProvider = provider;
+          },
+          async start(provider: string, request: KernelRequest): Promise<KernelRun> {
+            if (provider === 'major') {
+              if (!majorProvider) throw new Error('Major provider was not registered');
+              return majorProvider.start(request);
+            }
+            expect(provider).toBe('claude-review');
+            writeFileSync(target, 'mutated by reviewer');
+            return {
+              result: Promise.resolve({
+                output: [{ type: 'text', text: 'VERDICT: PASS' }],
+                stopReason: 'completed',
+              }),
+              async dispose() {},
+            };
+          },
+        },
+        commands: { register: (command: KernelCommand) => (majorCommand = command) },
+      });
+      if (!majorCommand) throw new Error('Major command was not registered');
+      await expect(
+        majorCommand.handler({
+          rawInput: 'implement the acceptance change',
+          agent: { session: { header: { cwd: root } } },
+          signal: new AbortController().signal,
+        }),
+      ).rejects.toThrow(/Claude review changed the project workspace/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('refuses /major when MAJOR_SESSION_HOST is missing instead of pinning Codex', async () => {

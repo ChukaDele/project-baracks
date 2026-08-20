@@ -1,5 +1,6 @@
-import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import { lstatSync, readFileSync, readlinkSync, readdirSync, realpathSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 export const name = 'major-workstation';
 export const inject = ['commands', 'subagents', 'subprocess'];
@@ -9,6 +10,54 @@ const RESULT_LIMIT = 8 * 1024;
 const NO_START_CAPABILITIES = Object.freeze({});
 const SESSION_HOSTS = new Set(['claude', 'codex', 'cursor', 'antigravity']);
 const FOREGROUND_DISPATCH_PREFIX = 'MAJOR_FOREGROUND_DISPATCH:';
+const REVIEW_HASH_EXCLUSIONS = new Set(['.git', 'node_modules']);
+const REVIEW_HASH_MAX_ENTRIES = 100_000;
+const REVIEW_HASH_MAX_BYTES = 2 * 1024 * 1024 * 1024;
+const REVIEW_HASH_MAX_DEPTH = 64;
+
+/** Bind the independent review to one immutable workspace view. The upstream
+ * Claude provider runs in plan mode; this second boundary detects any file,
+ * mode, directory, or symlink change if that provider ever violates it. */
+export function hashReviewWorkspace(root) {
+  const canonicalRoot = realpathSync(root);
+  const hash = createHash('sha256');
+  let entries = 0;
+  let bytes = 0;
+  const visit = (directory, depth) => {
+    if (depth > REVIEW_HASH_MAX_DEPTH) {
+      throw new Error('major-workstation: review workspace exceeds directory depth limit');
+    }
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    )) {
+      if (REVIEW_HASH_EXCLUSIONS.has(entry.name)) continue;
+      const path = join(directory, entry.name);
+      const rel = relative(canonicalRoot, path);
+      const stat = lstatSync(path);
+      entries += 1;
+      if (entries > REVIEW_HASH_MAX_ENTRIES) {
+        throw new Error('major-workstation: review workspace exceeds entry limit');
+      }
+      if (stat.isDirectory()) {
+        hash.update(`d\0${rel}\0${stat.mode & 0o777}\0`);
+        visit(path, depth + 1);
+      } else if (stat.isFile()) {
+        bytes += stat.size;
+        if (bytes > REVIEW_HASH_MAX_BYTES) {
+          throw new Error('major-workstation: review workspace exceeds byte limit');
+        }
+        hash.update(`f\0${rel}\0${stat.mode & 0o777}\0`);
+        hash.update(readFileSync(path));
+      } else if (stat.isSymbolicLink()) {
+        hash.update(`l\0${rel}\0${readlinkSync(path)}\0`);
+      } else {
+        throw new Error(`major-workstation: unsupported review workspace object: ${rel}`);
+      }
+    }
+  };
+  visit(canonicalRoot, 0);
+  return hash.digest('hex');
+}
 
 function sessionHost() {
   const host = process.env.MAJOR_SESSION_HOST;
@@ -232,19 +281,29 @@ export function apply(ctx) {
       if (majorResult.stopReason !== 'completed') return failedResult('Major', majorResult);
 
       const majorSummary = textContent(majorResult.output);
-      const reviewResult = await settleSubagent(
-        ctx,
-        'claude-review',
-        [
-          'Independently review the current repository after this Major increment.',
-          'You are running in native plan mode. Inspect the diff and relevant tests without modifying files.',
-          'Return a concise verdict with concrete findings.',
-          `Requested task: ${task}`,
-          `Major execution: ${majorSummary}`,
-        ].join('\n'),
-        invocation.agent,
-        invocation.signal,
-      );
+      const cwd = invocation.agent.session.header.cwd;
+      if (!cwd) return { kind: 'error', text: 'The DSH session has no project directory.' };
+      const beforeReview = hashReviewWorkspace(cwd);
+      let reviewResult;
+      try {
+        reviewResult = await settleSubagent(
+          ctx,
+          'claude-review',
+          [
+            'Independently review the current repository after this Major increment.',
+            'You are running in native plan mode. Inspect the diff and relevant tests without modifying files.',
+            'Return a concise verdict with concrete findings.',
+            `Requested task: ${task}`,
+            `Major execution: ${majorSummary}`,
+          ].join('\n'),
+          invocation.agent,
+          invocation.signal,
+        );
+      } finally {
+        if (hashReviewWorkspace(cwd) !== beforeReview) {
+          throw new Error('major-workstation: Claude review changed the project workspace');
+        }
+      }
       if (reviewResult.stopReason !== 'completed')
         return failedResult('Claude review', reviewResult);
 
