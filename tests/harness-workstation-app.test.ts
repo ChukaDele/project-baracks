@@ -62,6 +62,36 @@ function bash(
   }
 }
 
+function waitForOutput(
+  child: ReturnType<typeof spawn>,
+  expected: string,
+  timeoutMs = 5000,
+): Promise<void> {
+  return new Promise((resolveReady, reject) => {
+    let output = '';
+    const timeout = setTimeout(() => {
+      reject(new Error(`timed out waiting for child output: ${expected}`));
+    }, timeoutMs);
+    child.stdout?.on('data', (chunk) => {
+      output += String(chunk);
+      if (output.includes(expected)) {
+        clearTimeout(timeout);
+        resolveReady();
+      }
+    });
+    child.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.once('exit', (code, signal) => {
+      if (!output.includes(expected)) {
+        clearTimeout(timeout);
+        reject(new Error(`child exited before ${expected} (code=${code}, signal=${signal})`));
+      }
+    });
+  });
+}
+
 describe('Major DSH workstation app', () => {
   it('WRAPS official DSH web boot and BORROWS Chrome app-mode', () => {
     const plan = buildWorkstationAppPlan();
@@ -176,19 +206,85 @@ describe('Major DSH workstation app', () => {
     expect(existsSync(join(home, 'run/workstation.lock'))).toBe(false);
   });
 
+  it('rejects a foreign listener without opening Chrome, killing it, or signalling stale lock PIDs', async () => {
+    const home = isolatedHome();
+    const project = mkdtempSync(join(tmpdir(), 'major-project-'));
+    homes.push(project);
+    const bin = join(home, 'fakes');
+    const dshMarker = join(home, 'dsh-opened');
+    const chromeMarker = join(home, 'chrome-opened');
+    fakeExec(bin, 'dsh', `touch "${dshMarker}"; sleep 60`);
+    fakeExec(bin, 'chrome', `touch "${chromeMarker}"; sleep 60`);
+
+    const foreign = spawn(
+      'python3',
+      [
+        '-u',
+        '-c',
+        'import socket,time; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind(("127.0.0.1",3080)); s.listen(); print("READY",flush=True); time.sleep(60)',
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    const staleSentinel = spawn('sh', ['-c', 'while :; do sleep 1; done'], {
+      stdio: 'ignore',
+    });
+
+    try {
+      await waitForOutput(foreign, 'READY');
+      const lock = join(home, 'run/workstation.lock');
+      mkdirSync(lock, { recursive: true });
+      writeFileSync(join(lock, 'dsh.pid'), `${foreign.pid}\n`);
+      writeFileSync(join(lock, 'dsh.identity'), 'stale process identity\n');
+      writeFileSync(join(lock, 'launcher.pid'), `${staleSentinel.pid}\n`);
+      writeFileSync(join(lock, 'launcher.identity'), 'stale process identity\n');
+      writeFileSync(join(lock, 'chrome.pid'), `${staleSentinel.pid}\n`);
+      writeFileSync(join(lock, 'chrome.identity'), 'stale process identity\n');
+
+      const result = bash([START, '--project', project], {
+        MAJOR_DSH_HOME: home,
+        MAJOR_DSH_BIN: join(bin, 'dsh'),
+        MAJOR_CHROME_BIN: join(bin, 'chrome'),
+        MAJOR_WORKSTATION_READY_TIMEOUT: '1',
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}${result.stderr}`).toContain(
+        'refusing foreign listener on 127.0.0.1:3080',
+      );
+      expect(foreign.exitCode).toBeNull();
+      expect(staleSentinel.exitCode).toBeNull();
+      expect(existsSync(dshMarker)).toBe(false);
+      expect(existsSync(chromeMarker)).toBe(false);
+    } finally {
+      const foreignClosed = new Promise<void>((resolveClosed) =>
+        foreign.once('close', () => resolveClosed()),
+      );
+      const sentinelClosed = new Promise<void>((resolveClosed) =>
+        staleSentinel.once('close', () => resolveClosed()),
+      );
+      foreign.kill('SIGTERM');
+      staleSentinel.kill('SIGTERM');
+      await Promise.all([foreignClosed, sentinelClosed]);
+    }
+  });
+
   it('starts one fake DSH process, refuses duplicates, logs under the home, and stops cleanly', async () => {
     const home = isolatedHome();
     const project = mkdtempSync(join(tmpdir(), 'major-project-'));
     homes.push(project);
     const bin = join(home, 'fakes');
-    fakeExec(bin, 'dsh', 'echo "fake-dsh $*"; while :; do sleep 1; done');
+    fakeExec(
+      bin,
+      'dsh',
+      `echo "fake-dsh $*"; exec python3 -c 'from http.server import BaseHTTPRequestHandler,HTTPServer; H=type("H",(BaseHTTPRequestHandler,),{"do_GET":lambda s:(s.send_response(200),s.end_headers(),s.wfile.write(b"<script>window.__DSH_BOOT__={modules:[{id:\\"@major/dsh-kernel\\"}]}</script>")),"log_message":lambda *a:None}); HTTPServer(("127.0.0.1",3080),H).serve_forever()'`,
+    );
     fakeExec(bin, 'chrome', 'echo "fake-chrome $*"; while :; do sleep 1; done');
     const env = {
       ...process.env,
       MAJOR_DSH_HOME: home,
       MAJOR_DSH_BIN: join(bin, 'dsh'),
       MAJOR_CHROME_BIN: join(bin, 'chrome'),
-      MAJOR_WORKSTATION_READY_TIMEOUT: '0',
+      MAJOR_WORKSTATION_READY_TIMEOUT: '5',
     };
     const child = spawn('bash', [START, '--project', project], {
       cwd: REPO_ROOT,
@@ -211,13 +307,16 @@ describe('Major DSH workstation app', () => {
         await new Promise((r) => setTimeout(r, 50));
       }
       expect(existsSync(join(home, 'run/workstation.lock/dsh.pid'))).toBe(true);
+      expect(readFileSync(join(home, 'run/workstation.lock/boot-graph'), 'utf8').trim()).toBe(
+        '@major/dsh-kernel',
+      );
       expect(readFileSync(log, 'utf8')).toContain('fake-dsh');
       expect(readFileSync(join(home, 'run/current-project'), 'utf8').trim()).toBe(project);
       const duplicate = bash([START, '--project', project], {
         MAJOR_DSH_HOME: home,
         MAJOR_DSH_BIN: join(bin, 'dsh'),
         MAJOR_CHROME_BIN: join(bin, 'chrome'),
-        MAJOR_WORKSTATION_READY_TIMEOUT: '0',
+        MAJOR_WORKSTATION_READY_TIMEOUT: '5',
       });
       expect(duplicate.status).not.toBe(0);
       expect(`${duplicate.stdout}${duplicate.stderr}`).toMatch(/already running/);
@@ -230,7 +329,7 @@ describe('Major DSH workstation app', () => {
       child.on('close', () => resolveExit());
       setTimeout(resolveExit, 3000);
     });
-  });
+  }, 20_000);
 });
 
 describe('major harness workstation-app CLI', () => {

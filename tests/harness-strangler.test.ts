@@ -97,7 +97,14 @@ describe('DeepSeek Harness workstation composition', () => {
 
   it('uses the official bundle manifest and a resolvable local profile dependency', () => {
     expect(bundleManifest(majorKernelBundle()).dsh.bundle.patch).toBe('./cordis.patch.yml');
+    expect(bundleManifest(majorKernelBundle()).dsh.client).toEqual({
+      inject: ['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-ui-conversation'],
+      platform: 'web',
+    });
     expect(bundleManifest(majorKernelBundle()).main).toBe('./index.js');
+    expect(bundleManifest(majorKernelBundle()).exports['./client']).toBe('./client.js');
+    expect(bundleManifest(majorKernelBundle()).exports['./package.json']).toBe('./package.json');
+    expect(bundleManifest(majorKernelBundle()).files).not.toContain('command-input.js');
     expect(
       profileManifest(majorWorkstationHeadlessProfile()).dependencies['@major/dsh-kernel'],
     ).toBe(MAJOR_KERNEL_LOCAL_SPEC);

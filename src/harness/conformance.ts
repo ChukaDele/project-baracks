@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CAPABILITY_REUSE,
@@ -110,6 +110,10 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
   const kernelManifest = JSON.parse(
     readRepoFile(repoRoot, 'distribution/deepseek-harness/bundles/major-kernel/package.json'),
   ) as ReturnType<typeof bundleManifest>;
+  const kernelClient = readRepoFile(
+    repoRoot,
+    'distribution/deepseek-harness/bundles/major-kernel/client.js',
+  );
   const webManifest = JSON.parse(
     readRepoFile(
       repoRoot,
@@ -137,6 +141,24 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
       'bundle.manifest-matches-upstream',
       JSON.stringify(kernelManifest) === JSON.stringify(bundleManifest(majorKernelBundle())),
       'major-kernel must use the upstream dsh.bundle.patch manifest shape',
+    ),
+    check(
+      'bundle.major-command-replay-projection',
+      kernelManifest.dsh.client?.platform === 'web' &&
+        kernelManifest.exports['./client'] === './client.js' &&
+        kernelManifest.exports['./package.json'] === './package.json' &&
+        kernelClient.includes('window.__ModuleLoader__.load({') &&
+        kernelClient.includes("id: '@major/dsh-kernel'") &&
+        kernelClient.includes('conversationEvents.register(majorCommandInputDefinition)') &&
+        !kernelClient.includes('slots.register(') &&
+        !existsSync(
+          join(repoRoot, 'distribution/deepseek-harness/bundles/major-kernel/client.css'),
+        ) &&
+        kernelClient.includes("event.type === 'command/run'") &&
+        kernelClient.includes("event.data.name === 'major'") &&
+        kernelClient.includes("kind: 'command-input'") &&
+        kernelClient.includes('anchorSeq: context.state.seq - 0.1'),
+      '/major must reuse the upstream command-input renderer before the generic result after replay',
     ),
     check(
       'web.patch-matches-runtime',
@@ -220,8 +242,12 @@ function workstationAppMatches(repoRoot: string): ConformanceCheck[] {
     ),
     check(
       'workstation.single-instance',
-      launcher.includes('workstation.lock') && launcher.includes('already running'),
-      'launcher must refuse a second live lock',
+      launcher.includes('workstation.lock') &&
+        launcher.includes('already running') &&
+        launcher.includes('process_identity') &&
+        launcher.includes('wait_for_owned_listen') &&
+        launcher.includes('refusing foreign listener'),
+      'launcher must fingerprint its lock and open only after its DSH process owns the port',
     ),
     check(
       'workstation.logs',

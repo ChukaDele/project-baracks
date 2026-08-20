@@ -322,6 +322,21 @@ function failedResult(provider, result) {
   };
 }
 
+/** Commands are log-only, but DSH rc.8 considers a persisted session blank
+ * until its first turn/start. Use an otherwise empty, completed turn so the
+ * upstream session list durably retains valid /major executions. */
+function nextTurn(session) {
+  return (
+    session.events.reduce(
+      (maximum, event) =>
+        event.type === 'turn/start' || event.type === 'turn/end'
+          ? Math.max(maximum, event.data.turn)
+          : maximum,
+      0,
+    ) + 1
+  );
+}
+
 export function apply(ctx) {
   ctx.subagents.registerProvider(createMajorProvider(ctx));
   ctx.commands.register({
@@ -331,49 +346,55 @@ export function apply(ctx) {
     handler: async (invocation) => {
       const task = invocation.rawInput.trim();
       if (!task) return { kind: 'error', text: 'Usage: /major <task>' };
-
-      const majorResult = await settleSubagent(
-        ctx,
-        'major',
-        task,
-        invocation.agent,
-        invocation.signal,
-      );
-      if (majorResult.stopReason !== 'completed') return failedResult('Major', majorResult);
-
-      const majorSummary = textContent(majorResult.output);
-      const cwd = invocation.agent.session.header.cwd;
-      if (!cwd) return { kind: 'error', text: 'The DSH session has no project directory.' };
-      const beforeReview = hashReviewWorkspace(cwd);
-      let reviewResult;
+      const session = invocation.agent.session;
+      const turn = nextTurn(session);
+      session.append('turn/start', { turn });
       try {
-        reviewResult = await settleSubagent(
+        const majorResult = await settleSubagent(
           ctx,
-          'claude-review',
-          [
-            'Independently review the current repository after this Major increment.',
-            'You are running in native plan mode. Inspect the diff and relevant tests without modifying files.',
-            'Return a concise verdict with concrete findings.',
-            `Requested task: ${task}`,
-            `Major execution: ${majorSummary}`,
-          ].join('\n'),
+          'major',
+          task,
           invocation.agent,
           invocation.signal,
         );
-      } finally {
-        if (hashReviewWorkspace(cwd) !== beforeReview) {
-          throw new Error('major-workstation: Claude review changed the project workspace');
-        }
-      }
-      if (reviewResult.stopReason !== 'completed')
-        return failedResult('Claude review', reviewResult);
+        if (majorResult.stopReason !== 'completed') return failedResult('Major', majorResult);
 
-      return {
-        kind: 'success',
-        text: clip(
-          `${majorSummary}\n\nClaude independent review:\n${textContent(reviewResult.output)}`,
-        ),
-      };
+        const majorSummary = textContent(majorResult.output);
+        const cwd = session.header.cwd;
+        if (!cwd) return { kind: 'error', text: 'The DSH session has no project directory.' };
+        const beforeReview = hashReviewWorkspace(cwd);
+        let reviewResult;
+        try {
+          reviewResult = await settleSubagent(
+            ctx,
+            'claude-review',
+            [
+              'Independently review the current repository after this Major increment.',
+              'You are running in native plan mode. Inspect the diff and relevant tests without modifying files.',
+              'Return a concise verdict with concrete findings.',
+              `Requested task: ${task}`,
+              `Major execution: ${majorSummary}`,
+            ].join('\n'),
+            invocation.agent,
+            invocation.signal,
+          );
+        } finally {
+          if (hashReviewWorkspace(cwd) !== beforeReview) {
+            throw new Error('major-workstation: Claude review changed the project workspace');
+          }
+        }
+        if (reviewResult.stopReason !== 'completed')
+          return failedResult('Claude review', reviewResult);
+
+        return {
+          kind: 'success',
+          text: clip(
+            `${majorSummary}\n\nClaude independent review:\n${textContent(reviewResult.output)}`,
+          ),
+        };
+      } finally {
+        session.append('turn/end', { turn, reason: { kind: 'completed' } });
+      }
     },
   });
 }

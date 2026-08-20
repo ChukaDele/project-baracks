@@ -157,6 +157,10 @@ stage_kernel_bundle() {
   mkdir -p "$KERNEL_DEST"
   cp -f "$KERNEL_SOURCE/package.json" "$KERNEL_DEST/package.json"
   cp -f "$KERNEL_SOURCE/index.js" "$KERNEL_DEST/index.js"
+  cp -f "$KERNEL_SOURCE/client.js" "$KERNEL_DEST/client.js"
+  # Remove the superseded raw-ESM split module on upgrade. The browser entry
+  # is one self-contained lazy-CJS factory, as required by DSH client-modules.
+  rm -f "$KERNEL_DEST/command-input.js"
   cp -f "$KERNEL_SOURCE/cordis.patch.yml" "$KERNEL_DEST/cordis.patch.yml"
 }
 

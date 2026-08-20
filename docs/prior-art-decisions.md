@@ -181,3 +181,13 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Major-specific layer retained:** pin installer, isolated DSH home, loopback-only bind, duplicate prevention, clean stop, rollback of the `.app` without touching the user checkout or live Major backend
 - **Rejected alternatives:** Electron; Tauri; login LaunchAgent; wrapping DeepSeekHarnessGreen; replacing DSH web with a custom UI; binding `0.0.0.0` (official CLI rejects it)
 - **Evidence:** official CLI reference: `dsh --profile <name>` boots `$DSH_HOME/profiles/<name>`, web args are `--host`/`--port`/`--no-open`/`--trusted-host`, default `http://127.0.0.1:3080`, invoking directory is the default workspace, first SIGTERM drains then exits 0. Chrome `--app=URL` opens a dedicated window. The existing web profile already disables native directory-picker-auto on darwin loopback.
+
+## 2026-08-20 — `/major` command transcript rendering
+
+- **Capability:** durably render the complete human-entered `/major` command before its result after a DSH restart
+- **Candidates:** DSH conversation-event Definition plus upstream `command-input` view renderer; a Major session store; a Major React component or CSS layer
+- **Decision:** BORROW the upstream conversation-event projection, `command-input` renderer, session log, and trajectory target. Ship one prebuilt, self-contained lazy-CJS `@major/dsh-kernel` client factory; project Major's durable command lifecycle into the upstream chat and trajectory targets.
+- **Reason:** DSH already persists and replays `command/run`, `command/done`, and turn markers and owns their UI. Major needs only an empty completed turn for rc.8 restart visibility, its command input at the correct sequence anchor, and a tool-shaped contribution containing the complete result. A second session store, result renderer, trajectory implementation, React tree, or stylesheet would duplicate upstream infrastructure and could diverge after restart.
+- **Major-specific layer retained:** recognition and reconstruction of the human-entered `/major` input; the existing log-only execution semantics remain unchanged
+- **Rejected alternatives:** raw ESM browser entrypoints; a split runtime-loaded `command-input.js`; a Major session store; bespoke command/result UI or CSS
+- **Evidence:** the pinned DSH client-module contract registers browser bundles with `window.__ModuleLoader__.load({ id, factory })`; factory VM tests materialize `@major/dsh-kernel`, build the upstream `command-input` node and native trajectory tool contribution from replayed events, and the server command test records only a closed empty turn around the log-only command handler—no user, assistant, step, or model-dispatch event.

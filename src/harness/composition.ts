@@ -139,19 +139,39 @@ export function bundleManifest(bundle: DshBundle): {
   private: true;
   type: 'module';
   main: './index.js';
-  exports: { '.': './index.js' };
-  files: ['index.js', 'cordis.patch.yml'];
+  exports: {
+    '.': './index.js';
+    './client': './client.js';
+    './package.json': './package.json';
+  };
+  files: ['index.js', 'client.js', 'cordis.patch.yml'];
   version: '0.0.0-shadow';
-  dsh: { bundle: { patch: string } };
+  dsh: {
+    client: {
+      inject: ['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-ui-conversation'];
+      platform: 'web';
+    };
+    bundle: { patch: string };
+  };
 } {
   return {
     name: bundle.name,
     private: true,
     type: 'module',
     main: './index.js',
-    exports: { '.': './index.js' },
-    files: ['index.js', 'cordis.patch.yml'],
+    exports: {
+      '.': './index.js',
+      './client': './client.js',
+      './package.json': './package.json',
+    },
+    files: ['index.js', 'client.js', 'cordis.patch.yml'],
     version: '0.0.0-shadow',
-    dsh: { bundle: { patch: `./${bundle.patchFile}` } },
+    dsh: {
+      client: {
+        inject: ['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-ui-conversation'],
+        platform: 'web',
+      },
+      bundle: { patch: `./${bundle.patchFile}` },
+    },
   };
 }
