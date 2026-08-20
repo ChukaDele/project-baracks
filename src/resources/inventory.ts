@@ -109,6 +109,7 @@ export interface InstallHistoryEntry {
 
 export interface InventoryDeps {
   home: string;
+  executionConfigPath?: string;
   nowMs?: number;
   limaInstances?: { name: string }[];
   limaListError?: string;
@@ -180,12 +181,13 @@ export function rollbackShas(
 
 export function readGcRoots(
   home: string,
-  extras: { leases?: LeaseRoot[]; goals?: GoalRoot[] } = {},
+  extras: { leases?: LeaseRoot[]; goals?: GoalRoot[]; executionConfigPath?: string } = {},
 ): GcRoots {
   const installed = readJson(join(home, 'installed-release.json')) as
     InstalledReleaseRecord | undefined;
   const history = readHistory(join(home, 'install-history.jsonl'));
-  const execution = readJson(join(home, 'execution.json')) as { instance?: string } | undefined;
+  const execution = readJson(extras.executionConfigPath ?? join(home, 'execution.json')) as
+    { instance?: string } | undefined;
   const activeSha =
     typeof installed?.sha === 'string' && SHA40.test(installed.sha) ? installed.sha : undefined;
   const rollbacks = rollbackShas(history, activeSha);
@@ -606,6 +608,7 @@ export function scanInventory(deps: InventoryDeps): InventoryScan {
   const roots = readGcRoots(home, {
     ...(deps.leases ? { leases: deps.leases } : {}),
     ...(deps.goals ? { goals: deps.goals } : {}),
+    ...(deps.executionConfigPath ? { executionConfigPath: deps.executionConfigPath } : {}),
   });
   const resources: ClassifiedResource[] = [];
   const push = (candidate: ResourceCandidate) => {

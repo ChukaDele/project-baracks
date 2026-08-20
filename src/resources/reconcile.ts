@@ -38,8 +38,7 @@ export interface ReconcileResult {
   applied?: CleanupApplyResult;
 }
 
-function loadLimactlPath(home: string): string | undefined {
-  const path = join(home, 'execution.json');
+function loadLimactlPath(path: string): string | undefined {
   if (!existsSync(path)) return undefined;
   try {
     return loadLimaExecutionConfig(path).limactlPath;
@@ -49,7 +48,10 @@ function loadLimactlPath(home: string): string | undefined {
 }
 
 export function productionCleanupDeps(home = majorHome(), tools?: ReclaimTools): CleanupDeps {
-  const limactlPath = loadLimactlPath(home);
+  const executionConfigPath = resolve(
+    process.env.MAJOR_EXECUTION_CONFIG ?? join(home, 'execution.json'),
+  );
+  const limactlPath = loadLimactlPath(executionConfigPath);
   const reclaim = tools ?? createReclaimTools({ ...(limactlPath ? { limactlPath } : {}) });
   let limaInstances: { name: string }[] = [];
   let limaListError: string | undefined;
@@ -109,6 +111,7 @@ export function productionCleanupDeps(home = majorHome(), tools?: ReclaimTools):
   }
   return {
     home,
+    executionConfigPath,
     limaInstances,
     ...(limaListError ? { limaListError } : {}),
     credentials,
