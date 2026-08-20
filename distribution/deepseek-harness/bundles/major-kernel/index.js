@@ -234,10 +234,10 @@ export function apply(ctx) {
       const majorSummary = textContent(majorResult.output);
       const reviewResult = await settleSubagent(
         ctx,
-        'claude-code',
+        'claude-review',
         [
           'Independently review the current repository after this Major increment.',
-          'Do not modify files. Inspect the diff and relevant tests.',
+          'You are running in native plan mode. Inspect the diff and relevant tests without modifying files.',
           'Return a concise verdict with concrete findings.',
           `Requested task: ${task}`,
           `Major execution: ${majorSummary}`,

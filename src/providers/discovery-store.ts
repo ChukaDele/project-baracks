@@ -192,6 +192,55 @@ export function persistProviderDiscovery(
   );
 }
 
+/** Fail closed for a named provider account whose owner-approved policy was
+ * removed, disabled, or could not be refreshed. Historical observations and
+ * billing evidence stay append-only; only current routing eligibility is
+ * revoked. */
+export function revokeProviderAccountRouting(
+  db: Db,
+  providerKey: string,
+  note: string,
+  now: () => Date = () => new Date(),
+): boolean {
+  return db.transaction(
+    (tx) => {
+      const provider = selectProviderByCapacityKey(tx, providerKey);
+      if (!provider) return false;
+      const observedAt = now().toISOString();
+      const models = tx
+        .select()
+        .from(agentModels)
+        .where(eq(agentModels.providerId, provider.id))
+        .all();
+      for (const model of models) {
+        const state = {
+          visible: false,
+          authenticated: false,
+          availability: 'unknown' as const,
+          prohibited: true,
+          prohibitedReason: redactText(note).slice(0, 4_000),
+          nextProbeAt: null,
+          lastProbedAt: observedAt,
+        };
+        tx.update(agentModels).set(state).where(eq(agentModels.id, model.id)).run();
+        tx.insert(discoveryObservations)
+          .values({
+            id: newId('dobs'),
+            providerId: provider.id,
+            modelId: model.id,
+            observedJson: JSON.stringify({ modelRef: model.modelRef, ...state }),
+            source: 'human',
+            confidence: CONFIDENCE_BY_SOURCE.human,
+            observedAt,
+          })
+          .run();
+      }
+      return true;
+    },
+    { behavior: 'immediate' },
+  );
+}
+
 /**
  * Record an AUTHORITATIVE billing observation: a human attestation ('human')
  * or a provider-observed run outcome ('run_outcome'). This is the ONLY code

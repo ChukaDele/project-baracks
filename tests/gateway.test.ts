@@ -320,11 +320,11 @@ describe('discovery resolution (process-free, no subprocess)', () => {
   });
 });
 
-function fakeLimaBackend(onExecute: () => void): ExecutionBackend {
+function fakeBackend(kind: string, onExecute: () => void): ExecutionBackend {
   return {
-    kind: 'lima',
+    kind,
     inspect: async () => ({
-      kind: 'lima',
+      kind,
       available: true,
       filesystemIsolation: true,
       networkIsolation: true,
@@ -393,7 +393,7 @@ describe('Codex guest mutation gateway boundary', () => {
   it('refuses Codex mutation on the Lima backend without a source digest', () => {
     const { gateway, root } = makeGateway({
       commandPolicy: { allowedExecutables: ['codex'] },
-      backend: fakeLimaBackend(() => {
+      backend: fakeBackend('lima', () => {
         throw new Error('backend must not run');
       }),
       verifyProviderDecision: () => true,
@@ -418,11 +418,40 @@ describe('Codex guest mutation gateway boundary', () => {
     ).toThrow(/source workspace digest/);
   });
 
+  it('refuses Codex mutation on a configured backend that is not Lima', () => {
+    const { gateway, root } = makeGateway({
+      commandPolicy: { allowedExecutables: ['codex'] },
+      backend: fakeBackend('test', () => {
+        throw new Error('backend must not run');
+      }),
+      verifyProviderDecision: () => true,
+    });
+    expect(() =>
+      gateway.execute({
+        executable: 'codex',
+        args: ['exec'],
+        cwd: root,
+        executionAuthority: workshopAuthority,
+        providerRequest: {
+          host: 'codex',
+          prompt: 'mutate',
+          allowGuestMutation: true,
+          workspaceHash: 'a'.repeat(64),
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/Lima execution backend/);
+  });
+
   it('admits Codex mutation through Lima after Workshop authority and a source digest', () => {
     let executed = false;
     const { gateway, root } = makeGateway({
       commandPolicy: { allowedExecutables: ['codex'] },
-      backend: fakeLimaBackend(() => {
+      backend: fakeBackend('lima', () => {
         executed = true;
       }),
       verifyProviderDecision: () => true,

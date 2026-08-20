@@ -1,4 +1,6 @@
-import { resolve } from 'node:path';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CAPABILITY_REUSE, missingRetainedCapabilities } from '../src/harness/capabilities.js';
@@ -80,6 +82,8 @@ describe('DeepSeek Harness workstation composition', () => {
       missingRetainedCapabilities(CAPABILITY_REUSE.map((record) => record.capability)),
     ).toEqual([]);
     expect(majorKernelBundle().patch).toContain("name: '@major/dsh-kernel'");
+    expect(majorKernelBundle().patch).toContain('providerName: claude-review');
+    expect(majorKernelBundle().patch).toContain('permissionMode: plan');
     expect(DEFAULT_EXECUTION_BACKEND).toBe('lima');
   });
 
@@ -127,27 +131,34 @@ describe('DeepSeek Harness strangle install plan', () => {
   });
 
   it('dry-runs on the macOS system Bash without mutating the harness home', () => {
-    const output = execFileSync(
-      'bash',
-      [resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh'), '--dry-run'],
-      {
-        cwd: REPO_ROOT,
-        env: {
-          ...process.env,
-          MAJOR_DSH_HOME: resolve(REPO_ROOT, '.tmp-dsh-dry-run-must-not-exist'),
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-dry-run-'));
+    const target = join(root, 'must-not-exist');
+    try {
+      const output = execFileSync(
+        'bash',
+        [resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh'), '--dry-run'],
+        {
+          cwd: REPO_ROOT,
+          env: {
+            ...process.env,
+            MAJOR_DSH_HOME: target,
+          },
+          encoding: 'utf8',
         },
-        encoding: 'utf8',
-      },
-    );
-    expect(output).toContain('mode: dry-run');
-    expect(output).toContain('disk preflight before DSH/Lima install');
-    expect(output).toContain('stage');
-    expect(output).toContain('write exact runtime manifest');
-    expect(output).toContain('link shared runtime');
-    expect(output).toContain('compose pinned profile major-workstation-web');
-    expect(output).toContain('Major.app');
-    expect(output).toContain('Live Major execution remains on Lima');
-    expect(output).toContain('MAJOR_SESSION_HOST');
+      );
+      expect(output).toContain('mode: dry-run');
+      expect(output).toContain('disk preflight before DSH/Lima install');
+      expect(output).toContain('stage');
+      expect(output).toContain('write exact runtime manifest');
+      expect(output).toContain('link shared runtime');
+      expect(output).toContain('compose pinned profile major-workstation-web');
+      expect(output).toContain('Major.app');
+      expect(output).toContain('Live Major execution remains on Lima');
+      expect(output).toContain('MAJOR_SESSION_HOST');
+      expect(existsSync(target)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

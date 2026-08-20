@@ -22,10 +22,10 @@ export function assertGuestMutationPolicy(input: GuestMutationPolicyInput): void
     throw new Error('antigravity cannot mutate the quarantined guest workspace');
   }
   if (!input.allowGuestMutation) return;
+  if (input.host !== 'codex') return;
   if (!input.workspaceHash || !WORKSPACE_HASH.test(input.workspaceHash)) {
     throw new Error('mutable provider execution requires a source workspace digest');
   }
-  if (input.host !== 'codex') return;
   if (!input.isolatedBackend) {
     throw new Error('Codex guest mutation requires the Lima execution backend');
   }

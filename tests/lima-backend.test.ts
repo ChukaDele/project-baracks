@@ -263,7 +263,7 @@ describe('Lima backend credential import: cross-provider path binding', () => {
 describe('Lima backend Codex profile import guards', () => {
   it('refuses importing an approved profile into the default credential slot', async () => {
     const result = await backend(fakeLima()).importCodexProfileCredential(
-      '/tmp/codex-profile/auth.json',
+      '/tmp/codex-profile',
       'default',
     );
     expect(result).toMatchObject({
@@ -274,7 +274,7 @@ describe('Lima backend Codex profile import guards', () => {
 
   it('refuses unsafe account labels before any Lima operation', async () => {
     const result = await backend(fakeLima()).importCodexProfileCredential(
-      '/tmp/codex-profile/auth.json',
+      '/tmp/codex-profile',
       '../etc',
     );
     expect(result).toMatchObject({
@@ -283,14 +283,14 @@ describe('Lima backend Codex profile import guards', () => {
     });
   });
 
-  it('refuses unsafe profile auth paths before any Lima operation', async () => {
+  it('refuses unavailable profile homes before any Lima operation', async () => {
     const result = await backend(fakeLima()).importCodexProfileCredential(
       '/tmp/not-auth.json',
       'cod-01',
     );
     expect(result).toMatchObject({
       ok: false,
-      detail: expect.stringMatching(/unsafe Codex profile credential path/),
+      detail: expect.stringMatching(/profile home is unavailable or unsafe/),
     });
   });
 });
@@ -370,7 +370,7 @@ describe('Lima backend Codex profile fd-pinned import', () => {
     const limactl = fakeLoginLima();
     try {
       await expect(
-        backend(limactl).importCodexProfileCredential(auth, 'cod-01'),
+        backend(limactl).importCodexProfileCredential(profile, 'cod-01'),
       ).resolves.toMatchObject({
         ok: true,
       });
@@ -393,7 +393,7 @@ describe('Lima backend Codex profile fd-pinned import', () => {
     const limactl = fakeLoginLima();
     try {
       await expect(
-        backend(limactl).importCodexProfileCredential(auth, 'cod-01'),
+        backend(limactl).importCodexProfileCredential(authDir, 'cod-01'),
       ).resolves.toMatchObject({
         ok: false,
         detail: expect.stringMatching(/unavailable or unsafe/),

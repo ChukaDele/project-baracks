@@ -309,16 +309,19 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     try {
       const report = await syncApprovedCodexProfiles(majorExecutionBackend(), opened.db);
       if (args.includes('--json')) console.log(JSON.stringify(report, null, 2));
-      else if (report.error && report.profiles.length === 0) {
-        console.log(`Codex profile sync failed: ${report.error}`);
-      } else {
+      else {
         for (const profile of report.profiles) {
           const availability = profile.availability ?? 'unknown';
           console.log(
             `${profile.policyId}\t${profile.accountLabel}\t${profile.imported ? 'imported' : 'skipped'}\t${availability}\t${profile.detail}`,
           );
         }
-        if (report.error) console.log(`warning: ${report.error}`);
+        for (const profile of report.revokedProfiles ?? []) {
+          console.log(`revoked\t${profile.accountLabel}\t${profile.detail}`);
+        }
+        if (report.error && report.profiles.length === 0) {
+          console.log(`Codex profile sync failed: ${report.error}`);
+        } else if (report.error) console.log(`warning: ${report.error}`);
       }
       if (report.error) process.exitCode = 1;
     } finally {

@@ -1,4 +1,4 @@
-import { mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -32,7 +32,10 @@ import {
 } from '../src/security/staged-validation.js';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
 import { authorizeSessionWorkshop, resolveProjectForCwd } from '../src/supervisor/state.js';
-import { allowGuestMutationForHost } from '../src/supervisor/worker.js';
+import {
+  allowGuestMutationForHost,
+  mutationWorkspaceHashForHost,
+} from '../src/supervisor/worker.js';
 import { seedProject, testDb } from './helpers.js';
 
 const ALL_FIVE: Capability[] = [
@@ -44,6 +47,20 @@ const ALL_FIVE: Capability[] = [
 ];
 
 describe('the v0.5.2 capability gate', () => {
+  it('does not impose the Codex source-tree digest on Claude or Cursor mutation', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'major-mutation-hash-')));
+    try {
+      const source = join(root, 'source.txt');
+      writeFileSync(source, 'shared inode');
+      linkSync(source, join(root, 'hard-link.txt'));
+      expect(mutationWorkspaceHashForHost('claude', root, true)).toBeUndefined();
+      expect(mutationWorkspaceHashForHost('cursor', root, true)).toBeUndefined();
+      expect(() => mutationWorkspaceHashForHost('codex', root, true)).toThrow(/hard link/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps all five build capabilities frozen and available', () => {
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual([...ALL_FIVE].sort());
     expect(Object.isFrozen(CAPABILITY_DEFINITIONS)).toBe(true);

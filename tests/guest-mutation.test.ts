@@ -74,12 +74,11 @@ describe('Codex guest mutation policy', () => {
     ).not.toThrow();
   });
 
-  it('keeps Claude and Cursor mutation contracts and forbids Antigravity writes', () => {
+  it('keeps Claude and Cursor mutation contracts without requiring a new source digest', () => {
     expect(() =>
       assertGuestMutationPolicy({
         host: 'claude',
         allowGuestMutation: true,
-        workspaceHash: digest,
         executionAuthorityKind: 'supervised',
         isolatedBackend: true,
       }),
@@ -88,11 +87,13 @@ describe('Codex guest mutation policy', () => {
       assertGuestMutationPolicy({
         host: 'cursor',
         allowGuestMutation: true,
-        workspaceHash: digest,
         executionAuthorityKind: 'supervised',
         isolatedBackend: true,
       }),
     ).not.toThrow();
+  });
+
+  it('forbids Antigravity writes', () => {
     expect(() =>
       assertGuestMutationPolicy({
         host: 'antigravity',

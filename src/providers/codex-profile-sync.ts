@@ -4,7 +4,10 @@
  * imports policy credentials and writes codex#label ProviderInfo availability.
  *
  * `major provider usage` remains read-only; run `major provider sync-profiles`
- * deliberately when policy profiles should become routable siblings.
+ * deliberately when policy profiles should become routable siblings. The
+ * same explicit sync fails closed by revoking persisted routing for removed,
+ * disabled, missing, or failed profiles. Root-only guest credentials remain
+ * intact for rollback; this command never performs credential deletion.
  */
 import { existsSync, lstatSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -23,6 +26,7 @@ import {
   loadPersistedProviderInfos,
   persistProviderDiscovery,
   recordBillingObservation,
+  revokeProviderAccountRouting,
 } from './discovery-store.js';
 import { loadModelRegistry, registryModels } from './registry.js';
 import type { ModelState, ProviderInfo } from './types.js';
@@ -38,6 +42,7 @@ export interface CodexProfileSyncRow {
 export interface CodexProfileSyncReport {
   syncedAt: string;
   profiles: CodexProfileSyncRow[];
+  revokedProfiles?: Array<{ accountLabel: string; detail: string }>;
   error?: string;
 }
 
@@ -92,7 +97,7 @@ function buildProviderInfo(input: {
 export async function syncApprovedCodexProfiles(
   backend: ExecutionBackend & {
     importCodexProfileCredential?: (
-      profileAuthPath: string,
+      profileHome: string,
       accountLabel: string,
     ) => Promise<{ ok: true; detail: string } | { ok: false; detail: string }>;
     readCodexUsage: (accountLabels: readonly string[]) => Promise<CodexUsageAccount[]>;
@@ -101,33 +106,76 @@ export async function syncApprovedCodexProfiles(
   now: () => Date = () => new Date(),
 ): Promise<CodexProfileSyncReport> {
   const syncedAt = now().toISOString();
+  const existing = loadPersistedProviderInfos(db);
+  const existingNamedLabels = existing
+    .map((info) => parseCapacityKey(info.name))
+    .filter(
+      ({ providerName, accountLabel }) =>
+        providerName === 'codex' && accountLabel !== DEFAULT_ACCOUNT_LABEL,
+    )
+    .map(({ accountLabel }) => accountLabel);
   const policy = readCodexProfilePolicy();
+  const active = policy?.accounts.filter((row) => row.role === 'active') ?? [];
+
+  const mapped = mapPolicyIdsToAccountLabels(active.map((row) => row.id));
+  if ('error' in mapped) {
+    const revokedProfiles = existingNamedLabels.map((accountLabel) => {
+      revokeProviderAccountRouting(
+        db,
+        capacityKey('codex', accountLabel),
+        'Codex profile routing revoked because the owner policy is invalid',
+        now,
+      );
+      return { accountLabel, detail: 'routing revoked; credential retained for rollback' };
+    });
+    return { syncedAt, profiles: [], revokedProfiles, error: mapped.error };
+  }
+
+  const activeLabels = new Set(mapped.labels.values());
+  const revokedProfiles: Array<{ accountLabel: string; detail: string }> = [];
+  const revokeRouting = (accountLabel: string, reason: string) => {
+    revokeProviderAccountRouting(db, capacityKey('codex', accountLabel), reason, now);
+    if (!revokedProfiles.some((profile) => profile.accountLabel === accountLabel)) {
+      revokedProfiles.push({
+        accountLabel,
+        detail: 'routing revoked; root-only credential retained for rollback',
+      });
+    }
+  };
+  for (const accountLabel of existingNamedLabels) {
+    if (!activeLabels.has(accountLabel)) {
+      revokeRouting(accountLabel, 'Codex profile is no longer active in the owner policy');
+    }
+  }
+
   if (!policy) {
     return {
       syncedAt,
       profiles: [],
+      ...(revokedProfiles.length > 0 ? { revokedProfiles } : {}),
       error: 'no Codex profile policy found at ~/.major/codex-account-policy.json',
     };
   }
-  const active = policy.accounts.filter((row) => row.role === 'active');
   if (active.length === 0) {
-    return { syncedAt, profiles: [], error: 'Codex profile policy has no active profiles' };
-  }
-
-  const mapped = mapPolicyIdsToAccountLabels(active.map((row) => row.id));
-  if ('error' in mapped) {
-    return { syncedAt, profiles: [], error: mapped.error };
-  }
-
-  if (typeof backend.importCodexProfileCredential !== 'function') {
     return {
       syncedAt,
       profiles: [],
+      ...(revokedProfiles.length > 0 ? { revokedProfiles } : {}),
+    };
+  }
+
+  if (typeof backend.importCodexProfileCredential !== 'function') {
+    for (const accountLabel of activeLabels) {
+      revokeRouting(accountLabel, 'Codex profile import is unavailable');
+    }
+    return {
+      syncedAt,
+      profiles: [],
+      ...(revokedProfiles.length > 0 ? { revokedProfiles } : {}),
       error: 'Codex profile import is unavailable in the current execution backend',
     };
   }
 
-  const existing = loadPersistedProviderInfos(db);
   const defaultExecutable = existing.find(
     (info) =>
       parseCapacityKey(info.name).providerName === 'codex' &&
@@ -141,6 +189,7 @@ export async function syncApprovedCodexProfiles(
     const accountLabel = mapped.labels.get(row.id)!;
     const authPath = profileAuthPath(row.home);
     if (!existsSync(authPath) || !lstatSync(authPath).isFile()) {
+      revokeRouting(accountLabel, 'Approved Codex profile credential is unavailable');
       profiles.push({
         policyId: row.id,
         accountLabel,
@@ -150,8 +199,9 @@ export async function syncApprovedCodexProfiles(
       continue;
     }
 
-    const imported = await backend.importCodexProfileCredential(authPath, accountLabel);
+    const imported = await backend.importCodexProfileCredential(row.home, accountLabel);
     if (!imported.ok) {
+      revokeRouting(accountLabel, 'Approved Codex profile credential import failed');
       profiles.push({
         policyId: row.id,
         accountLabel,
@@ -215,9 +265,14 @@ export async function syncApprovedCodexProfiles(
     return {
       syncedAt,
       profiles,
+      ...(revokedProfiles.length > 0 ? { revokedProfiles } : {}),
       error: 'every active Codex profile import failed',
     };
   }
 
-  return { syncedAt, profiles };
+  return {
+    syncedAt,
+    profiles,
+    ...(revokedProfiles.length > 0 ? { revokedProfiles } : {}),
+  };
 }

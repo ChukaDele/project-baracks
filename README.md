@@ -88,6 +88,11 @@ its launcher and runtime state remain under `$MAJOR_HOME/dsh-harness`.
 Start it with `bash scripts/start-major-workstation.sh --project /path/to/repo`.
 That path stays on Lima for live workers until strangle proof.
 
+`major provider sync-profiles` makes only owner-policy rows with `role: active`
+routable. A removed, disabled, missing, or failed profile immediately loses
+routing eligibility. Its root-only guest credential is retained for rollback;
+credential deletion remains an explicit owner operation.
+
 ## Recommended working mode for trusted projects
 
 JSS:

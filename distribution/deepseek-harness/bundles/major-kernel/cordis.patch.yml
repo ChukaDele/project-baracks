@@ -1,3 +1,8 @@
 - insert:
+    - id: subagent-claude-review
+      name: '@deepseek-ai/dsh-subagent-claude-code'
+      config:
+        providerName: claude-review
+        permissionMode: plan
     - id: major-workstation
       name: '@major/dsh-kernel'

@@ -833,7 +833,7 @@ export class LimaBackend implements ExecutionBackend {
    * default credential slot.
    */
   async importCodexProfileCredential(
-    profileAuthPath: string,
+    profileHome: string,
     accountLabel: string,
   ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
     if (!isCapabilityAvailable('live-agent-execution')) {
@@ -853,9 +853,12 @@ export class LimaBackend implements ExecutionBackend {
         detail: 'refusing to import an approved profile into the default Codex credential slot',
       };
     }
-    const resolved = resolve(profileAuthPath);
-    if (!resolved.endsWith('/auth.json')) {
-      return { ok: false, detail: 'refusing unsafe Codex profile credential path' };
+    let resolved: string;
+    try {
+      const canonicalHome = realpathSync(resolve(profileHome));
+      resolved = join(canonicalHome, 'auth.json');
+    } catch {
+      return { ok: false, detail: 'approved Codex profile home is unavailable or unsafe' };
     }
     let sourceFd: number | undefined;
     let credential: Buffer;
@@ -1514,7 +1517,7 @@ export class LimaBackend implements ExecutionBackend {
       manifestWritten = true;
       snapshotWorkspace(request.cwd, inputWorkspace);
       const baselineHash = hashWorkspaceTree(inputWorkspace);
-      if (request.providerRequest?.allowGuestMutation) {
+      if (request.providerRequest?.host === 'codex' && request.providerRequest.allowGuestMutation) {
         if (!request.providerRequest.workspaceHash) {
           throw new Error('mutable provider execution requires a source workspace digest');
         }

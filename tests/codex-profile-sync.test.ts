@@ -16,7 +16,10 @@ import {
   persistProviderDiscovery,
   recordBillingObservation,
 } from '../src/providers/discovery-store.js';
-import { subscriptionAccountPool } from '../src/routing/subscription-accounts.js';
+import {
+  providerHasUsableCapacity,
+  subscriptionAccountPool,
+} from '../src/routing/subscription-accounts.js';
 import { model } from './helpers.js';
 
 function tempHome(): string {
@@ -125,7 +128,8 @@ describe('Codex profile sync bridge', () => {
             labels.map((accountLabel) =>
               usageRow(accountLabel, accountLabel === 'cod-01' ? 10 : 100),
             ),
-          importCodexProfileCredential: async (path, accountLabel) => {
+          importCodexProfileCredential: async (profileHome, accountLabel) => {
+            const path = join(profileHome, 'auth.json');
             imported.push(`${accountLabel}:${path}`);
             expect(readFileSync(path).toString()).not.toBe('{"default":true}\n');
             return { ok: true, detail: `imported codex credential -> accounts/${accountLabel}` };
@@ -297,6 +301,83 @@ describe('Codex profile sync bridge', () => {
       opened.sqlite.close();
       if (priorHome === undefined) delete process.env.MAJOR_HOME;
       else process.env.MAJOR_HOME = priorHome;
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('revokes stale and failed named-account routes while retaining host credentials for rollback', async () => {
+    const home = tempHome();
+    const priorHome = process.env.MAJOR_HOME;
+    const priorDb = process.env.MAJOR_DB_PATH;
+    const dbPath = join(home, 'major.db');
+    process.env.MAJOR_HOME = home;
+    process.env.MAJOR_DB_PATH = dbPath;
+    const opened = openDb(dbPath);
+    try {
+      const authOne = writeProfileCredential(home, 'cod-01', 'profile-one');
+      const authTwo = writeProfileCredential(home, 'cod-02', 'profile-two');
+      await syncApprovedCodexProfiles(
+        testBackend({
+          readCodexUsage: async (labels) => labels.map((label) => usageRow(label, 10)),
+          importCodexProfileCredential: async (_home, accountLabel) => ({
+            ok: true,
+            detail: `imported ${accountLabel}`,
+          }),
+        }),
+        opened.db,
+      );
+
+      writeFileSync(
+        join(home, 'codex-account-policy.json'),
+        `${JSON.stringify(
+          {
+            accounts: [
+              { id: 'COD-01', role: 'backup-disabled', home: join(home, 'profiles', 'cod-01') },
+              { id: 'COD-02', role: 'active', home: join(home, 'profiles', 'cod-02') },
+            ],
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const report = await syncApprovedCodexProfiles(
+        testBackend({
+          readCodexUsage: async () => [],
+          importCodexProfileCredential: async () => ({
+            ok: false,
+            detail: 'refresh refused',
+          }),
+        }),
+        opened.db,
+      );
+
+      expect(report.revokedProfiles?.map(({ accountLabel }) => accountLabel).sort()).toEqual([
+        'cod-01',
+        'cod-02',
+      ]);
+      const named = loadPersistedProviderInfos(opened.db).filter((info) => info.name.includes('#'));
+      expect(named).toHaveLength(2);
+      expect(
+        named.every((info) =>
+          info.models.every(
+            (state) =>
+              !state.visible &&
+              !state.authenticated &&
+              state.availability === 'unknown' &&
+              state.prohibited,
+          ),
+        ),
+      ).toBe(true);
+      expect(named.every((info) => !providerHasUsableCapacity(info))).toBe(true);
+      expect(readFileSync(authOne, 'utf8')).toContain('profile-one');
+      expect(readFileSync(authTwo, 'utf8')).toContain('profile-two');
+    } finally {
+      opened.sqlite.close();
+      if (priorHome === undefined) delete process.env.MAJOR_HOME;
+      else process.env.MAJOR_HOME = priorHome;
+      if (priorDb === undefined) delete process.env.MAJOR_DB_PATH;
+      else process.env.MAJOR_DB_PATH = priorDb;
       rmSync(home, { recursive: true, force: true });
     }
   });

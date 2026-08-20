@@ -101,7 +101,7 @@ describe('Major DSH workstation kernel', () => {
           if (!majorProvider) throw new Error('Major provider was not registered');
           return majorProvider.start(request);
         }
-        expect(provider).toBe('claude-code');
+        expect(provider).toBe('claude-review');
         return {
           result: Promise.resolve({
             output: [{ type: 'text', text: 'VERDICT: PASS\nNo findings.' }],

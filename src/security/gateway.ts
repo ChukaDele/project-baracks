@@ -340,7 +340,7 @@ export class ExecutionGateway {
             ? { workspaceHash: request.providerRequest.workspaceHash }
             : {}),
           executionAuthorityKind: request.executionAuthority?.kind ?? 'supervised',
-          isolatedBackend: Boolean(this.options.backend),
+          isolatedBackend: this.options.backend?.kind === 'lima',
         });
       } catch (error) {
         this.refuse(

@@ -24,6 +24,11 @@ export const DSH_CODEX_BUNDLE = '@deepseek-ai/dsh-subagent-codex';
 export const MAJOR_KERNEL_LOCAL_SPEC = 'file:../../bundles/major-kernel';
 export const EMPTY_CORDIS_PATCH = '[]\n';
 export const MAJOR_KERNEL_PATCH = `- insert:
+    - id: subagent-claude-review
+      name: '@deepseek-ai/dsh-subagent-claude-code'
+      config:
+        providerName: claude-review
+        permissionMode: plan
     - id: major-workstation
       name: '@major/dsh-kernel'
 `;

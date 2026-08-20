@@ -341,6 +341,7 @@ export async function runWorker(input: {
         : await waitForResource(request.request, input.timeoutMs);
     const spec = workerCommand(input.host, input.prompt, input.modelRef, input.resumeSessionRef);
     const allowGuestMutation = allowGuestMutationForHost(input.host, input.cwd);
+    const workspaceHash = mutationWorkspaceHashForHost(input.host, input.cwd, allowGuestMutation);
     const outcome = await runGatewayCommand({
       executable: spec.command,
       args: spec.args,
@@ -351,7 +352,7 @@ export async function runWorker(input: {
         host: input.host,
         prompt: input.prompt,
         allowGuestMutation,
-        ...(allowGuestMutation ? { workspaceHash: hashSourceWorkspaceTree(input.cwd) } : {}),
+        ...(workspaceHash ? { workspaceHash } : {}),
         // Batch CLI providers expose no per-tool approval callback. Ordinary
         // worker runs therefore carry no sensitive-action authority.
         approvalAuthority: input.approvalAuthority ?? { decisions: [] },
@@ -387,4 +388,15 @@ export function allowGuestMutationForHost(host: WorkerHost, cwd: string): boolea
   } catch {
     return false;
   }
+}
+
+/** Only Codex needs the new source digest because its mutation authority is
+ * conditional on the live Workshop. Claude and Cursor retain their existing
+ * Lima mutation path without a new synchronous full-tree traversal. */
+export function mutationWorkspaceHashForHost(
+  host: WorkerHost,
+  cwd: string,
+  allowGuestMutation: boolean,
+): string | undefined {
+  return host === 'codex' && allowGuestMutation ? hashSourceWorkspaceTree(cwd) : undefined;
 }
