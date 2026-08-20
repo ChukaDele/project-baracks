@@ -5,9 +5,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   applyIndependentCompletionGrade,
   readSupervisorState,
+  updateGoal,
   writeSupervisorState,
   type SupervisorGoal,
 } from '../src/supervisor/state.js';
+import {
+  codexMutationClaimRefusal,
+  mutationClaimRefusalGoalPatch,
+} from '../src/supervisor/runtime.js';
+import type { WorkerReport } from '../src/supervisor/worker-report.js';
 
 let root: string;
 let priorStatePath: string | undefined;
@@ -23,6 +29,7 @@ function pendingGoal(): SupervisorGoal {
     preferredCoordinator: 'codex',
     cycle: 1,
     consecutiveFailures: 0,
+    activePid: 123,
     createdAt: '2026-08-11T00:00:00.000Z',
     updatedAt: '2026-08-11T00:01:00.000Z',
     lastCoordinator: 'codex',
@@ -49,6 +56,69 @@ afterEach(() => {
 });
 
 describe('independent goal completion', () => {
+  it('rejects only the canonical Codex BUILT claim when Lima observed no returned delta', () => {
+    const done: WorkerReport = { status: 'done', summary: 'acceptance task passed' };
+    const built: WorkerReport = { status: 'active', summary: 'BUILT provider route' };
+    expect(
+      codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, done),
+    ).toBeUndefined();
+    expect(codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, built)).toMatch(
+      /observed no project delta/,
+    );
+    for (const summary of ['not BUILT provider route', 'PRE-BUILT provider route', 'built route']) {
+      expect(
+        codexMutationClaimRefusal(
+          { host: 'codex', workspaceMutated: false },
+          { status: 'active', summary },
+        ),
+      ).toBeUndefined();
+    }
+  });
+
+  it('keeps a refused BUILT claim active and clears pending completion', () => {
+    const patch = mutationClaimRefusalGoalPatch(pendingGoal(), 'Rejected Codex mutation claim', {
+      sessionRef: 'session-2',
+    });
+    expect(patch).toMatchObject({
+      status: 'active',
+      pendingCompletion: undefined,
+      retryImmediately: false,
+      consecutiveFailures: 1,
+      lastSessionRef: 'session-2',
+    });
+    expect(Object.hasOwn(patch, 'pendingCompletion')).toBe(true);
+    expect(Object.hasOwn(patch, 'activePid')).toBe(true);
+    const persisted = updateGoal('goal-1', patch);
+    expect(persisted.pendingCompletion).toBeUndefined();
+    expect(persisted.activePid).toBeUndefined();
+  });
+
+  it('uses bounded generic failure escalation and preserves an existing session ref', () => {
+    const goal = pendingGoal();
+    goal.consecutiveFailures = 5;
+    goal.lastSessionRef = 'session-1';
+    updateGoal('goal-1', { consecutiveFailures: 5, lastSessionRef: 'session-1' });
+    const patch = mutationClaimRefusalGoalPatch(goal, 'Rejected Codex mutation claim', {});
+    expect(patch).toMatchObject({ status: 'failed', consecutiveFailures: 6 });
+    expect(Object.hasOwn(patch, 'lastSessionRef')).toBe(false);
+    expect(updateGoal('goal-1', patch).lastSessionRef).toBe('session-1');
+  });
+
+  it('does not invent mutation evidence or reject non-Codex and non-claim reports', () => {
+    const done: WorkerReport = { status: 'done', summary: 'acceptance task passed' };
+    const active: WorkerReport = { status: 'active', summary: 'inspection complete' };
+    expect(codexMutationClaimRefusal({ host: 'codex' }, done)).toBeUndefined();
+    expect(
+      codexMutationClaimRefusal({ host: 'claude', workspaceMutated: false }, done),
+    ).toBeUndefined();
+    expect(
+      codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, active),
+    ).toBeUndefined();
+    expect(
+      codexMutationClaimRefusal({ host: 'codex', workspaceMutated: true }, done),
+    ).toBeUndefined();
+  });
+
   it('marks a pending completion done only after a different provider passes it', () => {
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',

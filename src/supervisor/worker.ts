@@ -86,6 +86,7 @@ export interface WorkerOutcome {
   runId?: string;
   errorKind?: ExecuteOutcome['errorKind'];
   cleanup?: ExecuteOutcome['cleanup'];
+  workspaceMutated?: boolean;
   sessionRef?: string;
   usage?: unknown;
   modelSelection?: ExecuteOutcome['modelSelection'];
@@ -104,6 +105,7 @@ export interface GatewayCommandOutcome {
   runId?: string;
   errorKind?: ExecuteOutcome['errorKind'];
   cleanup?: ExecuteOutcome['cleanup'];
+  workspaceMutated?: boolean;
   sessionRef?: string;
   usage?: unknown;
   modelSelection?: ExecuteOutcome['modelSelection'];
@@ -272,6 +274,9 @@ export async function runGatewayCommand(input: {
         ...(outcome.runId ? { runId: outcome.runId } : {}),
         ...(outcome.errorKind ? { errorKind: outcome.errorKind } : {}),
         ...(outcome.cleanup ? { cleanup: outcome.cleanup } : {}),
+        ...(outcome.workspaceMutated !== undefined
+          ? { workspaceMutated: outcome.workspaceMutated }
+          : {}),
         ...(outcome.sessionRef ? { sessionRef: outcome.sessionRef } : {}),
         ...(outcome.usage !== undefined ? { usage: outcome.usage } : {}),
         ...(outcome.modelSelection ? { modelSelection: outcome.modelSelection } : {}),

@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -11,11 +12,59 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { detectProviderOutcomeSignals, LimaBackend } from '../src/execution/lima-backend.js';
+import {
+  detectProviderOutcomeSignals,
+  LimaBackend,
+  workspaceMutatedFromDiffExit,
+} from '../src/execution/lima-backend.js';
 import { openDb } from '../src/db/client.js';
 import { verifyProviderApprovalAuthority } from '../src/security/provider-approval-policy.js';
 import { EXHAUSTION_PATTERN, RATE_LIMIT_PATTERN } from '../src/providers/commands.js';
 import { tempDbPath } from './helpers.js';
+
+describe('returned workspace diff evidence', () => {
+  it('maps exit 0 to unchanged and exit 1 to mutated', () => {
+    expect(workspaceMutatedFromDiffExit(0)).toBe(false);
+    expect(workspaceMutatedFromDiffExit(1)).toBe(true);
+  });
+
+  it('fails closed for every other diff exit', () => {
+    expect(() => workspaceMutatedFromDiffExit(2, 'fatal: comparison failed')).toThrow(
+      /delta creation failed \(exit 2\): fatal: comparison failed/,
+    );
+    expect(() => workspaceMutatedFromDiffExit(128)).toThrow(/exit 128/);
+    expect(() => workspaceMutatedFromDiffExit(null)).toThrow(/exit unknown/);
+    expect(() =>
+      workspaceMutatedFromDiffExit(2, 'token ghp_abcdefghijklmnopqrstuvwxyz123456'),
+    ).toThrow(/\[REDACTED\]/);
+  });
+
+  it('classifies real returned-tree diffs for unchanged and mutated paths', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-returned-tree-'));
+    try {
+      const input = join(root, 'input', 'workspace');
+      const result = join(root, 'result', 'workspace');
+      mkdirSync(input, { recursive: true });
+      mkdirSync(result, { recursive: true });
+      writeFileSync(join(input, 'proof.txt'), 'same\n');
+      writeFileSync(join(result, 'proof.txt'), 'same\n');
+      const diff = () =>
+        spawnSync(
+          '/usr/bin/git',
+          ['diff', '--no-index', '--binary', '--full-index', input, result],
+          { encoding: 'utf8' },
+        );
+      const unchanged = diff();
+      expect(workspaceMutatedFromDiffExit(unchanged.status, unchanged.stderr)).toBe(false);
+      writeFileSync(join(result, 'proof.txt'), 'mutated\n');
+      const mutated = diff();
+      expect(workspaceMutatedFromDiffExit(mutated.status, mutated.stderr)).toBe(true);
+      expect(mutated.stdout).toContain('proof.txt');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 function fakeLima(version = 'limactl version 2.2.0'): string {
   const root = mkdtempSync(join(tmpdir(), 'major-fake-lima-'));

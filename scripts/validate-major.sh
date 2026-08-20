@@ -348,5 +348,9 @@ grep -Fq "WRAP the existing \`major-workstation-web\` profile" docs/prior-art-de
 grep -Fq "Codex guest mutation requires active supervised Workshop authority" src/security/guest-mutation.ts || fail "Codex guest mutation must require active Supervised Workshop"
 grep -Fq "assertGuestMutationPolicy" src/security/gateway.ts || fail "execution gateway must enforce guest mutation policy"
 grep -Fq "assertGuestMutationPolicy" src/execution/lima-backend.ts || fail "Lima copy-back must enforce guest mutation policy"
+grep -Fq "workspaceMutatedFromDiffExit(diff.code, diff.stderr)" src/execution/lima-backend.ts || fail "Lima must classify its returned workspace delta"
+grep -Fq "if (code === 0) return false" src/execution/lima-backend.ts || fail "Lima diff exit 0 must mean no returned delta"
+grep -Fq "if (code === 1) return true" src/execution/lima-backend.ts || fail "Lima diff exit 1 must mean a returned delta"
+grep -Fq "codexMutationClaimRefusal(outcome, report)" src/supervisor/runtime.ts || fail "supervisor must adjudicate Codex mutation claims from backend evidence"
 
 echo "Major validation passed."

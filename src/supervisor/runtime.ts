@@ -820,6 +820,13 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
 
   if (outcome.status === 'succeeded') {
     const report = parseWorkerReport(outcome.stdout);
+    const mutationClaimRefusal = codexMutationClaimRefusal(outcome, report);
+    if (mutationClaimRefusal) {
+      // A rejected readiness claim is not a trusted source for capability-use
+      // or learning self-reports. Refuse it before recording either one.
+      updateGoal(goal.id, mutationClaimRefusalGoalPatch(after, mutationClaimRefusal, outcome));
+      return;
+    }
     recordReportedCapabilityUses(capabilityResolution.capabilities, report?.capabilityUse);
     let learningWarning = '';
     if (report?.learning) {
@@ -860,7 +867,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         ownerGate: report.ownerGate,
         pendingCompletion: undefined,
         retryImmediately: false,
-        lastSessionRef: outcome.sessionRef,
+        ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
       });
       return;
     }
@@ -875,7 +882,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         nextRunAt: undefined,
         pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
         retryImmediately: false,
-        lastSessionRef: outcome.sessionRef,
+        ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
       });
       return;
     }
@@ -890,7 +897,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
       pendingCompletion: undefined,
       retryImmediately: false,
-      lastSessionRef: outcome.sessionRef,
+      ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
     });
   } else {
     const patch = nonSuccessCyclePatch({
@@ -916,6 +923,49 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       retryImmediately: patch.retryImmediately,
     });
   }
+}
+
+/** A provider report is never proof that files changed. Lima's returned-tree
+ * comparison is the authority: when it explicitly observed no delta, Codex
+ * may not label the implementation with the canonical BUILT readiness claim.
+ * Read-only work may still legitimately report done without a project delta. */
+export function codexMutationClaimRefusal(
+  outcome: Pick<WorkerOutcome, 'host' | 'workspaceMutated'>,
+  report: ReturnType<typeof parseWorkerReport>,
+): string | undefined {
+  if (outcome.host !== 'codex' || outcome.workspaceMutated !== false || !report) return undefined;
+  if (!/^BUILT(?:\b|:)/.test(report.summary)) return undefined;
+  return (
+    'Rejected Codex mutation claim: the isolated backend compared the returned workspace ' +
+    'with its input and observed no project delta. The task remains active.'
+  );
+}
+
+export function mutationClaimRefusalGoalPatch(
+  goal: Pick<SupervisorGoal, 'consecutiveFailures'>,
+  refusal: string,
+  outcome: Pick<WorkerOutcome, 'sessionRef'>,
+): Partial<SupervisorGoal> {
+  const failure = nonSuccessCyclePatch({
+    modelOutcome: undefined,
+    stderr: refusal,
+    stdout: '',
+    provider: 'codex',
+    modelRef: 'readiness-claim',
+    host: 'codex',
+    consecutiveFailures: goal.consecutiveFailures,
+  });
+  return {
+    status: failure.status,
+    consecutiveFailures: failure.consecutiveFailures,
+    activePid: undefined,
+    lastFinishedAt: new Date().toISOString(),
+    lastSummary: failure.lastSummary,
+    nextRunAt: new Date(Date.now() + failure.nextRunDelayMs).toISOString(),
+    pendingCompletion: undefined,
+    retryImmediately: failure.retryImmediately,
+    ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
+  };
 }
 
 /**

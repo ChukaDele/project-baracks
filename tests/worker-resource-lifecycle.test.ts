@@ -43,6 +43,40 @@ afterEach(() => {
 });
 
 describe('worker resource lifecycle', () => {
+  it('propagates returned-tree evidence from the gateway outcome to the worker outcome', async () => {
+    const running = runWorker({ host: 'codex', cwd: root, prompt: 'read only' });
+    await Promise.resolve();
+    if (!finish) throw new Error('gateway propagation mock was not initialized');
+    finish({
+      status: 'succeeded',
+      exitCode: 0,
+      rateLimited: false,
+      exhausted: false,
+      cleanup: 'complete',
+      workspaceMutated: false,
+    });
+    await expect(running).resolves.toMatchObject({
+      host: 'codex',
+      status: 'succeeded',
+      workspaceMutated: false,
+    });
+  });
+
+  it('keeps omitted returned-tree evidence omitted', async () => {
+    const running = runWorker({ host: 'codex', cwd: root, prompt: 'read only' });
+    await Promise.resolve();
+    if (!finish) throw new Error('gateway propagation mock was not initialized');
+    finish({
+      status: 'succeeded',
+      exitCode: 0,
+      rateLimited: false,
+      exhausted: false,
+      cleanup: 'complete',
+    });
+    const outcome = await running;
+    expect(Object.hasOwn(outcome, 'workspaceMutated')).toBe(false);
+  });
+
   it('keeps a two-hour worker lease alive until execution is terminal', async () => {
     const running = runWorker({
       host: 'claude',
