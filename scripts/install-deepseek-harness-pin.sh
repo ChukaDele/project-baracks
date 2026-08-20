@@ -246,12 +246,13 @@ verify_profile_composition() {
 }
 
 stage_workstation_app() {
-  local args=()
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    args+=(--dry-run)
+    MAJOR_HOME="$MAJOR_HOME" MAJOR_DSH_HOME="$DSH_HOME" \
+      bash "$ROOT/scripts/stage-major-workstation-app.sh" --dry-run
+  else
+    MAJOR_HOME="$MAJOR_HOME" MAJOR_DSH_HOME="$DSH_HOME" \
+      bash "$ROOT/scripts/stage-major-workstation-app.sh"
   fi
-  MAJOR_HOME="$MAJOR_HOME" MAJOR_DSH_HOME="$DSH_HOME" \
-    bash "$ROOT/scripts/stage-major-workstation-app.sh" "${args[@]}"
 }
 
 write_install_record() {
