@@ -1,6 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstatSync, readFileSync, readlinkSync, readdirSync, realpathSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readlinkSync,
+  readdirSync,
+  realpathSync,
+} from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 
 export const name = 'major-workstation';
 export const inject = ['commands', 'subagents', 'subprocess'];
@@ -10,7 +17,8 @@ const RESULT_LIMIT = 8 * 1024;
 const NO_START_CAPABILITIES = Object.freeze({});
 const SESSION_HOSTS = new Set(['claude', 'codex', 'cursor', 'antigravity']);
 const FOREGROUND_DISPATCH_PREFIX = 'MAJOR_FOREGROUND_DISPATCH:';
-const REVIEW_HASH_EXCLUSIONS = new Set(['.git', 'node_modules']);
+const REVIEW_HASH_EXCLUSIONS = new Set(['node_modules']);
+const GIT_CONTROL_NAMES = ['HEAD', 'index', 'config', 'packed-refs', 'commondir', 'hooks', 'refs'];
 const REVIEW_HASH_MAX_ENTRIES = 100_000;
 const REVIEW_HASH_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 const REVIEW_HASH_MAX_DEPTH = 64;
@@ -23,6 +31,73 @@ export function hashReviewWorkspace(root) {
   const hash = createHash('sha256');
   let entries = 0;
   let bytes = 0;
+
+  const hashPath = (path, label, depth) => {
+    if (depth > REVIEW_HASH_MAX_DEPTH) {
+      throw new Error('major-workstation: review workspace exceeds directory depth limit');
+    }
+    const stat = lstatSync(path);
+    entries += 1;
+    if (entries > REVIEW_HASH_MAX_ENTRIES) {
+      throw new Error('major-workstation: review workspace exceeds entry limit');
+    }
+    if (stat.isDirectory()) {
+      hash.update(`d\0${label}\0${stat.mode & 0o777}\0`);
+      for (const entry of readdirSync(path, { withFileTypes: true }).sort((left, right) =>
+        left.name.localeCompare(right.name),
+      )) {
+        if (REVIEW_HASH_EXCLUSIONS.has(entry.name)) continue;
+        const childPath = join(path, entry.name);
+        const childLabel = `${label}/${entry.name}`;
+        if (entry.name === '.git') hashGitState(childPath, childLabel);
+        else hashPath(childPath, childLabel, depth + 1);
+      }
+    } else if (stat.isFile()) {
+      bytes += stat.size;
+      if (bytes > REVIEW_HASH_MAX_BYTES) {
+        throw new Error('major-workstation: review workspace exceeds byte limit');
+      }
+      hash.update(`f\0${label}\0${stat.mode & 0o777}\0`);
+      hash.update(readFileSync(path));
+    } else if (stat.isSymbolicLink()) {
+      hash.update(`l\0${label}\0${readlinkSync(path)}\0`);
+    } else {
+      throw new Error(`major-workstation: unsupported review workspace object: ${label}`);
+    }
+  };
+
+  const hashGitDirectory = (gitDirectory, label) => {
+    for (const name of GIT_CONTROL_NAMES) {
+      const path = join(gitDirectory, name);
+      if (existsSync(path)) hashPath(path, `${label}/${name}`, 1);
+    }
+    const commonDirFile = join(gitDirectory, 'commondir');
+    if (!existsSync(commonDirFile)) return;
+    const commonDirectory = resolve(gitDirectory, readFileSync(commonDirFile, 'utf8').trim());
+    for (const name of ['config', 'packed-refs', 'hooks', 'refs']) {
+      const path = join(commonDirectory, name);
+      if (existsSync(path)) hashPath(path, `${label}/common/${name}`, 1);
+    }
+  };
+
+  const hashGitState = (gitPath, label) => {
+    const stat = lstatSync(gitPath);
+    if (stat.isDirectory()) {
+      hash.update(`git\0${label}\0`);
+      hashGitDirectory(gitPath, label);
+      return;
+    }
+    if (!stat.isFile()) {
+      hashPath(gitPath, label, 0);
+      return;
+    }
+    hashPath(gitPath, label, 0);
+    const pointer = readFileSync(gitPath, 'utf8')
+      .trim()
+      .match(/^gitdir:\s*(.+)$/i);
+    if (pointer) hashGitDirectory(resolve(dirname(gitPath), pointer[1]), `${label}/worktree`);
+  };
+
   const visit = (directory, depth) => {
     if (depth > REVIEW_HASH_MAX_DEPTH) {
       throw new Error('major-workstation: review workspace exceeds directory depth limit');
@@ -32,29 +107,15 @@ export function hashReviewWorkspace(root) {
     )) {
       if (REVIEW_HASH_EXCLUSIONS.has(entry.name)) continue;
       const path = join(directory, entry.name);
-      const rel = relative(canonicalRoot, path);
-      const stat = lstatSync(path);
-      entries += 1;
-      if (entries > REVIEW_HASH_MAX_ENTRIES) {
-        throw new Error('major-workstation: review workspace exceeds entry limit');
-      }
-      if (stat.isDirectory()) {
-        hash.update(`d\0${rel}\0${stat.mode & 0o777}\0`);
-        visit(path, depth + 1);
-      } else if (stat.isFile()) {
-        bytes += stat.size;
-        if (bytes > REVIEW_HASH_MAX_BYTES) {
-          throw new Error('major-workstation: review workspace exceeds byte limit');
-        }
-        hash.update(`f\0${rel}\0${stat.mode & 0o777}\0`);
-        hash.update(readFileSync(path));
-      } else if (stat.isSymbolicLink()) {
-        hash.update(`l\0${rel}\0${readlinkSync(path)}\0`);
+      const label = relative(canonicalRoot, path);
+      if (entry.name === '.git' && directory === canonicalRoot) {
+        hashGitState(path, label);
       } else {
-        throw new Error(`major-workstation: unsupported review workspace object: ${rel}`);
+        hashPath(path, label, depth);
       }
     }
   };
+
   visit(canonicalRoot, 0);
   return hash.digest('hex');
 }

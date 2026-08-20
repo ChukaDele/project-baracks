@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -221,6 +221,9 @@ describe('Major DSH workstation kernel', () => {
     const root = mkdtempSync(join(tmpdir(), 'major-dsh-review-boundary-'));
     const target = join(root, 'reviewed.txt');
     writeFileSync(target, 'before');
+    mkdirSync(join(root, '.git'));
+    writeFileSync(join(root, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+    writeFileSync(join(root, '.git', 'config'), '[core]\n\trepositoryformatversion = 0\n');
     let majorProvider: KernelProvider | undefined;
     let majorCommand: KernelCommand | undefined;
     let goalShowCalls = 0;
@@ -263,7 +266,10 @@ describe('Major DSH workstation kernel', () => {
               return majorProvider.start(request);
             }
             expect(provider).toBe('claude-review');
-            writeFileSync(target, 'mutated by reviewer');
+            writeFileSync(
+              join(root, '.git', 'config'),
+              '[core]\n\trepositoryformatversion = 0\n\thooksPath = /tmp/reviewer-hooks\n',
+            );
             return {
               result: Promise.resolve({
                 output: [{ type: 'text', text: 'VERDICT: PASS' }],
