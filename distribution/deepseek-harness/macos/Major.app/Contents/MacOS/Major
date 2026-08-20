@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Reversible installer-managed stub: starts the pinned DSH web profile via the
+# DSH-home launcher. Not Electron, Tauri, or a login agent.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+APP_BUNDLE="$(cd "$HERE/../.." && pwd)"
+DSH_HOME_POINTER="$APP_BUNDLE/Contents/Resources/major-dsh-home"
+[[ -f "$DSH_HOME_POINTER" ]] || {
+  echo "Major workstation DSH-home pointer missing: $DSH_HOME_POINTER" >&2
+  exit 1
+}
+IFS= read -r DSH_HOME < "$DSH_HOME_POINTER"
+[[ -n "$DSH_HOME" && "$DSH_HOME" = /* && -d "$DSH_HOME" ]] || {
+  echo "Major workstation DSH-home pointer is invalid: $DSH_HOME_POINTER" >&2
+  exit 1
+}
+export MAJOR_DSH_HOME="$DSH_HOME"
+export DSH_HOME
+LAUNCHER="$DSH_HOME/bin/start-major-workstation.sh"
+[[ -x "$LAUNCHER" ]] || {
+  echo "Major workstation launcher missing: $LAUNCHER" >&2
+  exit 1
+}
+PROJECT="${MAJOR_WORKSTATION_PROJECT:-}"
+if [[ -z "$PROJECT" && -f "$DSH_HOME/run/current-project" ]]; then
+  PROJECT="$(cat "$DSH_HOME/run/current-project")"
+fi
+if [[ -n "$PROJECT" ]]; then
+  exec "$LAUNCHER" --project "$PROJECT" "$@"
+fi
+exec "$LAUNCHER" "$@"

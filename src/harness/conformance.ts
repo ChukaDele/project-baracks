@@ -11,6 +11,7 @@ import {
   DSH_BASE_BUNDLE,
   HARNESS_MIGRATION_PHASES,
   MAJOR_KERNEL_BUNDLE,
+  PROFILE_PNPM_WORKSPACE,
   bundleManifest,
   majorKernelBundle,
   majorWorkstationHeadlessProfile,
@@ -24,6 +25,15 @@ import {
   HARNESS_PIN_RELATIVE_PATH,
   deepSeekHarnessPinSchema,
 } from './pin.js';
+import {
+  WORKSTATION_APP_BUNDLE,
+  WORKSTATION_CHROME_HOST,
+  WORKSTATION_DSH_APP_ARGS,
+  WORKSTATION_FORBIDDEN,
+  WORKSTATION_LISTEN_HOST,
+  WORKSTATION_PORT,
+  WORKSTATION_PROFILE,
+} from './workstation-app.js';
 
 export interface ConformanceCheck {
   id: string;
@@ -155,6 +165,85 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
         JSON.stringify(profileManifest(majorWorkstationHeadlessProfile())),
       'headless profile bundles must match composition',
     ),
+    check(
+      'web.profile-pnpm-layout',
+      readRepoFile(
+        repoRoot,
+        'distribution/deepseek-harness/profiles/major-workstation-web/pnpm-workspace.yaml',
+      ) === PROFILE_PNPM_WORKSPACE,
+      'web profile must use the upstream hoisted out-of-tree plugin layout',
+    ),
+    check(
+      'headless.profile-pnpm-layout',
+      readRepoFile(
+        repoRoot,
+        'distribution/deepseek-harness/profiles/major-workstation-headless/pnpm-workspace.yaml',
+      ) === PROFILE_PNPM_WORKSPACE,
+      'headless profile must use the upstream hoisted out-of-tree plugin layout',
+    ),
+  ];
+}
+
+function workstationAppMatches(repoRoot: string): ConformanceCheck[] {
+  const launcher = readRepoFile(repoRoot, 'scripts/start-major-workstation.sh');
+  const stager = readRepoFile(repoRoot, 'scripts/stage-major-workstation-app.sh');
+  const installer = readRepoFile(repoRoot, 'scripts/install-deepseek-harness-pin.sh');
+  const appExec = readRepoFile(
+    repoRoot,
+    'distribution/deepseek-harness/macos/Major.app/Contents/MacOS/Major',
+  );
+  const plist = readRepoFile(
+    repoRoot,
+    'distribution/deepseek-harness/macos/Major.app/Contents/Info.plist',
+  );
+  const combined = `${launcher}\n${stager}\n${installer}\n${appExec}\n${plist}`;
+  const forbiddenHit = WORKSTATION_FORBIDDEN.find((token) => combined.includes(token));
+  return [
+    check(
+      'workstation.profile',
+      launcher.includes(`PROFILE="${WORKSTATION_PROFILE}"`) &&
+        launcher.includes(`LISTEN_HOST="${WORKSTATION_LISTEN_HOST}"`) &&
+        launcher.includes(`PORT="${WORKSTATION_PORT}"`),
+      'launcher must boot the pinned web profile on loopback 3080',
+    ),
+    check(
+      'workstation.dsh-args',
+      WORKSTATION_DSH_APP_ARGS.every((arg) => launcher.includes(arg)),
+      'launcher must pass official --host/--port/--no-open/--trusted-host app args',
+    ),
+    check(
+      'workstation.chrome-app-mode',
+      launcher.includes('--app=') &&
+        launcher.includes(WORKSTATION_CHROME_HOST) &&
+        launcher.includes('--user-data-dir='),
+      'launcher must open Chrome app-mode against localhost with a DSH-home profile',
+    ),
+    check(
+      'workstation.single-instance',
+      launcher.includes('workstation.lock') && launcher.includes('already running'),
+      'launcher must refuse a second live lock',
+    ),
+    check(
+      'workstation.logs',
+      launcher.includes('$DSH_HOME/logs/workstation.log'),
+      'launcher logs must stay under the DSH home',
+    ),
+    check(
+      'workstation.preserve-major-path',
+      launcher.includes('ORIGINAL_PATH') && launcher.includes('preserve PATH'),
+      'launcher must preserve the current Major PATH',
+    ),
+    check(
+      'workstation.no-desktop-runtime',
+      forbiddenHit === undefined &&
+        installer.includes('stage_workstation_app') &&
+        stager.includes(WORKSTATION_APP_BUNDLE) &&
+        plist.includes('com.chuka.major.workstation-web') &&
+        appExec.includes('start-major-workstation.sh'),
+      forbiddenHit === undefined
+        ? 'Major.app is installer-managed without Electron, Tauri, or a login agent'
+        : `forbidden workstation token: ${forbiddenHit}`,
+    ),
   ];
 }
 
@@ -173,6 +262,10 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
   const rangeUsed = Object.values(pin.npm.packages).some((version) =>
     pin.npm.forbiddenResolutions.some((token) => version.includes(token)),
   );
+  const kernelSource = readRepoFile(
+    repoRoot,
+    'distribution/deepseek-harness/bundles/major-kernel/index.js',
+  );
   const checks: ConformanceCheck[] = [
     check('pin.parse', true, `pinned ${pin.npm.version}`),
     check(
@@ -190,8 +283,11 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
       'pin.attested',
       pin.git.attestedCommit !== null &&
         /^[0-9a-f]{40}$/.test(pin.git.attestedCommit) &&
-        Object.values(pin.npm.integrities).every((integrity) => integrity.startsWith('sha512-')),
-      'official release tag commit and npm package integrities are attested',
+        Object.values(pin.npm.integrities).every((integrity) => integrity.startsWith('sha512-')) &&
+        Object.values(pin.npm.runtimePeers.integrities).every((integrity) =>
+          integrity.startsWith('sha512-'),
+        ),
+      'official release tag commit, dsh packages, and runtime peers are attested',
     ),
     check(
       'deps.not-installed',
@@ -217,9 +313,21 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
       CAPABILITY_REUSE.every((record) => record.decision === 'KEEP'),
       'every retained Major capability has a KEEP reuse record',
     ),
+    check(
+      'kernel.subscription-routing',
+      kernelSource.includes('MAJOR_SESSION_HOST') &&
+        kernelSource.includes('MAJOR_FOREGROUND_DISPATCH') &&
+        !kernelSource.includes('NO_CYCLE_MESSAGE') &&
+        !kernelSource.includes("'--host', 'codex'") &&
+        !kernelSource.includes("'--host', 'claude'") &&
+        !kernelSource.includes("'--host', 'cursor'") &&
+        !kernelSource.includes("'--host', 'antigravity'"),
+      '/major must take MAJOR_SESSION_HOST for admit/attach; Major run still routes the worker',
+    ),
     ...assertProfileComposition(majorWorkstationWebProfile()),
     ...assertProfileComposition(majorWorkstationHeadlessProfile()),
     ...distributionMatches(repoRoot),
+    ...workstationAppMatches(repoRoot),
   ];
 
   return {

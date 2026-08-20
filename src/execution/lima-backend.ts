@@ -2,7 +2,9 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
+  constants,
   existsSync,
+  fstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -13,7 +15,12 @@ import {
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { providerExecutable } from '../providers/commands.js';
-import { accountAuthStoreRelativePath, providerStateAccountArgs } from '../providers/account.js';
+import {
+  accountAuthStoreRelativePath,
+  assertAccountLabel,
+  DEFAULT_ACCOUNT_LABEL,
+  providerStateAccountArgs,
+} from '../providers/account.js';
 import {
   CODEX_APP_SERVER_READY_DELAY_MS,
   CODEX_APP_SERVER_STARTUP_DELAY_MS,
@@ -42,6 +49,7 @@ import {
   assertActiveResourceLeaseForProcess,
 } from '../supervisor/resources.js';
 import { assertSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
+import { assertGuestMutationPolicy } from '../security/guest-mutation.js';
 import type {
   BackendExecuteRequest,
   BackendProviderStatus,
@@ -205,6 +213,7 @@ export class LimaBackend implements ExecutionBackend {
     onLine?: (line: string) => void,
     cwd?: string,
     env: NodeJS.ProcessEnv = this.hostEnv(),
+    input?: Buffer,
   ) {
     return new Promise<CommandResult>((resolvePromise, reject) => {
       let stdout = '';
@@ -212,12 +221,17 @@ export class LimaBackend implements ExecutionBackend {
       let pending = '';
       const child = spawn(executable, [...args], {
         env,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         shell: false,
         detached: true,
         ...(cwd ? { cwd } : {}),
       });
       this.activeChild = child;
+      if (!child.stdout || !child.stderr) {
+        child.kill();
+        reject(new Error('child process output pipes are unavailable'));
+        return;
+      }
       child.stdout.on('data', (chunk: Buffer) => {
         const text = chunk.toString('utf8');
         stdout += text;
@@ -232,6 +246,12 @@ export class LimaBackend implements ExecutionBackend {
         stderr += chunk.toString('utf8');
         if (stderr.length > 200_000) stderr = stderr.slice(-200_000);
       });
+      if (input && child.stdin) {
+        child.stdin.on('error', (error) => {
+          stderr += `stdin transfer failed: ${error.message}`;
+        });
+        child.stdin.end(input);
+      }
       child.once('error', reject);
       child.once('close', (code) => {
         if (pending && onLine) onLine(pending);
@@ -328,6 +348,11 @@ export class LimaBackend implements ExecutionBackend {
   private async lima(args: readonly string[], onLine?: (line: string) => void) {
     const trusted = this.registry.verify(basename(this.config.limactlPath));
     return this.run(trusted.spawnPath, args, onLine);
+  }
+
+  private async limaWithInput(args: readonly string[], input: Buffer) {
+    const trusted = this.registry.verify(basename(this.config.limactlPath));
+    return this.run(trusted.spawnPath, args, undefined, undefined, this.hostEnv(), input);
   }
 
   private async instance(): Promise<ValidatedLimaInstance> {
@@ -766,7 +791,9 @@ export class LimaBackend implements ExecutionBackend {
     host: 'claude' | 'codex' | 'cursor' | 'antigravity',
     guestTmp: string,
     importScript: string,
+    accountLabel: string = DEFAULT_ACCOUNT_LABEL,
   ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
+    assertAccountLabel(accountLabel);
     const copiedScript = await this.lima([
       'copy',
       importScript,
@@ -788,6 +815,7 @@ export class LimaBackend implements ExecutionBackend {
       'python3',
       `${guestTmp}/import.py`,
       host,
+      ...(accountLabel === DEFAULT_ACCOUNT_LABEL ? [] : [accountLabel]),
     ]);
     if (placed.code !== 0) {
       return {
@@ -796,6 +824,139 @@ export class LimaBackend implements ExecutionBackend {
       };
     }
     return { ok: true, detail: placed.stdout.trim() };
+  }
+
+  /**
+   * Import one approved Codex profile credential into a named provider-auth
+   * slot. Copies from the profile's existing auth.json through the same guest
+   * staging broker as host onboarding; never modifies the source file or the
+   * default credential slot.
+   */
+  async importCodexProfileCredential(
+    profileHome: string,
+    accountLabel: string,
+  ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
+    if (!isCapabilityAvailable('live-agent-execution')) {
+      return {
+        ok: false,
+        detail: 'credential import is disabled while live-agent-execution is unavailable',
+      };
+    }
+    try {
+      assertAccountLabel(accountLabel);
+    } catch (error) {
+      return { ok: false, detail: errorText(error) };
+    }
+    if (accountLabel === DEFAULT_ACCOUNT_LABEL) {
+      return {
+        ok: false,
+        detail: 'refusing to import an approved profile into the default Codex credential slot',
+      };
+    }
+    let resolved: string;
+    try {
+      const canonicalHome = realpathSync(resolve(profileHome));
+      resolved = join(canonicalHome, 'auth.json');
+    } catch {
+      return { ok: false, detail: 'approved Codex profile home is unavailable or unsafe' };
+    }
+    let sourceFd: number | undefined;
+    let credential: Buffer;
+    try {
+      sourceFd = openSync(resolved, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const source = fstatSync(sourceFd);
+      if (!source.isFile() || source.nlink !== 1) {
+        return { ok: false, detail: 'approved Codex profile credential is not a regular file' };
+      }
+      credential = readFileSync(sourceFd);
+    } catch {
+      return { ok: false, detail: 'approved Codex profile credential is unavailable or unsafe' };
+    } finally {
+      if (sourceFd !== undefined) closeSync(sourceFd);
+    }
+    try {
+      const parsed: unknown = JSON.parse(credential.toString('utf8'));
+      if (typeof parsed !== 'object' || parsed === null || Object.keys(parsed).length === 0) {
+        return { ok: false, detail: 'approved Codex profile credential is not valid JSON' };
+      }
+    } catch {
+      return { ok: false, detail: 'approved Codex profile credential is not valid JSON' };
+    }
+
+    const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
+    const importScript = join(executingRoot, 'scripts', 'import-major-provider-credential.py');
+    const stateRoot = join(majorHome(), 'execution', 'lima');
+    const lock = join(stateRoot, 'backend.lock');
+    mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+    await this.acquireLock(lock);
+    try {
+      await this.start();
+      const guestTmp = '/tmp/major-credential-import';
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        guestTmp,
+      ]);
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'install',
+        '-d',
+        '-m',
+        '0700',
+        guestTmp,
+      ]);
+      const copiedCredential = await this.limaWithInput(
+        [
+          'shell',
+          '--tty=false',
+          this.config.instance,
+          'sh',
+          '-c',
+          'umask 077; cat > "$1"',
+          'major-credential-stage',
+          `${guestTmp}/staged`,
+        ],
+        credential,
+      );
+      if (copiedCredential.code !== 0) {
+        return {
+          ok: false,
+          detail:
+            'could not send this credential to the isolated worker — try again; ' +
+            `technical detail: ${redactText(copiedCredential.stderr)}`,
+        };
+      }
+      const placed = await this.placeStagedCredentialIntoStore(
+        'codex',
+        guestTmp,
+        importScript,
+        accountLabel,
+      );
+      return placed;
+    } finally {
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        '/tmp/major-credential-import',
+      ]).catch(() => undefined);
+      try {
+        await this.stop();
+      } finally {
+        rmSync(lock, { recursive: true, force: true });
+      }
+    }
   }
 
   /**
@@ -1206,6 +1367,17 @@ export class LimaBackend implements ExecutionBackend {
         opened.sqlite.close();
       }
     }
+    if (request.providerRequest) {
+      assertGuestMutationPolicy({
+        host: request.providerRequest.host,
+        allowGuestMutation: request.providerRequest.allowGuestMutation,
+        ...(request.providerRequest.workspaceHash
+          ? { workspaceHash: request.providerRequest.workspaceHash }
+          : {}),
+        executionAuthorityKind: request.executionAuthority.kind,
+        isolatedBackend: true,
+      });
+    }
     const queue = new EventQueue<ProviderEvent>();
     const runId = randomUUID();
     this.cancelled = false;
@@ -1345,6 +1517,14 @@ export class LimaBackend implements ExecutionBackend {
       manifestWritten = true;
       snapshotWorkspace(request.cwd, inputWorkspace);
       const baselineHash = hashWorkspaceTree(inputWorkspace);
+      if (request.providerRequest?.host === 'codex' && request.providerRequest.allowGuestMutation) {
+        if (!request.providerRequest.workspaceHash) {
+          throw new Error('mutable provider execution requires a source workspace digest');
+        }
+        if (request.providerRequest.workspaceHash !== baselineHash) {
+          throw new Error('source workspace changed before isolated execution began');
+        }
+      }
       const instance = await this.start();
       if (request.executionAuthority.kind === 'staged_validation') {
         const marker = await this.lima([
@@ -1743,6 +1923,13 @@ export class LimaBackend implements ExecutionBackend {
         };
       }
       if (diff.code === 1) {
+        assertGuestMutationPolicy({
+          host: providerIntent.host,
+          allowGuestMutation: true,
+          ...(providerIntent.workspaceHash ? { workspaceHash: providerIntent.workspaceHash } : {}),
+          executionAuthorityKind: request.executionAuthority.kind,
+          isolatedBackend: true,
+        });
         const check = await this.run('/usr/bin/git', [
           '-C',
           realpathSync(request.cwd),

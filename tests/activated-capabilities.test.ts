@@ -1,4 +1,5 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -24,10 +25,17 @@ import {
   isCapabilityAvailable,
   type Capability,
 } from '../src/security/capabilities.js';
+import { executeMajorCommand } from '../src/security/major-gateway.js';
 import {
   currentActivationState,
   issueStagedValidationLease,
 } from '../src/security/staged-validation.js';
+import { configureProjectPolicy } from '../src/supervisor/policy.js';
+import { authorizeSessionWorkshop, resolveProjectForCwd } from '../src/supervisor/state.js';
+import {
+  allowGuestMutationForHost,
+  mutationWorkspaceHashForHost,
+} from '../src/supervisor/worker.js';
 import { seedProject, testDb } from './helpers.js';
 
 const ALL_FIVE: Capability[] = [
@@ -39,6 +47,20 @@ const ALL_FIVE: Capability[] = [
 ];
 
 describe('the v0.5.2 capability gate', () => {
+  it('does not impose the Codex source-tree digest on Claude or Cursor mutation', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'major-mutation-hash-')));
+    try {
+      const source = join(root, 'source.txt');
+      writeFileSync(source, 'shared inode');
+      linkSync(source, join(root, 'hard-link.txt'));
+      expect(mutationWorkspaceHashForHost('claude', root, true)).toBeUndefined();
+      expect(mutationWorkspaceHashForHost('cursor', root, true)).toBeUndefined();
+      expect(() => mutationWorkspaceHashForHost('codex', root, true)).toThrow(/hard link/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps all five build capabilities frozen and available', () => {
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual([...ALL_FIVE].sort());
     expect(Object.isFrozen(CAPABILITY_DEFINITIONS)).toBe(true);
@@ -81,6 +103,70 @@ describe('the v0.5.2 capability gate', () => {
       for (const [name, value] of previous) {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
+      }
+    }
+  });
+
+  it('recognizes owner-approved Workshop authority while live-agent-execution is active', () => {
+    expect(isCapabilityAvailable('live-agent-execution')).toBe(true);
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'major-workshop-live-')));
+    spawnSync('git', ['init', '--initial-branch=main', root], { encoding: 'utf8' });
+    const prior = {
+      home: process.env.MAJOR_HOME,
+      state: process.env.MAJOR_STATE_PATH,
+      policy: process.env.MAJOR_POLICY_PATH,
+      stop: process.env.MAJOR_STOP_PATH,
+    };
+    process.env.MAJOR_HOME = join(root, '.major-test');
+    process.env.MAJOR_STATE_PATH = join(root, 'state.json');
+    process.env.MAJOR_POLICY_PATH = join(root, 'policy.json');
+    process.env.MAJOR_STOP_PATH = join(root, 'STOP');
+    try {
+      const project = resolveProjectForCwd(root)!;
+      configureProjectPolicy({
+        project: project.project,
+        repoPath: project.repoPath,
+        projectClass: 'workshop',
+        trust: 'build',
+        ownerApprovedBuild: true,
+      });
+      expect(allowGuestMutationForHost('codex', root)).toBe(false);
+      authorizeSessionWorkshop({
+        host: 'codex',
+        cwd: root,
+        project: project.project,
+        repoPath: project.repoPath,
+        sessionId: 'thread-live-123',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+      expect(allowGuestMutationForHost('codex', root)).toBe(true);
+      expect(allowGuestMutationForHost('antigravity', root)).toBe(false);
+      expect(() =>
+        executeMajorCommand({
+          executable: 'codex',
+          args: ['exec'],
+          cwd: root,
+          allowedRoots: [root],
+          providerRequest: {
+            host: 'codex',
+            prompt: 'read package.json',
+            allowGuestMutation: false,
+            approvalAuthority: { decisions: [] },
+          },
+        }),
+      ).toThrow(/supervised Workshop provider execution requires a worker resource lease/);
+    } finally {
+      for (const [name, value] of Object.entries(prior)) {
+        const key =
+          name === 'home'
+            ? 'MAJOR_HOME'
+            : name === 'state'
+              ? 'MAJOR_STATE_PATH'
+              : name === 'policy'
+                ? 'MAJOR_POLICY_PATH'
+                : 'MAJOR_STOP_PATH';
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
       }
     }
   });

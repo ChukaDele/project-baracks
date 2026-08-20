@@ -25,6 +25,7 @@ import {
   type CodexUsageAccount,
 } from './codex-usage.js';
 import { readApprovedCodexProfileUsage } from './codex-profile-reader.js';
+import { syncApprovedCodexProfiles } from './codex-profile-sync.js';
 import { classifyModel, loadModelRegistry } from './registry.js';
 
 const ATTESTABLE_PROVIDERS = Object.freeze({
@@ -231,6 +232,8 @@ Commands:
   status                                             list persisted provider/model state
   usage [--json]                                     read current capacity from existing Codex accounts;
                                                       persists a masked snapshot for status/session attach
+  sync-profiles [--json]                             import approved Codex policy profiles into named
+                                                      provider-auth slots and persist codex#label routing
   connect <name> [--yes|--no] [--relogin]             onboard a provider: reuse a host login if one exists and is
                                                       version-compatible, else fall back to native sign-in
                                                       (--provider <name> also accepted; --relogin re-authenticates
@@ -299,6 +302,31 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     writeCodexUsageReport(report);
     if (args.includes('--json')) console.log(JSON.stringify(report, null, 2));
     else console.log(formatCodexUsage(report));
+    return true;
+  }
+  if (args[1] === 'sync-profiles') {
+    const opened = openDb();
+    try {
+      const report = await syncApprovedCodexProfiles(majorExecutionBackend(), opened.db);
+      if (args.includes('--json')) console.log(JSON.stringify(report, null, 2));
+      else {
+        for (const profile of report.profiles) {
+          const availability = profile.availability ?? 'unknown';
+          console.log(
+            `${profile.policyId}\t${profile.accountLabel}\t${profile.imported ? 'imported' : 'skipped'}\t${availability}\t${profile.detail}`,
+          );
+        }
+        for (const profile of report.revokedProfiles ?? []) {
+          console.log(`revoked\t${profile.accountLabel}\t${profile.detail}`);
+        }
+        if (report.error && report.profiles.length === 0) {
+          console.log(`Codex profile sync failed: ${report.error}`);
+        } else if (report.error) console.log(`warning: ${report.error}`);
+      }
+      if (report.error) process.exitCode = 1;
+    } finally {
+      opened.sqlite.close();
+    }
     return true;
   }
   if (args[1] === 'connect') {

@@ -1,4 +1,13 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -138,6 +147,51 @@ describe('Lima backend inspection', () => {
     }
   });
 
+  it('refuses Codex guest mutation outside supervised Workshop before any Lima operation', () => {
+    expect(() =>
+      backend(fakeLima()).execute({
+        executionAuthority: { kind: 'supervised' },
+        executable: 'codex',
+        args: ['exec'],
+        cwd: process.cwd(),
+        allowedRoots: [process.cwd()],
+        providerRequest: {
+          host: 'codex',
+          prompt: 'mutate',
+          allowGuestMutation: true,
+          workspaceHash: 'a'.repeat(64),
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/active supervised Workshop authority/);
+  });
+
+  it('refuses Codex guest mutation without a source digest before any Lima operation', () => {
+    expect(() =>
+      backend(fakeLima()).execute({
+        executionAuthority: { kind: 'supervised' },
+        executable: 'codex',
+        args: ['exec'],
+        cwd: process.cwd(),
+        allowedRoots: [process.cwd()],
+        providerRequest: {
+          host: 'codex',
+          prompt: 'mutate',
+          allowGuestMutation: true,
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/source workspace digest/);
+  });
+
   it('rejects a forged Workshop authority before any Lima operation', () => {
     expect(() =>
       backend(fakeLima()).execute({
@@ -206,6 +260,41 @@ describe('Lima backend credential import: cross-provider path binding', () => {
   });
 });
 
+describe('Lima backend Codex profile import guards', () => {
+  it('refuses importing an approved profile into the default credential slot', async () => {
+    const result = await backend(fakeLima()).importCodexProfileCredential(
+      '/tmp/codex-profile',
+      'default',
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/default Codex credential slot/),
+    });
+  });
+
+  it('refuses unsafe account labels before any Lima operation', async () => {
+    const result = await backend(fakeLima()).importCodexProfileCredential(
+      '/tmp/codex-profile',
+      '../etc',
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/invalid account label/),
+    });
+  });
+
+  it('refuses unavailable profile homes before any Lima operation', async () => {
+    const result = await backend(fakeLima()).importCodexProfileCredential(
+      '/tmp/not-auth.json',
+      'cod-01',
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/profile home is unavailable or unsafe/),
+    });
+  });
+});
+
 /**
  * A stateful fake limactl for loginProviderNative: real limactl subprocesses
  * spawned by LimaBackend go through hostEnv(), a deliberately minimal,
@@ -233,6 +322,7 @@ function fakeLoginLima(
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 STATUS_FILE="$DIR/vm-status"
+printf '%s\n' "$*" >> "$DIR/log"
 case "$1" in
   --version) printf 'limactl version 2.2.0\\n' ;;
   list)
@@ -245,6 +335,7 @@ case "$1" in
   shell)
     line="$*"
     case "$line" in
+      *"major-credential-stage"*) cat > "$DIR/staged"; exit 0 ;;
       *login\\ --device-auth*)
         printf 'Open this link in your browser and sign in to your account\\n'
         printf 'https://auth.openai.com/codex/device\\n'
@@ -269,6 +360,51 @@ esac
   chmodSync(path, 0o755);
   return path;
 }
+
+describe('Lima backend Codex profile fd-pinned import', () => {
+  it('streams the one verified source inode without handing its host path to limactl', async () => {
+    const profile = mkdtempSync(join(tmpdir(), 'major-codex-profile-'));
+    const auth = join(profile, 'auth.json');
+    const credential = '{"tokens":{"access_token":"opaque"}}\n';
+    writeFileSync(auth, credential, { mode: 0o600 });
+    const limactl = fakeLoginLima();
+    try {
+      await expect(
+        backend(limactl).importCodexProfileCredential(profile, 'cod-01'),
+      ).resolves.toMatchObject({
+        ok: true,
+      });
+      expect(readFileSync(join(dirname(limactl), 'staged'), 'utf8')).toBe(credential);
+      expect(readFileSync(join(dirname(limactl), 'log'), 'utf8')).not.toContain(auth);
+    } finally {
+      rmSync(profile, { recursive: true, force: true });
+      rmSync(dirname(limactl), { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a symlinked profile before starting Lima', async () => {
+    const profile = mkdtempSync(join(tmpdir(), 'major-codex-profile-'));
+    const attacker = join(profile, 'attacker.json');
+    const authDir = join(profile, 'approved');
+    mkdirSync(authDir);
+    writeFileSync(attacker, '{"attacker":true}\n');
+    const auth = join(authDir, 'auth.json');
+    symlinkSync(attacker, auth);
+    const limactl = fakeLoginLima();
+    try {
+      await expect(
+        backend(limactl).importCodexProfileCredential(authDir, 'cod-01'),
+      ).resolves.toMatchObject({
+        ok: false,
+        detail: expect.stringMatching(/unavailable or unsafe/),
+      });
+      expect(existsSync(join(dirname(limactl), 'log'))).toBe(false);
+    } finally {
+      rmSync(profile, { recursive: true, force: true });
+      rmSync(dirname(limactl), { recursive: true, force: true });
+    }
+  });
+});
 
 describe('Lima backend native login (Codex device-auth)', () => {
   it('refuses immediately for a provider with no verified native-login flow, before any Lima operation', async () => {

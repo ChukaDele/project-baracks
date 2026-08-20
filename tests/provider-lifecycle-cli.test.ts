@@ -53,6 +53,7 @@ describe('major provider help/usage', () => {
       expect(output).toMatch(/probe --provider/);
       expect(output).toMatch(/attest-billing/);
       expect(output).toMatch(/attest-availability/);
+      expect(output).toMatch(/sync-profiles/);
     }
   });
 

@@ -3,7 +3,12 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { snapshotWorkspace, validateWorkspaceTree } from '../src/execution/workspace-transfer.js';
+import {
+  hashSourceWorkspaceTree,
+  hashWorkspaceTree,
+  snapshotWorkspace,
+  validateWorkspaceTree,
+} from '../src/execution/workspace-transfer.js';
 
 function temp(name: string): string {
   return mkdtempSync(join(tmpdir(), name));
@@ -20,6 +25,7 @@ describe('Lima workspace quarantine', () => {
     writeFileSync(join(source, 'node_modules', 'package.js'), 'private\n');
     snapshotWorkspace(source, output);
     expect(validateWorkspaceTree(output)).toEqual({ entries: 1, bytes: 5 });
+    expect(hashSourceWorkspaceTree(source)).toBe(hashWorkspaceTree(output));
   });
 
   it('preserves safe relative symlinks when snapshotting a workspace', () => {

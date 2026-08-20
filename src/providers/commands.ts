@@ -13,6 +13,22 @@ export interface ProviderCommandRequest {
 export const RATE_LIMIT_PATTERN = /rate.?limit|overloaded|429|too many requests|slow down/i;
 export const EXHAUSTION_PATTERN = /usage limit|quota exceeded|out of credits|allowance|plan limit/i;
 
+/** Whether the current CLI adapter persists vendor sessions across runs. */
+export function providerSupportsVendorResume(host: ProviderCommandHost): boolean {
+  switch (host) {
+    case 'cursor':
+    case 'antigravity':
+      return true;
+    case 'claude':
+      return false;
+    case 'codex':
+      // Each Lima run gets a fresh ephemeral Codex home, so a vendor session
+      // reference cannot be resumed across runs even though the CLI has a
+      // resume subcommand for environments that persist its local state.
+      return false;
+  }
+}
+
 export function providerExecutable(host: ProviderCommandHost): string {
   switch (host) {
     case 'claude':

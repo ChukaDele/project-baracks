@@ -12,13 +12,19 @@ import {
   formatHarnessConformance,
   runHarnessConformance,
 } from './conformance.js';
+import { buildHarnessInstallPlan, formatHarnessInstallPlan } from './install-plan.js';
 import { DEEPSEEK_HARNESS_PIN } from './pin.js';
+import { buildHarnessShadowTask, formatHarnessShadowTask } from './shadow-task.js';
+import { buildWorkstationAppPlan, formatWorkstationAppPlan } from './workstation-app.js';
 
 const HARNESS_HELP = `major harness — DeepSeek Harness distribution (shadow strangler)
 
   harness status [--json]
   harness compose [--json]
   harness conformance [--json]
+  harness install-plan [--json]
+  harness shadow-task [--json]
+  harness workstation-app [--json]
 `;
 
 function repoRootFromCwd(): string {
@@ -67,6 +73,21 @@ export async function runHarnessCli(args: string[]): Promise<boolean> {
     }
     return true;
   }
+  if (command === 'install-plan') {
+    const plan = buildHarnessInstallPlan(repoRootFromCwd());
+    console.log(json ? JSON.stringify(plan, null, 2) : formatHarnessInstallPlan(plan));
+    return true;
+  }
+  if (command === 'shadow-task') {
+    const task = buildHarnessShadowTask();
+    console.log(json ? JSON.stringify(task, null, 2) : formatHarnessShadowTask(task));
+    return true;
+  }
+  if (command === 'workstation-app') {
+    const plan = buildWorkstationAppPlan();
+    console.log(json ? JSON.stringify(plan, null, 2) : formatWorkstationAppPlan(plan));
+    return true;
+  }
   throw new Error(`unknown harness command: ${command}`);
 }
 
@@ -84,7 +105,7 @@ function formatStatus(): string {
 function formatCompose(): string {
   const [web, headless] = workstationProfiles();
   return [
-    `kernel ${majorKernelBundle().name}: shadow no-op patch; Major remains live outside dsh`,
+    `kernel ${majorKernelBundle().name}: /major command with Major and Claude trajectory providers`,
     `web ${web.id}: ${web.bundles.join(' -> ')}`,
     `headless ${headless.id}: ${headless.bundles.join(' -> ')}`,
     `default backend: ${DEFAULT_EXECUTION_BACKEND}`,

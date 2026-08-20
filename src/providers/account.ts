@@ -32,6 +32,52 @@ export function assertAccountLabel(label: string): string {
   return label;
 }
 
+/**
+ * Map an owner-approved Codex policy id (e.g. COD-01) into a routable account
+ * label without modifying the policy file. Throws when the result would still
+ * violate {@link ACCOUNT_LABEL_PATTERN}.
+ */
+export function normalizePolicyIdToAccountLabel(policyId: string): string {
+  let normalized = policyId
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
+  normalized = normalized.replace(/^-+|-+$/g, '');
+  if (!normalized || !/^[a-z]/.test(normalized)) {
+    normalized = `p-${normalized || 'profile'}`.replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  if (normalized.length > 32) normalized = normalized.slice(0, 32).replace(/-+$/, '');
+  if (!normalized) normalized = 'profile';
+  return assertAccountLabel(normalized);
+}
+
+/** Assign distinct account labels for a batch of policy ids; fail on collision. */
+export function mapPolicyIdsToAccountLabels(
+  policyIds: readonly string[],
+): { labels: Map<string, string> } | { error: string } {
+  const labels = new Map<string, string>();
+  const ownerByLabel = new Map<string, string>();
+  for (const policyId of policyIds) {
+    let accountLabel: string;
+    try {
+      accountLabel = normalizePolicyIdToAccountLabel(policyId);
+    } catch {
+      return {
+        error: `policy id '${policyId}' cannot be normalized to a valid account label`,
+      };
+    }
+    const prior = ownerByLabel.get(accountLabel);
+    if (prior !== undefined && prior !== policyId) {
+      return {
+        error: `policy ids '${prior}' and '${policyId}' collide on account label '${accountLabel}'`,
+      };
+    }
+    ownerByLabel.set(accountLabel, policyId);
+    labels.set(policyId, accountLabel);
+  }
+  return { labels };
+}
+
 export function capacityKey(
   providerName: string,
   accountLabel: string = DEFAULT_ACCOUNT_LABEL,
@@ -77,6 +123,24 @@ export function accountAuthStoreRelativePath(
   }
   if (accountLabel === DEFAULT_ACCOUNT_LABEL) return authRelativePath;
   return `accounts/${accountLabel}/${authRelativePath}`;
+}
+
+/**
+ * Relative path segments (under `provider-auth/<host>/`) that must exist as
+ * root-owned 0700 directories before writing a named account credential.
+ */
+export function namedAuthStoreParentRelativePaths(
+  authRelativePath: string,
+  accountLabel: string,
+): readonly string[] {
+  assertAccountLabel(accountLabel);
+  if (accountLabel === DEFAULT_ACCOUNT_LABEL) {
+    throw new Error('named auth store parents apply only to non-default accounts');
+  }
+  const relParent = authRelativePath.includes('/')
+    ? authRelativePath.slice(0, authRelativePath.lastIndexOf('/'))
+    : '.';
+  return [`accounts`, `accounts/${accountLabel}`, `accounts/${accountLabel}/${relParent}`];
 }
 
 /** Extra argv for `/opt/major/manage-provider-state` when a named account is selected. */

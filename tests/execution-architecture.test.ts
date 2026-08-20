@@ -73,6 +73,14 @@ describe('single execution boundary', () => {
     expect(usage).not.toContain('routing/');
     expect(usage).not.toContain('persistProviderDiscovery');
     expect(usage).not.toContain('importProviderCredential');
+    expect(usage).not.toContain('syncApprovedCodexProfiles');
+    const lifecycle = readFileSync(join(root, 'src', 'providers', 'lifecycle-cli.ts'), 'utf8');
+    const usageBlock = lifecycle.slice(
+      lifecycle.indexOf("if (args[1] === 'usage')"),
+      lifecycle.indexOf("if (args[1] === 'sync-profiles')"),
+    );
+    expect(usageBlock).not.toContain('syncApprovedCodexProfiles');
+    expect(usageBlock).not.toContain('importCodexProfileCredential');
     expect(appServer).not.toContain('node:child_process');
     expect(appServer).not.toContain('routing/');
     expect(appServer).toContain('refreshToken: false');

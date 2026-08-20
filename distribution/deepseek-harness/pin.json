@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "upstream": {
     "name": "DeepSeek Harness",
     "organization": "deepseek-ai",
@@ -14,13 +14,27 @@
       "@deepseek-ai/dsh": "0.1.0-rc.8",
       "@deepseek-ai/dsh-base": "0.1.0-rc.8",
       "@deepseek-ai/dsh-headless": "0.1.0-rc.8",
+      "@deepseek-ai/dsh-subagent-claude-code": "0.1.0-rc.8",
+      "@deepseek-ai/dsh-subagent-codex": "0.1.0-rc.8",
       "@deepseek-ai/dsh-web-app": "0.1.0-rc.8"
     },
     "integrities": {
       "@deepseek-ai/dsh": "sha512-VQU5NlomrKLRgcXuOf+sxWFvqxPA8q9vMhrKPlPPXiOJEhGlGlAdiyxZvZxkCVI+v0zbhe21cY3/luLyxpSzzA==",
       "@deepseek-ai/dsh-base": "sha512-aMjXT6d5t8SGQg24geOSX6O0ky+hJLijhzZklDcICrBvGSKXvuS8jxLOcL5u4s4pFCODXhuOpvTfFuUhN2RK3Q==",
       "@deepseek-ai/dsh-headless": "sha512-SfjPjyLeno7iScndgFI3s9s8focqXADLNgIxkFbsL0BdAY7v3A6TOe+iSxnYX0fMhDqFC1jT3FVYlEzbJBg0Kg==",
+      "@deepseek-ai/dsh-subagent-claude-code": "sha512-Yw4gUki+9UWIDRuDe3mH2KNah6e+dg3Q2IIOOkRkINM0EgvOvfOgIZ7kBjp0ugI7fHoLKFZEVGFkxGUHsvH2JA==",
+      "@deepseek-ai/dsh-subagent-codex": "sha512-lp/2sM/Y2V7VEGsE34C3zeQ11N5sYI9TkvfppJFGH6fGI8/PCSfKwLobRWhQc3nG5jYO2PooJvZi9I8JHfNmnA==",
       "@deepseek-ai/dsh-web-app": "sha512-Te/N+AxFmQF2267yMqama5Lp2evsBJeFsqhnEZPfvFhquLBBWgtO5DNZ2cxto5NhGGNNCk/JV25vHRxd7bZl8g=="
+    },
+    "runtimePeers": {
+      "packages": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1"
+      },
+      "integrities": {
+        "react": "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==",
+        "react-dom": "sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw=="
+      }
     },
     "pinPolicy": "exact-version",
     "forbiddenResolutions": ["latest", "next", "*", "^", "~", ">"]

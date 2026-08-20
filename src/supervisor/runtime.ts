@@ -394,11 +394,15 @@ export function coordinatorPrompt(
   } catch {
     skillResolutionFailed = true;
   }
+  const skillProvenance =
+    resolvedSkills.length > 0
+      ? resolvedSkills.map((skill) => `- ${skill.id}: ${skill.path}`).join('\n')
+      : '';
   const skillContext = skillResolutionFailed
-    ? '(Major skill registry unavailable. Continue without skill context and report the degraded resolver.)'
+    ? '(Major skill registry unavailable. Continue without skill context and report the degraded resolver in MAJOR_RESULT if it materially affects work.)'
     : resolvedSkills.length === 0
-      ? '(No installed skill matched deterministically. Inspect the registry before inventing a new workflow.)'
-      : resolvedSkills.map((skill) => `- ${skill.id}: ${skill.path}`).join('\n');
+      ? '(No installed skill matched deterministically. Continue with the injected Major operating contract.)'
+      : `${skillProvenance}\nHost skill paths above are routing provenance only; they are intentionally unavailable inside this guest. Continue from the Major operating contract already injected below—do not stop or attempt host access to load them. Report unavailable skill content as degraded in MAJOR_RESULT when it materially affects work.`;
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const workerLanguage =
     policy.maxWorkers <= 1
@@ -415,6 +419,15 @@ ${goal.goal}
 CANONICAL TARGET:
 - project: ${goal.project}
 - repository path: ${goal.repoPath}
+
+ISOLATED WORKSPACE CONTRACT:
+- Your current working directory is Major's verified source mirror of the canonical target above.
+- This mirror intentionally excludes host .git; Lima may initialize a synthetic Git repo here with no remote or history.
+- The canonical repository path names the host worktree; it is not mounted inside this guest.
+- Missing host path access, Git remote, or commit history is expected isolation, not a project-identity blocker.
+- Confirm project identity from the embedded CANONICAL TARGET plus the source tree in your current cwd, then do all work here.
+- The parent coordinator validates your patch and applies it back to the canonical host worktree.
+- Major binds every mutable dispatch to an internal source-tree digest and refuses execution or copy-back if the canonical host tree changes. The digest is not sent to the provider.
 
 RESOLVED TOOLSMITH CAPABILITIES:
 ${
@@ -436,7 +449,7 @@ Use this exact optional field for that evidence:
 
 ${formatCodexCapacityOverview(readCodexUsageReport())}
 
-Before any substantive mutation, verify that the current Git root/remote and the task's named or implied target agree with this canonical target. If the task clearly belongs to another known project, do not patch this repository. Use project-context-integrity and reroute to the correct repository when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong repository is a failed task.
+Before any substantive mutation, confirm the embedded CANONICAL TARGET and the source tree in your current cwd describe the same project. Do not treat missing host path access, Git remote, or history as identity failure. If the task clearly belongs to another known project, do not patch this mirror. Use project-context-integrity and reroute when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong project is a failed task.
 
 ${trustContract(policy)}
 
@@ -445,7 +458,7 @@ MAJOR OPERATING CONTRACT:
 - Speed and MVP are the default. Reduce broad scope to the smallest end-to-end P0 that proves value, then keep expanding only while P0 gaps remain.
 - Do not stop after one PR, migration, fix, test, or subtask. After each result ask: what is now the highest-impact missing piece blocking the goal?
 - ${workerLanguage}
-- Before inventing a process, run Major's skill resolver and load the exact project or immutable-runtime skill paths it returns.
+- RESOLVED MAJOR SKILLS lists routing provenance only; host skill files are not mounted here. Follow the injected Major operating contract and matched skill ids—do not stop or attempt host access to open skill paths.
 - Read project LEARNINGS.md and the Major learning candidates below before acting. Do not repeat a captured correction merely because a fresh worker lacks chat history.
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
 - For substantial UI/website creation, redesign, art-direction changes, or "generic/AI-looking/too safe/too loud" feedback, use design-direction-and-taste first. It is the single Major art-direction/taste authority; do not stack competing generic taste systems.

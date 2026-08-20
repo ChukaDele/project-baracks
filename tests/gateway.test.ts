@@ -30,7 +30,9 @@ vi.mock('../src/security/capabilities.js', async (importOriginal) => {
     },
   };
 });
+import type { ExecutionBackend } from '../src/execution/backend.js';
 import type { Containment } from '../src/security/containment.js';
+import { verifyProviderApprovalAuthority } from '../src/security/provider-approval-policy.js';
 import { BILLING_ENV_NAMES, sanitizeEnv } from '../src/security/env.js';
 import {
   ExecutionGateway,
@@ -315,5 +317,158 @@ describe('discovery resolution (process-free, no subprocess)', () => {
     expect(() => gateway.resolveExecutable('/tmp/evil/node')).toThrow(GatewayViolationError);
     // Names outside the allowlist are refused outright.
     expect(() => gateway.resolveExecutable('rm')).toThrow(GatewayViolationError);
+  });
+});
+
+function fakeBackend(kind: string, onExecute: () => void): ExecutionBackend {
+  return {
+    kind,
+    inspect: async () => ({
+      kind,
+      available: true,
+      filesystemIsolation: true,
+      networkIsolation: true,
+      lifecycleIsolation: true,
+      detail: 'test backend',
+    }),
+    probeProvider: async () => ({
+      executable: 'codex',
+      installed: false,
+      authenticated: false,
+      detail: 'test backend',
+    }),
+    readCodexUsage: async () => [],
+    execute: () => {
+      onExecute();
+      return {
+        events: (async function* () {})(),
+        cancel() {},
+        outcome: Promise.resolve({
+          status: 'succeeded',
+          exitCode: 0,
+          rateLimited: false,
+          exhausted: false,
+        }),
+      };
+    },
+  };
+}
+
+describe('Codex guest mutation gateway boundary', () => {
+  const workshopAuthority = {
+    kind: 'supervised_workshop' as const,
+    attachmentId: 'attach',
+    sessionId: 'session',
+    project: 'demo',
+    repoPath: '/tmp/demo',
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  };
+
+  it('refuses Codex mutation through host containment even with Workshop authority', () => {
+    const { gateway, root } = makeGateway({
+      commandPolicy: { allowedExecutables: ['codex'] },
+      verifyProviderDecision: () => true,
+    });
+    expect(() =>
+      gateway.execute({
+        executable: 'codex',
+        args: ['exec'],
+        cwd: root,
+        executionAuthority: workshopAuthority,
+        providerRequest: {
+          host: 'codex',
+          prompt: 'mutate',
+          allowGuestMutation: true,
+          workspaceHash: 'a'.repeat(64),
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/Lima execution backend/);
+  });
+
+  it('refuses Codex mutation on the Lima backend without a source digest', () => {
+    const { gateway, root } = makeGateway({
+      commandPolicy: { allowedExecutables: ['codex'] },
+      backend: fakeBackend('lima', () => {
+        throw new Error('backend must not run');
+      }),
+      verifyProviderDecision: () => true,
+    });
+    expect(() =>
+      gateway.execute({
+        executable: 'codex',
+        args: ['exec'],
+        cwd: root,
+        executionAuthority: workshopAuthority,
+        providerRequest: {
+          host: 'codex',
+          prompt: 'mutate',
+          allowGuestMutation: true,
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/source workspace digest/);
+  });
+
+  it('refuses Codex mutation on a configured backend that is not Lima', () => {
+    const { gateway, root } = makeGateway({
+      commandPolicy: { allowedExecutables: ['codex'] },
+      backend: fakeBackend('test', () => {
+        throw new Error('backend must not run');
+      }),
+      verifyProviderDecision: () => true,
+    });
+    expect(() =>
+      gateway.execute({
+        executable: 'codex',
+        args: ['exec'],
+        cwd: root,
+        executionAuthority: workshopAuthority,
+        providerRequest: {
+          host: 'codex',
+          prompt: 'mutate',
+          allowGuestMutation: true,
+          workspaceHash: 'a'.repeat(64),
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/Lima execution backend/);
+  });
+
+  it('admits Codex mutation through Lima after Workshop authority and a source digest', () => {
+    let executed = false;
+    const { gateway, root } = makeGateway({
+      commandPolicy: { allowedExecutables: ['codex'] },
+      backend: fakeBackend('lima', () => {
+        executed = true;
+      }),
+      verifyProviderDecision: () => true,
+    });
+    gateway.execute({
+      executable: 'codex',
+      args: ['exec'],
+      cwd: root,
+      executionAuthority: workshopAuthority,
+      providerRequest: {
+        host: 'codex',
+        prompt: 'mutate',
+        allowGuestMutation: true,
+        workspaceHash: 'a'.repeat(64),
+        approvalAuthority: verifyProviderApprovalAuthority('codex', { decisions: [] }, () => true),
+      },
+    });
+    expect(executed).toBe(true);
   });
 });

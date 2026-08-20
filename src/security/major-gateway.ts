@@ -186,7 +186,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
   const runtimeHome = majorHome();
   const staged = request.stagedValidationAuthority;
   let workshop: SupervisedWorkshopExecutionAuthority | undefined;
-  if (!staged && !isCapabilityAvailable('live-agent-execution')) {
+  if (!staged) {
     try {
       workshop = resolveSupervisedWorkshopAuthority(request.cwd);
     } catch {
