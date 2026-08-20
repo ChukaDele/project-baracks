@@ -2,9 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { configuredDshRuntimeRoute } from '../src/harness/runtime-routing.js';
 
 describe('DSH runtime routing checkpoint', () => {
-  it('preserves the compatibility path only when the opt-in is unset', () => {
-    expect(configuredDshRuntimeRoute({})).toBeUndefined();
-    expect(configuredDshRuntimeRoute({ MAJOR_DSH_EXECUTION_ENVIRONMENT: '' })).toBeUndefined();
+  it('defaults normal workstation work to the native local route', () => {
+    expect(configuredDshRuntimeRoute({})).toEqual({ environment: 'local' });
+    expect(configuredDshRuntimeRoute({ MAJOR_DSH_EXECUTION_ENVIRONMENT: '' })).toEqual({
+      environment: 'local',
+    });
+  });
+
+  it('keeps the old Major/Lima pipeline only as an explicit compatibility route', () => {
+    expect(
+      configuredDshRuntimeRoute({ MAJOR_DSH_EXECUTION_ENVIRONMENT: 'legacy' }),
+    ).toBeUndefined();
   });
 
   it('keeps provider and environment as independent typed choices', () => {

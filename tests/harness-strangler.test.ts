@@ -27,7 +27,6 @@ import {
 import { conformancePassed, runHarnessConformance } from '../src/harness/conformance.js';
 import { buildHarnessInstallPlan } from '../src/harness/install-plan.js';
 import { DEEPSEEK_HARNESS_PIN, deepSeekHarnessPinSchema } from '../src/harness/pin.js';
-import { buildHarnessShadowTask } from '../src/harness/shadow-task.js';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
@@ -85,7 +84,7 @@ describe('DeepSeek Harness workstation composition', () => {
     expect(majorWorkstationHeadlessProfile().patch).toBe(EMPTY_CORDIS_PATCH);
   });
 
-  it('preserves every KEEP Major capability outside dsh during shadow', () => {
+  it('preserves every KEEP Major capability behind the DSH kernel', () => {
     expect(
       missingRetainedCapabilities(CAPABILITY_REUSE.map((record) => record.capability)),
     ).toEqual([]);
@@ -97,7 +96,7 @@ describe('DeepSeek Harness workstation composition', () => {
       "CODEX_HOME: !!js dshHomePath('providers/codex/default')",
     );
     expect(majorKernelBundle().patch).toContain('permissionMode: plan');
-    expect(DEFAULT_EXECUTION_BACKEND).toBe('lima');
+    expect(DEFAULT_EXECUTION_BACKEND).toBe('dsh');
   });
 
   it('uses the official bundle manifest and a resolvable local profile dependency', () => {
@@ -119,13 +118,14 @@ describe('DeepSeek Harness workstation composition', () => {
   });
 });
 
-describe('DeepSeek Harness strangle install plan', () => {
-  it('requires an attested pin and keeps live traffic on Lima', () => {
+describe('DeepSeek Harness cutover install plan', () => {
+  it('requires an attested pin and defaults live traffic to local DSH', () => {
     const plan = buildHarnessInstallPlan(REPO_ROOT);
     expect(plan.pinVersion).toBe('0.1.0-rc.8');
     expect(plan.attestedCommit).toBe('141eb6fef83422698aef7a981029e843e8161534');
-    expect(plan.executionBackend).toBe('lima');
-    expect(plan.liveTrafficRemains).toBe('lima-cli-acp');
+    expect(plan.executionBackend).toBe('dsh');
+    expect(plan.defaultRuntime).toBe('dsh-local');
+    expect(plan.compatibilityRuntimes).toEqual(['dsh-lima', 'legacy-major-lima']);
     expect(plan.profiles.map((profile) => profile.id)).toEqual([
       'major-workstation-web',
       'major-workstation-headless',
@@ -141,16 +141,6 @@ describe('DeepSeek Harness strangle install plan', () => {
     );
     expect(plan.npmInstalls.every(({ integrity }) => integrity.startsWith('sha512-'))).toBe(true);
     expect(plan.commands.join('\n')).not.toMatch(/latest|next|\^|~/);
-  });
-
-  it('plans a Lima-hosted composed-profile smoke without switching live workers', () => {
-    const task = buildHarnessShadowTask();
-    expect(task.executionHost).toBe('lima');
-    expect(task.liveTrafficRemains).toBe('lima-cli-acp');
-    expect(task.optInDefault).toBe(false);
-    expect(task.ready).toBe(false);
-    expect(task.smoke.command).toContain('--dump-config');
-    expect(task.smoke.command).not.toMatch(/latest|next|\^|~/);
   });
 
   it('dry-runs on the macOS system Bash without mutating the harness home', () => {
@@ -177,7 +167,7 @@ describe('DeepSeek Harness strangle install plan', () => {
       expect(output).toContain('compose pinned profile major-workstation-web');
       expect(output).toContain('stage isolated Codex worker home');
       expect(output).toContain('Major.app');
-      expect(output).toContain('Live Major execution remains on Lima');
+      expect(output).toContain('Normal trusted repository execution defaults to DSH local');
       expect(output).toContain('MAJOR_SESSION_HOST');
       expect(existsSync(target)).toBe(false);
     } finally {
@@ -201,6 +191,8 @@ describe('DeepSeek Harness strangle install plan', () => {
         /stage_workstation_app\(\) \{[\s\S]*?\n\}\n\nwrite_install_record\(\)/,
       )?.[0];
       expect(functionSource).toBeDefined();
+      expect(installer).toContain('stage_named_codex_worker_homes');
+      expect(installer).toContain('providerName: codex-{account_label}');
       const command = (dryRun: 0 | 1) =>
         [
           'ROOT=/tmp/source',
@@ -236,16 +228,16 @@ describe('DeepSeek Harness strangle install plan', () => {
   });
 });
 
-describe('DeepSeek Harness shadow conformance', () => {
+describe('DeepSeek Harness cutover conformance', () => {
   it('passes the distribution contract without claiming live dsh or cleanup', () => {
     const report = runHarnessConformance(REPO_ROOT);
     expect(report.checks.filter((item) => !item.ok)).toEqual([]);
     expect(conformancePassed(report)).toBe(true);
-    expect(report.phase).toBe('shadow');
-    expect(report.executionBackend).toBe('lima');
+    expect(report.phase).toBe('cutover');
+    expect(report.executionBackend).toBe('dsh');
     expect(report.liveDshInstalled).toBe(false);
     expect(report.ready).toBe(false);
-    expect(CURRENT_HARNESS_MIGRATION_PHASE).toBe('shadow');
+    expect(CURRENT_HARNESS_MIGRATION_PHASE).toBe('cutover');
   });
 });
 
@@ -277,8 +269,8 @@ describe('major harness CLI', () => {
   it('prints pin, composition and passing conformance', async () => {
     capture();
     expect(await runHarnessCli(['harness', 'status'])).toBe(true);
-    expect(logs.join('\n')).toMatch(/phase: shadow/);
-    expect(logs.join('\n')).toMatch(/live execution backend: lima/);
+    expect(logs.join('\n')).toMatch(/phase: cutover/);
+    expect(logs.join('\n')).toMatch(/live execution backend: dsh/);
     logs.length = 0;
     expect(await runHarnessCli(['harness', 'compose'])).toBe(true);
     expect(logs.join('\n')).toContain(
@@ -289,11 +281,7 @@ describe('major harness CLI', () => {
     expect(logs.join('\n')).toMatch(/PASS pin.exact/);
     logs.length = 0;
     expect(await runHarnessCli(['harness', 'install-plan'])).toBe(true);
-    expect(logs.join('\n')).toMatch(/live traffic: lima-cli-acp/);
-    logs.length = 0;
-    expect(await runHarnessCli(['harness', 'shadow-task'])).toBe(true);
-    expect(logs.join('\n')).toMatch(/opt-in default: false/);
-    expect(logs.join('\n')).toMatch(/--dump-config/);
+    expect(logs.join('\n')).toMatch(/default runtime: dsh-local/);
     logs.length = 0;
     expect(await runHarnessCli(['harness', 'workstation-app'])).toBe(true);
     expect(logs.join('\n')).toMatch(/profile: major-workstation-web/);

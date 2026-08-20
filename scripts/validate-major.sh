@@ -266,7 +266,7 @@ if grep -Fq "never consumes codex for implementation work" tests/router.test.ts;
 fi
 
 # Old runtime remains a temporary migration source until the new supervisor proves itself on JSS.
-grep -Fiq "migration is incomplete" docs/architecture.md || fail "runtime migration caveat missing"
+grep -Fq "Migration cleanup is incomplete" docs/architecture.md || fail "runtime migration caveat missing"
 grep -Fq "DELETE after successor verification" docs/migrations/major-v2-legacy-receipt.md || fail "legacy deletion gate missing"
 
 [ -f src/resources/retention.ts ] || fail "resource retention policy missing"
@@ -289,9 +289,9 @@ grep -Fq "designed before creation" docs/architecture.md || fail "resource-effic
 grep -Fq "CURRENT_HARNESS_MIGRATION_PHASE" src/harness/composition.ts || fail "harness migration phase missing"
 grep -Fq "export async function runHarnessCli" src/harness/cli.ts || fail "harness CLI export missing"
 grep -Fq "runHarnessCli" src/entry.ts || fail "harness CLI not wired through entry"
-grep -Fq "return new LimaBackend" src/security/major-gateway.ts || fail "Lima must remain the default execution backend during shadow"
+grep -Fq "return new LimaBackend" src/security/major-gateway.ts || fail "the explicit legacy Lima compatibility backend must remain available"
 grep -Fq "ADOPT DeepSeek Harness" docs/prior-art-decisions.md || fail "DeepSeek Harness prior-art decision missing"
-grep -Fq "Status: **shadow**" docs/migrations/deepseek-harness-strangler.md || fail "strangler must stay in shadow until successor proof"
+grep -Fq "Status: **cutover**" docs/migrations/deepseek-harness-strangler.md || fail "DeepSeek Harness cutover receipt missing"
 grep -Fq '"declaredTag": "dsh-v0.1.0-rc.8"' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness release tag is not attested"
 grep -Fq '"attestedCommit": "141eb6fef83422698aef7a981029e843e8161534"' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness commit is not attested"
 grep -Fq '"@deepseek-ai/dsh": "sha512-' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness npm integrity is not attested"
@@ -324,10 +324,9 @@ fi
 [ -f distribution/deepseek-harness/profiles/major-workstation-web/pnpm-workspace.yaml ] || fail "DeepSeek Harness web profile pnpm layout missing"
 [ -f distribution/deepseek-harness/profiles/major-workstation-headless/pnpm-workspace.yaml ] || fail "DeepSeek Harness headless profile pnpm layout missing"
 grep -Fq "buildHarnessInstallPlan" src/harness/cli.ts || fail "harness install-plan CLI missing"
-grep -Fq "buildHarnessShadowTask" src/harness/cli.ts || fail "harness shadow-task CLI missing"
 grep -Fq "attestedCommit is required before install" scripts/install-deepseek-harness-pin.sh || fail "pin installer must refuse unattested commits"
 grep -Fq "integrity mismatch" scripts/install-deepseek-harness-pin.sh || fail "pin installer must verify npm integrity"
-grep -Fq "liveTrafficRemains" scripts/install-deepseek-harness-pin.sh || fail "pin installer must record that live traffic stays on Lima"
+grep -Fq '"defaultRuntime": "dsh-local"' scripts/install-deepseek-harness-pin.sh || fail "pin installer must record local DSH as the default runtime"
 grep -Fq -- "--dump-config" scripts/install-deepseek-harness-pin.sh || fail "pin installer must verify composed profiles"
 grep -Fq "link_shared_runtime" scripts/install-deepseek-harness-pin.sh || fail "pin installer must share one DSH dependency closure"
 grep -Fq "disk preflight blocked" scripts/install-deepseek-harness-pin.sh || fail "pin installer must refuse DSH/Lima install on a full disk"
@@ -335,8 +334,8 @@ grep -Fq "MAJOR_SESSION_HOST" distribution/deepseek-harness/bundles/major-kernel
 if grep -Eq "'--host', '(claude|codex|cursor|antigravity)'" distribution/deepseek-harness/bundles/major-kernel/index.js; then
   fail "Major DSH kernel must not hard-code a provider host"
 fi
-[ -f scripts/validate-dsh-shadow-field.sh ] || fail "DeepSeek Harness shadow field validator missing"
-grep -Fq "validate:dsh-shadow" package.json || fail "package.json must expose validate:dsh-shadow"
+[ -f scripts/validate-dsh-field.sh ] || fail "DeepSeek Harness field validator missing"
+grep -Fq '"validate:dsh"' package.json || fail "package.json must expose validate:dsh"
 grep -Fq "sessionHostEnv" scripts/install-deepseek-harness-pin.sh || fail "install record must record MAJOR_SESSION_HOST"
 [ -f scripts/start-major-workstation.sh ] || fail "Major workstation launcher missing"
 [ -f scripts/stage-major-workstation-app.sh ] || fail "Major.app stager missing"

@@ -15,7 +15,7 @@
     "lima-subprocess.js",
     "cordis.patch.yml"
   ],
-  "version": "0.0.0-shadow",
+  "version": "0.0.0-cutover",
   "dependencies": {
     "@deepseek-ai/dsh-subprocess-local": "0.1.0-rc.8"
   },

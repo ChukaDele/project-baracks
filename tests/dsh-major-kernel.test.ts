@@ -59,18 +59,28 @@ function kernelSession(cwd?: string, seed: KernelSession['events'] = []): Kernel
 
 async function loadKernel(): Promise<{
   apply(ctx: unknown): void;
-  dshAdapterForMajorHost(host: string, environment?: string): string;
+  dshAdapterForMajorHost(host: string, environment?: string, accountLabel?: string): string;
   foregroundDispatchHops(stdout: string): number;
   hashReviewWorkspace(root: string): string;
+  nativeWorkerTask(
+    task: string,
+    resolvedSkills?: Array<{ id: string; source: string; content: string }>,
+    skillResolutionDegraded?: boolean,
+  ): string;
 }> {
   const url = pathToFileURL(
     resolve('distribution/deepseek-harness/bundles/major-kernel/index.js'),
   ).href;
   return (await import(url)) as {
     apply(ctx: unknown): void;
-    dshAdapterForMajorHost(host: string, environment?: string): string;
+    dshAdapterForMajorHost(host: string, environment?: string, accountLabel?: string): string;
     foregroundDispatchHops(stdout: string): number;
     hashReviewWorkspace(root: string): string;
+    nativeWorkerTask(
+      task: string,
+      resolvedSkills?: Array<{ id: string; source: string; content: string }>,
+      skillResolutionDegraded?: boolean,
+    ): string;
   };
 }
 
@@ -287,6 +297,7 @@ describe('Major DSH workstation kernel', () => {
 
   it('admits through the attaching session host, then records an independent Claude review', async () => {
     process.env.MAJOR_SESSION_HOST = 'cursor';
+    process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT = 'legacy';
     const projectRoot = mkdtempSync(join(tmpdir(), 'major-dsh-kernel-project-'));
     temporaryRoots.push(projectRoot);
     writeFileSync(join(projectRoot, 'reviewed.txt'), 'stable');
@@ -383,6 +394,7 @@ describe('Major DSH workstation kernel', () => {
 
   it('returns a Major error without starting Claude when foreground dispatch runs zero hops', async () => {
     process.env.MAJOR_SESSION_HOST = 'cursor';
+    process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT = 'legacy';
     const providersStarted: string[] = [];
     let majorProvider: KernelProvider | undefined;
     let majorCommand: KernelCommand | undefined;
@@ -451,6 +463,7 @@ describe('Major DSH workstation kernel', () => {
 
   it('fails the command if the plan-mode Claude reviewer changes the workspace', async () => {
     process.env.MAJOR_SESSION_HOST = 'cursor';
+    process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT = 'legacy';
     const root = mkdtempSync(join(tmpdir(), 'major-dsh-review-boundary-'));
     const target = join(root, 'reviewed.txt');
     writeFileSync(target, 'before');
@@ -575,6 +588,17 @@ describe('Major DSH workstation kernel', () => {
     );
   });
 
+  it('injects resolved Major and GBrain-generated skills into the native worker', async () => {
+    const kernel = await loadKernel();
+    const prompt = kernel.nativeWorkerTask('repair the release', [
+      { id: 'release-gate', source: 'internal', content: '# Release gate\nRun the exact checks.' },
+      { id: 'learned-fix', source: 'gbrain-generated', content: '# Learned fix\nReuse it.' },
+    ]);
+    expect(prompt).toContain('RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT');
+    expect(prompt).toContain('MAJOR SKILL release-gate (internal)');
+    expect(prompt).toContain('MAJOR SKILL learned-fix (gbrain-generated)');
+  });
+
   it('rejects an empty command without starting a provider', async () => {
     let majorCommand: KernelCommand | undefined;
     const kernel = await loadKernel();
@@ -620,6 +644,10 @@ describe('Major DSH workstation kernel', () => {
                 provider: 'codex#work-b',
                 accountLabel: 'work-b',
                 modelRef: 'gpt-5.6-codex',
+                resolvedSkills: [
+                  { id: 'safe-edit', source: 'internal', content: '# Safe edit\nVerify the diff.' },
+                ],
+                skillResolutionDegraded: false,
               }),
             );
           }
@@ -645,9 +673,10 @@ describe('Major DSH workstation kernel', () => {
           registered = provider;
         },
         async start(provider: string, request: { prompt: Array<{ type: string; text: string }> }) {
-          expect(provider).toBe('codex');
+          expect(provider).toBe('codex-work-b');
           expect(request.prompt[0]?.text).toContain('MAJOR LEAF WORKER CONTRACT');
           expect(request.prompt[0]?.text).toContain('Do not run Major CLI commands');
+          expect(request.prompt[0]?.text).toContain('MAJOR SKILL safe-edit (internal)');
           expect(request.prompt[0]?.text).toContain('TASK:\nmake the mutation');
           return {
             result: Promise.resolve({
@@ -700,6 +729,7 @@ describe('Major DSH workstation kernel', () => {
   it('maps routed Claude to the composed adapter and fails closed for unsupported hosts', async () => {
     const kernel = await loadKernel();
     expect(kernel.dshAdapterForMajorHost('codex')).toBe('codex');
+    expect(kernel.dshAdapterForMajorHost('codex', 'local', 'cod-02')).toBe('codex-cod-02');
     expect(kernel.dshAdapterForMajorHost('codex', 'lima')).toBe('codex-lima');
     expect(kernel.dshAdapterForMajorHost('claude')).toBe('claude-review');
     expect(() => kernel.dshAdapterForMajorHost('cursor')).toThrow(/no live DSH adapter/);

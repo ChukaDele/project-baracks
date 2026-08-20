@@ -1,5 +1,6 @@
-import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { LimaBackend } from '../execution/lima-backend.js';
 import { loadLimaExecutionConfig } from '../execution/lima-config.js';
 import type { ProviderCommandHost } from '../providers/commands.js';
@@ -8,6 +9,7 @@ import { getGoal } from '../supervisor/state.js';
 import {
   CURRENT_HARNESS_MIGRATION_PHASE,
   DEFAULT_EXECUTION_BACKEND,
+  DEFAULT_EXECUTION_ENVIRONMENT,
   bundleManifest,
   majorKernelBundle,
   profileManifest,
@@ -20,21 +22,38 @@ import {
 } from './conformance.js';
 import { buildHarnessInstallPlan, formatHarnessInstallPlan } from './install-plan.js';
 import { DEEPSEEK_HARNESS_PIN } from './pin.js';
-import { buildHarnessShadowTask, formatHarnessShadowTask } from './shadow-task.js';
 import { buildWorkstationAppPlan, formatWorkstationAppPlan } from './workstation-app.js';
 
-const HARNESS_HELP = `major harness — DeepSeek Harness distribution (shadow strangler)
+const HARNESS_HELP = `major harness — DeepSeek Harness live workstation
 
   harness status [--json]
   harness compose [--json]
   harness conformance [--json]
   harness install-plan [--json]
-  harness shadow-task [--json]
   harness workstation-app [--json]
 `;
 
 function repoRootFromCwd(): string {
   return resolve(process.env.MAJOR_HARNESS_ROOT ?? process.cwd());
+}
+
+function liveDshInstalled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const majorHome = env.MAJOR_HOME ?? join(homedir(), '.major');
+  const dshHome = env.MAJOR_DSH_HOME ?? join(majorHome, 'dsh-harness');
+  try {
+    const record = JSON.parse(readFileSync(join(dshHome, 'major-install.json'), 'utf8')) as {
+      pinVersion?: string;
+      attestedCommit?: string;
+    };
+    return (
+      record.pinVersion === DEEPSEEK_HARNESS_PIN.npm.version &&
+      record.attestedCommit === DEEPSEEK_HARNESS_PIN.git.attestedCommit &&
+      existsSync(join(dshHome, 'runtime', 'node_modules', '.bin', 'dsh')) &&
+      existsSync(join(dshHome, 'profiles', 'major-workstation-web'))
+    );
+  } catch {
+    return false;
+  }
 }
 
 function requiredFlag(args: readonly string[], name: string): string {
@@ -109,11 +128,13 @@ export async function runHarnessCli(args: string[]): Promise<boolean> {
     return true;
   }
   if (command === 'status') {
+    const installed = liveDshInstalled();
     const payload = {
       phase: CURRENT_HARNESS_MIGRATION_PHASE,
       executionBackend: DEFAULT_EXECUTION_BACKEND,
+      defaultEnvironment: DEFAULT_EXECUTION_ENVIRONMENT,
       pin: DEEPSEEK_HARNESS_PIN,
-      liveDshInstalled: false,
+      liveDshInstalled: installed,
       ready: false,
     };
     console.log(json ? JSON.stringify(payload, null, 2) : formatStatus());
@@ -147,11 +168,6 @@ export async function runHarnessCli(args: string[]): Promise<boolean> {
     console.log(json ? JSON.stringify(plan, null, 2) : formatHarnessInstallPlan(plan));
     return true;
   }
-  if (command === 'shadow-task') {
-    const task = buildHarnessShadowTask();
-    console.log(json ? JSON.stringify(task, null, 2) : formatHarnessShadowTask(task));
-    return true;
-  }
   if (command === 'workstation-app') {
     const plan = buildWorkstationAppPlan();
     console.log(json ? JSON.stringify(plan, null, 2) : formatWorkstationAppPlan(plan));
@@ -166,7 +182,8 @@ function formatStatus(): string {
     `pin: ${DEEPSEEK_HARNESS_PIN.npm.version} (${DEEPSEEK_HARNESS_PIN.git.declaredTag})`,
     `attested commit: ${DEEPSEEK_HARNESS_PIN.git.attestedCommit ?? 'none'}`,
     `live execution backend: ${DEFAULT_EXECUTION_BACKEND}`,
-    'live dsh installed: false',
+    `default execution environment: ${DEFAULT_EXECUTION_ENVIRONMENT}`,
+    `live dsh installed: ${liveDshInstalled()}`,
     'ready: false',
   ].join('\n');
 }
@@ -178,5 +195,6 @@ function formatCompose(): string {
     `web ${web.id}: ${web.bundles.join(' -> ')}`,
     `headless ${headless.id}: ${headless.bundles.join(' -> ')}`,
     `default backend: ${DEFAULT_EXECUTION_BACKEND}`,
+    `default environment: ${DEFAULT_EXECUTION_ENVIRONMENT}`,
   ].join('\n');
 }

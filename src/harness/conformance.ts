@@ -8,6 +8,7 @@ import {
 import {
   CURRENT_HARNESS_MIGRATION_PHASE,
   DEFAULT_EXECUTION_BACKEND,
+  DEFAULT_EXECUTION_ENVIRONMENT,
   DSH_BASE_BUNDLE,
   HARNESS_MIGRATION_PHASES,
   MAJOR_KERNEL_BUNDLE,
@@ -92,9 +93,9 @@ function assertProfileComposition(profile: DshProfile): ConformanceCheck[] {
         : `${profile.id} missing capabilities: ${missing.join(', ')}`,
     ),
     check(
-      `${profile.id}.lima-default`,
-      DEFAULT_EXECUTION_BACKEND === 'lima',
-      `${profile.id} live traffic must remain on ${DEFAULT_EXECUTION_BACKEND}`,
+      `${profile.id}.dsh-local-default`,
+      DEFAULT_EXECUTION_BACKEND === 'dsh' && DEFAULT_EXECUTION_ENVIRONMENT === 'local',
+      `${profile.id} must default to DSH with the local execution environment`,
     ),
   ];
 }
@@ -119,7 +120,7 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
   ) as {
     defaultEnvironment?: string;
     defaultPath?: string;
-    optInRoutes?: Array<{
+    nativeRoutes?: Array<{
       environment?: string;
       providerAuthority?: string;
       hostAdapters?: { codex?: string; claude?: string };
@@ -173,16 +174,23 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
     ),
     check(
       'runtime.local-major-routed-checkpoint',
-      runtimeCheckpoint.defaultEnvironment === 'lima' &&
-        runtimeCheckpoint.defaultPath === 'major-run' &&
-        runtimeCheckpoint.optInRoutes?.some(
+      runtimeCheckpoint.defaultEnvironment === 'local' &&
+        runtimeCheckpoint.defaultPath === 'dsh-native' &&
+        runtimeCheckpoint.nativeRoutes?.some(
           (route) =>
             route.environment === 'local' &&
             route.providerAuthority === 'major-router' &&
             route.hostAdapters?.codex === 'codex' &&
             route.hostAdapters?.claude === 'claude-review',
+        ) === true &&
+        runtimeCheckpoint.nativeRoutes?.some(
+          (route) =>
+            route.environment === 'lima' &&
+            route.providerAuthority === 'major-router' &&
+            route.hostAdapters?.codex === 'codex-lima' &&
+            route.hostAdapters?.claude === 'claude-review',
         ) === true,
-      'local DSH is explicit opt-in and provider-routed while Lima/major-run remains default',
+      'DSH local is default and the same Major routing authority selects optional DSH Lima',
     ),
     check(
       'web.patch-matches-runtime',
@@ -347,14 +355,14 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
         : `unexpected live dsh dependency: ${dshDepNames.join(', ')}`,
     ),
     check(
-      'execution.lima-default',
+      'execution.legacy-lima-available',
       gateway.includes('export function majorExecutionBackend') &&
         gateway.includes('return new LimaBackend'),
-      'majorExecutionBackend still returns LimaBackend',
+      'the explicit legacy compatibility path still exposes LimaBackend',
     ),
     check(
-      'phase.shadow',
-      CURRENT_HARNESS_MIGRATION_PHASE === 'shadow' &&
+      'phase.cutover',
+      CURRENT_HARNESS_MIGRATION_PHASE === 'cutover' &&
         HARNESS_MIGRATION_PHASES.includes(CURRENT_HARNESS_MIGRATION_PHASE),
       `migration phase is ${CURRENT_HARNESS_MIGRATION_PHASE}`,
     ),
@@ -369,14 +377,17 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
         kernelSource.includes('MAJOR_FOREGROUND_DISPATCH') &&
         kernelSource.includes('MAJOR_DSH_EXECUTION_ENVIRONMENT') &&
         kernelSource.includes("[major, 'goal', 'route-execution'") &&
-        kernelSource.includes("environment === 'lima' ? 'codex-lima' : 'codex'") &&
+        kernelSource.includes('RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT') &&
+        kernelSource.includes(
+          "return accountLabel === 'default' ? 'codex' : `codex-${accountLabel}`",
+        ) &&
         kernelSource.includes("if (host === 'claude') return 'claude-review'") &&
         !kernelSource.includes('NO_CYCLE_MESSAGE') &&
         !kernelSource.includes("'--host', 'codex'") &&
         !kernelSource.includes("'--host', 'claude'") &&
         !kernelSource.includes("'--host', 'cursor'") &&
         !kernelSource.includes("'--host', 'antigravity'"),
-      '/major admits through Major; native Codex is opt-in and Major run remains the default route',
+      '/major admits through Major; DSH-native providers are the default and legacy is explicit',
     ),
     ...assertProfileComposition(majorWorkstationWebProfile()),
     ...assertProfileComposition(majorWorkstationHeadlessProfile()),

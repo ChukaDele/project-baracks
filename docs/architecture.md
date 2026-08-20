@@ -274,15 +274,18 @@ Git history is the archive. After a successor path is independently validated on
 
 ## Migration status
 
-The thin-kernel runtime is **built**, not yet **ready**. The migration is incomplete until the JSS assist pilot and independent grade pass, then the old v1 runtime can be removed under `docs/migrations/major-v2-legacy-receipt.md`.
-
-Major is becoming an upstream-compatible DeepSeek Harness distribution through a recoverable strangler (`docs/migrations/deepseek-harness-strangler.md`). That overlay is in **shadow**: the pin and plugin composition exist, live execution still uses Lima plus official CLI/ACP adapters, and legacy paths stay until a representative project run and independent review pass.
+The thin-kernel runtime is the default live workstation. The migration remains
+recoverable under `docs/migrations/deepseek-harness-strangler.md`: Lima and the
+old Major/Lima pipeline stay available as explicit compatibility paths until
+their active consumers reach zero.
+Migration cleanup is incomplete until those consumers reach zero and the
+canonical installed workstation passes its release gates.
 
 ## 10.1 DeepSeek Harness distribution
 
 DeepSeek Harness is the adopted agent-loop/tool/session/UI substrate. Major does not fork it. Exact npm versions are pinned; `latest`, `next` and version ranges are refused.
 
-Major-specific capabilities remain on the live Major path during shadow. The
+Major-specific capabilities remain behind a thin control-plane seam. The
 `@major/dsh-kernel` bundle is the thin integration seam after
 `@deepseek-ai/dsh-base`. It registers `/major`, delegates work through the
 existing Major control plane, and uses DSH's official Claude Code provider for
@@ -293,27 +296,24 @@ its adapter and conformance proof exist:
 - project trust, approval policy and kill switch;
 - independent evidence;
 - subscription routing and project-context integrity;
-- Lima isolation as the default execution backend.
+- provider-independent execution-environment policy, with local as the default
+  and Lima as optional high isolation.
 
 The proposed unified Mac workstation is two source profiles on that pin:
 loopback Web UI for the owner and headless for Major-driven runs. Neither
 profile starts a login daemon or attaches Ruflo globally. `major harness
-conformance` is the deterministic shadow gate for this source layer; it does
-not claim that dsh is installed, bootable, or ready. `major harness
-install-plan` and `scripts/install-deepseek-harness-pin.sh` stage the attested
-pin into an isolated harness home for strangle prep without changing the live
-backend. One shared runtime owns the pinned packages; profiles symlink that
+conformance` is the deterministic source gate. `major harness install-plan`
+and `scripts/install-deepseek-harness-pin.sh` install the attested pin into an
+isolated harness home. One shared runtime owns the pinned packages; profiles symlink that
 closure. The installer refuses a full disk and proves both profiles with
 `--dump-config`. `major harness workstation-app` is the installer-managed
 `Major.app` launcher: an installer-marked bundle in `~/Applications` (or
 `MAJOR_APP_DIR`) points to one loopback DSH web process, Chrome `--app` for a real
-project, logs and lock under the DSH home, no Electron/Tauri/login daemon, live
-`major` PATH unchanged. `major harness shadow-task` is the planned first Lima-hosted
-composition smoke; it is not live-worker cutover. `/major` takes
-`MAJOR_SESSION_HOST` so `goal admit` can attach, then `major run` routes the
-worker. DSH Claude Code is only the independent reviewer. `pnpm
-validate:dsh-shadow` is the one-hop source validation script for the Mac
-workstation before Lima field proof.
+project, logs and lock under the DSH home, no Electron/Tauri/login daemon, and
+the `major` PATH unchanged. `/major` takes `MAJOR_SESSION_HOST`, asks Major for
+the provider/model/account routing decision, then invokes the provider through
+DSH. DSH Claude Code performs independent review. `pnpm validate:dsh` is the
+one-hop source validation script.
 
 ## 11. Resource hygiene
 

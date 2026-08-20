@@ -38,7 +38,8 @@ export interface WorkstationAppPlan {
   preservesMajorPath: true;
   autoStartDaemon: false;
   duplicatePolicy: 'refuse-if-lock-alive';
-  liveTrafficRemains: 'lima-cli-acp';
+  defaultRuntime: 'dsh-local';
+  compatibilityRuntimes: readonly ['dsh-lima', 'legacy-major-lima'];
 }
 
 export function chromeAppUrl(): string {
@@ -58,7 +59,8 @@ export function buildWorkstationAppPlan(): WorkstationAppPlan {
     preservesMajorPath: true,
     autoStartDaemon: false,
     duplicatePolicy: 'refuse-if-lock-alive',
-    liveTrafficRemains: 'lima-cli-acp',
+    defaultRuntime: 'dsh-local',
+    compatibilityRuntimes: ['dsh-lima', 'legacy-major-lima'],
   };
 }
 
@@ -75,6 +77,7 @@ export function formatWorkstationAppPlan(plan: WorkstationAppPlan): string {
     `preserves major path: ${plan.preservesMajorPath}`,
     `daemon: ${plan.autoStartDaemon}`,
     `duplicates: ${plan.duplicatePolicy}`,
-    `live traffic: ${plan.liveTrafficRemains}`,
+    `default runtime: ${plan.defaultRuntime}`,
+    `compatibility runtimes: ${plan.compatibilityRuntimes.join(', ')}`,
   ].join('\n');
 }

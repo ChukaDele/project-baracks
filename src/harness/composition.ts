@@ -10,10 +10,11 @@ export const HARNESS_MIGRATION_PHASES = [
 
 export type HarnessMigrationPhase = (typeof HARNESS_MIGRATION_PHASES)[number];
 
-/** Live workers still use Lima. Composition and conformance exist. */
-export const CURRENT_HARNESS_MIGRATION_PHASE: HarnessMigrationPhase = 'shadow';
+/** DSH owns live execution. Local is the default environment; Lima is optional. */
+export const CURRENT_HARNESS_MIGRATION_PHASE: HarnessMigrationPhase = 'cutover';
 
-export const DEFAULT_EXECUTION_BACKEND = 'lima' as const;
+export const DEFAULT_EXECUTION_BACKEND = 'dsh' as const;
+export const DEFAULT_EXECUTION_ENVIRONMENT = 'local' as const;
 
 export const MAJOR_KERNEL_BUNDLE = '@major/dsh-kernel';
 export const DSH_BASE_BUNDLE = '@deepseek-ai/dsh-base';
@@ -168,7 +169,7 @@ export function bundleManifest(bundle: DshBundle): {
     './package.json': './package.json';
   };
   files: ['index.js', 'client.js', 'lima-subprocess.js', 'cordis.patch.yml'];
-  version: '0.0.0-shadow';
+  version: '0.0.0-cutover';
   dependencies: { '@deepseek-ai/dsh-subprocess-local': typeof DEEPSEEK_HARNESS_PIN.npm.version };
   dsh: {
     client: {
@@ -190,7 +191,7 @@ export function bundleManifest(bundle: DshBundle): {
       './package.json': './package.json',
     },
     files: ['index.js', 'client.js', 'lima-subprocess.js', 'cordis.patch.yml'],
-    version: '0.0.0-shadow',
+    version: '0.0.0-cutover',
     dependencies: {
       '@deepseek-ai/dsh-subprocess-local': DEEPSEEK_HARNESS_PIN.npm.version,
     },

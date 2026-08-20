@@ -6,18 +6,19 @@ export interface DshRuntimeRoute {
 }
 
 /**
- * First strangle checkpoint. Provider selection and execution environment are
- * deliberately independent: later Lima composition can reuse the provider
- * adapter without making the workstation environment part of provider policy.
- * Unset configuration returns undefined and therefore preserves `major run`
- * plus Lima as the compatibility default until both native environments pass
- * acceptance. An explicit `lima` selects the DSH-native Lima environment.
+ * Provider selection and execution environment are deliberately independent.
+ * Local DSH execution is the default. Lima selects the same native provider
+ * adapter behind the high-isolation environment. Legacy selects the old
+ * Major/Lima CLI compatibility path and is never implicit.
  */
 export function configuredDshRuntimeRoute(
   env: NodeJS.ProcessEnv = process.env,
 ): DshRuntimeRoute | undefined {
   const environment = env.MAJOR_DSH_EXECUTION_ENVIRONMENT;
-  if (environment === undefined || environment === '') return undefined;
+  if (environment === undefined || environment === '' || environment === 'local') {
+    return { environment: 'local' };
+  }
+  if (environment === 'legacy') return undefined;
   if (environment !== 'local' && environment !== 'lima') {
     throw new Error(`unsupported DSH execution environment: ${environment}`);
   }

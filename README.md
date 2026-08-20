@@ -86,7 +86,9 @@ The optional pinned DSH workstation launcher is staged by
 `scripts/install-deepseek-harness-pin.sh` as `${MAJOR_APP_DIR:-$HOME/Applications}/Major.app`;
 its launcher and runtime state remain under `$MAJOR_HOME/dsh-harness`.
 Start it with `bash scripts/start-major-workstation.sh --project /path/to/repo`.
-That path stays on Lima for live workers until strangle proof.
+Normal trusted repository work runs through native DSH providers in the local
+environment. Set `MAJOR_DSH_EXECUTION_ENVIRONMENT=lima` for optional high
+isolation or `legacy` for the old Major/Lima compatibility pipeline.
 
 `major provider sync-profiles` makes only owner-policy rows with `role: active`
 routable. A removed, disabled, missing, or failed profile immediately loses

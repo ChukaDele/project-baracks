@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { allocateDevPort, listDevPorts } from '../dev/ports.js';
@@ -36,6 +36,7 @@ import {
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
+import { resolveSkills } from '../skills/resolver.js';
 import {
   majorStatusOverview,
   runDaemon,
@@ -592,7 +593,22 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const goal = getGoal(id);
     if (!goal) throw new Error(`unknown goal: ${id}`);
     const selection = routeGoalExecution(goal);
-    console.log(JSON.stringify(selection, null, 2));
+    let resolvedSkills: Array<{ id: string; source: string; content: string }> = [];
+    let skillResolutionDegraded = false;
+    if (selection.kind === 'route') {
+      try {
+        resolvedSkills = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills.map(
+          (skill) => ({
+            id: skill.id,
+            source: skill.source,
+            content: readFileSync(skill.path, 'utf8').slice(0, 32_000),
+          }),
+        );
+      } catch {
+        skillResolutionDegraded = true;
+      }
+    }
+    console.log(JSON.stringify({ ...selection, resolvedSkills, skillResolutionDegraded }, null, 2));
     return true;
   }
 

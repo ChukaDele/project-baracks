@@ -165,17 +165,27 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Capability:** upstream-compatible, pinned coding-agent harness that Major can distribute on a Mac workstation without losing goals, GBrain, policy or evidence
 - **Date:** 2026-08-20
 - **Candidates:** DeepSeek Harness (`deepseek-ai/deepseek-harness`, MIT, `@deepseek-ai/dsh`); Vercel AI SDK `HarnessAgent` (already rejected for v0.5.1); keep Major's custom CLI/ACP adapters as the only runtime; goose; OpenCode
-- **Decision:** ADOPT DeepSeek Harness as the swappable agent-loop, tool, session and UI substrate. WRAP it as a Major distribution through the official profile, bundle and patch mechanism. Do not fork upstream. Do not install it as a live `package.json` dependency until the pin is integrity-attested. KEEP the Major kernel and Lima execution boundary as the default until a representative project run and independent review pass.
+- **Decision:** ADOPT DeepSeek Harness as the live agent-loop, tool, session and UI substrate. WRAP it as a Major distribution through the official profile, bundle and patch mechanism. Do not fork upstream. Keep Major as the thin intelligence and policy layer. Use local execution for trusted repositories and Lima only when policy selects higher isolation.
 - **Reason:** DeepSeek Harness is the maintained MIT plugin runtime whose explicit contract is that models, tools, sessions, sandboxes, storage, loops, scheduling and UI are replaceable plugins. That is the strangler seam Major needs. AI SDK HarnessAgent was already rejected on orphan-process, approval and inner-sandbox grounds. goose and OpenCode would add a second harness/UI on top of Major. Building another agent loop would duplicate a substantially solved problem. Developer-preview breakage is expected, so the distribution pins exact versions and refuses `latest`, `next` and range resolution.
-- **Major-specific layer retained:** durable goals, GBrain and learning, skill resolver, Toolsmith, project trust and policy, independent evidence, subscription routing, kill switch, project-context integrity, and Lima isolation with validated copy-back
-- **Rejected alternatives:** fork DeepSeek Harness; wrap AI SDK HarnessAgent; adopt goose or OpenCode wholesale; replace GBrain with the DSH session log; replace Lima with the default DSH sandbox before a seam proof; resolve unpinned `@deepseek-ai` dist-tags
+- **Major-specific layer retained:** durable goals, GBrain and learning, skill resolver, Toolsmith, project trust and policy, independent evidence, subscription routing, kill switch, project-context integrity, and provider-independent environment selection
+- **Rejected alternatives:** fork DeepSeek Harness; wrap AI SDK HarnessAgent; adopt goose or OpenCode wholesale; replace GBrain with the DSH session log; make Lima the permanent provider runtime; resolve unpinned `@deepseek-ai` dist-tags
 - **Evidence:** the official repository describes profile and plugin composition and warns that the developer preview will have compatibility-breaking changes. npm published `@deepseek-ai/dsh@0.1.0-rc.8` on 2026-08-19 with integrity `sha512-VQU5NlomrKLRgcXuOf+sxWFvqxPA8q9vMhrKPlPPXiOJEhGlGlAdiyxZvZxkCVI+v0zbhe21cY3/luLyxpSzzA==`. Official tag `dsh-v0.1.0-rc.8` resolves to commit `141eb6fef83422698aef7a981029e843e8161534`.
 
-### First live-runtime checkpoint
+### Live-runtime cutover
 
-- **Decision:** ADOPT the pinned DSH provider adapters for an explicit `local` strangle route; WRAP goal admission, Major provider/model/account routing, and result checkpointing with the existing Major CLI. Provider choice remains Major control-plane policy, orthogonal to the `local` or `lima` execution environment.
-- **Boundary:** the route is opt-in through `MAJOR_DSH_EXECUTION_ENVIRONMENT=local`. An unset value and `lima` continue through `major run` and `LimaBackend`; the selected Major Codex host maps to DSH `codex`, the selected Claude host maps to the already-composed `claude-review`, and hosts without live DSH adapters fail closed. DSH-inside-Lima remains reserved until its proof.
+- **Decision:** ADOPT the pinned DSH provider adapters as the default live route; WRAP only goal admission, Major provider/model/account routing, environment selection and result checkpointing. Provider choice remains Major control-plane policy, orthogonal to the `local` or `lima` execution environment.
+- **Boundary:** unset, empty or explicit `local` selects native DSH local execution. Explicit `lima` selects the same Major-routed provider through the DSH Lima environment. Explicit `legacy` selects the old `major run` and `LimaBackend` compatibility path. Hosts without live DSH adapters fail closed.
 - **Machine receipt:** `distribution/deepseek-harness/runtime-checkpoint.json`.
+
+## 2026-08-20 — future Computer execution environment donor register
+
+- **Capability:** later browser and human-control execution environment, independent from provider choice
+- **Date:** 2026-08-20
+- **Candidates:** OpenBot desktop/workspace concepts; OpenBrowser profile, handoff, telemetry and audit patterns; OpenDevBrowser accessibility snapshots, screencast and fail-closed ref patterns; existing DSH browser tools
+- **Decision:** BORROW only clean MIT-licensed implementation patterns for a later `Computer` environment. Do not install OpenBot or add a second runtime in P0.
+- **Reusable donor surface:** isolated Chromium profile; workspace; live screen/screencast; accessibility snapshot; human take-control and return-control; browser/file action gateway; audit-before-action; fail-closed policy; secret entry outside the transcript.
+- **Rejected alternatives:** CopilotKit Intelligence as canonical memory; a second Postgres runtime; the LangGraph example stack; a second canonical agent platform. GBrain remains canonical learning and memory.
+- **Evidence:** OpenBot desktop exposes shared CLI/desktop configuration and workspaces (`https://github.com/next-open-ai/openbot`). OpenBrowser documents isolated profiles, human auth handoff, telemetry and audits (`https://github.com/floomhq/openbrowser`). OpenDevBrowser documents accessibility snapshots, screencast, persistent profiles and explicit secret-entry boundaries (`https://github.com/freshtechbro/opendevbrowser`).
 
 ## 2026-08-20 — Mac application experience for the pinned DSH workstation
 

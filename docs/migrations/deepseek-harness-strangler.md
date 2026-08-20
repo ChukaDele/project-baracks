@@ -1,18 +1,19 @@
-# DeepSeek Harness strangler receipt
+# DeepSeek Harness cutover receipt
 
-Status: **shadow**. Major is now an upstream-compatible DeepSeek Harness *distribution contract*. Live execution remains the existing Lima + official-CLI/ACP path. Do not delete that path.
+Status: **cutover**. DeepSeek Harness owns the live session, agent loop, tools,
+subagents, persistence, trajectory and workstation UI. Major is the thin
+routing, policy, goal, account, skill, evaluation and GBrain layer.
 
 ## Outcome
 
-Pin DeepSeek Harness, define upstream-shaped dsh profile and bundle source
-artifacts, preserve superior Major and GBrain capabilities on the live Major
-path, and keep the migration recoverable until real adapters, a representative
-project run and independent review pass.
+Run trusted repositories through native DSH providers in the local environment.
+Keep provider choice independent from environment choice. Preserve Lima and the
+old Major/Lima pipeline as explicit high-isolation and rollback choices.
 
 ## KEEP
 
 - Major kernel: durable goals, GBrain/learning, skill resolver, Toolsmith, policy/autonomy, evidence, project integrity, subscription routing, kill switch
-- Lima `ExecutionBackend` as the default live isolation boundary
+- Lima `ExecutionBackend` as an optional isolation and compatibility boundary
 - Official Claude/Codex/Antigravity CLI adapters and Cursor native ACP
 - Existing install, rollback, workshop session and kill-switch behaviour
 - Ruflo as optional subordinate memory/swarm infrastructure, not the agent loop
@@ -24,14 +25,14 @@ project run and independent review pass.
 ## WRAP
 
 - Official dsh profile/bundle/`cordis.patch.yml` composition so Major can add adapters without forking. The kernel patch mounts `@major/dsh-kernel` after upstream bundles; it must not become the live worker backend.
-- dsh approval/session/sandbox *transport* under Major policy and Lima isolation
-- Existing subscription-backed providers as model plugins when a later seam proof passes
+- DSH provider/environment transport under Major routing and policy
+- Existing subscription-backed providers through their official DSH adapters
 
 ## SHIM
 
-- Current Lima + CLI/ACP runtime remains the default live path until cutover evidence exists
-- Consumer: every supervised worker
-- Removal condition: `cutover` phase after attested pin, live dsh conformance, representative project work, and independent review
+- `MAJOR_DSH_EXECUTION_ENVIRONMENT=lima` selects optional DSH-native Lima.
+- `MAJOR_DSH_EXECUTION_ENVIRONMENT=legacy` selects the old Major/Lima pipeline.
+- Removal condition: active consumers reach zero after canonical cutover remains green.
 
 ## DELETE later, not now
 
@@ -42,12 +43,14 @@ project run and independent review pass.
 ## Phases
 
 1. `pin` — exact upstream versions recorded
-2. `shadow` — composition and deterministic conformance exist; live traffic still Lima (**current**)
+2. `shadow` — composition and deterministic conformance existed
 3. `strangle` — selected tasks may opt into pinned dsh inside Lima
-4. `cutover` — dsh is default; Lima remains rollback
+4. `cutover` — DSH is default; local is the default environment; Lima remains rollback (**current**)
 5. `cleanup` — delete obsolete active paths under `legacy-cleanup`
 
-The upstream release tag and npm package integrities are attested. Cutover and cleanup remain forbidden while `package.json` has no validated dsh dependency, while live DSH conformance has not passed, or while no representative project run exists.
+The upstream release tag and npm package integrities are attested. The exact pin
+is installed outside `package.json`. Native local and Lima environment proofs
+passed before default cutover.
 
 ## Unified Mac workstation
 
@@ -80,12 +83,11 @@ policy stays in `workspace-lifecycle-management`.
 - Pin, source profiles, the upstream-shaped Major command kernel and `major harness` conformance exist
 - `major harness install-plan` and `scripts/install-deepseek-harness-pin.sh` stage the attested pin into an isolated `$MAJOR_HOME/dsh-harness` without changing the live backend
 - Installer disk preflight matches Major's 10%/20GiB block before npm or Lima cycling
-- `/major` admits with `MAJOR_SESSION_HOST` (required by `goal admit`) and leaves worker routing to `major run`; DSH Claude Code remains the independent reviewer
-- `major harness shadow-task` records the first Lima-hosted `--dump-config` smoke; it does not opt live workers into dsh
+- `/major` admits with `MAJOR_SESSION_HOST`, asks Major for provider/model/account routing, and invokes the selected native DSH adapter
 - `major harness workstation-app` records the reversible `Major.app` + Chrome app-mode launcher contract
-- `pnpm validate:dsh-shadow` runs the deterministic source gate (validate-major, harness tests, conformance, install dry-run)
+- `pnpm validate:dsh` runs the deterministic source gate (validate-major, harness tests, conformance, install dry-run)
 - Isolated-home tests stage/remove `Major.app` and prove single-instance start/stop with fakes; they are not a Mac field proof
-- Default execution backend remains `LimaBackend`
-- A reproducible Mac field-install receipt is still required before promotion; disposable local observations are diagnostic only
-- Live dsh install inside Lima is **not** claimed
-- Mac field proof and independent review are **not** claimed
+- The default execution backend is DSH and the default environment is local.
+- The same Major-selected Codex adapter passed a separate Lima environment proof.
+- Both proofs included a real file mutation, tests, an independent native Claude review, trajectory persistence and restart/resume.
+- Canonical installation and exact-main release gates remain separate checks.

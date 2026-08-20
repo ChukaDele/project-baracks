@@ -206,7 +206,8 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "dsh: ${DSH_CMD[*]}"
   echo "chrome app-mode: --app=${CHROME_URL} --user-data-dir=$CHROME_PROFILE"
   echo "preserve PATH (major CLI unchanged)"
-  echo "live Major execution remains on Lima + official CLI/ACP"
+  echo "normal trusted repository execution defaults to DSH local"
+  echo "DSH Lima and legacy Major/Lima remain explicit compatibility choices"
   echo "no Electron, Tauri, LaunchAgent, or login daemon"
   exit 0
 fi
@@ -273,6 +274,7 @@ echo "served boot graph includes @major/dsh-kernel"
 echo "Chrome app-mode: $CHROME_URL"
 echo "project: $PROJECT"
 echo "log: $LOG_FILE"
-echo "live Major execution remains on Lima + official CLI/ACP"
+echo "normal trusted repository execution defaults to DSH local"
+echo "DSH Lima and legacy Major/Lima remain explicit compatibility choices"
 
 wait "$DSH_PID" || true

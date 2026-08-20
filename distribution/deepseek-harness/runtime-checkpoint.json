@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "phase": "strangle-checkpoint",
-  "defaultEnvironment": "lima",
-  "defaultPath": "major-run",
-  "optInRoutes": [
+  "phase": "cutover",
+  "defaultEnvironment": "local",
+  "defaultPath": "dsh-native",
+  "nativeRoutes": [
     {
       "environment": "local",
       "providerAuthority": "major-router",
@@ -11,7 +11,15 @@
         "codex": "codex",
         "claude": "claude-review"
       }
+    },
+    {
+      "environment": "lima",
+      "providerAuthority": "major-router",
+      "hostAdapters": {
+        "codex": "codex-lima",
+        "claude": "claude-review"
+      }
     }
   ],
-  "reservedRoutes": [{ "environment": "lima", "path": "dsh-composition" }]
+  "compatibilityRoutes": [{ "environment": "legacy", "path": "major-run" }]
 }

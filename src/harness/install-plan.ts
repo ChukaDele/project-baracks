@@ -32,7 +32,8 @@ export interface HarnessInstallPlan {
   npmInstalls: HarnessNpmInstall[];
   profiles: HarnessProfileStage[];
   commands: string[];
-  liveTrafficRemains: 'lima-cli-acp';
+  defaultRuntime: 'dsh-local';
+  compatibilityRuntimes: readonly ['dsh-lima', 'legacy-major-lima'];
 }
 
 function readPinFromRepo(repoRoot: string) {
@@ -83,7 +84,8 @@ export function buildHarnessInstallPlan(
     `# stages ${profiles.map((p) => p.id).join(' and ')} under ${dshHome}`,
     `# stages reversible Major.app launcher (loopback web + Chrome app-mode) under ${dshHome}`,
     `# installs exact npm packages: ${exactArgs}`,
-    `# live Major traffic remains on ${DEFAULT_EXECUTION_BACKEND} + official CLI/ACP until strangle proof`,
+    '# normal trusted repository work runs through DSH with the local environment',
+    '# Lima and the legacy Major/Lima pipeline remain explicit compatibility choices',
   ];
 
   return {
@@ -95,7 +97,8 @@ export function buildHarnessInstallPlan(
     npmInstalls,
     profiles,
     commands,
-    liveTrafficRemains: 'lima-cli-acp',
+    defaultRuntime: 'dsh-local',
+    compatibilityRuntimes: ['dsh-lima', 'legacy-major-lima'],
   };
 }
 
@@ -104,7 +107,8 @@ export function formatHarnessInstallPlan(plan: HarnessInstallPlan): string {
     `phase: ${plan.phase}`,
     `pin: ${plan.pinVersion} (${plan.attestedCommit.slice(0, 7)})`,
     `dsh home: ${plan.dshHome}`,
-    `live traffic: ${plan.liveTrafficRemains} via ${plan.executionBackend}`,
+    `default runtime: ${plan.defaultRuntime} via ${plan.executionBackend}`,
+    `compatibility runtimes: ${plan.compatibilityRuntimes.join(', ')}`,
     'profiles:',
     ...plan.profiles.map((profile) => `  - ${profile.id}: ${profile.bundles.join(' -> ')}`),
     'npm installs:',

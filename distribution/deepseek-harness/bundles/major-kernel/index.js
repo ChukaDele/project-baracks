@@ -204,15 +204,21 @@ export function foregroundDispatchHops(stdout) {
 
 export function configuredRuntimeRoute(env = process.env) {
   const environment = env.MAJOR_DSH_EXECUTION_ENVIRONMENT;
-  if (environment === undefined || environment === '') return undefined;
+  if (environment === undefined || environment === '' || environment === 'local') {
+    return { environment: 'local' };
+  }
+  if (environment === 'legacy') return undefined;
   if (environment !== 'local' && environment !== 'lima') {
     throw new Error(`major-workstation: unsupported DSH execution environment: ${environment}`);
   }
   return { environment };
 }
 
-export function dshAdapterForMajorHost(host, environment = 'local') {
-  if (host === 'codex') return environment === 'lima' ? 'codex-lima' : 'codex';
+export function dshAdapterForMajorHost(host, environment = 'local', accountLabel = 'default') {
+  if (host === 'codex') {
+    if (environment === 'lima') return 'codex-lima';
+    return accountLabel === 'default' ? 'codex' : `codex-${accountLabel}`;
+  }
   if (host === 'claude') return 'claude-review';
   throw new Error(
     `major-workstation: Major selected ${String(host)}, which has no live DSH adapter`,
@@ -287,9 +293,22 @@ function withRoutedEnvironment(selection, goalId, lease, callback) {
     });
 }
 
-export function nativeWorkerTask(task) {
+export function nativeWorkerTask(task, resolvedSkills = [], skillResolutionDegraded = false) {
+  const skillContext = skillResolutionDegraded
+    ? 'Major skill and GBrain resolution is temporarily unavailable. Continue without it and report the degraded context if material.'
+    : resolvedSkills.length === 0
+      ? 'No existing Major or GBrain-generated skill matched this task.'
+      : resolvedSkills
+          .map(
+            (skill) =>
+              `--- MAJOR SKILL ${String(skill.id)} (${String(skill.source)}) ---\n${String(skill.content)}`,
+          )
+          .join('\n\n');
   return `MAJOR LEAF WORKER CONTRACT:
 Major has already admitted this goal and selected you through the DSH runtime. You are the leased leaf worker, not the control-plane coordinator. Do not run Major CLI commands, admit or dispatch another goal, or delegate to another worker. Perform the task directly in the current workspace, run its verification, and report the observed result.
+
+RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT:
+${skillContext}
 
 TASK:
 ${task}`;
@@ -377,11 +396,21 @@ async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
       `major-workstation: provider routing checkpoint: ${String(selection.reason ?? 'no eligible route')}`,
     );
   }
-  const dshProviderName = dshAdapterForMajorHost(selection.host, route.environment);
+  const dshProviderName = dshAdapterForMajorHost(
+    selection.host,
+    route.environment,
+    selection.accountLabel,
+  );
   const lease = await acquireWorkerLease(ctx, major, goal, signal);
   try {
     const run = await withRoutedEnvironment(selection, admitted.goalId, lease, () =>
-      settleSubagent(ctx, dshProviderName, nativeWorkerTask(task), parent, signal),
+      settleSubagent(
+        ctx,
+        dshProviderName,
+        nativeWorkerTask(task, selection.resolvedSkills, selection.skillResolutionDegraded),
+        parent,
+        signal,
+      ),
     );
     if (run.stopReason !== 'completed') {
       throw new Error(
