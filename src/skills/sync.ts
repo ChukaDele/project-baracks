@@ -3,6 +3,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   renameSync,
@@ -10,7 +11,9 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
 import { majorHome } from '../supervisor/state.js';
 
@@ -33,6 +36,8 @@ export interface SkillSyncResult {
   activeBundle: string;
   internalSkillCount: number;
 }
+
+const DEFAULT_SKILLS_REPO_URL = 'https://github.com/ChukaDele/project-baracks.git';
 
 function assertRegistry(value: unknown): Registry {
   if (!value || typeof value !== 'object') throw new Error('invalid Major skills registry');
@@ -156,8 +161,8 @@ function retainRollbackBundles(bundlesRoot: string, activeId: string): void {
   for (const row of rows.slice(2)) rmSync(row.path, { recursive: true, force: true });
 }
 
-export function syncMajorSkills(input: { sourceRoot: string }): SkillSyncResult {
-  const sourceRoot = resolve(input.sourceRoot);
+function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyncResult {
+  const sourceRoot = resolve(sourceRootInput);
   const validated = validateSource(sourceRoot);
   const bundleId = bundleHash(sourceRoot, [
     join(sourceRoot, 'guidance'),
@@ -183,7 +188,7 @@ export function syncMajorSkills(input: { sourceRoot: string }): SkillSyncResult 
         version: 1,
         sha: bundleId,
         registryVersion: validated.registry.version,
-        source: sourceRoot,
+        source: sourceLabel ?? sourceRoot,
         installedAt: new Date().toISOString(),
       },
       null,
@@ -200,10 +205,33 @@ export function syncMajorSkills(input: { sourceRoot: string }): SkillSyncResult 
   retainRollbackBundles(bundlesRoot, bundleId);
 
   return {
-    sourceRoot,
+    sourceRoot: sourceLabel ?? sourceRoot,
     bundleId,
     registryVersion: validated.registry.version,
     activeBundle: destination,
     internalSkillCount: validated.internalIds.length,
   };
+}
+
+/**
+ * Sync the complete Major knowledge bundle. An explicit sourceRoot is useful
+ * for local development and exact-checkout testing. Without one, fetch the
+ * canonical origin/main into a temporary checkout so `major skill sync` works
+ * from any directory and cannot silently reuse a stale local checkout.
+ */
+export function syncMajorSkills(input: { sourceRoot?: string } = {}): SkillSyncResult {
+  const explicitSource = input.sourceRoot ?? process.env.MAJOR_SKILLS_SOURCE;
+  if (explicitSource) return syncFromSource(explicitSource);
+
+  const repoUrl = process.env.MAJOR_SKILLS_REPO_URL ?? DEFAULT_SKILLS_REPO_URL;
+  const tempRoot = mkdtempSync(join(tmpdir(), 'major-skill-sync-'));
+  const checkout = join(tempRoot, 'source');
+  try {
+    execFileSync('git', ['clone', '--quiet', '--depth', '1', '--branch', 'main', repoUrl, checkout], {
+      stdio: 'inherit',
+    });
+    return syncFromSource(checkout, `${repoUrl}#main`);
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
 }
