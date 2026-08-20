@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   applyIndependentCompletionGrade,
   readSupervisorState,
+  updateGoal,
   writeSupervisorState,
   type SupervisorGoal,
 } from '../src/supervisor/state.js';
@@ -28,6 +29,7 @@ function pendingGoal(): SupervisorGoal {
     preferredCoordinator: 'codex',
     cycle: 1,
     consecutiveFailures: 0,
+    activePid: 123,
     createdAt: '2026-08-11T00:00:00.000Z',
     updatedAt: '2026-08-11T00:01:00.000Z',
     lastCoordinator: 'codex',
@@ -63,6 +65,14 @@ describe('independent goal completion', () => {
     expect(codexMutationClaimRefusal({ host: 'codex', workspaceMutated: false }, built)).toMatch(
       /observed no project delta/,
     );
+    for (const summary of ['not BUILT provider route', 'PRE-BUILT provider route', 'built route']) {
+      expect(
+        codexMutationClaimRefusal(
+          { host: 'codex', workspaceMutated: false },
+          { status: 'active', summary },
+        ),
+      ).toBeUndefined();
+    }
   });
 
   it('keeps a refused BUILT claim active and clears pending completion', () => {
@@ -76,6 +86,22 @@ describe('independent goal completion', () => {
       consecutiveFailures: 1,
       lastSessionRef: 'session-2',
     });
+    expect(Object.hasOwn(patch, 'pendingCompletion')).toBe(true);
+    expect(Object.hasOwn(patch, 'activePid')).toBe(true);
+    const persisted = updateGoal('goal-1', patch);
+    expect(persisted.pendingCompletion).toBeUndefined();
+    expect(persisted.activePid).toBeUndefined();
+  });
+
+  it('uses bounded generic failure escalation and preserves an existing session ref', () => {
+    const goal = pendingGoal();
+    goal.consecutiveFailures = 5;
+    goal.lastSessionRef = 'session-1';
+    updateGoal('goal-1', { consecutiveFailures: 5, lastSessionRef: 'session-1' });
+    const patch = mutationClaimRefusalGoalPatch(goal, 'Rejected Codex mutation claim', {});
+    expect(patch).toMatchObject({ status: 'failed', consecutiveFailures: 6 });
+    expect(Object.hasOwn(patch, 'lastSessionRef')).toBe(false);
+    expect(updateGoal('goal-1', patch).lastSessionRef).toBe('session-1');
   });
 
   it('does not invent mutation evidence or reject non-Codex and non-claim reports', () => {

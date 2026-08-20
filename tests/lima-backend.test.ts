@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -29,10 +30,39 @@ describe('returned workspace diff evidence', () => {
 
   it('fails closed for every other diff exit', () => {
     expect(() => workspaceMutatedFromDiffExit(2, 'fatal: comparison failed')).toThrow(
-      /delta creation failed: fatal: comparison failed/,
+      /delta creation failed \(exit 2\): fatal: comparison failed/,
     );
-    expect(() => workspaceMutatedFromDiffExit(128)).toThrow(/delta creation failed/);
-    expect(() => workspaceMutatedFromDiffExit(null)).toThrow(/delta creation failed/);
+    expect(() => workspaceMutatedFromDiffExit(128)).toThrow(/exit 128/);
+    expect(() => workspaceMutatedFromDiffExit(null)).toThrow(/exit unknown/);
+    expect(() =>
+      workspaceMutatedFromDiffExit(2, 'token ghp_abcdefghijklmnopqrstuvwxyz123456'),
+    ).toThrow(/\[REDACTED\]/);
+  });
+
+  it('classifies real returned-tree diffs for unchanged and mutated paths', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-returned-tree-'));
+    try {
+      const input = join(root, 'input', 'workspace');
+      const result = join(root, 'result', 'workspace');
+      mkdirSync(input, { recursive: true });
+      mkdirSync(result, { recursive: true });
+      writeFileSync(join(input, 'proof.txt'), 'same\n');
+      writeFileSync(join(result, 'proof.txt'), 'same\n');
+      const diff = () =>
+        spawnSync(
+          '/usr/bin/git',
+          ['diff', '--no-index', '--binary', '--full-index', input, result],
+          { encoding: 'utf8' },
+        );
+      const unchanged = diff();
+      expect(workspaceMutatedFromDiffExit(unchanged.status, unchanged.stderr)).toBe(false);
+      writeFileSync(join(result, 'proof.txt'), 'mutated\n');
+      const mutated = diff();
+      expect(workspaceMutatedFromDiffExit(mutated.status, mutated.stderr)).toBe(true);
+      expect(mutated.stdout).toContain('proof.txt');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

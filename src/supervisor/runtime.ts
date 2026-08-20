@@ -822,6 +822,8 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     const report = parseWorkerReport(outcome.stdout);
     const mutationClaimRefusal = codexMutationClaimRefusal(outcome, report);
     if (mutationClaimRefusal) {
+      // A rejected readiness claim is not a trusted source for capability-use
+      // or learning self-reports. Refuse it before recording either one.
       updateGoal(goal.id, mutationClaimRefusalGoalPatch(after, mutationClaimRefusal, outcome));
       return;
     }
@@ -865,7 +867,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         ownerGate: report.ownerGate,
         pendingCompletion: undefined,
         retryImmediately: false,
-        lastSessionRef: outcome.sessionRef,
+        ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
       });
       return;
     }
@@ -880,7 +882,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         nextRunAt: undefined,
         pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
         retryImmediately: false,
-        lastSessionRef: outcome.sessionRef,
+        ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
       });
       return;
     }
@@ -895,7 +897,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
       pendingCompletion: undefined,
       retryImmediately: false,
-      lastSessionRef: outcome.sessionRef,
+      ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
     });
   } else {
     const patch = nonSuccessCyclePatch({
@@ -932,7 +934,7 @@ export function codexMutationClaimRefusal(
   report: ReturnType<typeof parseWorkerReport>,
 ): string | undefined {
   if (outcome.host !== 'codex' || outcome.workspaceMutated !== false || !report) return undefined;
-  if (!/\bBUILT\b/.test(report.summary)) return undefined;
+  if (!/^BUILT(?:\b|:)/.test(report.summary)) return undefined;
   return (
     'Rejected Codex mutation claim: the isolated backend compared the returned workspace ' +
     'with its input and observed no project delta. The task remains active.'
@@ -944,16 +946,25 @@ export function mutationClaimRefusalGoalPatch(
   refusal: string,
   outcome: Pick<WorkerOutcome, 'sessionRef'>,
 ): Partial<SupervisorGoal> {
+  const failure = nonSuccessCyclePatch({
+    modelOutcome: undefined,
+    stderr: refusal,
+    stdout: '',
+    provider: 'codex',
+    modelRef: 'readiness-claim',
+    host: 'codex',
+    consecutiveFailures: goal.consecutiveFailures,
+  });
   return {
-    status: 'active',
-    consecutiveFailures: goal.consecutiveFailures + 1,
+    status: failure.status,
+    consecutiveFailures: failure.consecutiveFailures,
     activePid: undefined,
     lastFinishedAt: new Date().toISOString(),
-    lastSummary: refusal,
-    nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+    lastSummary: failure.lastSummary,
+    nextRunAt: new Date(Date.now() + failure.nextRunDelayMs).toISOString(),
     pendingCompletion: undefined,
-    retryImmediately: false,
-    lastSessionRef: outcome.sessionRef,
+    retryImmediately: failure.retryImmediately,
+    ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
   };
 }
 

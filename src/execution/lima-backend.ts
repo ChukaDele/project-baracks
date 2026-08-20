@@ -2050,5 +2050,5 @@ export class LimaBackend implements ExecutionBackend {
 export function workspaceMutatedFromDiffExit(code: number | null, stderr = ''): boolean {
   if (code === 0) return false;
   if (code === 1) return true;
-  throw new Error(`delta creation failed: ${redactText(stderr)}`);
+  throw new Error(`delta creation failed (exit ${code ?? 'unknown'}): ${redactText(stderr)}`);
 }
