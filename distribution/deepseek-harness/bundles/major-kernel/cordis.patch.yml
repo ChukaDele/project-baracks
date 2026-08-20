@@ -2,9 +2,6 @@
   config:
     provider: major
     model: composer
-- id: agent-presets
-  config:
-    default: major
 - id: subagent-codex
   config:
     permissionMode: approve-for-me

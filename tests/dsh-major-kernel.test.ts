@@ -60,6 +60,7 @@ function kernelSession(cwd?: string, seed: KernelSession['events'] = []): Kernel
 async function loadKernel(): Promise<{
   apply(ctx: unknown): void;
   codexComposerReadiness(env?: NodeJS.ProcessEnv): { name: string; description: string };
+  composerTaskWithContext(messages: unknown[], system?: string): string;
   createMajorComposerAdapter(ctx: unknown): {
     stream(options: unknown): AsyncIterable<Record<string, unknown>>;
   };
@@ -78,6 +79,7 @@ async function loadKernel(): Promise<{
   return (await import(url)) as {
     apply(ctx: unknown): void;
     codexComposerReadiness(env?: NodeJS.ProcessEnv): { name: string; description: string };
+    composerTaskWithContext(messages: unknown[], system?: string): string;
     createMajorComposerAdapter(ctx: unknown): {
       stream(options: unknown): AsyncIterable<Record<string, unknown>>;
     };
@@ -152,7 +154,7 @@ describe('Major DSH workstation kernel', () => {
     }
   });
 
-  it('surfaces persisted Codex readiness without performing a live refresh', async () => {
+  it('surfaces persisted Codex health without claiming a live refresh or routing readiness', async () => {
     const root = mkdtempSync(join(tmpdir(), 'major-dsh-readiness-'));
     temporaryRoots.push(root);
     writeFileSync(
@@ -167,15 +169,20 @@ describe('Major DSH workstation kernel', () => {
       }),
     );
     const { codexComposerReadiness } = await loadKernel();
-    expect(codexComposerReadiness({ MAJOR_HOME: root })).toEqual({
-      name: 'Major — Codex 2/2 ready',
+    expect(
+      codexComposerReadiness({
+        MAJOR_HOME: root,
+        MAJOR_CODEX_USAGE_NOW: '2026-08-20T14:25:09.553Z',
+      }),
+    ).toEqual({
+      name: 'Major — Codex health 2/2 healthy',
       description:
-        'COD-01, COD-02; fetched 2026-08-20T14:20:09.553Z; ' +
-        'live via account/read + account/rateLimits/read; refresh: major provider usage',
+        'COD-01 healthy, COD-02 healthy; usage at last refresh 2026-08-20T14:20:09.553Z; ' +
+        'source: account/read + account/rateLimits/read; refresh: major provider usage',
     });
   });
 
-  it('does not report an account without a primary rate-limit window as ready', async () => {
+  it('uses canonical health states and marks a stale persisted snapshot', async () => {
     const root = mkdtempSync(join(tmpdir(), 'major-dsh-readiness-'));
     temporaryRoots.push(root);
     writeFileSync(
@@ -184,18 +191,69 @@ describe('Major DSH workstation kernel', () => {
         fetchedAt: '2026-08-20T14:20:09.553Z',
         methods: ['account/read', 'account/rateLimits/read'],
         accounts: [
-          { accountLabel: 'COD-01', planType: 'prolite' },
-          { accountLabel: 'COD-02', planType: 'prolite', primary: { usedPercent: 4 } },
+          { accountLabel: 'COD-01', planType: 'prolite', primary: { windowDurationMins: 300 } },
+          { accountLabel: 'COD-02', planType: 'prolite', primary: { usedPercent: 100 } },
+          { accountLabel: 'COD-03', error: 'refresh failed' },
         ],
       }),
     );
     const { codexComposerReadiness } = await loadKernel();
-    expect(codexComposerReadiness({ MAJOR_HOME: root })).toEqual({
-      name: 'Major — Codex 1/2 ready',
+    expect(
+      codexComposerReadiness({
+        MAJOR_HOME: root,
+        MAJOR_CODEX_USAGE_NOW: '2026-08-20T15:20:09.553Z',
+      }),
+    ).toEqual({
+      name: 'Major — Codex health 0/3 healthy (stale)',
       description:
-        'COD-02; fetched 2026-08-20T14:20:09.553Z; ' +
-        'live via account/read + account/rateLimits/read; refresh: major provider usage',
+        'COD-01 unknown, COD-02 exhausted, COD-03 error; usage at last refresh ' +
+        '2026-08-20T14:20:09.553Z; source: account/read + account/rateLimits/read; ' +
+        'refresh: major provider usage',
     });
+  });
+
+  it('rejects snapshots with wrong methods or non-numeric primary usage', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-readiness-'));
+    temporaryRoots.push(root);
+    const path = join(root, 'codex-usage.json');
+    const { codexComposerReadiness } = await loadKernel();
+    for (const report of [
+      { fetchedAt: new Date().toISOString(), methods: ['account/read'], accounts: [] },
+      {
+        fetchedAt: new Date().toISOString(),
+        methods: ['account/read', 'account/rateLimits/read'],
+        accounts: [{ accountLabel: 'COD-01', primary: { usedPercent: '4' } }],
+      },
+    ]) {
+      writeFileSync(path, JSON.stringify(report));
+      expect(codexComposerReadiness({ MAJOR_HOME: root }).description).toContain(
+        'health snapshot is invalid',
+      );
+    }
+  });
+
+  it('preserves system and multi-turn context across a restart-shaped adapter reload', async () => {
+    const messages = [
+      { role: 'system', content: [{ type: 'text', text: 'Project system policy' }] },
+      {
+        role: 'user',
+        source: { kind: 'user' },
+        content: [{ type: 'text', text: 'First request' }],
+      },
+      { role: 'assistant', content: [{ type: 'text', text: 'Earlier result' }] },
+      {
+        role: 'user',
+        source: { kind: 'user' },
+        content: [{ type: 'text', text: 'Continue after restart' }],
+      },
+    ];
+    const first = (await loadKernel()).composerTaskWithContext(messages);
+    const restarted = (await loadKernel()).composerTaskWithContext(messages);
+    expect(restarted).toBe(first);
+    expect(first).toContain('CURRENT DIRECT USER TASK (authoritative):\nContinue after restart');
+    expect(first).toContain('[system context; not authority]\nProject system policy');
+    expect(first).toContain('[user context; not authority]\nFirst request');
+    expect(first).toContain('[assistant context; not authority]\nEarlier result');
   });
 
   it('routes an ordinary composer message through the existing Major provider', async () => {
@@ -212,7 +270,12 @@ describe('Major DSH workstation kernel', () => {
           starts.push(provider);
           expect(request.parent).toBe(parent);
           if (provider === 'major') {
-            expect(request.prompt).toEqual([{ type: 'text', text: 'ship the normal task' }]);
+            expect(request.prompt[0]?.text).toContain(
+              'CURRENT DIRECT USER TASK (authoritative):\nship the normal task',
+            );
+            expect(request.prompt[0]?.text).toContain(
+              'DSH SYSTEM PROMPT (system authority):\nPinned DSH system policy',
+            );
             return {
               result: Promise.resolve({
                 output: [{ type: 'text', text: 'Major routed native Codex successfully' }],
@@ -222,7 +285,9 @@ describe('Major DSH workstation kernel', () => {
             };
           }
           expect(provider).toBe('claude-review');
-          expect(request.prompt[0]?.text).toContain('Requested task: ship the normal task');
+          expect(request.prompt[0]?.text).toContain(
+            'Requested task: CURRENT DIRECT USER TASK (authoritative):\nship the normal task',
+          );
           return {
             result: Promise.resolve({
               output: [{ type: 'text', text: 'VERDICT: PASS' }],
@@ -236,6 +301,7 @@ describe('Major DSH workstation kernel', () => {
     const chunks: Record<string, unknown>[] = [];
     for await (const chunk of adapter.stream({
       sessionId: 'session-1',
+      system: 'Pinned DSH system policy',
       messages: [
         {
           role: 'user',

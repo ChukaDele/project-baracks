@@ -60,7 +60,7 @@ describe('Codex usage monitor selection and formatting', () => {
     ).toEqual(['default', 'work-b']);
   });
 
-  it('formats a compact live two-account snapshot without emails or secrets', () => {
+  it('formats a compact refreshed two-account snapshot without emails or secrets', () => {
     const now = new Date('2026-08-17T18:00:00.000Z');
     const report = {
       fetchedAt: now.toISOString(),
@@ -91,8 +91,8 @@ describe('Codex usage monitor selection and formatting', () => {
     expect(text).toBe(
       [
         'CODEX CAPACITY',
-        'live via account/read + account/rateLimits/read',
-        'fetched 2026-08-17T18:00:00.000Z  refresh: major provider usage',
+        'snapshot source: account/read + account/rateLimits/read',
+        'usage refreshed at 2026-08-17T18:00:00.000Z  refresh: major provider usage',
         '',
         'default  plus     5h [####......] 42% 2h   week [##........] 18% 4d healthy',
         'work-b   error  no Codex credential in the provider-auth store for work-b',
@@ -111,8 +111,8 @@ describe('Codex usage monitor selection and formatting', () => {
         'Codex capacity:',
         '  default  plus     5h [####......] 42% 2h   week [##........] 18% 4d healthy',
         '  work-b   error  no Codex credential in the provider-auth store for work-b',
-        '  fetched 2026-08-17T18:00:00.000Z',
-        '  live via account/read + account/rateLimits/read',
+        '  usage at last refresh 2026-08-17T18:00:00.000Z',
+        '  source: account/read + account/rateLimits/read',
         '  refresh: major provider usage',
       ].join('\n'),
     );
@@ -225,6 +225,19 @@ describe('Codex usage monitor selection and formatting', () => {
       expect(refreshed).toMatch(/5h \[#\.{9}\] 10%/);
       expect(refreshed).not.toMatch(/42%|91%/);
       expectCompactLines(refreshed);
+
+      writeCodexUsageReport({
+        fetchedAt: '2026-08-17T19:05:00.000Z',
+        methods: ['account/read', 'account/rateLimits/read'],
+        accounts: [
+          {
+            accountLabel: 'default',
+            planType: 'plus',
+            primary: { windowDurationMins: 300 },
+          },
+        ],
+      });
+      expect(readCodexUsageReport()?.accounts[0]?.primary).toEqual({ windowDurationMins: 300 });
     } finally {
       if (priorHome === undefined) delete process.env.MAJOR_HOME;
       else process.env.MAJOR_HOME = priorHome;

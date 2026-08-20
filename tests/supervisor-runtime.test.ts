@@ -547,9 +547,9 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('Codex capacity:');
     expect(prompt).toMatch(/default\s+plus\s+5h \[####\.{6}\] 42%/);
     expect(prompt).toMatch(/work-b\s+plus\s+5h \[#{9}\.\] 91%/);
-    expect(prompt).toContain('live via account/read + account/rateLimits/read');
+    expect(prompt).toContain('source: account/read + account/rateLimits/read');
     expect(prompt).toContain('refresh: major provider usage');
-    expect(prompt).not.toContain('no live snapshot');
+    expect(prompt).not.toContain('no refreshed snapshot');
     for (const line of prompt.split('\n')) {
       if (
         line.includes('Codex capacity') ||

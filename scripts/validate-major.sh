@@ -317,7 +317,11 @@ grep -Fq "resolveSupervisedWorkshopAuthority(cwd)" src/harness/cli.ts || fail "D
 grep -Fq "assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd)" src/execution/lima-backend.ts || fail "DeepSeek Harness Lima bridge does not revalidate mutation authority"
 grep -Fq "routeGoalExecution(goal, { eligibleHosts: ['codex'] })" src/supervisor/cli.ts || fail "DeepSeek Harness route must exclude hosts without a live mutation adapter"
 grep -Fq "name: '@major/dsh-kernel'" distribution/deepseek-harness/bundles/major-kernel/cordis.patch.yml || fail "DeepSeek Harness Major kernel is not mounted"
-grep -Fq "default: major" distribution/deepseek-harness/bundles/major-kernel/cordis.patch.yml || fail "DeepSeek Harness Major agent preset is not the default"
+grep -Fq "provider: major" distribution/deepseek-harness/bundles/major-kernel/cordis.patch.yml || fail "DeepSeek Harness Major composer provider is not the default model"
+grep -Fq "model: composer" distribution/deepseek-harness/bundles/major-kernel/cordis.patch.yml || fail "DeepSeek Harness Major composer model is not the default model"
+if grep -Fq "id: agent-presets" distribution/deepseek-harness/bundles/major-kernel/cordis.patch.yml; then fail "DeepSeek Harness shared kernel must not patch the web-only agent preset entry"; fi
+grep -Fq "id: agent-presets" distribution/deepseek-harness/profiles/major-workstation-web/cordis.patch.yml || fail "DeepSeek Harness web profile does not select the Major agent preset"
+grep -Fq "default: major" distribution/deepseek-harness/profiles/major-workstation-web/cordis.patch.yml || fail "DeepSeek Harness Major agent preset is not the web default"
 [ -f distribution/deepseek-harness/agent-presets/major/agent.cordis.yml ] || fail "DeepSeek Harness Major system preset composition missing"
 [ -f distribution/deepseek-harness/agent-presets/major/preset.yml ] || fail "DeepSeek Harness Major system preset metadata missing"
 grep -Fq 'stage_major_system_preset' scripts/install-deepseek-harness-pin.sh || fail "DeepSeek Harness installer omits the Major system preset"

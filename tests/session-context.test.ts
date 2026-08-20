@@ -354,10 +354,10 @@ describe('fresh session context', () => {
     expect(output).toContain('current worker capacity:');
     expect(output).toMatch(/current worker capacity:.*\bcodex\b/);
     expect(output).toMatch(/current worker capacity:.*claude \(not yet discovered\)/);
-    expect(output).toContain('no live snapshot — run `major provider usage`');
+    expect(output).toContain('no refreshed snapshot — run `major provider usage`');
   });
 
-  it('surfaces persisted live Codex capacity for both authenticated accounts in the banner', async () => {
+  it('surfaces persisted Codex capacity for both authenticated accounts in the banner', async () => {
     const current = repo('codex-capacity-project');
     configureProjectPolicy({
       project: 'github.com/example/codex-capacity-project',
@@ -392,7 +392,7 @@ describe('fresh session context', () => {
     expect(output).toMatch(/default\s+plus\s+5h \[####\.{6}\] 42%/);
     expect(output).toMatch(/work-b\s+plus\s+5h \[#{9}\.\] 91%/);
     expect(output).toContain('refresh: major provider usage');
-    expect(output).not.toContain('no live snapshot');
+    expect(output).not.toContain('no refreshed snapshot');
     for (const line of output.split('\n')) {
       if (
         line.includes('Codex capacity') ||

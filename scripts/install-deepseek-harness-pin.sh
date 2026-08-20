@@ -16,6 +16,17 @@ KERNEL_SOURCE="$ROOT/distribution/deepseek-harness/bundles/major-kernel"
 KERNEL_DEST="$DSH_HOME/bundles/major-kernel"
 MAJOR_PRESET_SOURCE="$ROOT/distribution/deepseek-harness/agent-presets/major"
 DRY_RUN=0
+TRANSACTION_DIR=""
+TRANSACTION_ACTIVE=0
+MANAGED_PATHS=(
+  "runtime"
+  "profiles/major-workstation-web"
+  "profiles/major-workstation-headless"
+  "bundles/major-kernel"
+  "providers/codex"
+  "bin/start-major-workstation.sh"
+  "major-install.json"
+)
 
 usage() {
   cat <<'EOF'
@@ -126,6 +137,50 @@ disk_preflight() {
   local stats
   stats="$(require_disk_headroom)"
   echo "disk preflight ok: ${stats%%$'\t'*}% free"
+}
+
+begin_managed_transaction() {
+  [[ "$DRY_RUN" -eq 0 ]] || return 0
+  mkdir -p "$DSH_HOME"
+  TRANSACTION_DIR="$(mktemp -d "$DSH_HOME/.install-rollback.XXXXXX")"
+  mkdir -p "$TRANSACTION_DIR/backup"
+  : > "$TRANSACTION_DIR/existing"
+  TRANSACTION_ACTIVE=1
+  trap rollback_managed_transaction EXIT
+  local relative
+  for relative in "${MANAGED_PATHS[@]}"; do
+    if [[ -e "$DSH_HOME/$relative" || -L "$DSH_HOME/$relative" ]]; then
+      printf '%s\n' "$relative" >> "$TRANSACTION_DIR/existing"
+      mkdir -p "$TRANSACTION_DIR/backup/$(dirname "$relative")"
+      # The rollback runtime stays on the same volume and is renamed, not
+      # copied. This preserves bytes/metadata without doubling a large pin.
+      mv "$DSH_HOME/$relative" "$TRANSACTION_DIR/backup/$relative"
+    fi
+  done
+}
+
+rollback_managed_transaction() {
+  local exit_code=$?
+  [[ "$TRANSACTION_ACTIVE" -eq 1 ]] || return "$exit_code"
+  trap - EXIT
+  local relative
+  for relative in "${MANAGED_PATHS[@]}"; do
+    rm -rf "$DSH_HOME/$relative"
+  done
+  while IFS= read -r relative; do
+    mkdir -p "$DSH_HOME/$(dirname "$relative")"
+    mv "$TRANSACTION_DIR/backup/$relative" "$DSH_HOME/$relative"
+  done < "$TRANSACTION_DIR/existing"
+  rm -rf "$TRANSACTION_DIR"
+  echo "DSH PIN INSTALL ROLLED BACK: prior installer-managed state restored" >&2
+  exit "$exit_code"
+}
+
+commit_managed_transaction() {
+  [[ "$TRANSACTION_ACTIVE" -eq 1 ]] || return 0
+  TRANSACTION_ACTIVE=0
+  rm -rf "$TRANSACTION_DIR"
+  trap - EXIT
 }
 
 verify_npm_integrity() {
@@ -380,12 +435,23 @@ link_kernel_bundle() {
 
 verify_profile_composition() {
   local profile_id="$1"
+  local composition_output
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[dry-run] compose pinned profile $profile_id from the shared runtime anchor"
     return 0
   fi
-  DSH_HOME="$DSH_HOME" "$RUNTIME_DIR/node_modules/.bin/dsh" \
-    --profile "$profile_id" --dump-config >/dev/null
+  if ! composition_output="$(
+    DSH_HOME="$DSH_HOME" "$RUNTIME_DIR/node_modules/.bin/dsh" \
+      --profile "$profile_id" --dump-config 2>&1
+  )"; then
+    printf '%s\n' "$composition_output" >&2
+    fail "DSH profile composition failed: $profile_id"
+  fi
+  if printf '%s\n' "$composition_output" | grep -Eiq \
+    '(^|[[:space:]])error(:|[[:space:]])|patch:[[:space:]]*entry .* not found'; then
+    printf '%s\n' "$composition_output" >&2
+    fail "DSH profile composition reported an error: $profile_id"
+  fi
 }
 
 stage_workstation_app() {
@@ -431,6 +497,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 disk_preflight
+begin_managed_transaction
 stage_profile major-workstation-web
 stage_profile major-workstation-headless
 stage_kernel_bundle
@@ -444,9 +511,13 @@ link_kernel_bundle
 link_shared_runtime major-workstation-web
 link_shared_runtime major-workstation-headless
 verify_profile_composition major-workstation-web
+if [[ "${MAJOR_DSH_TEST_FAIL_AFTER_COMPOSITION:-0}" == "1" ]]; then
+  fail "injected failure after web profile composition"
+fi
 verify_profile_composition major-workstation-headless
 stage_workstation_app
 write_install_record
+commit_managed_transaction
 
 echo "DeepSeek Harness pin staged. Normal trusted repository execution defaults to DSH local."
 echo "DSH Lima and the legacy Major/Lima pipeline remain explicit compatibility choices."

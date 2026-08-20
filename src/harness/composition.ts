@@ -28,9 +28,6 @@ export const MAJOR_KERNEL_PATCH = `- id: agent-default-model
   config:
     provider: major
     model: composer
-- id: agent-presets
-  config:
-    default: major
 - id: subagent-codex
   config:
     permissionMode: approve-for-me
@@ -63,7 +60,10 @@ export const MAJOR_KERNEL_PATCH = `- id: agent-default-model
       name: '@major/dsh-kernel'
 `;
 /** Web profile: disable auto (native on darwin loopback) and mount upstream browse host + UI. */
-export const MAJOR_WORKSTATION_WEB_PATCH = `- id: directory-picker
+export const MAJOR_WORKSTATION_WEB_PATCH = `- id: agent-presets
+  config:
+    default: major
+- id: directory-picker
   disabled: true
 - insert:
     - id: directory-picker-browse

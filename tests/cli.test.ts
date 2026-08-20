@@ -736,9 +736,9 @@ describe('major CLI', () => {
       expect(status.stdout).toContain('Codex capacity:');
       expect(status.stdout).toMatch(/default\s+plus\s+5h \[####\.{6}\] 42%/);
       expect(status.stdout).toMatch(/work-b\s+plus\s+5h \[#{9}\.\] 91%/);
-      expect(status.stdout).toContain('live via account/read + account/rateLimits/read');
+      expect(status.stdout).toContain('source: account/read + account/rateLimits/read');
       expect(status.stdout).toContain('refresh: major provider usage');
-      expect(status.stdout).not.toContain('no live snapshot');
+      expect(status.stdout).not.toContain('no refreshed snapshot');
       for (const line of status.stdout.split('\n')) {
         if (
           line.includes('Codex capacity') ||
@@ -776,7 +776,7 @@ describe('major CLI', () => {
     try {
       const before = entryEnv(env, 'status');
       expect(before.status, before.stderr).toBe(0);
-      expect(before.stdout).toContain('no live snapshot — run `major provider usage`');
+      expect(before.stdout).toContain('no refreshed snapshot — run `major provider usage`');
 
       const help = entryEnv(env, 'provider');
       expect(help.status, help.stderr).toBe(0);
@@ -793,7 +793,7 @@ describe('major CLI', () => {
       expect(after.status, after.stderr).toBe(0);
       expect(after.stdout).toContain('No authenticated Codex accounts');
       expect(after.stdout).toContain('refresh: major provider usage');
-      expect(after.stdout).not.toContain('no live snapshot');
+      expect(after.stdout).not.toContain('no refreshed snapshot');
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
