@@ -11,11 +11,11 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
 import { majorHome } from '../supervisor/state.js';
+import { cloneGitBranch } from '../resources/tools.js';
 
 interface RegistryEntry {
   id: string;
@@ -227,8 +227,10 @@ export function syncMajorSkills(input: { sourceRoot?: string } = {}): SkillSyncR
   const tempRoot = mkdtempSync(join(tmpdir(), 'major-skill-sync-'));
   const checkout = join(tempRoot, 'source');
   try {
-    execFileSync('git', ['clone', '--quiet', '--depth', '1', '--branch', 'main', repoUrl, checkout], {
-      stdio: 'inherit',
+    cloneGitBranch({
+      repoUrl,
+      branch: 'main',
+      destination: checkout,
     });
     return syncFromSource(checkout, `${repoUrl}#main`);
   } finally {

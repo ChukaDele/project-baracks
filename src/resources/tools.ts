@@ -87,6 +87,28 @@ export function createReclaimTools(
   };
 }
 
+/** Deterministic maintenance clone used by hot skill sync. */
+export function cloneGitBranch(input: {
+  repoUrl: string;
+  branch: string;
+  destination: string;
+  gitPath?: string;
+}): void {
+  const result = run(input.gitPath ?? 'git', [
+    'clone',
+    '--quiet',
+    '--depth',
+    '1',
+    '--branch',
+    input.branch,
+    input.repoUrl,
+    input.destination,
+  ]);
+  if (result.status !== 0) {
+    throw new Error(result.stdout.trim() || `git clone ${input.repoUrl} failed`);
+  }
+}
+
 /** tar.gz a directory next to itself. Used only for cold-archive compaction. */
 export function tarGzDirectory(path: string): string {
   const archive = `${path}.tar.gz`;
