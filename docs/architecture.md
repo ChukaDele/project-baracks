@@ -283,9 +283,11 @@ Major is becoming an upstream-compatible DeepSeek Harness distribution through a
 DeepSeek Harness is the adopted agent-loop/tool/session/UI substrate. Major does not fork it. Exact npm versions are pinned; `latest`, `next` and version ranges are refused.
 
 Major-specific capabilities remain on the live Major path during shadow. The
-`@major/dsh-kernel` bundle is a resolvable no-op seam after
-`@deepseek-ai/dsh-base`; each capability moves behind that seam only after its
-adapter and conformance proof exist:
+`@major/dsh-kernel` bundle is the thin integration seam after
+`@deepseek-ai/dsh-base`. It registers `/major`, delegates work through the
+existing Major control plane, and uses DSH's official Claude Code provider for
+independent review. Each remaining capability moves behind that seam only after
+its adapter and conformance proof exist:
 
 - durable goals, GBrain/learning, skill resolver and Toolsmith;
 - project trust, approval policy and kill switch;
@@ -297,7 +299,17 @@ The proposed unified Mac workstation is two source profiles on that pin:
 loopback Web UI for the owner and headless for Major-driven runs. Neither
 profile starts a login daemon or attaches Ruflo globally. `major harness
 conformance` is the deterministic shadow gate for this source layer; it does
-not claim that dsh is installed, bootable, or ready.
+not claim that dsh is installed, bootable, or ready. `major harness
+install-plan` and `scripts/install-deepseek-harness-pin.sh` stage the attested
+pin into an isolated harness home for strangle prep without changing the live
+backend. One shared runtime owns the pinned packages; profiles symlink that
+closure. The installer refuses a full disk and proves both profiles with
+`--dump-config`. `major harness shadow-task` is the planned first Lima-hosted
+composition smoke; it is not live-worker cutover. `/major` takes
+`MAJOR_SESSION_HOST` so `goal admit` can attach, then `major run` routes the
+worker. DSH Claude Code is only the independent reviewer. `pnpm
+validate:dsh-shadow` is the one-hop source validation script for the Mac
+workstation before Lima field proof.
 
 ## 11. Resource hygiene
 

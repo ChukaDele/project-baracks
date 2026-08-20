@@ -206,6 +206,41 @@ describe('Lima backend credential import: cross-provider path binding', () => {
   });
 });
 
+describe('Lima backend Codex profile import guards', () => {
+  it('refuses importing an approved profile into the default credential slot', async () => {
+    const result = await backend(fakeLima()).importCodexProfileCredential(
+      '/tmp/codex-profile/auth.json',
+      'default',
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/default Codex credential slot/),
+    });
+  });
+
+  it('refuses unsafe account labels before any Lima operation', async () => {
+    const result = await backend(fakeLima()).importCodexProfileCredential(
+      '/tmp/codex-profile/auth.json',
+      '../etc',
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/invalid account label/),
+    });
+  });
+
+  it('refuses unsafe profile auth paths before any Lima operation', async () => {
+    const result = await backend(fakeLima()).importCodexProfileCredential(
+      '/tmp/not-auth.json',
+      'cod-01',
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      detail: expect.stringMatching(/unsafe Codex profile credential path/),
+    });
+  });
+});
+
 /**
  * A stateful fake limactl for loginProviderNative: real limactl subprocesses
  * spawned by LimaBackend go through hostEnv(), a deliberately minimal,

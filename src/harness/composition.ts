@@ -19,13 +19,34 @@ export const MAJOR_KERNEL_BUNDLE = '@major/dsh-kernel';
 export const DSH_BASE_BUNDLE = '@deepseek-ai/dsh-base';
 export const DSH_WEB_BUNDLE = '@deepseek-ai/dsh-web-app';
 export const DSH_HEADLESS_BUNDLE = '@deepseek-ai/dsh-headless';
+export const DSH_CLAUDE_CODE_BUNDLE = '@deepseek-ai/dsh-subagent-claude-code';
+export const DSH_CODEX_BUNDLE = '@deepseek-ai/dsh-subagent-codex';
 export const MAJOR_KERNEL_LOCAL_SPEC = 'file:../../bundles/major-kernel';
 export const EMPTY_CORDIS_PATCH = '[]\n';
+export const MAJOR_KERNEL_PATCH = `- insert:
+    - id: major-workstation
+      name: '@major/dsh-kernel'
+`;
+/** Web profile: disable auto (native on darwin loopback) and mount upstream browse host + UI. */
+export const MAJOR_WORKSTATION_WEB_PATCH = `- id: directory-picker
+  disabled: true
+- insert:
+    - id: directory-picker-browse
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: directory-picker-browse-ui
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+`;
+export const PROFILE_PNPM_WORKSPACE = `packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: false
+`;
 
 export interface DshBundle {
   name: string;
   patchFile: 'cordis.patch.yml';
-  patch: typeof EMPTY_CORDIS_PATCH;
+  patch: typeof MAJOR_KERNEL_PATCH;
 }
 
 export interface DshProfile {
@@ -34,7 +55,7 @@ export interface DshProfile {
   listen: '127.0.0.1';
   purpose: 'owner-web' | 'major-headless';
   bundles: readonly string[];
-  patch: typeof EMPTY_CORDIS_PATCH;
+  patch: typeof EMPTY_CORDIS_PATCH | typeof MAJOR_WORKSTATION_WEB_PATCH;
   autoStartDaemon: false;
   attachRufloGlobally: false;
 }
@@ -43,7 +64,7 @@ export function majorKernelBundle(): DshBundle {
   return {
     name: MAJOR_KERNEL_BUNDLE,
     patchFile: 'cordis.patch.yml',
-    patch: EMPTY_CORDIS_PATCH,
+    patch: MAJOR_KERNEL_PATCH,
   };
 }
 
@@ -53,8 +74,14 @@ export function majorWorkstationWebProfile(): DshProfile {
     name: '@major/dsh-profile-workstation-web',
     listen: '127.0.0.1',
     purpose: 'owner-web',
-    bundles: [DSH_BASE_BUNDLE, DSH_WEB_BUNDLE, MAJOR_KERNEL_BUNDLE],
-    patch: EMPTY_CORDIS_PATCH,
+    bundles: [
+      DSH_BASE_BUNDLE,
+      DSH_WEB_BUNDLE,
+      DSH_CODEX_BUNDLE,
+      DSH_CLAUDE_CODE_BUNDLE,
+      MAJOR_KERNEL_BUNDLE,
+    ],
+    patch: MAJOR_WORKSTATION_WEB_PATCH,
     autoStartDaemon: false,
     attachRufloGlobally: false,
   };
@@ -66,7 +93,13 @@ export function majorWorkstationHeadlessProfile(): DshProfile {
     name: '@major/dsh-profile-workstation-headless',
     listen: '127.0.0.1',
     purpose: 'major-headless',
-    bundles: [DSH_BASE_BUNDLE, DSH_HEADLESS_BUNDLE, MAJOR_KERNEL_BUNDLE],
+    bundles: [
+      DSH_BASE_BUNDLE,
+      DSH_HEADLESS_BUNDLE,
+      DSH_CODEX_BUNDLE,
+      DSH_CLAUDE_CODE_BUNDLE,
+      MAJOR_KERNEL_BUNDLE,
+    ],
     patch: EMPTY_CORDIS_PATCH,
     autoStartDaemon: false,
     attachRufloGlobally: false,
@@ -99,12 +132,20 @@ export function profileManifest(profile: DshProfile): {
 export function bundleManifest(bundle: DshBundle): {
   name: string;
   private: true;
+  type: 'module';
+  main: './index.js';
+  exports: { '.': './index.js' };
+  files: ['index.js', 'cordis.patch.yml'];
   version: '0.0.0-shadow';
   dsh: { bundle: { patch: string } };
 } {
   return {
     name: bundle.name,
     private: true,
+    type: 'module',
+    main: './index.js',
+    exports: { '.': './index.js' },
+    files: ['index.js', 'cordis.patch.yml'],
     version: '0.0.0-shadow',
     dsh: { bundle: { patch: `./${bundle.patchFile}` } },
   };

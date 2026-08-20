@@ -32,6 +32,8 @@ import {
 } from '../providers/evidence.js';
 import type { ProviderApprovalAuthority } from '../security/provider-approval-policy.js';
 import type { ApprovalCategory } from '../security/provider-approval-policy.js';
+import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
+import { hashSourceWorkspaceTree } from '../execution/workspace-transfer.js';
 
 export function captureProviderApprovalRequest(input: {
   cwd: string;
@@ -176,9 +178,11 @@ export async function runGatewayCommand(input: {
     host: WorkerHost;
     prompt: string;
     allowGuestMutation: boolean;
+    workspaceHash?: string;
     approvalAuthority: ProviderApprovalAuthority;
     modelRef?: string;
     resumeSessionRef?: string;
+    accountLabel?: string;
   };
 }): Promise<GatewayCommandOutcome> {
   const started = Date.now();
@@ -336,6 +340,7 @@ export async function runWorker(input: {
         ? request.lease
         : await waitForResource(request.request, input.timeoutMs);
     const spec = workerCommand(input.host, input.prompt, input.modelRef, input.resumeSessionRef);
+    const allowGuestMutation = allowGuestMutationForHost(input.host, input.cwd);
     const outcome = await runGatewayCommand({
       executable: spec.command,
       args: spec.args,
@@ -345,7 +350,8 @@ export async function runWorker(input: {
       providerRequest: {
         host: input.host,
         prompt: input.prompt,
-        allowGuestMutation: input.host === 'claude' || input.host === 'cursor',
+        allowGuestMutation,
+        ...(allowGuestMutation ? { workspaceHash: hashSourceWorkspaceTree(input.cwd) } : {}),
         // Batch CLI providers expose no per-tool approval callback. Ordinary
         // worker runs therefore carry no sensitive-action authority.
         approvalAuthority: input.approvalAuthority ?? { decisions: [] },
@@ -369,5 +375,16 @@ export async function runWorker(input: {
     };
   } finally {
     if (lease) releaseResource(lease.id);
+  }
+}
+
+export function allowGuestMutationForHost(host: WorkerHost, cwd: string): boolean {
+  if (host === 'claude' || host === 'cursor') return true;
+  if (host !== 'codex') return false;
+  try {
+    resolveSupervisedWorkshopAuthority(cwd);
+    return true;
+  } catch {
+    return false;
   }
 }

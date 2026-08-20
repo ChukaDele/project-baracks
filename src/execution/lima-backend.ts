@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -13,7 +14,12 @@ import {
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { providerExecutable } from '../providers/commands.js';
-import { accountAuthStoreRelativePath, providerStateAccountArgs } from '../providers/account.js';
+import {
+  accountAuthStoreRelativePath,
+  assertAccountLabel,
+  DEFAULT_ACCOUNT_LABEL,
+  providerStateAccountArgs,
+} from '../providers/account.js';
 import {
   CODEX_APP_SERVER_READY_DELAY_MS,
   CODEX_APP_SERVER_STARTUP_DELAY_MS,
@@ -766,7 +772,9 @@ export class LimaBackend implements ExecutionBackend {
     host: 'claude' | 'codex' | 'cursor' | 'antigravity',
     guestTmp: string,
     importScript: string,
+    accountLabel: string = DEFAULT_ACCOUNT_LABEL,
   ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
+    assertAccountLabel(accountLabel);
     const copiedScript = await this.lima([
       'copy',
       importScript,
@@ -788,6 +796,7 @@ export class LimaBackend implements ExecutionBackend {
       'python3',
       `${guestTmp}/import.py`,
       host,
+      ...(accountLabel === DEFAULT_ACCOUNT_LABEL ? [] : [accountLabel]),
     ]);
     if (placed.code !== 0) {
       return {
@@ -796,6 +805,133 @@ export class LimaBackend implements ExecutionBackend {
       };
     }
     return { ok: true, detail: placed.stdout.trim() };
+  }
+
+  /**
+   * Import one approved Codex profile credential into a named provider-auth
+   * slot. Copies from the profile's existing auth.json through the same guest
+   * staging broker as host onboarding; never modifies the source file or the
+   * default credential slot.
+   */
+  async importCodexProfileCredential(
+    profileAuthPath: string,
+    accountLabel: string,
+  ): Promise<{ ok: true; detail: string } | { ok: false; detail: string }> {
+    if (!isCapabilityAvailable('live-agent-execution')) {
+      return {
+        ok: false,
+        detail: 'credential import is disabled while live-agent-execution is unavailable',
+      };
+    }
+    try {
+      assertAccountLabel(accountLabel);
+    } catch (error) {
+      return { ok: false, detail: errorText(error) };
+    }
+    if (accountLabel === DEFAULT_ACCOUNT_LABEL) {
+      return {
+        ok: false,
+        detail: 'refusing to import an approved profile into the default Codex credential slot',
+      };
+    }
+    const resolved = resolve(profileAuthPath);
+    if (!resolved.endsWith('/auth.json')) {
+      return { ok: false, detail: 'refusing unsafe Codex profile credential path' };
+    }
+    let before;
+    try {
+      before = lstatSync(resolved);
+    } catch {
+      return { ok: false, detail: 'approved Codex profile credential is unavailable' };
+    }
+    if (before.isSymbolicLink()) {
+      return { ok: false, detail: 'refusing to import a symlinked Codex profile credential' };
+    }
+    if (!before.isFile() || before.nlink !== 1) {
+      return { ok: false, detail: 'approved Codex profile credential is not a regular file' };
+    }
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(resolved, 'utf8'));
+      if (typeof parsed !== 'object' || parsed === null || Object.keys(parsed).length === 0) {
+        return { ok: false, detail: 'approved Codex profile credential is not valid JSON' };
+      }
+    } catch {
+      return { ok: false, detail: 'approved Codex profile credential is not valid JSON' };
+    }
+
+    const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
+    const importScript = join(executingRoot, 'scripts', 'import-major-provider-credential.py');
+    const stateRoot = join(majorHome(), 'execution', 'lima');
+    const lock = join(stateRoot, 'backend.lock');
+    mkdirSync(stateRoot, { recursive: true, mode: 0o700 });
+    await this.acquireLock(lock);
+    try {
+      await this.start();
+      const guestTmp = '/tmp/major-credential-import';
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        guestTmp,
+      ]);
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'install',
+        '-d',
+        '-m',
+        '0700',
+        guestTmp,
+      ]);
+      const copiedCredential = await this.lima([
+        'copy',
+        resolved,
+        `${this.config.instance}:${guestTmp}/staged`,
+      ]);
+      if (copiedCredential.code !== 0) {
+        return {
+          ok: false,
+          detail:
+            'could not send this credential to the isolated worker — try again; ' +
+            `technical detail: ${redactText(copiedCredential.stderr)}`,
+        };
+      }
+      const placed = await this.placeStagedCredentialIntoStore(
+        'codex',
+        guestTmp,
+        importScript,
+        accountLabel,
+      );
+      const after = lstatSync(resolved);
+      if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
+        return {
+          ok: false,
+          detail: 'Codex profile credential changed during import; refusing to continue',
+        };
+      }
+      return placed;
+    } finally {
+      await this.lima([
+        'shell',
+        '--tty=false',
+        this.config.instance,
+        'sudo',
+        'rm',
+        '-rf',
+        '--',
+        '/tmp/major-credential-import',
+      ]).catch(() => undefined);
+      try {
+        await this.stop();
+      } finally {
+        rmSync(lock, { recursive: true, force: true });
+      }
+    }
   }
 
   /**
@@ -1345,6 +1481,14 @@ export class LimaBackend implements ExecutionBackend {
       manifestWritten = true;
       snapshotWorkspace(request.cwd, inputWorkspace);
       const baselineHash = hashWorkspaceTree(inputWorkspace);
+      if (request.providerRequest?.allowGuestMutation) {
+        if (!request.providerRequest.workspaceHash) {
+          throw new Error('mutable provider execution requires a source workspace digest');
+        }
+        if (request.providerRequest.workspaceHash !== baselineHash) {
+          throw new Error('source workspace changed before isolated execution began');
+        }
+      }
       const instance = await this.start();
       if (request.executionAuthority.kind === 'staged_validation') {
         const marker = await this.lima([

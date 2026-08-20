@@ -121,8 +121,32 @@ describe('subscription account pool', () => {
 });
 
 describe('context continuity', () => {
-  it('resumes a vendor session only on the same host and account', () => {
-    const same = contextContinuity({
+  it('resumes a vendor session only when the adapter persists and the slot is unchanged', () => {
+    const cursorSame = contextContinuity({
+      lastCoordinator: 'cursor',
+      lastAccountLabel: 'default',
+      lastSessionRef: 'sess-a',
+      lastSummary: 'implemented the router',
+      nextHost: 'cursor',
+      nextAccountLabel: 'default',
+    });
+    expect(cursorSame.resumeSessionRef).toBe('sess-a');
+    expect(cursorSame.promptBlock).toMatch(/Resuming the vendor session/);
+    expect(cursorSame.promptBlock).not.toContain('sess-a');
+
+    const antigravitySame = contextContinuity({
+      lastCoordinator: 'antigravity',
+      lastAccountLabel: 'default',
+      lastSessionRef: 'conv-a',
+      lastSummary: 'planned the rollout',
+      nextHost: 'antigravity',
+      nextAccountLabel: 'default',
+    });
+    expect(antigravitySame.resumeSessionRef).toBe('conv-a');
+    expect(antigravitySame.promptBlock).toMatch(/Resuming the vendor session/);
+    expect(antigravitySame.promptBlock).not.toContain('conv-a');
+
+    const codexSame = contextContinuity({
       lastCoordinator: 'codex',
       lastAccountLabel: 'default',
       lastSessionRef: 'sess-a',
@@ -130,15 +154,30 @@ describe('context continuity', () => {
       nextHost: 'codex',
       nextAccountLabel: 'default',
     });
-    expect(same.resumeSessionRef).toBe('sess-a');
-    expect(same.promptBlock).toMatch(/Resuming the vendor session/);
+    expect(codexSame.resumeSessionRef).toBeUndefined();
+    expect(codexSame.promptBlock).toMatch(/without a vendor session resume/);
+    expect(codexSame.promptBlock).toContain('implemented the router');
+    expect(codexSame.promptBlock).not.toContain('sess-a');
+
+    const claudeSame = contextContinuity({
+      lastCoordinator: 'claude',
+      lastAccountLabel: 'default',
+      lastSessionRef: 'sess-claude',
+      lastSummary: 'refined the policy layer',
+      nextHost: 'claude',
+      nextAccountLabel: 'default',
+    });
+    expect(claudeSame.resumeSessionRef).toBeUndefined();
+    expect(claudeSame.promptBlock).toMatch(/without a vendor session resume/);
+    expect(claudeSame.promptBlock).toContain('refined the policy layer');
+    expect(claudeSame.promptBlock).not.toContain('sess-claude');
 
     const hop = contextContinuity({
-      lastCoordinator: 'codex',
+      lastCoordinator: 'cursor',
       lastAccountLabel: 'default',
       lastSessionRef: 'sess-a',
       lastSummary: 'implemented the router',
-      nextHost: 'codex',
+      nextHost: 'cursor',
       nextAccountLabel: 'work-b',
     });
     expect(hop.resumeSessionRef).toBeUndefined();

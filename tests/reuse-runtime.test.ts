@@ -35,6 +35,9 @@ describe('reuse-first provider runtime', () => {
     expect(commands).toContain("next[sandbox + 1] = 'danger-full-access'");
     expect(commands).toContain("if (host !== 'codex') return args");
     expect(commands).toContain('Codex approval bypass is forbidden');
+    expect(gateway).toContain('if (!staged) {');
+    expect(gateway).toContain('resolveSupervisedWorkshopAuthority(request.cwd)');
+    expect(gateway).not.toContain("!staged && !isCapabilityAvailable('live-agent-execution')");
     expect(gateway).toContain('workshop && request.providerRequest');
     expect(gateway).toContain('providerWorkshopArgs(request.providerRequest.host, request.args)');
     expect(source('package.json')).not.toContain('@ai-sdk/harness');

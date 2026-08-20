@@ -23,7 +23,7 @@ project run and independent review pass.
 
 ## WRAP
 
-- Official dsh profile/bundle/`cordis.patch.yml` composition so Major can add adapters without forking. The shadow kernel patch is intentionally empty; it must not invent plugin rows before their packages exist.
+- Official dsh profile/bundle/`cordis.patch.yml` composition so Major can add adapters without forking. The kernel patch mounts `@major/dsh-kernel` after upstream bundles; it must not become the live worker backend.
 - dsh approval/session/sandbox *transport* under Major policy and Lima isolation
 - Existing subscription-backed providers as model plugins when a later seam proof passes
 
@@ -53,20 +53,31 @@ The upstream release tag and npm package integrities are attested. Cutover and c
 
 One pin, two profiles:
 
-- `major-workstation-web` — loopback dsh Web UI for the owner
+- `major-workstation-web` — loopback dsh Web UI for the owner. Its
+  `cordis.patch.yml` disables `@deepseek-ai/dsh-host-directory-picker-auto`
+  (which selects native on darwin loopback) and mounts the upstream browse host
+  plus client UI so workspace creation stays in-page.
 - `major-workstation-headless` — Major-driven runs with no extra UI
 
-Both source manifests stack `@deepseek-ai/dsh-base` then the local
-`@major/dsh-kernel` bundle. The local dependency is resolvable in the staged
-distribution layout. The kernel and profile patches are no-ops during shadow,
-so they do not claim a bootable Major adapter. Neither profile auto-starts a
-login daemon nor attaches Ruflo globally. Hot workspace policy stays in
-`workspace-lifecycle-management`.
+Both source manifests stack `@deepseek-ai/dsh-base`, the official Codex and
+Claude Code providers, then the local `@major/dsh-kernel` bundle. One shared
+runtime owns the exact attested DSH packages and React 18.3.1 peers. Both
+installer-owned profiles share that dependency closure and the local kernel
+through symlinks. The installer proves both composed profiles with
+`--dump-config`. Neither profile auto-starts a login daemon nor attaches Ruflo
+globally. Hot workspace policy stays in `workspace-lifecycle-management`.
 
 ## Evidence so far
 
 - Prior-art decision recorded 2026-08-20
-- Official tag `dsh-v0.1.0-rc.8` attested at `141eb6fef83422698aef7a981029e843e8161534`; SRI hashes recorded for all four pinned npm packages
-- Pin, source profiles, the upstream-shaped no-op kernel seam and `major harness` conformance exist
+- Official tag `dsh-v0.1.0-rc.8` attested at `141eb6fef83422698aef7a981029e843e8161534`; SRI hashes recorded for six DSH packages and two React runtime peers
+- Pin, source profiles, the upstream-shaped Major command kernel and `major harness` conformance exist
+- `major harness install-plan` and `scripts/install-deepseek-harness-pin.sh` stage the attested pin into an isolated `$MAJOR_HOME/dsh-harness` without changing the live backend
+- Installer disk preflight matches Major's 10%/20GiB block before npm or Lima cycling
+- `/major` admits with `MAJOR_SESSION_HOST` (required by `goal admit`) and leaves worker routing to `major run`; DSH Claude Code remains the independent reviewer
+- `major harness shadow-task` records the first Lima-hosted `--dump-config` smoke; it does not opt live workers into dsh
+- `pnpm validate:dsh-shadow` runs the deterministic source gate (validate-major, harness tests, conformance, install dry-run)
 - Default execution backend remains `LimaBackend`
-- Live dsh install, Mac field proof and independent review are **not** claimed
+- A reproducible Mac field-install receipt is still required before promotion; disposable local observations are diagnostic only
+- Live dsh install inside Lima is **not** claimed
+- Mac field proof and independent review are **not** claimed

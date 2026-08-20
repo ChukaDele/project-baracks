@@ -9,6 +9,8 @@
       "bundles": [
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-headless",
+        "@deepseek-ai/dsh-subagent-codex",
+        "@deepseek-ai/dsh-subagent-claude-code",
         "@major/dsh-kernel"
       ]
     }

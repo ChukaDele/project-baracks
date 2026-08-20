@@ -453,6 +453,44 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('RESOLVED MAJOR SKILLS');
     expect(prompt).toContain('mvp-speed-prioritisation');
     expect(prompt).toContain('Codex capacity:');
+    expect(prompt).toContain('ISOLATED WORKSPACE CONTRACT');
+    expect(prompt).toContain("Major's verified source mirror of the canonical target");
+    expect(prompt).toContain('synthetic Git repo here with no remote or history');
+    expect(prompt).toContain('it is not mounted inside this guest');
+    expect(prompt).toContain('expected isolation, not a project-identity blocker');
+    expect(prompt).toContain('applies it back to the canonical host worktree');
+    expect(prompt).toContain('binds every mutable dispatch to an internal source-tree digest');
+    expect(prompt).toContain('The digest is not sent to the provider');
+    expect(prompt).toContain('routing provenance only');
+    expect(prompt).toContain('do not stop or attempt host access');
+    expect(prompt).toContain('Report unavailable skill content as degraded in MAJOR_RESULT');
+    expect(prompt).not.toContain('verify that the current Git root/remote');
+    expect(prompt).not.toContain(
+      'load the exact project or immutable-runtime skill paths it returns',
+    );
+  });
+
+  it('states the isolated Lima workspace contract without host-only verification gates', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'major-runtime-isolated-'));
+    roots.push(repo);
+    process.env.MAJOR_HOME = join(repo, '.major');
+    process.env.MAJOR_POLICY_PATH = join(repo, 'policies.json');
+    mkdirSync(join(repo, '.git'));
+    writeFileSync(join(repo, 'README.md'), '# Mirror project\n');
+    const hostCanonicalPath = '/Users/owner/canonical/jss-tool';
+    const prompt = coordinatorPrompt(goal(hostCanonicalPath));
+    expect(prompt).toContain(`repository path: ${hostCanonicalPath}`);
+    expect(prompt).toContain(
+      'Confirm project identity from the embedded CANONICAL TARGET plus the source tree',
+    );
+    expect(prompt).toContain(
+      'Do not treat missing host path access, Git remote, or history as identity failure',
+    );
+    expect(prompt).toContain('do all work here');
+    expect(prompt).not.toContain('verify that the current Git root/remote');
+    expect(prompt).not.toContain(
+      'load the exact project or immutable-runtime skill paths it returns',
+    );
   });
 
   it('renders persisted two-account Codex capacity in the supervisor runtime prompt', () => {

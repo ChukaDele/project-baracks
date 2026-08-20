@@ -1,4 +1,11 @@
-import { linkSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -129,6 +136,75 @@ os.close(fd)
     expect(written).not.toContain('ATTACKER-CONTROLLED-CONTENT');
   });
 
+  it('auth_store_path nests named accounts under accounts/<label>/', () => {
+    const result = pythonDriver(
+      `
+print(broker.auth_store_path("codex", ".codex/auth.json", "cod-01"))
+print(broker.auth_store_path("codex", ".codex/auth.json", "default"))
+`,
+      join(fixtureDir(), 'unused'),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim().split('\n')).toEqual([
+      '/var/lib/major/provider-auth/codex/accounts/cod-01/.codex/auth.json',
+      '/var/lib/major/provider-auth/codex/.codex/auth.json',
+    ]);
+  });
+
+  it('assert_account_label rejects unsafe labels before store placement', () => {
+    const result = pythonDriver(
+      'broker.assert_account_label("../etc")',
+      join(fixtureDir(), 'unused'),
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/invalid account label/);
+  });
+
+  it('named_auth_store_parent_dirs lists root-owned 0700 parents for named Codex accounts', () => {
+    const result = pythonDriver(
+      `
+for path in broker.named_auth_store_parent_dirs("codex", "cod-01", ".codex/auth.json"):
+    print(path)
+`,
+      join(fixtureDir(), 'unused'),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim().split('\n')).toEqual([
+      '/var/lib/major/provider-auth/codex',
+      '/var/lib/major/provider-auth/codex/accounts',
+      '/var/lib/major/provider-auth/codex/accounts/cod-01',
+      '/var/lib/major/provider-auth/codex/accounts/cod-01/.codex',
+    ]);
+  });
+
+  it('creates every nested antigravity credential parent without following symlinks', () => {
+    const dir = fixtureDir();
+    const authRoot = join(dir, 'provider-auth');
+    mkdirSync(authRoot, { recursive: true, mode: 0o700 });
+    const result = pythonDriver(
+      `
+import pathlib, stat
+root = pathlib.Path(${JSON.stringify(authRoot)})
+broker.AUTH_ROOT = root
+target = broker.ensure_auth_store_parents(
+    "antigravity",
+    ".gemini/antigravity-cli/antigravity-oauth-token",
+    "ag-01",
+)
+components = target.parent.relative_to(root).parts
+for depth in range(1, len(components) + 1):
+    path = root.joinpath(*components[:depth])
+    info = path.lstat()
+    assert stat.S_ISDIR(info.st_mode) and not stat.S_ISLNK(info.st_mode)
+    assert stat.S_IMODE(info.st_mode) == 0o700
+print("ok")
+`,
+      join(dir, 'unused'),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe('ok');
+  });
+
   it('write_verified_staging refuses to reuse a pre-existing symlink at the staging destination', () => {
     const dir = fixtureDir();
     const staged = join(dir, 'staged');
@@ -147,10 +223,8 @@ os.close(fd)
 `,
       staged,
     );
-    expect(result.status).toBe(0);
-    const written = execFileSync('cat', [stagingOut], { encoding: 'utf8' });
-    expect(written).toBe('real-bytes');
-    const attackerContent = execFileSync('cat', [attackerTarget], { encoding: 'utf8' });
-    expect(attackerContent).toBe('should-not-be-touched');
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/refusing unsafe or pre-existing credential staging path/);
+    expect(readFileSync(attackerTarget, 'utf8')).toBe('should-not-be-touched');
   });
 });

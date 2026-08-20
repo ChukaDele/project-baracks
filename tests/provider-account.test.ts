@@ -4,6 +4,8 @@ import {
   assertAccountLabel,
   capacityKey,
   DEFAULT_ACCOUNT_LABEL,
+  mapPolicyIdsToAccountLabels,
+  normalizePolicyIdToAccountLabel,
   parseCapacityKey,
   providerStateAccountArgs,
 } from '../src/providers/account.js';
@@ -45,5 +47,18 @@ describe('provider capacity keys', () => {
     );
     expect(providerStateAccountArgs()).toEqual([]);
     expect(providerStateAccountArgs('work-b')).toEqual(['work-b']);
+  });
+
+  it('normalizes approved policy ids into valid account labels', () => {
+    expect(normalizePolicyIdToAccountLabel('COD-01')).toBe('cod-01');
+    expect(normalizePolicyIdToAccountLabel('COD-02')).toBe('cod-02');
+  });
+
+  it('rejects policy ids that cannot normalize safely', () => {
+    expect(() => normalizePolicyIdToAccountLabel('accounts')).toThrow(/invalid account label/);
+    const colliding = mapPolicyIdsToAccountLabels(['COD-01', 'COD_01']);
+    expect(colliding).toEqual({
+      error: "policy ids 'COD-01' and 'COD_01' collide on account label 'cod-01'",
+    });
   });
 });

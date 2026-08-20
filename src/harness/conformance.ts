@@ -11,6 +11,7 @@ import {
   DSH_BASE_BUNDLE,
   HARNESS_MIGRATION_PHASES,
   MAJOR_KERNEL_BUNDLE,
+  PROFILE_PNPM_WORKSPACE,
   bundleManifest,
   majorKernelBundle,
   majorWorkstationHeadlessProfile,
@@ -155,6 +156,22 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
         JSON.stringify(profileManifest(majorWorkstationHeadlessProfile())),
       'headless profile bundles must match composition',
     ),
+    check(
+      'web.profile-pnpm-layout',
+      readRepoFile(
+        repoRoot,
+        'distribution/deepseek-harness/profiles/major-workstation-web/pnpm-workspace.yaml',
+      ) === PROFILE_PNPM_WORKSPACE,
+      'web profile must use the upstream hoisted out-of-tree plugin layout',
+    ),
+    check(
+      'headless.profile-pnpm-layout',
+      readRepoFile(
+        repoRoot,
+        'distribution/deepseek-harness/profiles/major-workstation-headless/pnpm-workspace.yaml',
+      ) === PROFILE_PNPM_WORKSPACE,
+      'headless profile must use the upstream hoisted out-of-tree plugin layout',
+    ),
   ];
 }
 
@@ -173,6 +190,10 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
   const rangeUsed = Object.values(pin.npm.packages).some((version) =>
     pin.npm.forbiddenResolutions.some((token) => version.includes(token)),
   );
+  const kernelSource = readRepoFile(
+    repoRoot,
+    'distribution/deepseek-harness/bundles/major-kernel/index.js',
+  );
   const checks: ConformanceCheck[] = [
     check('pin.parse', true, `pinned ${pin.npm.version}`),
     check(
@@ -190,8 +211,11 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
       'pin.attested',
       pin.git.attestedCommit !== null &&
         /^[0-9a-f]{40}$/.test(pin.git.attestedCommit) &&
-        Object.values(pin.npm.integrities).every((integrity) => integrity.startsWith('sha512-')),
-      'official release tag commit and npm package integrities are attested',
+        Object.values(pin.npm.integrities).every((integrity) => integrity.startsWith('sha512-')) &&
+        Object.values(pin.npm.runtimePeers.integrities).every((integrity) =>
+          integrity.startsWith('sha512-'),
+        ),
+      'official release tag commit, dsh packages, and runtime peers are attested',
     ),
     check(
       'deps.not-installed',
@@ -216,6 +240,17 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
       'reuse.keep-major',
       CAPABILITY_REUSE.every((record) => record.decision === 'KEEP'),
       'every retained Major capability has a KEEP reuse record',
+    ),
+    check(
+      'kernel.subscription-routing',
+      kernelSource.includes('MAJOR_SESSION_HOST') &&
+        kernelSource.includes('MAJOR_FOREGROUND_DISPATCH') &&
+        !kernelSource.includes('NO_CYCLE_MESSAGE') &&
+        !kernelSource.includes("'--host', 'codex'") &&
+        !kernelSource.includes("'--host', 'claude'") &&
+        !kernelSource.includes("'--host', 'cursor'") &&
+        !kernelSource.includes("'--host', 'antigravity'"),
+      '/major must take MAJOR_SESSION_HOST for admit/attach; Major run still routes the worker',
     ),
     ...assertProfileComposition(majorWorkstationWebProfile()),
     ...assertProfileComposition(majorWorkstationHeadlessProfile()),

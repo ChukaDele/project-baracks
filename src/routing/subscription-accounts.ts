@@ -9,6 +9,7 @@
  */
 
 import { capacityKey, DEFAULT_ACCOUNT_LABEL, parseCapacityKey } from '../providers/account.js';
+import { providerSupportsVendorResume, type ProviderCommandHost } from '../providers/commands.js';
 import type { ModelState, ProviderInfo } from '../providers/types.js';
 
 export function providerHasUsableCapacity(info: ProviderInfo): boolean {
@@ -124,7 +125,7 @@ export function contextContinuity(input: {
   lastAccountLabel?: string;
   lastSessionRef?: string;
   lastSummary?: string;
-  nextHost: string;
+  nextHost: ProviderCommandHost;
   nextAccountLabel: string;
 }): { resumeSessionRef?: string; promptBlock: string } {
   const previousAccount = input.lastAccountLabel ?? DEFAULT_ACCOUNT_LABEL;
@@ -132,7 +133,10 @@ export function contextContinuity(input: {
   const nextSlot = `${input.nextHost}/${input.nextAccountLabel}`;
   const sameAccount =
     input.lastCoordinator === input.nextHost && previousAccount === input.nextAccountLabel;
-  const resumeSessionRef = sameAccount && input.lastSessionRef ? input.lastSessionRef : undefined;
+  const resumeSessionRef =
+    sameAccount && input.lastSessionRef && providerSupportsVendorResume(input.nextHost)
+      ? input.lastSessionRef
+      : undefined;
   const summary = input.lastSummary?.trim();
   const lines = ['CONTEXT CONTINUITY:'];
   if (resumeSessionRef) {

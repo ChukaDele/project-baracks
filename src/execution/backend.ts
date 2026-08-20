@@ -9,6 +9,8 @@ export interface BackendProviderRequest {
   prompt: string;
   /** Set only after Major policy authorises mutation of the quarantined guest copy. */
   allowGuestMutation: boolean;
+  /** Internal source-tree digest. Required before a mutable guest may copy back. */
+  workspaceHash?: string;
   /** Major-owned authority. An empty set means no sensitive tool action is approved. */
   approvalAuthority: VerifiedProviderApprovalAuthority;
   /** Set only by Major after a live session-scoped Workshop authority is verified. */

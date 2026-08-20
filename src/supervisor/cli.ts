@@ -441,6 +441,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
           `out of eligible capacity (up to ${policy.maxRunMinutes} minutes)`,
       );
       const outcome = await runForegroundGoal(goal.id, { maxRunMinutes: policy.maxRunMinutes });
+      console.log(`MAJOR_FOREGROUND_DISPATCH: ${JSON.stringify(outcome)}`);
       if (outcome.hops === 0) {
         console.log(
           'supervisor: no cycle actually ran this call — another Major process already holds ' +
