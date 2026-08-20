@@ -260,7 +260,7 @@ describe('major status: host/provider breakdown, separate from goal detail', () 
       expect(output).toContain('codex=READY');
       expect(output).toContain('Fallback capacity:    1 healthy provider');
       expect(output).toContain(
-        'Codex capacity:       no live snapshot — run `major provider usage`',
+        'Codex capacity:       no refreshed snapshot — run `major provider usage`',
       );
       expect(output).toContain('live worker: codex@thread-live');
       expect(output).toContain('heartbeat 0m ago');
@@ -345,9 +345,9 @@ describe('major status: host/provider breakdown, separate from goal detail', () 
     expect(output).toMatch(/work-b\s+plus\s+5h \[#{9}\.\] 91%/);
     expect(output).toMatch(/week \[##\.{8}\] 18%/);
     expect(output).toMatch(/week \[#\.{9}\] 8%/);
-    expect(output).toContain('live via account/read + account/rateLimits/read');
+    expect(output).toContain('source: account/read + account/rateLimits/read');
     expect(output).toContain('refresh: major provider usage');
-    expect(output).not.toContain('no live snapshot');
+    expect(output).not.toContain('no refreshed snapshot');
     for (const line of output.split('\n')) {
       if (
         line.includes('Codex capacity') ||

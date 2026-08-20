@@ -32,6 +32,7 @@ export const CODEX_CAPACITY_BAR_WIDTH = 10;
 export const CODEX_CAPACITY_MAX_LINE_WIDTH = 80;
 
 const CONTROL_SURFACE_INDENT = '  ';
+const CODEX_SNAPSHOT_MAX_AGE_MS = 15 * 60 * 1000;
 
 export interface CodexUsageReport {
   fetchedAt: string;
@@ -133,10 +134,9 @@ export function codexRefreshHealth(
   account: CodexUsageAccount,
 ): 'healthy' | 'exhausted' | 'unknown' | 'error' {
   if (account.error) return 'error';
-  if (account.primary?.usedPercent !== undefined && account.primary.usedPercent >= 100) {
-    return 'exhausted';
-  }
-  return account.primary ? 'healthy' : 'unknown';
+  const usedPercent = account.primary?.usedPercent;
+  if (usedPercent === undefined || !Number.isFinite(usedPercent)) return 'unknown';
+  return usedPercent >= 100 ? 'exhausted' : 'healthy';
 }
 
 export function formatCodexCapacityRows(
@@ -171,8 +171,8 @@ export function formatCodexUsage(
 ): string {
   return [
     'CODEX CAPACITY',
-    'live via account/read + account/rateLimits/read',
-    `fetched ${report.fetchedAt}  refresh: major provider usage`,
+    'snapshot source: account/read + account/rateLimits/read',
+    `usage refreshed at ${report.fetchedAt}  refresh: major provider usage`,
     '',
     ...formatCodexCapacityRows(report, now),
   ].join('\n');
@@ -184,16 +184,19 @@ export function formatCodexCapacityOverview(
   now?: Date,
 ): string {
   if (!report) {
-    return 'Codex capacity:       no live snapshot — run `major provider usage`';
+    return 'Codex capacity:       no refreshed snapshot — run `major provider usage`';
   }
   const rows = formatCodexCapacityRows(report, now ?? new Date(report.fetchedAt));
+  const observedAt = now ?? new Date();
+  const fetchedAt = new Date(report.fetchedAt);
+  const stale = observedAt.getTime() - fetchedAt.getTime() > CODEX_SNAPSHOT_MAX_AGE_MS;
   // Keep quota bars on following lines. A 22-char status prefix plus a
   // two-window row is 89 columns and wraps on a standard terminal.
   return [
     'Codex capacity:',
     ...rows.map((row) => `${CONTROL_SURFACE_INDENT}${row}`),
-    `${CONTROL_SURFACE_INDENT}fetched ${report.fetchedAt}`,
-    `${CONTROL_SURFACE_INDENT}live via account/read + account/rateLimits/read`,
+    `${CONTROL_SURFACE_INDENT}usage at last refresh ${report.fetchedAt}${stale ? ' (stale)' : ''}`,
+    `${CONTROL_SURFACE_INDENT}source: account/read + account/rateLimits/read`,
     `${CONTROL_SURFACE_INDENT}refresh: major provider usage`,
   ].join('\n');
 }
@@ -209,6 +212,17 @@ function parsePersistedAccount(value: unknown): CodexUsageAccount | undefined {
   const accountKind = typeof value.accountKind === 'string' ? value.accountKind : undefined;
   const primary = parseRateLimitWindow(value.primary);
   const secondary = parseRateLimitWindow(value.secondary);
+  for (const [supplied, parsed] of [
+    [value.primary, primary],
+    [value.secondary, secondary],
+  ] as const) {
+    if (supplied === undefined) continue;
+    if (!parsed || !isRecord(supplied)) return undefined;
+    for (const key of ['usedPercent', 'used_percent'] as const) {
+      if (!Object.prototype.hasOwnProperty.call(supplied, key)) continue;
+      if (typeof supplied[key] !== 'number' || !Number.isFinite(supplied[key])) return undefined;
+    }
+  }
   return {
     accountLabel: value.accountLabel,
     ...(planType ? { planType } : {}),
@@ -219,7 +233,16 @@ function parsePersistedAccount(value: unknown): CodexUsageAccount | undefined {
 }
 
 export function parseCodexUsageReport(value: unknown): CodexUsageReport | undefined {
-  if (!isRecord(value) || typeof value.fetchedAt !== 'string' || !Array.isArray(value.accounts)) {
+  if (!isRecord(value)) return undefined;
+  const methods = value.methods;
+  if (
+    typeof value.fetchedAt !== 'string' ||
+    !Number.isFinite(Date.parse(value.fetchedAt)) ||
+    !Array.isArray(methods) ||
+    methods.length !== CODEX_USAGE_METHODS.length ||
+    !CODEX_USAGE_METHODS.every((method, index) => methods[index] === method) ||
+    !Array.isArray(value.accounts)
+  ) {
     return undefined;
   }
   const accounts: CodexUsageAccount[] = [];

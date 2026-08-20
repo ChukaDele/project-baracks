@@ -1,3 +1,7 @@
+- id: agent-default-model
+  config:
+    provider: major
+    model: composer
 - id: subagent-codex
   config:
     permissionMode: approve-for-me

@@ -24,7 +24,11 @@ export const DSH_CLAUDE_CODE_BUNDLE = '@deepseek-ai/dsh-subagent-claude-code';
 export const DSH_CODEX_BUNDLE = '@deepseek-ai/dsh-subagent-codex';
 export const MAJOR_KERNEL_LOCAL_SPEC = 'file:../../bundles/major-kernel';
 export const EMPTY_CORDIS_PATCH = '[]\n';
-export const MAJOR_KERNEL_PATCH = `- id: subagent-codex
+export const MAJOR_KERNEL_PATCH = `- id: agent-default-model
+  config:
+    provider: major
+    model: composer
+- id: subagent-codex
   config:
     permissionMode: approve-for-me
     env:
@@ -56,7 +60,10 @@ export const MAJOR_KERNEL_PATCH = `- id: subagent-codex
       name: '@major/dsh-kernel'
 `;
 /** Web profile: disable auto (native on darwin loopback) and mount upstream browse host + UI. */
-export const MAJOR_WORKSTATION_WEB_PATCH = `- id: directory-picker
+export const MAJOR_WORKSTATION_WEB_PATCH = `- id: agent-presets
+  config:
+    default: major
+- id: directory-picker
   disabled: true
 - insert:
     - id: directory-picker-browse

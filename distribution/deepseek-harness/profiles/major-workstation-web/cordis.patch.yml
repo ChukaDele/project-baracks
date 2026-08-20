@@ -1,3 +1,6 @@
+- id: agent-presets
+  config:
+    default: major
 - id: directory-picker
   disabled: true
 - insert:

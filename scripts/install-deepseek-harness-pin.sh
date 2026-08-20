@@ -14,7 +14,27 @@ DSH_CODEX_HOME="$DSH_HOME/providers/codex/default"
 CODEX_ACCOUNT_POLICY="${MAJOR_CODEX_ACCOUNT_POLICY:-$MAJOR_HOME/codex-account-policy.json}"
 KERNEL_SOURCE="$ROOT/distribution/deepseek-harness/bundles/major-kernel"
 KERNEL_DEST="$DSH_HOME/bundles/major-kernel"
+MAJOR_PRESET_SOURCE="$ROOT/distribution/deepseek-harness/agent-presets/major"
+APP_DIR="${MAJOR_APP_DIR:-$HOME/Applications}"
+APP_DEST="$APP_DIR/Major.app"
+APP_MARKER_REL="Contents/Resources/major-dsh-installer-owned"
+APP_MARKER_VALUE="major-dsh-workstation-app-v1"
+APP_TRANSACTION_BACKUP=""
+APP_EXISTED_BEFORE_TRANSACTION=0
+APP_BACKED_UP=0
+APP_ACTIVATED=0
 DRY_RUN=0
+TRANSACTION_DIR=""
+TRANSACTION_ACTIVE=0
+MANAGED_PATHS=(
+  "runtime"
+  "profiles/major-workstation-web"
+  "profiles/major-workstation-headless"
+  "bundles/major-kernel"
+  "providers/codex"
+  "bin/start-major-workstation.sh"
+  "major-install.json"
+)
 
 usage() {
   cat <<'EOF'
@@ -118,6 +138,11 @@ PY
 }
 
 disk_preflight() {
+  if [[ "${MAJOR_DSH_TEST_SKIP_DISK_PREFLIGHT:-0}" == "1" ]]; then
+    [[ "${NODE_ENV:-}" == "test" ]] || fail "disk preflight bypass is test-only"
+    echo "disk preflight skipped by test fixture"
+    return 0
+  fi
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[dry-run] disk preflight before DSH/Lima install"
     return 0
@@ -125,6 +150,76 @@ disk_preflight() {
   local stats
   stats="$(require_disk_headroom)"
   echo "disk preflight ok: ${stats%%$'\t'*}% free"
+}
+
+begin_managed_transaction() {
+  [[ "$DRY_RUN" -eq 0 ]] || return 0
+  if [[ -e "$APP_DEST" || -L "$APP_DEST" ]]; then
+    [[ -d "$APP_DEST" && ! -L "$APP_DEST" ]] || \
+      fail "refusing to transact unmarked app: $APP_DEST"
+    [[ -f "$APP_DEST/$APP_MARKER_REL" ]] || \
+      fail "refusing to transact unmarked app: $APP_DEST"
+    [[ "$(cat "$APP_DEST/$APP_MARKER_REL")" == "$APP_MARKER_VALUE" ]] || \
+      fail "refusing to transact unmarked app: $APP_DEST"
+    APP_EXISTED_BEFORE_TRANSACTION=1
+  fi
+  mkdir -p "$DSH_HOME"
+  TRANSACTION_DIR="$(mktemp -d "$DSH_HOME/.install-rollback.XXXXXX")"
+  mkdir -p "$TRANSACTION_DIR/backup"
+  : > "$TRANSACTION_DIR/existing"
+  TRANSACTION_ACTIVE=1
+  trap rollback_managed_transaction EXIT
+  local relative
+  for relative in "${MANAGED_PATHS[@]}"; do
+    if [[ -e "$DSH_HOME/$relative" || -L "$DSH_HOME/$relative" ]]; then
+      printf '%s\n' "$relative" >> "$TRANSACTION_DIR/existing"
+      mkdir -p "$TRANSACTION_DIR/backup/$(dirname "$relative")"
+      # The rollback runtime stays on the same volume and is renamed, not
+      # copied. This preserves bytes/metadata without doubling a large pin.
+      mv "$DSH_HOME/$relative" "$TRANSACTION_DIR/backup/$relative"
+    fi
+  done
+  if [[ "$APP_EXISTED_BEFORE_TRANSACTION" -eq 1 ]]; then
+    mkdir -p "$APP_DIR"
+    APP_TRANSACTION_BACKUP="$APP_DIR/.Major.app.install-rollback.$$"
+    [[ ! -e "$APP_TRANSACTION_BACKUP" && ! -L "$APP_TRANSACTION_BACKUP" ]] || \
+      fail "app rollback path already exists: $APP_TRANSACTION_BACKUP"
+    mv "$APP_DEST" "$APP_TRANSACTION_BACKUP"
+    APP_BACKED_UP=1
+  fi
+}
+
+rollback_managed_transaction() {
+  local exit_code=$?
+  [[ "$TRANSACTION_ACTIVE" -eq 1 ]] || return "$exit_code"
+  trap - EXIT
+  local relative
+  for relative in "${MANAGED_PATHS[@]}"; do
+    rm -rf "$DSH_HOME/$relative"
+  done
+  if [[ "$APP_BACKED_UP" -eq 1 ]]; then
+    rm -rf "$APP_DEST"
+    mv "$APP_TRANSACTION_BACKUP" "$APP_DEST"
+  elif [[ "$APP_ACTIVATED" -eq 1 ]]; then
+    rm -rf "$APP_DEST"
+  fi
+  while IFS= read -r relative; do
+    mkdir -p "$DSH_HOME/$(dirname "$relative")"
+    mv "$TRANSACTION_DIR/backup/$relative" "$DSH_HOME/$relative"
+  done < "$TRANSACTION_DIR/existing"
+  rm -rf "$TRANSACTION_DIR"
+  echo "DSH PIN INSTALL ROLLED BACK: prior installer-managed state restored" >&2
+  exit "$exit_code"
+}
+
+commit_managed_transaction() {
+  [[ "$TRANSACTION_ACTIVE" -eq 1 ]] || return 0
+  TRANSACTION_ACTIVE=0
+  if [[ "$APP_BACKED_UP" -eq 1 ]]; then
+    rm -rf "$APP_TRANSACTION_BACKUP"
+  fi
+  rm -rf "$TRANSACTION_DIR"
+  trap - EXIT
 }
 
 verify_npm_integrity() {
@@ -327,6 +422,23 @@ install_runtime_packages() {
   [[ -x "$RUNTIME_DIR/node_modules/.bin/dsh" ]] || fail "pinned dsh executable missing after install"
 }
 
+stage_major_system_preset() {
+  local preset_root="$RUNTIME_DIR/node_modules/@deepseek-ai/dsh/config/agent-presets"
+  local destination="$preset_root/major"
+  [[ -f "$MAJOR_PRESET_SOURCE/agent.cordis.yml" ]] || \
+    fail "missing Major system preset composition: $MAJOR_PRESET_SOURCE/agent.cordis.yml"
+  [[ -f "$MAJOR_PRESET_SOURCE/preset.yml" ]] || \
+    fail "missing Major system preset metadata: $MAJOR_PRESET_SOURCE/preset.yml"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] stage Major system preset $MAJOR_PRESET_SOURCE -> $destination"
+    return 0
+  fi
+  [[ -d "$preset_root/standard" ]] || fail "pinned DSH system preset root missing: $preset_root"
+  mkdir -p "$destination"
+  cp -f "$MAJOR_PRESET_SOURCE/agent.cordis.yml" "$destination/agent.cordis.yml"
+  cp -f "$MAJOR_PRESET_SOURCE/preset.yml" "$destination/preset.yml"
+}
+
 link_shared_runtime() {
   local profile_id="$1"
   local dest="$DSH_HOME/profiles/$profile_id"
@@ -362,12 +474,23 @@ link_kernel_bundle() {
 
 verify_profile_composition() {
   local profile_id="$1"
+  local composition_output
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[dry-run] compose pinned profile $profile_id from the shared runtime anchor"
     return 0
   fi
-  DSH_HOME="$DSH_HOME" "$RUNTIME_DIR/node_modules/.bin/dsh" \
-    --profile "$profile_id" --dump-config >/dev/null
+  if ! composition_output="$(
+    DSH_HOME="$DSH_HOME" "$RUNTIME_DIR/node_modules/.bin/dsh" \
+      --profile "$profile_id" --dump-config 2>&1
+  )"; then
+    printf '%s\n' "$composition_output" >&2
+    fail "DSH profile composition failed: $profile_id"
+  fi
+  if printf '%s\n' "$composition_output" | grep -Eiq \
+    '(^|[[:space:]])error(:|[[:space:]])|patch:[[:space:]]*entry .* not found'; then
+    printf '%s\n' "$composition_output" >&2
+    fail "DSH profile composition reported an error: $profile_id"
+  fi
 }
 
 stage_workstation_app() {
@@ -413,6 +536,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 disk_preflight
+begin_managed_transaction
 stage_profile major-workstation-web
 stage_profile major-workstation-headless
 stage_kernel_bundle
@@ -420,14 +544,23 @@ stage_codex_worker_home
 stage_named_codex_worker_homes
 write_runtime_manifest
 install_runtime_packages
+stage_major_system_preset
 link_kernel_runtime
 link_kernel_bundle
 link_shared_runtime major-workstation-web
 link_shared_runtime major-workstation-headless
 verify_profile_composition major-workstation-web
+if [[ "${MAJOR_DSH_TEST_FAIL_AFTER_COMPOSITION:-0}" == "1" ]]; then
+  fail "injected failure after web profile composition"
+fi
 verify_profile_composition major-workstation-headless
+APP_ACTIVATED=1
 stage_workstation_app
+if [[ "${MAJOR_DSH_TEST_FAIL_AFTER_APP_ACTIVATION:-0}" == "1" ]]; then
+  fail "injected failure after app activation"
+fi
 write_install_record
+commit_managed_transaction
 
 echo "DeepSeek Harness pin staged. Normal trusted repository execution defaults to DSH local."
 echo "DSH Lima and the legacy Major/Lima pipeline remain explicit compatibility choices."

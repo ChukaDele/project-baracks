@@ -18,6 +18,8 @@ import {
   DEFAULT_EXECUTION_BACKEND,
   EMPTY_CORDIS_PATCH,
   MAJOR_KERNEL_LOCAL_SPEC,
+  MAJOR_KERNEL_PATCH,
+  MAJOR_WORKSTATION_WEB_PATCH,
   bundleManifest,
   majorKernelBundle,
   majorWorkstationHeadlessProfile,
@@ -102,6 +104,8 @@ describe('DeepSeek Harness workstation composition', () => {
 
   it('pins the web profile to the upstream browse directory picker on loopback', () => {
     const web = majorWorkstationWebProfile();
+    expect(web.patch).toContain('id: agent-presets');
+    expect(web.patch).toContain('default: major');
     expect(web.patch).toContain('directory-picker-browse');
     expect(web.patch).toContain('@deepseek-ai/dsh-host-directory-picker-browse');
     expect(web.patch).toContain('@deepseek-ai/dsh-client-ui-directory-picker-browse');
@@ -109,11 +113,54 @@ describe('DeepSeek Harness workstation composition', () => {
     expect(majorWorkstationHeadlessProfile().patch).toBe(EMPTY_CORDIS_PATCH);
   });
 
+  it('keeps the web-only preset override out of the shared headless kernel', () => {
+    expect(MAJOR_KERNEL_PATCH).toContain('id: agent-default-model');
+    expect(MAJOR_KERNEL_PATCH).toContain('provider: major');
+    expect(MAJOR_KERNEL_PATCH).toContain('model: composer');
+    expect(MAJOR_KERNEL_PATCH).not.toContain('id: agent-presets');
+    expect(MAJOR_WORKSTATION_WEB_PATCH).toContain('id: agent-presets');
+  });
+
+  it('keeps generated composition exactly aligned with the shipped patches', () => {
+    expect(
+      readFileSync(
+        resolve('distribution/deepseek-harness/bundles/major-kernel/cordis.patch.yml'),
+        'utf8',
+      ),
+    ).toBe(MAJOR_KERNEL_PATCH);
+    expect(
+      readFileSync(
+        resolve('distribution/deepseek-harness/profiles/major-workstation-web/cordis.patch.yml'),
+        'utf8',
+      ),
+    ).toBe(MAJOR_WORKSTATION_WEB_PATCH);
+    expect(
+      readFileSync(
+        resolve(
+          'distribution/deepseek-harness/profiles/major-workstation-headless/cordis.patch.yml',
+        ),
+        'utf8',
+      ),
+    ).toBe(EMPTY_CORDIS_PATCH);
+  });
+
   it('preserves every KEEP Major capability behind the DSH kernel', () => {
     expect(
       missingRetainedCapabilities(CAPABILITY_REUSE.map((record) => record.capability)),
     ).toEqual([]);
     expect(majorKernelBundle().patch).toContain("name: '@major/dsh-kernel'");
+    expect(majorKernelBundle().patch).toContain('provider: major');
+    expect(majorKernelBundle().patch).toContain('model: composer');
+    expect(majorWorkstationWebProfile().patch).toContain('default: major');
+    expect(
+      readFileSync(
+        resolve('distribution/deepseek-harness/agent-presets/major/agent.cordis.yml'),
+        'utf8',
+      ).trimEnd(),
+    ).toMatch(/\[\]$/);
+    expect(
+      readFileSync(resolve('distribution/deepseek-harness/agent-presets/major/preset.yml'), 'utf8'),
+    ).toContain('name: Major');
     expect(majorKernelBundle().patch).toContain('providerName: claude-review');
     expect(majorKernelBundle().patch).toContain('id: subagent-codex');
     expect(majorKernelBundle().patch).toContain('permissionMode: approve-for-me');
@@ -252,6 +299,165 @@ describe('DeepSeek Harness cutover install plan', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('rejects DSH composition errors even when dump-config exits zero', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-compose-error-'));
+    const runtime = join(root, 'runtime');
+    const fakeDsh = join(runtime, 'node_modules/.bin/dsh');
+    try {
+      mkdirSync(join(runtime, 'node_modules/.bin'), { recursive: true });
+      writeFileSync(
+        fakeDsh,
+        '#!/bin/sh\necho \'dsh: [@major/dsh-kernel] patch: entry "agent-presets" not found\' >&2\nexit 0\n',
+      );
+      chmodSync(fakeDsh, 0o755);
+      const installer = readFileSync(
+        resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh'),
+        'utf8',
+      );
+      const functionSource = installer.match(
+        /verify_profile_composition\(\) \{[\s\S]*?\n\}\n\nstage_workstation_app\(\)/,
+      )?.[0];
+      expect(functionSource).toBeDefined();
+      const command = [
+        `RUNTIME_DIR=${JSON.stringify(runtime)}`,
+        `DSH_HOME=${JSON.stringify(join(root, 'home'))}`,
+        'DRY_RUN=0',
+        'fail() { echo "$*" >&2; return 1; }',
+        functionSource!.replace(/\n\nstage_workstation_app\(\)$/, ''),
+        'verify_profile_composition major-workstation-headless',
+      ].join('\n');
+      const result = spawnSync('/bin/bash', ['-uc', command], { encoding: 'utf8' });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(
+        'dsh: [@major/dsh-kernel] patch: entry "agent-presets" not found',
+      );
+      expect(result.stderr).toContain(
+        'DSH profile composition reported an error: major-workstation-headless',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('restores DSH state and installer-owned Major.app after a post-activation failure', () => {
+    const installerSource = readFileSync(
+      resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh'),
+      'utf8',
+    );
+    expect(installerSource).toContain('APP_ACTIVATED=1\nstage_workstation_app');
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-rollback-'));
+    const home = join(root, 'major-home');
+    const dshHome = join(home, 'dsh-harness');
+    const codexHome = join(root, 'codex');
+    const fakeBin = join(root, 'bin');
+    const appDir = join(root, 'Applications');
+    const app = join(appDir, 'Major.app');
+    const runtimeMarker = join(dshHome, 'runtime/rollback-runtime.txt');
+    const profileMarker = join(dshHome, 'profiles/major-workstation-web/prior-profile.txt');
+    const sessionMarker = join(dshHome, 'sessions/preserved.txt');
+    const chromeMarker = join(dshHome, 'chrome-profile/preserved.txt');
+    try {
+      for (const path of [
+        join(dshHome, 'runtime'),
+        join(dshHome, 'profiles/major-workstation-web'),
+        join(dshHome, 'sessions'),
+        join(dshHome, 'chrome-profile'),
+        codexHome,
+        fakeBin,
+        join(app, 'Contents/Resources'),
+      ]) {
+        mkdirSync(path, { recursive: true });
+      }
+      writeFileSync(runtimeMarker, 'installed rollback runtime\n');
+      writeFileSync(profileMarker, 'prior managed profile\n');
+      writeFileSync(sessionMarker, 'session state\n');
+      writeFileSync(chromeMarker, 'chrome state\n');
+      writeFileSync(
+        join(app, 'Contents/Resources/major-dsh-installer-owned'),
+        'major-dsh-workstation-app-v1\n',
+      );
+      writeFileSync(join(app, 'prior-app.txt'), 'exact prior app\n');
+      writeFileSync(join(codexHome, 'auth.json'), '{}\n');
+      writeFileSync(
+        join(fakeBin, 'npm'),
+        '#!/bin/sh\npython3 - "$2" <<\'PY\'\n' +
+          'import json, os, sys\n' +
+          'pin=json.load(open(os.environ["MAJOR_TEST_PIN"]))\n' +
+          'name=sys.argv[1].rsplit("@", 1)[0]\n' +
+          'print(({**pin["npm"]["integrities"], **pin["npm"]["runtimePeers"]["integrities"]})[name])\n' +
+          'PY\n',
+      );
+      writeFileSync(
+        join(fakeBin, 'pnpm'),
+        '#!/bin/sh\n' +
+          'while [ "$#" -gt 0 ]; do [ "$1" = --dir ] && { shift; dir=$1; }; shift; done\n' +
+          'mkdir -p "$dir/node_modules/.bin" "$dir/node_modules/@deepseek-ai/dsh/config/agent-presets/standard"\n' +
+          'printf \'#!/bin/sh\\necho composed\\n\' > "$dir/node_modules/.bin/dsh"\n' +
+          'chmod +x "$dir/node_modules/.bin/dsh"\n',
+      );
+      chmodSync(join(fakeBin, 'npm'), 0o755);
+      chmodSync(join(fakeBin, 'pnpm'), 0o755);
+      const result = spawnSync(
+        '/bin/bash',
+        [resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh')],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${fakeBin}:${process.env.PATH ?? ''}`,
+            MAJOR_HOME: home,
+            MAJOR_DSH_HOME: dshHome,
+            MAJOR_DSH_CODEX_PROFILE_HOME: codexHome,
+            MAJOR_APP_DIR: appDir,
+            MAJOR_TEST_PIN: resolve(REPO_ROOT, 'distribution/deepseek-harness/pin.json'),
+            NODE_ENV: 'test',
+            MAJOR_DSH_TEST_SKIP_DISK_PREFLIGHT: '1',
+            MAJOR_DSH_TEST_FAIL_AFTER_APP_ACTIVATION: '1',
+          },
+        },
+      );
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('injected failure after app activation');
+      expect(result.stderr).toContain('prior installer-managed state restored');
+      expect(readFileSync(runtimeMarker, 'utf8')).toBe('installed rollback runtime\n');
+      expect(readFileSync(profileMarker, 'utf8')).toBe('prior managed profile\n');
+      expect(readFileSync(sessionMarker, 'utf8')).toBe('session state\n');
+      expect(readFileSync(chromeMarker, 'utf8')).toBe('chrome state\n');
+      expect(readFileSync(join(app, 'prior-app.txt'), 'utf8')).toBe('exact prior app\n');
+      expect(existsSync(join(app, 'Contents/MacOS/Major'))).toBe(false);
+      expect(existsSync(join(dshHome, 'major-install.json'))).toBe(false);
+
+      rmSync(app, { recursive: true, force: true });
+      const absentResult = spawnSync(
+        '/bin/bash',
+        [resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh')],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${fakeBin}:${process.env.PATH ?? ''}`,
+            MAJOR_HOME: home,
+            MAJOR_DSH_HOME: dshHome,
+            MAJOR_DSH_CODEX_PROFILE_HOME: codexHome,
+            MAJOR_APP_DIR: appDir,
+            MAJOR_TEST_PIN: resolve(REPO_ROOT, 'distribution/deepseek-harness/pin.json'),
+            NODE_ENV: 'test',
+            MAJOR_DSH_TEST_SKIP_DISK_PREFLIGHT: '1',
+            MAJOR_DSH_TEST_FAIL_AFTER_APP_ACTIVATION: '1',
+          },
+        },
+      );
+      expect(absentResult.status).not.toBe(0);
+      expect(absentResult.stderr).toContain('injected failure after app activation');
+      expect(existsSync(app)).toBe(false);
+      expect(readFileSync(runtimeMarker, 'utf8')).toBe('installed rollback runtime\n');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 20_000);
 });
 
 describe('DeepSeek Harness cutover conformance', () => {
