@@ -1,7 +1,15 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CAPABILITY_REUSE, missingRetainedCapabilities } from '../src/harness/capabilities.js';
 import { runHarnessCli } from '../src/harness/cli.js';
@@ -135,7 +143,7 @@ describe('DeepSeek Harness strangle install plan', () => {
     const target = join(root, 'must-not-exist');
     try {
       const output = execFileSync(
-        'bash',
+        '/bin/bash',
         [resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh'), '--dry-run'],
         {
           cwd: REPO_ROOT,
@@ -156,6 +164,56 @@ describe('DeepSeek Harness strangle install plan', () => {
       expect(output).toContain('Live Major execution remains on Lima');
       expect(output).toContain('MAJOR_SESSION_HOST');
       expect(existsSync(target)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stages the app without an empty array and propagates stager failures in both modes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-live-stage-'));
+    const fakeBin = join(root, 'bin');
+    const fakeBash = join(fakeBin, 'bash');
+    try {
+      mkdirSync(fakeBin);
+      writeFileSync(fakeBash, '#!/bin/sh\nprintf "%s\\n" "$*"\n');
+      chmodSync(fakeBash, 0o755);
+      const installer = readFileSync(
+        resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh'),
+        'utf8',
+      );
+      const functionSource = installer.match(
+        /stage_workstation_app\(\) \{[\s\S]*?\n\}\n\nwrite_install_record\(\)/,
+      )?.[0];
+      expect(functionSource).toBeDefined();
+      const command = (dryRun: 0 | 1) =>
+        [
+          'ROOT=/tmp/source',
+          'MAJOR_HOME=/tmp/major-home',
+          'DSH_HOME=/tmp/dsh-home',
+          `DRY_RUN=${dryRun}`,
+          functionSource!.replace(/\n\nwrite_install_record\(\)$/, ''),
+          'stage_workstation_app',
+        ].join('\n');
+      const output = execFileSync('/bin/bash', ['-uc', command(0)], {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH ?? ''}` },
+      });
+      expect(output.trim()).toBe('/tmp/source/scripts/stage-major-workstation-app.sh');
+      const dryRunOutput = execFileSync('/bin/bash', ['-uc', command(1)], {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH ?? ''}` },
+      });
+      expect(dryRunOutput.trim()).toBe(
+        '/tmp/source/scripts/stage-major-workstation-app.sh --dry-run',
+      );
+
+      writeFileSync(fakeBash, '#!/bin/sh\nexit 37\n');
+      for (const dryRun of [0, 1] as const) {
+        const failed = spawnSync('/bin/bash', ['-uc', command(dryRun)], {
+          env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH ?? ''}` },
+        });
+        expect(failed.status).toBe(37);
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
