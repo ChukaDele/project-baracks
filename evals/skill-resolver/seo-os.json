@@ -1,0 +1,20 @@
+{
+  "skill": "seo-os",
+  "should_trigger": [
+    "Do a complete technical and on-page SEO audit, fix what is safe and prioritise the rest.",
+    "Find our highest-value organic growth opportunities using GSC, SERPs and competitors.",
+    "Improve internal linking and site architecture so our money pages rank better.",
+    "Build an SEO content plan based on what we already rank for and what competitors own.",
+    "Check our visibility in AI answers and improve GEO/AEO as part of SEO.",
+    "Use OpenSEO with our existing Major skills rather than rebuilding SEO tooling."
+  ],
+  "should_not_trigger": [
+    "Fix the spacing on this dashboard card.",
+    "Why is this SQL query slow?",
+    "Draft a cold email to this prospect.",
+    "Make this animation smoother."
+  ],
+  "conflicts": [
+    "website-design-qa owns broad visual/responsive/launch quality; compose it when SEO work touches production-site QA. knowledge-work provides general research rigor; seo-os owns the SEO-specific decision model. open-source-leverage and prior-art-discovery own the general reuse gate; seo-os applies it specifically to SEO providers such as OpenSEO."
+  ]
+}
