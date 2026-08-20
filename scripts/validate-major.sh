@@ -333,5 +333,8 @@ grep -Fq "stage_workstation_app" scripts/install-deepseek-harness-pin.sh || fail
 grep -Fq -- '--app=' scripts/start-major-workstation.sh || fail "workstation launcher must open Chrome app-mode"
 grep -Fq 'LISTEN_HOST="127.0.0.1"' scripts/start-major-workstation.sh || fail "workstation launcher must bind loopback only"
 grep -Fq "WRAP the existing \`major-workstation-web\` profile" docs/prior-art-decisions.md || fail "Mac workstation prior-art decision missing"
+grep -Fq "Codex guest mutation requires active supervised Workshop authority" src/security/guest-mutation.ts || fail "Codex guest mutation must require active Supervised Workshop"
+grep -Fq "assertGuestMutationPolicy" src/security/gateway.ts || fail "execution gateway must enforce guest mutation policy"
+grep -Fq "assertGuestMutationPolicy" src/execution/lima-backend.ts || fail "Lima copy-back must enforce guest mutation policy"
 
 echo "Major validation passed."

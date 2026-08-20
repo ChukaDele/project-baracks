@@ -49,6 +49,7 @@ import {
   assertActiveResourceLeaseForProcess,
 } from '../supervisor/resources.js';
 import { assertSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
+import { assertGuestMutationPolicy } from '../security/guest-mutation.js';
 import type {
   BackendExecuteRequest,
   BackendProviderStatus,
@@ -1363,6 +1364,17 @@ export class LimaBackend implements ExecutionBackend {
         opened.sqlite.close();
       }
     }
+    if (request.providerRequest) {
+      assertGuestMutationPolicy({
+        host: request.providerRequest.host,
+        allowGuestMutation: request.providerRequest.allowGuestMutation,
+        ...(request.providerRequest.workspaceHash
+          ? { workspaceHash: request.providerRequest.workspaceHash }
+          : {}),
+        executionAuthorityKind: request.executionAuthority.kind,
+        isolatedBackend: true,
+      });
+    }
     const queue = new EventQueue<ProviderEvent>();
     const runId = randomUUID();
     this.cancelled = false;
@@ -1908,6 +1920,13 @@ export class LimaBackend implements ExecutionBackend {
         };
       }
       if (diff.code === 1) {
+        assertGuestMutationPolicy({
+          host: providerIntent.host,
+          allowGuestMutation: true,
+          ...(providerIntent.workspaceHash ? { workspaceHash: providerIntent.workspaceHash } : {}),
+          executionAuthorityKind: request.executionAuthority.kind,
+          isolatedBackend: true,
+        });
         const check = await this.run('/usr/bin/git', [
           '-C',
           realpathSync(request.cwd),

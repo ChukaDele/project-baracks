@@ -40,6 +40,14 @@ describe('reuse-first provider runtime', () => {
     expect(gateway).not.toContain("!staged && !isCapabilityAvailable('live-agent-execution')");
     expect(gateway).toContain('workshop && request.providerRequest');
     expect(gateway).toContain('providerWorkshopArgs(request.providerRequest.host, request.args)');
+    expect(source('src/security/gateway.ts')).toContain('assertGuestMutationPolicy');
+    expect(source('src/execution/lima-backend.ts')).toContain('assertGuestMutationPolicy');
+    expect(source('src/security/guest-mutation.ts')).toContain(
+      'Codex guest mutation requires active supervised Workshop authority',
+    );
+    expect(source('src/execution/lima-backend.ts')).toContain(
+      'host workspace changed during execution; result remains quarantined',
+    );
     expect(source('package.json')).not.toContain('@ai-sdk/harness');
   });
 

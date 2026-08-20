@@ -16,6 +16,7 @@ import {
 import { redactText } from './redact.js';
 import { verifyProviderApprovalAuthority } from './provider-approval-policy.js';
 import type { ApprovalCategory, ProviderApprovalAuthority } from './provider-approval-policy.js';
+import { assertGuestMutationPolicy } from './guest-mutation.js';
 import type { BackendExecutionAuthority } from './staged-validation.js';
 import {
   ExecutableTrustError,
@@ -329,6 +330,26 @@ export class ExecutionGateway {
 
     const check = checkArgv(request.executable, request.args, this.options.commandPolicy);
     if (!check.allowed) this.refuse('execute', request, check.reason);
+
+    if (request.providerRequest) {
+      try {
+        assertGuestMutationPolicy({
+          host: request.providerRequest.host,
+          allowGuestMutation: request.providerRequest.allowGuestMutation,
+          ...(request.providerRequest.workspaceHash
+            ? { workspaceHash: request.providerRequest.workspaceHash }
+            : {}),
+          executionAuthorityKind: request.executionAuthority?.kind ?? 'supervised',
+          isolatedBackend: Boolean(this.options.backend),
+        });
+      } catch (error) {
+        this.refuse(
+          'execute',
+          request,
+          error instanceof Error ? error.message : 'guest mutation policy rejected execution',
+        );
+      }
+    }
 
     // Confine path-bearing arguments (absolute paths and tool directory flags
     // such as -C/--work-tree/--output) to the allowed roots, so a trusted

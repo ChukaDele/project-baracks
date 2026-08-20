@@ -147,6 +147,51 @@ describe('Lima backend inspection', () => {
     }
   });
 
+  it('refuses Codex guest mutation outside supervised Workshop before any Lima operation', () => {
+    expect(() =>
+      backend(fakeLima()).execute({
+        executionAuthority: { kind: 'supervised' },
+        executable: 'codex',
+        args: ['exec'],
+        cwd: process.cwd(),
+        allowedRoots: [process.cwd()],
+        providerRequest: {
+          host: 'codex',
+          prompt: 'mutate',
+          allowGuestMutation: true,
+          workspaceHash: 'a'.repeat(64),
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/active supervised Workshop authority/);
+  });
+
+  it('refuses Codex guest mutation without a source digest before any Lima operation', () => {
+    expect(() =>
+      backend(fakeLima()).execute({
+        executionAuthority: { kind: 'supervised' },
+        executable: 'codex',
+        args: ['exec'],
+        cwd: process.cwd(),
+        allowedRoots: [process.cwd()],
+        providerRequest: {
+          host: 'codex',
+          prompt: 'mutate',
+          allowGuestMutation: true,
+          approvalAuthority: verifyProviderApprovalAuthority(
+            'codex',
+            { decisions: [] },
+            () => true,
+          ),
+        },
+      }),
+    ).toThrow(/source workspace digest/);
+  });
+
   it('rejects a forged Workshop authority before any Lima operation', () => {
     expect(() =>
       backend(fakeLima()).execute({
