@@ -111,7 +111,9 @@ export function hashWorkspaceTree(root: string): string {
 
 /** Hash the host source exactly as the Lima snapshot sees it: .git and
  * node_modules are transport exclusions, while every other file, mode and
- * relative symlink target contributes to the digest. */
+ * relative symlink target contributes to the digest. Hard links are refused
+ * intentionally because the copy-back validator cannot preserve or safely
+ * reason about shared inodes; generated caches must stay in excluded paths. */
 export function hashSourceWorkspaceTree(root: string): string {
   const canonicalRoot = realpathSync(root);
   const hash = createHash('sha256');

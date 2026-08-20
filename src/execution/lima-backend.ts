@@ -2,8 +2,9 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
+  constants,
   existsSync,
-  lstatSync,
+  fstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -211,6 +212,7 @@ export class LimaBackend implements ExecutionBackend {
     onLine?: (line: string) => void,
     cwd?: string,
     env: NodeJS.ProcessEnv = this.hostEnv(),
+    input?: Buffer,
   ) {
     return new Promise<CommandResult>((resolvePromise, reject) => {
       let stdout = '';
@@ -218,12 +220,17 @@ export class LimaBackend implements ExecutionBackend {
       let pending = '';
       const child = spawn(executable, [...args], {
         env,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'],
         shell: false,
         detached: true,
         ...(cwd ? { cwd } : {}),
       });
       this.activeChild = child;
+      if (!child.stdout || !child.stderr) {
+        child.kill();
+        reject(new Error('child process output pipes are unavailable'));
+        return;
+      }
       child.stdout.on('data', (chunk: Buffer) => {
         const text = chunk.toString('utf8');
         stdout += text;
@@ -238,6 +245,12 @@ export class LimaBackend implements ExecutionBackend {
         stderr += chunk.toString('utf8');
         if (stderr.length > 200_000) stderr = stderr.slice(-200_000);
       });
+      if (input && child.stdin) {
+        child.stdin.on('error', (error) => {
+          stderr += `stdin transfer failed: ${error.message}`;
+        });
+        child.stdin.end(input);
+      }
       child.once('error', reject);
       child.once('close', (code) => {
         if (pending && onLine) onLine(pending);
@@ -334,6 +347,11 @@ export class LimaBackend implements ExecutionBackend {
   private async lima(args: readonly string[], onLine?: (line: string) => void) {
     const trusted = this.registry.verify(basename(this.config.limactlPath));
     return this.run(trusted.spawnPath, args, onLine);
+  }
+
+  private async limaWithInput(args: readonly string[], input: Buffer) {
+    const trusted = this.registry.verify(basename(this.config.limactlPath));
+    return this.run(trusted.spawnPath, args, undefined, undefined, this.hostEnv(), input);
   }
 
   private async instance(): Promise<ValidatedLimaInstance> {
@@ -838,20 +856,22 @@ export class LimaBackend implements ExecutionBackend {
     if (!resolved.endsWith('/auth.json')) {
       return { ok: false, detail: 'refusing unsafe Codex profile credential path' };
     }
-    let before;
+    let sourceFd: number | undefined;
+    let credential: Buffer;
     try {
-      before = lstatSync(resolved);
+      sourceFd = openSync(resolved, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const source = fstatSync(sourceFd);
+      if (!source.isFile() || source.nlink !== 1) {
+        return { ok: false, detail: 'approved Codex profile credential is not a regular file' };
+      }
+      credential = readFileSync(sourceFd);
     } catch {
-      return { ok: false, detail: 'approved Codex profile credential is unavailable' };
-    }
-    if (before.isSymbolicLink()) {
-      return { ok: false, detail: 'refusing to import a symlinked Codex profile credential' };
-    }
-    if (!before.isFile() || before.nlink !== 1) {
-      return { ok: false, detail: 'approved Codex profile credential is not a regular file' };
+      return { ok: false, detail: 'approved Codex profile credential is unavailable or unsafe' };
+    } finally {
+      if (sourceFd !== undefined) closeSync(sourceFd);
     }
     try {
-      const parsed: unknown = JSON.parse(readFileSync(resolved, 'utf8'));
+      const parsed: unknown = JSON.parse(credential.toString('utf8'));
       if (typeof parsed !== 'object' || parsed === null || Object.keys(parsed).length === 0) {
         return { ok: false, detail: 'approved Codex profile credential is not valid JSON' };
       }
@@ -888,11 +908,19 @@ export class LimaBackend implements ExecutionBackend {
         '0700',
         guestTmp,
       ]);
-      const copiedCredential = await this.lima([
-        'copy',
-        resolved,
-        `${this.config.instance}:${guestTmp}/staged`,
-      ]);
+      const copiedCredential = await this.limaWithInput(
+        [
+          'shell',
+          '--tty=false',
+          this.config.instance,
+          'sh',
+          '-c',
+          'umask 077; cat > "$1"',
+          'major-credential-stage',
+          `${guestTmp}/staged`,
+        ],
+        credential,
+      );
       if (copiedCredential.code !== 0) {
         return {
           ok: false,
@@ -907,13 +935,6 @@ export class LimaBackend implements ExecutionBackend {
         importScript,
         accountLabel,
       );
-      const after = lstatSync(resolved);
-      if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
-        return {
-          ok: false,
-          detail: 'Codex profile credential changed during import; refusing to continue',
-        };
-      }
       return placed;
     } finally {
       await this.lima([

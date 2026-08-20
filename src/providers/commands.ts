@@ -20,7 +20,11 @@ export function providerSupportsVendorResume(host: ProviderCommandHost): boolean
     case 'antigravity':
       return true;
     case 'claude':
+      return false;
     case 'codex':
+      // Each Lima run gets a fresh ephemeral Codex home, so a vendor session
+      // reference cannot be resumed across runs even though the CLI has a
+      // resume subcommand for environments that persist its local state.
       return false;
   }
 }

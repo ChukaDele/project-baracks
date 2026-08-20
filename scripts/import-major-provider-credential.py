@@ -83,6 +83,9 @@ def named_auth_store_parent_dirs(provider: str, account: str, relative: str) -> 
 
 def _ensure_directory_chain(root: pathlib.Path, components: tuple[str, ...]) -> None:
     """Create one directory chain using verified directory descriptors only."""
+    # Guest provisioning creates this fixed root as root:root 0700. The broker
+    # intentionally refuses a missing root instead of recreating an authority
+    # boundary from a potentially substituted parent path.
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     try:
         parent_fd = os.open(str(root), flags)
