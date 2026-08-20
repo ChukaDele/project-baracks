@@ -191,6 +191,38 @@ describe('Major DSH workstation app', () => {
     expect(result.stdout).toContain(`dsh home: ${home}`);
   });
 
+  it('normalizes a Rosetta app-script launch to native arm64 before starting DSH', () => {
+    const home = isolatedHome();
+    const appDir = join(home, 'Applications');
+    const app = join(appDir, 'Major.app');
+    const bin = join(home, 'fakes');
+    const archCall = join(home, 'arch-call');
+    const project = mkdtempSync(join(tmpdir(), 'major-project-'));
+    homes.push(project);
+
+    fakeExec(
+      bin,
+      'uname',
+      'if [ "$1" = "-s" ]; then echo Darwin; elif [ "${MAJOR_TEST_NATIVE_ARM64:-}" = 1 ]; then echo arm64; else echo x86_64; fi',
+    );
+    fakeExec(bin, 'sysctl', 'echo 1');
+    fakeExec(
+      bin,
+      'arch',
+      `printf '%s\\n' "$*" > "${archCall}"; shift; MAJOR_TEST_NATIVE_ARM64=1 exec "$@"`,
+    );
+
+    expect(bash([STAGE], { MAJOR_DSH_HOME: home, MAJOR_APP_DIR: appDir }).status).toBe(0);
+    const result = bash([join(app, 'Contents/MacOS/Major'), '--dry-run', '--project', project], {
+      MAJOR_DSH_HOME: '/must/not/control/the/staged/app',
+      PATH: `${bin}:${process.env.PATH ?? ''}`,
+    });
+
+    expect(result.status).toBe(0);
+    expect(readFileSync(archCall, 'utf8')).toContain('-arm64 /bin/bash');
+    expect(result.stdout).toContain(`dsh home: ${home}`);
+  });
+
   it('dry-runs start for a real project directory without writing a lock', () => {
     const home = isolatedHome();
     const project = mkdtempSync(join(tmpdir(), 'major-project-'));
