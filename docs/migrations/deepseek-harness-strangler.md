@@ -6,9 +6,12 @@ routing, policy, goal, account, skill, evaluation and GBrain layer.
 
 ## Outcome
 
-Run trusted repositories through native DSH providers in the local environment.
-Keep provider choice independent from environment choice. Preserve Lima and the
-old Major/Lima pipeline as explicit high-isolation and rollback choices.
+Run trusted repository mutation through native DSH Codex in the local
+environment and use native Claude for independent review. Keep the Codex worker
+choice independent from local or Lima environment choice. Preserve other hosts
+through the old compatibility path until each live DSH adapter passes the same
+gates. Preserve Lima and the old Major/Lima pipeline as explicit high-isolation
+and rollback choices.
 
 ## KEEP
 

@@ -229,7 +229,7 @@ export function dshAdapterForMajorHost(host, environment = 'local', accountLabel
   );
 }
 
-async function acquireWorkerLease(ctx, major, goal, signal) {
+async function acquireWorkerLease(ctx, major, goal, maxRunMinutes, signal) {
   const owner = `dsh-goal-${goal.id}`;
   let pollMs = LEASE_POLL_INITIAL_MS;
   for (;;) {
@@ -251,7 +251,7 @@ async function acquireWorkerLease(ctx, major, goal, signal) {
           '--pid',
           String(process.pid),
           '--ttl-minutes',
-          '120',
+          String(maxRunMinutes + 5),
         ],
         signal,
       ),
@@ -413,7 +413,20 @@ async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
     throw new Error('major-workstation: admitted goal does not match the DSH project directory');
   }
   const selection = parseJson(
-    await runProcess(ctx, cwd, [major, 'goal', 'route-execution', '--id', admitted.goalId], signal),
+    await runProcess(
+      ctx,
+      cwd,
+      [
+        major,
+        'goal',
+        'route-execution',
+        '--id',
+        admitted.goalId,
+        '--environment',
+        route.environment,
+      ],
+      signal,
+    ),
     'goal route-execution',
   );
   if (selection.kind !== 'route') {
@@ -424,16 +437,16 @@ async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
   if (!Number.isInteger(selection.maxRunMinutes) || selection.maxRunMinutes <= 0) {
     throw new Error('major-workstation: Major returned an invalid native run limit');
   }
-  const executionSignal = AbortSignal.any([
-    signal,
-    AbortSignal.timeout(selection.maxRunMinutes * 60 * 1_000),
-  ]);
   const dshProviderName = dshAdapterForMajorHost(
     selection.host,
     route.environment,
     selection.accountLabel,
   );
-  const lease = await acquireWorkerLease(ctx, major, goal, executionSignal);
+  const lease = await acquireWorkerLease(ctx, major, goal, selection.maxRunMinutes, signal);
+  const executionSignal = AbortSignal.any([
+    signal,
+    AbortSignal.timeout(selection.maxRunMinutes * 60 * 1_000),
+  ]);
   let executionError;
   try {
     const run = await withRoutedContext(selection, admitted.goalId, lease, () =>

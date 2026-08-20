@@ -315,6 +315,7 @@ grep -Fq "withRoutedExecutionContext" distribution/deepseek-harness/bundles/majo
 if grep -Fq "process.env.MAJOR_DSH_ROUTE_" distribution/deepseek-harness/bundles/major-kernel/lima-subprocess.js; then fail "DeepSeek Harness Lima route metadata must not use global process environment"; fi
 grep -Fq "resolveSupervisedWorkshopAuthority(cwd)" src/harness/cli.ts || fail "DeepSeek Harness Lima bridge does not resolve live mutation authority"
 grep -Fq "assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd)" src/execution/lima-backend.ts || fail "DeepSeek Harness Lima bridge does not revalidate mutation authority"
+grep -Fq "routeGoalExecution(goal, { eligibleHosts: ['codex'] })" src/supervisor/cli.ts || fail "DeepSeek Harness route must exclude hosts without a live mutation adapter"
 grep -Fq "name: '@major/dsh-kernel'" distribution/deepseek-harness/bundles/major-kernel/cordis.patch.yml || fail "DeepSeek Harness Major kernel is not mounted"
 grep -Fq 'served __DSH_BOOT__ graph omits @major/dsh-kernel' scripts/start-major-workstation.sh || fail "Major workstation does not verify the served kernel boot graph"
 grep -Fq "name: 'major'" distribution/deepseek-harness/bundles/major-kernel/index.js || fail "DeepSeek Harness Major provider missing"

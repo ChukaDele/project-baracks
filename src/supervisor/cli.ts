@@ -592,8 +592,12 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const id = requireFlag(args, '--id');
     const goal = getGoal(id);
     if (!goal) throw new Error(`unknown goal: ${id}`);
+    const environment = requireFlag(args, '--environment');
+    if (environment !== 'local' && environment !== 'lima') {
+      throw new Error(`unsupported native execution environment: ${environment}`);
+    }
     const policy = getProjectPolicy(goal.project, goal.repoPath);
-    const selection = routeGoalExecution(goal);
+    const selection = routeGoalExecution(goal, { eligibleHosts: ['codex'] });
     let resolvedSkills: Array<{ id: string; source: string; content: string }> = [];
     let skillResolutionDegraded = false;
     if (selection.kind === 'route') {

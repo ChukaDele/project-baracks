@@ -216,13 +216,23 @@ export function selectCoordinator(
 /** Resolve and persist the one provider/model/account decision used by every
  * live execution backend. Retry-eligible capacity is consumed here so the
  * hidden DSH bridge and the legacy Lima cycle cannot diverge. */
-export function routeGoalExecution(goal: SupervisorGoal): CoordinatorSelection {
+export function routeGoalExecution(
+  goal: SupervisorGoal,
+  options: { eligibleHosts?: readonly WorkerHost[] } = {},
+): CoordinatorSelection {
   assertExecutionAllowed(getProjectPolicy(goal.project, goal.repoPath));
   const providerState = openDb();
   let selection: CoordinatorSelection;
   try {
     const providerInfos = loadPersistedProviderInfos(providerState.db);
-    selection = selectCoordinator(goal, providerInfos);
+    const eligibleHosts = options.eligibleHosts ? new Set(options.eligibleHosts) : undefined;
+    const eligibleProviderInfos = eligibleHosts
+      ? providerInfos.filter((provider) => {
+          const host = PROVIDER_HOSTS[parseCapacityKey(provider.name).providerName];
+          return host !== undefined && eligibleHosts.has(host);
+        })
+      : providerInfos;
+    selection = selectCoordinator(goal, eligibleProviderInfos);
     if (selection.kind === 'route') {
       const routedSelection = selection;
       const selectedModel = providerInfos

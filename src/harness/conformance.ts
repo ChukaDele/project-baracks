@@ -376,7 +376,8 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
       kernelSource.includes('MAJOR_SESSION_HOST') &&
         kernelSource.includes('MAJOR_FOREGROUND_DISPATCH') &&
         kernelSource.includes('MAJOR_DSH_EXECUTION_ENVIRONMENT') &&
-        kernelSource.includes("[major, 'goal', 'route-execution'") &&
+        kernelSource.includes("'route-execution'") &&
+        kernelSource.includes("'--environment'") &&
         kernelSource.includes('withRoutedExecutionContext') &&
         !kernelSource.includes('process.env.MAJOR_DSH_ROUTE_') &&
         kernelSource.includes('RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT') &&

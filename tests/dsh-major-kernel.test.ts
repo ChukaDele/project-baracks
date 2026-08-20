@@ -743,6 +743,10 @@ describe('Major DSH workstation kernel', () => {
       ['resource', 'release', '--lease'],
     ]);
     expect(argv.flat()).not.toContain('run');
+    expect(argv[3]).toContain('--environment');
+    expect(argv[3]).toContain('local');
+    expect(argv[4]).toContain('--ttl-minutes');
+    expect(argv[4]).toContain('6');
     expect(argv[6]).toContain(
       'DSH local/codex#work-b/gpt-5.6-codex completed: ' +
         'mutated the requested file and tests passed',

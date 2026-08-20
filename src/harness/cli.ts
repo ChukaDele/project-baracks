@@ -93,7 +93,11 @@ export async function runHarnessCli(args: string[]): Promise<boolean> {
     ) {
       throw new Error('native execution environment does not match Major routing authority');
     }
-    const resourceLeasePid = Number.parseInt(requiredFlag(args, '--resource-lease-pid'), 10);
+    const resourceLeasePidRaw = requiredFlag(args, '--resource-lease-pid');
+    if (!/^[1-9]\d*$/.test(resourceLeasePidRaw)) {
+      throw new Error('--resource-lease-pid must be a positive integer');
+    }
+    const resourceLeasePid = Number(resourceLeasePidRaw);
     if (!Number.isInteger(resourceLeasePid) || resourceLeasePid <= 0) {
       throw new Error('--resource-lease-pid must be a positive integer');
     }
