@@ -209,6 +209,16 @@ describe('clean-install Lima provisioning', () => {
     expect(source).not.toMatch(/curl[^\n]*\|\s*(ba)?sh/);
   });
 
+  it('provisions and health-checks the minimal Node project toolchain', () => {
+    const bootstrap = readFileSync(resolve('scripts/bootstrap-major-lima-worker.sh'), 'utf8');
+    const provision = readFileSync(provisioner, 'utf8');
+    expect(bootstrap).toContain('apt-get install -y --no-install-recommends nodejs npm');
+    expect(bootstrap).toContain('command -v node >/dev/null');
+    expect(bootstrap).toContain('command -v npm >/dev/null');
+    expect(provision.match(/command -v node/g)).toHaveLength(2);
+    expect(provision.match(/command -v npm/g)).toHaveLength(2);
+  });
+
   it('migrates only each exact authorised credential file through sudo', () => {
     const source = readFileSync(resolve('scripts/bootstrap-major-lima-worker.sh'), 'utf8');
     expect(source).toContain('sudo test -f "$auth_source"');

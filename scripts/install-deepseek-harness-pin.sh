@@ -9,6 +9,8 @@ DSH_HOME="${MAJOR_DSH_HOME:-$MAJOR_HOME/dsh-harness}"
 PIN_FILE="$ROOT/distribution/deepseek-harness/pin.json"
 INSTALL_RECORD="$DSH_HOME/major-install.json"
 RUNTIME_DIR="$DSH_HOME/runtime"
+CODEX_PROFILE_HOME="${MAJOR_DSH_CODEX_PROFILE_HOME:-$HOME/.codex}"
+DSH_CODEX_HOME="$DSH_HOME/providers/codex/default"
 KERNEL_SOURCE="$ROOT/distribution/deepseek-harness/bundles/major-kernel"
 KERNEL_DEST="$DSH_HOME/bundles/major-kernel"
 DRY_RUN=0
@@ -25,6 +27,7 @@ Also stages a reversible Major.app launcher (loopback DSH web + Chrome app-mode)
 Environment:
   MAJOR_HOME      Major state root (default: ~/.major)
   MAJOR_DSH_HOME  Isolated harness home (default: $MAJOR_HOME/dsh-harness)
+  MAJOR_DSH_CODEX_PROFILE_HOME  Existing authenticated Codex profile (default: ~/.codex)
   MAJOR_APP_DIR   Major.app parent directory (default: ~/Applications)
 EOF
 }
@@ -158,10 +161,47 @@ stage_kernel_bundle() {
   cp -f "$KERNEL_SOURCE/package.json" "$KERNEL_DEST/package.json"
   cp -f "$KERNEL_SOURCE/index.js" "$KERNEL_DEST/index.js"
   cp -f "$KERNEL_SOURCE/client.js" "$KERNEL_DEST/client.js"
+  cp -f "$KERNEL_SOURCE/lima-subprocess.js" "$KERNEL_DEST/lima-subprocess.js"
   # Remove the superseded raw-ESM split module on upgrade. The browser entry
   # is one self-contained lazy-CJS factory, as required by DSH client-modules.
   rm -f "$KERNEL_DEST/command-input.js"
   cp -f "$KERNEL_SOURCE/cordis.patch.yml" "$KERNEL_DEST/cordis.patch.yml"
+}
+
+link_kernel_runtime() {
+  local destination="$KERNEL_DEST/node_modules"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] link shared runtime dependencies into $destination"
+    return 0
+  fi
+  if [[ -L "$destination" ]]; then
+    [[ "$(readlink "$destination")" == "$RUNTIME_DIR/node_modules" ]] || \
+      fail "refusing to replace a kernel dependency link with a different target: $destination"
+  elif [[ -e "$destination" ]]; then
+    fail "refusing to replace existing kernel dependency directory: $destination"
+  else
+    ln -s "$RUNTIME_DIR/node_modules" "$destination"
+  fi
+}
+
+stage_codex_worker_home() {
+  local source_auth="$CODEX_PROFILE_HOME/auth.json"
+  local dest_auth="$DSH_CODEX_HOME/auth.json"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] stage isolated Codex worker home $DSH_CODEX_HOME from existing auth $source_auth"
+    return 0
+  fi
+  [[ -f "$source_auth" ]] || fail "authenticated Codex profile missing: $source_auth"
+  mkdir -p "$DSH_CODEX_HOME"
+  chmod 700 "$DSH_CODEX_HOME"
+  if [[ -L "$dest_auth" ]]; then
+    [[ "$(readlink "$dest_auth")" == "$source_auth" ]] || \
+      fail "refusing to replace a Codex auth symlink with a different target: $dest_auth"
+  elif [[ -e "$dest_auth" ]]; then
+    fail "refusing to replace existing Codex worker auth: $dest_auth"
+  else
+    ln -s "$source_auth" "$dest_auth"
+  fi
 }
 
 write_runtime_manifest() {
@@ -294,8 +334,10 @@ disk_preflight
 stage_profile major-workstation-web
 stage_profile major-workstation-headless
 stage_kernel_bundle
+stage_codex_worker_home
 write_runtime_manifest
 install_runtime_packages
+link_kernel_runtime
 link_kernel_bundle
 link_shared_runtime major-workstation-web
 link_shared_runtime major-workstation-headless

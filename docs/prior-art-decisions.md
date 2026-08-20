@@ -171,6 +171,12 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Rejected alternatives:** fork DeepSeek Harness; wrap AI SDK HarnessAgent; adopt goose or OpenCode wholesale; replace GBrain with the DSH session log; replace Lima with the default DSH sandbox before a seam proof; resolve unpinned `@deepseek-ai` dist-tags
 - **Evidence:** the official repository describes profile and plugin composition and warns that the developer preview will have compatibility-breaking changes. npm published `@deepseek-ai/dsh@0.1.0-rc.8` on 2026-08-19 with integrity `sha512-VQU5NlomrKLRgcXuOf+sxWFvqxPA8q9vMhrKPlPPXiOJEhGlGlAdiyxZvZxkCVI+v0zbhe21cY3/luLyxpSzzA==`. Official tag `dsh-v0.1.0-rc.8` resolves to commit `141eb6fef83422698aef7a981029e843e8161534`.
 
+### First live-runtime checkpoint
+
+- **Decision:** ADOPT the pinned DSH provider adapters for an explicit `local` strangle route; WRAP goal admission, Major provider/model/account routing, and result checkpointing with the existing Major CLI. Provider choice remains Major control-plane policy, orthogonal to the `local` or `lima` execution environment.
+- **Boundary:** the route is opt-in through `MAJOR_DSH_EXECUTION_ENVIRONMENT=local`. An unset value and `lima` continue through `major run` and `LimaBackend`; the selected Major Codex host maps to DSH `codex`, the selected Claude host maps to the already-composed `claude-review`, and hosts without live DSH adapters fail closed. DSH-inside-Lima remains reserved until its proof.
+- **Machine receipt:** `distribution/deepseek-harness/runtime-checkpoint.json`.
+
 ## 2026-08-20 — Mac application experience for the pinned DSH workstation
 
 - **Capability:** smallest owner-facing Mac application that starts the already-pinned Major DSH web workstation for one real project

@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   detectProviderOutcomeSignals,
   LimaBackend,
+  rewriteNativeEnvironmentFrame,
   workspaceMutatedFromDiffExit,
 } from '../src/execution/lima-backend.js';
 import { openDb } from '../src/db/client.js';
@@ -23,6 +24,32 @@ import { EXHAUSTION_PATTERN, RATE_LIMIT_PATTERN } from '../src/providers/command
 import { tempDbPath } from './helpers.js';
 
 describe('returned workspace diff evidence', () => {
+  it('rewrites only the admitted App Server thread workspace for Lima', () => {
+    const start = rewriteNativeEnvironmentFrame(
+      JSON.stringify({
+        id: 2,
+        method: 'thread/start',
+        params: { cwd: '/host/repo', ephemeral: true },
+      }),
+      '/host/repo',
+      '/guest/repo',
+    );
+    expect(JSON.parse(start)).toEqual({
+      id: 2,
+      method: 'thread/start',
+      params: { cwd: '/guest/repo', ephemeral: true },
+    });
+    const initialize = JSON.stringify({ id: 1, method: 'initialize', params: { client: 'dsh' } });
+    expect(rewriteNativeEnvironmentFrame(initialize, '/host/repo', '/guest/repo')).toBe(initialize);
+    expect(() =>
+      rewriteNativeEnvironmentFrame(
+        JSON.stringify({ id: 2, method: 'thread/start', params: { cwd: '/other/repo' } }),
+        '/host/repo',
+        '/guest/repo',
+      ),
+    ).toThrow(/admitted host workspace/);
+  });
+
   it('maps exit 0 to unchanged and exit 1 to mutated', () => {
     expect(workspaceMutatedFromDiffExit(0)).toBe(false);
     expect(workspaceMutatedFromDiffExit(1)).toBe(true);

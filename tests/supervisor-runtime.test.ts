@@ -11,6 +11,7 @@ import {
   nonSuccessCyclePatch,
   parseWorkerReport,
   runForegroundGoal,
+  routingDecisionGoalPatch,
   selectCoordinator,
   tryAcquireRepoCycleLock,
 } from '../src/supervisor/runtime.js';
@@ -62,6 +63,31 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('persists the provider, model, account, and host selected for execution', () => {
+    expect(
+      routingDecisionGoalPatch(
+        {
+          kind: 'route',
+          host: 'claude',
+          provider: 'claude-code#review',
+          accountLabel: 'review',
+          modelRef: 'claude-opus-4-1',
+          reason: 'subscription route',
+        },
+        () => new Date('2026-08-20T12:00:00.000Z'),
+      ),
+    ).toEqual({
+      lastRoutingDecision: {
+        host: 'claude',
+        provider: 'claude-code#review',
+        accountLabel: 'review',
+        modelRef: 'claude-opus-4-1',
+        reason: 'subscription route',
+        selectedAt: '2026-08-20T12:00:00.000Z',
+      },
+    });
+  });
+
   it('revokes stale routing state on authentication or executable-trust failure', () => {
     const base = {
       host: 'claude' as const,

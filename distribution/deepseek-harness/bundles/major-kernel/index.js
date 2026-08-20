@@ -202,7 +202,100 @@ export function foregroundDispatchHops(stdout) {
   return receipt.hops;
 }
 
-async function executeMajor(ctx, cwd, task, signal) {
+export function configuredRuntimeRoute(env = process.env) {
+  const environment = env.MAJOR_DSH_EXECUTION_ENVIRONMENT;
+  if (environment === undefined || environment === '') return undefined;
+  if (environment !== 'local' && environment !== 'lima') {
+    throw new Error(`major-workstation: unsupported DSH execution environment: ${environment}`);
+  }
+  return { environment };
+}
+
+export function dshAdapterForMajorHost(host, environment = 'local') {
+  if (host === 'codex') return environment === 'lima' ? 'codex-lima' : 'codex';
+  if (host === 'claude') return 'claude-review';
+  throw new Error(
+    `major-workstation: Major selected ${String(host)}, which has no live DSH adapter`,
+  );
+}
+
+async function acquireWorkerLease(ctx, major, goal, signal) {
+  const owner = `dsh-goal-${goal.id}`;
+  for (;;) {
+    const result = parseJson(
+      await runProcess(
+        ctx,
+        goal.repoPath,
+        [
+          major,
+          'resource',
+          'acquire',
+          '--kind',
+          'worker',
+          '--owner',
+          owner,
+          '--project',
+          goal.project,
+          '--pid',
+          String(process.pid),
+          '--ttl-minutes',
+          '120',
+        ],
+        signal,
+      ),
+      'resource acquire',
+    );
+    if (result.status === 'active' && typeof result.lease?.id === 'string') {
+      return result.lease;
+    }
+    if (result.status !== 'queued') {
+      throw new Error(
+        `major-workstation: worker resource refused: ${String(result.reason ?? 'unknown reason')}`,
+      );
+    }
+    await new Promise((resolveWait, rejectWait) => {
+      const timer = setTimeout(resolveWait, 250);
+      const abort = () => {
+        clearTimeout(timer);
+        rejectWait(signal.reason ?? new Error('major-workstation: resource wait aborted'));
+      };
+      signal.addEventListener('abort', abort, { once: true });
+      timer.unref?.();
+    });
+  }
+}
+
+function withRoutedEnvironment(selection, goalId, lease, callback) {
+  const entries = {
+    MAJOR_DSH_ROUTE_GOAL_ID: goalId,
+    MAJOR_DSH_ROUTE_ACCOUNT_LABEL: selection.accountLabel,
+    MAJOR_DSH_ROUTE_MODEL_REF: selection.modelRef,
+    MAJOR_DSH_ROUTE_LEASE_ID: lease.id,
+    MAJOR_DSH_ROUTE_LEASE_PID: String(process.pid),
+  };
+  const previous = Object.fromEntries(
+    Object.keys(entries).map((name) => [name, process.env[name]]),
+  );
+  for (const [name, value] of Object.entries(entries)) process.env[name] = value;
+  return Promise.resolve()
+    .then(callback)
+    .finally(() => {
+      for (const [name, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    });
+}
+
+export function nativeWorkerTask(task) {
+  return `MAJOR LEAF WORKER CONTRACT:
+Major has already admitted this goal and selected you through the DSH runtime. You are the leased leaf worker, not the control-plane coordinator. Do not run Major CLI commands, admit or dispatch another goal, or delegate to another worker. Perform the task directly in the current workspace, run its verification, and report the observed result.
+
+TASK:
+${task}`;
+}
+
+async function admitMajorTask(ctx, cwd, task, signal) {
   const major = majorExecutable();
   const host = sessionHost();
   await runProcess(ctx, cwd, [major, 'session', 'attach', '--cwd', cwd, '--host', host], signal);
@@ -221,6 +314,11 @@ async function executeMajor(ctx, cwd, task, signal) {
   if (admitted.ownLiveWork !== true) {
     throw new Error('major-workstation: another Major session owns live work for this goal');
   }
+  return { major, host, admitted };
+}
+
+async function executeMajor(ctx, cwd, task, signal) {
+  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal);
   const beforeGoal = parseJson(
     await runProcess(ctx, cwd, [major, 'goal', 'show', '--id', admitted.goalId], signal),
     'goal show before run',
@@ -256,6 +354,82 @@ async function executeMajor(ctx, cwd, task, signal) {
   };
 }
 
+async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
+  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal);
+  const goal = parseJson(
+    await runProcess(ctx, cwd, [major, 'goal', 'show', '--id', admitted.goalId], signal),
+    'goal show before native run',
+  );
+  if (
+    goal.id !== admitted.goalId ||
+    goal.repoPath !== cwd ||
+    typeof goal.project !== 'string' ||
+    !goal.project
+  ) {
+    throw new Error('major-workstation: admitted goal does not match the DSH project directory');
+  }
+  const selection = parseJson(
+    await runProcess(ctx, cwd, [major, 'goal', 'route-execution', '--id', admitted.goalId], signal),
+    'goal route-execution',
+  );
+  if (selection.kind !== 'route') {
+    throw new Error(
+      `major-workstation: provider routing checkpoint: ${String(selection.reason ?? 'no eligible route')}`,
+    );
+  }
+  const dshProviderName = dshAdapterForMajorHost(selection.host, route.environment);
+  const lease = await acquireWorkerLease(ctx, major, goal, signal);
+  try {
+    const run = await withRoutedEnvironment(selection, admitted.goalId, lease, () =>
+      settleSubagent(ctx, dshProviderName, nativeWorkerTask(task), parent, signal),
+    );
+    if (run.stopReason !== 'completed') {
+      throw new Error(
+        `major-workstation: ${dshProviderName} ended with ${run.stopReason}` +
+          (run.diagnostic ? `: ${run.diagnostic}` : ''),
+      );
+    }
+    const summary = textContent(run.output) || `${dshProviderName} completed without text output`;
+    await runProcess(
+      ctx,
+      cwd,
+      [
+        major,
+        'goal',
+        'report',
+        '--id',
+        admitted.goalId,
+        '--status',
+        'active',
+        '--summary',
+        clip(
+          `DSH ${route.environment}/${selection.provider}/${selection.modelRef} completed: ${summary}`,
+          12_000,
+        ),
+      ],
+      signal,
+    );
+    return {
+      goalId: admitted.goalId,
+      status: 'active',
+      coordinator: selection.host,
+      account: selection.accountLabel,
+      runtime: 'dsh',
+      provider: selection.provider,
+      model: selection.modelRef,
+      environment: route.environment,
+      summary,
+    };
+  } finally {
+    await runProcess(
+      ctx,
+      cwd,
+      [major, 'resource', 'release', '--lease', lease.id, '--json'],
+      undefined,
+    );
+  }
+}
+
 export function createMajorProvider(ctx) {
   return {
     name: 'major',
@@ -268,18 +442,30 @@ export function createMajorProvider(ctx) {
       if (!task) throw new Error('major-workstation: a non-empty text task is required');
       const localAbort = new AbortController();
       const signal = AbortSignal.any([request.signal, localAbort.signal]);
-      const result = executeMajor(ctx, cwd, task, signal).then(
-        (run) => ({
-          output: [
-            {
-              type: 'text',
-              text:
-                `Major goal ${run.goalId} finished this increment with ${run.coordinator}` +
-                ` account ${run.account}; goal status ${run.status}.`,
-            },
-          ],
-          stopReason: 'completed',
-        }),
+      const route = configuredRuntimeRoute();
+      const execution = route
+        ? executeNativeDsh(ctx, cwd, task, request.parent, signal, route)
+        : executeMajor(ctx, cwd, task, signal);
+      const result = execution.then(
+        (run) => {
+          const route =
+            run.runtime === 'dsh'
+              ? ` DSH runtime route: provider=${run.provider}; model=${run.model};` +
+                ` account=${run.account}; environment=${run.environment}.` +
+                ` Worker result: ${run.summary}`
+              : '';
+          return {
+            output: [
+              {
+                type: 'text',
+                text:
+                  `Major goal ${run.goalId} finished this increment with ${run.coordinator}` +
+                  ` account ${run.account}; goal status ${run.status}.${route}`,
+              },
+            ],
+            stopReason: 'completed',
+          };
+        },
         (error) => ({
           output: [],
           stopReason: signal.aborted ? 'aborted' : 'error',

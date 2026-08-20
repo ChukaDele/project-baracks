@@ -41,6 +41,7 @@ import {
   runDaemon,
   runForegroundGoal,
   runGoalCycle,
+  routeGoalExecution,
   supervisorSnapshot,
   tryAcquireRepoCycleLock,
 } from './runtime.js';
@@ -573,6 +574,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       lastFinishedAt: new Date().toISOString(),
       ownerGate: ownerGate ? redactText(ownerGate).slice(0, 4_000) : undefined,
       pendingCompletion: undefined,
+      activePid: undefined,
       // An external report supersedes whatever the last automatic cycle left
       // behind; it must not leave a stale immediate-retry flag pointing at a
       // capacity rotation this report just overrode.
@@ -580,6 +582,17 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     };
     updateGoal(id, patch);
     console.log(`goal ${id}: ${statusRaw}`);
+    return true;
+  }
+
+  // Internal bridge for compositional runtimes. It deliberately accepts no
+  // provider override: Major remains the provider/model/account authority.
+  if (command === 'goal' && args[1] === 'route-execution') {
+    const id = requireFlag(args, '--id');
+    const goal = getGoal(id);
+    if (!goal) throw new Error(`unknown goal: ${id}`);
+    const selection = routeGoalExecution(goal);
+    console.log(JSON.stringify(selection, null, 2));
     return true;
   }
 

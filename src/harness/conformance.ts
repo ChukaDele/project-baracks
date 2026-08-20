@@ -114,6 +114,17 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
     repoRoot,
     'distribution/deepseek-harness/bundles/major-kernel/client.js',
   );
+  const runtimeCheckpoint = JSON.parse(
+    readRepoFile(repoRoot, 'distribution/deepseek-harness/runtime-checkpoint.json'),
+  ) as {
+    defaultEnvironment?: string;
+    defaultPath?: string;
+    optInRoutes?: Array<{
+      environment?: string;
+      providerAuthority?: string;
+      hostAdapters?: { codex?: string; claude?: string };
+    }>;
+  };
   const webManifest = JSON.parse(
     readRepoFile(
       repoRoot,
@@ -159,6 +170,19 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
         kernelClient.includes("kind: 'command-input'") &&
         kernelClient.includes('anchorSeq: context.state.seq - 0.1'),
       '/major must reuse the upstream command-input renderer before the generic result after replay',
+    ),
+    check(
+      'runtime.local-major-routed-checkpoint',
+      runtimeCheckpoint.defaultEnvironment === 'lima' &&
+        runtimeCheckpoint.defaultPath === 'major-run' &&
+        runtimeCheckpoint.optInRoutes?.some(
+          (route) =>
+            route.environment === 'local' &&
+            route.providerAuthority === 'major-router' &&
+            route.hostAdapters?.codex === 'codex' &&
+            route.hostAdapters?.claude === 'claude-review',
+        ) === true,
+      'local DSH is explicit opt-in and provider-routed while Lima/major-run remains default',
     ),
     check(
       'web.patch-matches-runtime',
@@ -343,12 +367,16 @@ export function runHarnessConformance(repoRoot: string): HarnessConformanceRepor
       'kernel.subscription-routing',
       kernelSource.includes('MAJOR_SESSION_HOST') &&
         kernelSource.includes('MAJOR_FOREGROUND_DISPATCH') &&
+        kernelSource.includes('MAJOR_DSH_EXECUTION_ENVIRONMENT') &&
+        kernelSource.includes("[major, 'goal', 'route-execution'") &&
+        kernelSource.includes("environment === 'lima' ? 'codex-lima' : 'codex'") &&
+        kernelSource.includes("if (host === 'claude') return 'claude-review'") &&
         !kernelSource.includes('NO_CYCLE_MESSAGE') &&
         !kernelSource.includes("'--host', 'codex'") &&
         !kernelSource.includes("'--host', 'claude'") &&
         !kernelSource.includes("'--host', 'cursor'") &&
         !kernelSource.includes("'--host', 'antigravity'"),
-      '/major must take MAJOR_SESSION_HOST for admit/attach; Major run still routes the worker',
+      '/major admits through Major; native Codex is opt-in and Major run remains the default route',
     ),
     ...assertProfileComposition(majorWorkstationWebProfile()),
     ...assertProfileComposition(majorWorkstationHeadlessProfile()),

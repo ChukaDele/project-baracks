@@ -23,7 +23,29 @@ export const DSH_CLAUDE_CODE_BUNDLE = '@deepseek-ai/dsh-subagent-claude-code';
 export const DSH_CODEX_BUNDLE = '@deepseek-ai/dsh-subagent-codex';
 export const MAJOR_KERNEL_LOCAL_SPEC = 'file:../../bundles/major-kernel';
 export const EMPTY_CORDIS_PATCH = '[]\n';
-export const MAJOR_KERNEL_PATCH = `- insert:
+export const MAJOR_KERNEL_PATCH = `- id: subagent-codex
+  config:
+    permissionMode: approve-for-me
+    env:
+      CODEX_HOME: !!js dshHomePath('providers/codex/default')
+- insert:
+    - id: codex-lima-environment
+      name: cordis:group
+      group: true
+      isolate:
+        subprocess: true
+      config:
+        - id: subprocess-lima
+          name: '@major/dsh-kernel/lima-subprocess'
+        - id: subagent-codex-lima
+          name: '@deepseek-ai/dsh-subagent-codex'
+          config:
+            providerName: codex-lima
+            permissionMode: approve-for-me
+            disposeGraceMs: 120000
+            env:
+              MAJOR_DSH_GUEST_PROVIDER: codex
+              MAJOR_DSH_GUEST_ARGV_JSON: '["/opt/major/providers/v1/codex/bin/codex-native","app-server","--stdio"]'
     - id: subagent-claude-review
       name: '@deepseek-ai/dsh-subagent-claude-code'
       config:
@@ -142,10 +164,12 @@ export function bundleManifest(bundle: DshBundle): {
   exports: {
     '.': './index.js';
     './client': './client.js';
+    './lima-subprocess': './lima-subprocess.js';
     './package.json': './package.json';
   };
-  files: ['index.js', 'client.js', 'cordis.patch.yml'];
+  files: ['index.js', 'client.js', 'lima-subprocess.js', 'cordis.patch.yml'];
   version: '0.0.0-shadow';
+  dependencies: { '@deepseek-ai/dsh-subprocess-local': typeof DEEPSEEK_HARNESS_PIN.npm.version };
   dsh: {
     client: {
       inject: ['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-ui-conversation'];
@@ -162,10 +186,14 @@ export function bundleManifest(bundle: DshBundle): {
     exports: {
       '.': './index.js',
       './client': './client.js',
+      './lima-subprocess': './lima-subprocess.js',
       './package.json': './package.json',
     },
-    files: ['index.js', 'client.js', 'cordis.patch.yml'],
+    files: ['index.js', 'client.js', 'lima-subprocess.js', 'cordis.patch.yml'],
     version: '0.0.0-shadow',
+    dependencies: {
+      '@deepseek-ai/dsh-subprocess-local': DEEPSEEK_HARNESS_PIN.npm.version,
+    },
     dsh: {
       client: {
         inject: ['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-ui-conversation'],

@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runSupervisorCli } from '../src/supervisor/cli.js';
 import { decideCursorPermission } from '../src/execution/cursor-acp-runtime.js';
 import { verifyProviderDecision } from '../src/security/major-gateway.js';
-import { writeSupervisorState, type SupervisorGoal } from '../src/supervisor/state.js';
+import {
+  readSupervisorState,
+  writeSupervisorState,
+  type SupervisorGoal,
+} from '../src/supervisor/state.js';
 import { openDb } from '../src/db/client.js';
 import {
   persistProviderDiscovery,
@@ -75,6 +79,30 @@ afterEach(() => {
 });
 
 describe('supervisor CLI authority', () => {
+  it('clears a stale legacy cycle pid when a compositional runtime reports', async () => {
+    writeSupervisorState({
+      version: 1,
+      goals: [{ ...goal(), activePid: 12345, retryImmediately: true }],
+      sessions: [],
+    });
+    await expect(
+      runSupervisorCli([
+        'goal',
+        'report',
+        '--id',
+        'goal-1',
+        '--status',
+        'active',
+        '--summary',
+        'DSH local Codex completed and tests passed',
+      ]),
+    ).resolves.toBe(true);
+    const persisted = readSupervisorState().goals[0];
+    expect(persisted?.activePid).toBeUndefined();
+    expect(persisted?.retryImmediately).toBe(false);
+    expect(persisted?.lastSummary).toContain('DSH local Codex completed');
+  });
+
   it('refuses direct done and running reports', async () => {
     await expect(
       runSupervisorCli([

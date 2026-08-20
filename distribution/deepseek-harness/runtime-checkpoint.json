@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "phase": "strangle-checkpoint",
+  "defaultEnvironment": "lima",
+  "defaultPath": "major-run",
+  "optInRoutes": [
+    {
+      "environment": "local",
+      "providerAuthority": "major-router",
+      "hostAdapters": {
+        "codex": "codex",
+        "claude": "claude-review"
+      }
+    }
+  ],
+  "reservedRoutes": [{ "environment": "lima", "path": "dsh-composition" }]
+}

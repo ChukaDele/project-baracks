@@ -91,6 +91,11 @@ describe('DeepSeek Harness workstation composition', () => {
     ).toEqual([]);
     expect(majorKernelBundle().patch).toContain("name: '@major/dsh-kernel'");
     expect(majorKernelBundle().patch).toContain('providerName: claude-review');
+    expect(majorKernelBundle().patch).toContain('id: subagent-codex');
+    expect(majorKernelBundle().patch).toContain('permissionMode: approve-for-me');
+    expect(majorKernelBundle().patch).toContain(
+      "CODEX_HOME: !!js dshHomePath('providers/codex/default')",
+    );
     expect(majorKernelBundle().patch).toContain('permissionMode: plan');
     expect(DEFAULT_EXECUTION_BACKEND).toBe('lima');
   });
@@ -103,6 +108,9 @@ describe('DeepSeek Harness workstation composition', () => {
     });
     expect(bundleManifest(majorKernelBundle()).main).toBe('./index.js');
     expect(bundleManifest(majorKernelBundle()).exports['./client']).toBe('./client.js');
+    expect(bundleManifest(majorKernelBundle()).exports['./lima-subprocess']).toBe(
+      './lima-subprocess.js',
+    );
     expect(bundleManifest(majorKernelBundle()).exports['./package.json']).toBe('./package.json');
     expect(bundleManifest(majorKernelBundle()).files).not.toContain('command-input.js');
     expect(
@@ -122,7 +130,7 @@ describe('DeepSeek Harness strangle install plan', () => {
       'major-workstation-web',
       'major-workstation-headless',
     ]);
-    expect(plan.npmInstalls).toHaveLength(8);
+    expect(plan.npmInstalls).toHaveLength(9);
     for (const item of plan.npmInstalls.filter(({ package: name }) =>
       name.startsWith('@deepseek-ai/'),
     )) {
@@ -167,6 +175,7 @@ describe('DeepSeek Harness strangle install plan', () => {
       expect(output).toContain('write exact runtime manifest');
       expect(output).toContain('link shared runtime');
       expect(output).toContain('compose pinned profile major-workstation-web');
+      expect(output).toContain('stage isolated Codex worker home');
       expect(output).toContain('Major.app');
       expect(output).toContain('Live Major execution remains on Lima');
       expect(output).toContain('MAJOR_SESSION_HOST');

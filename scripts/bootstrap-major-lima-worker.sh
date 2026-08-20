@@ -12,6 +12,16 @@ install_root=/opt/major/providers/v1
 existing_install=0
 [[ -e "$install_root" ]] && existing_install=1
 
+# The provider binary is not the project toolchain. Native DSH workers must be
+# able to execute the same repository checks that they request on a trusted
+# local environment. Keep the first baseline deliberately small and use the
+# Ubuntu image's maintained packages instead of installing another runtime
+# manager or a second provider image.
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get update
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm
+fi
+
 for provider in claude codex cursor antigravity; do
   user="major-${provider}"
   if ! id "$user" >/dev/null 2>&1; then
@@ -129,6 +139,8 @@ sudo install -m 0555 -o root -g root \
   /opt/major/manage-provider-state
 printf '%s\n' 'major-lima-worker-v1' | sudo tee /opt/major/runner-version >/dev/null
 sudo chmod 0444 /opt/major/runner-version
+command -v node >/dev/null
+command -v npm >/dev/null
 
 for provider in claude codex cursor antigravity; do
   user="major-${provider}"

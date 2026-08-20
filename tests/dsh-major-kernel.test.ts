@@ -59,6 +59,7 @@ function kernelSession(cwd?: string, seed: KernelSession['events'] = []): Kernel
 
 async function loadKernel(): Promise<{
   apply(ctx: unknown): void;
+  dshAdapterForMajorHost(host: string, environment?: string): string;
   foregroundDispatchHops(stdout: string): number;
   hashReviewWorkspace(root: string): string;
 }> {
@@ -67,6 +68,7 @@ async function loadKernel(): Promise<{
   ).href;
   return (await import(url)) as {
     apply(ctx: unknown): void;
+    dshAdapterForMajorHost(host: string, environment?: string): string;
     foregroundDispatchHops(stdout: string): number;
     hashReviewWorkspace(root: string): string;
   };
@@ -106,11 +108,17 @@ function processHandle(stdout: string, exitCode = 0) {
 
 describe('Major DSH workstation kernel', () => {
   const previousHost = process.env.MAJOR_SESSION_HOST;
+  const previousDshEnvironment = process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT;
+  const previousDshProvider = process.env.MAJOR_DSH_PROVIDER;
   const temporaryRoots: string[] = [];
 
   afterEach(() => {
     if (previousHost === undefined) delete process.env.MAJOR_SESSION_HOST;
     else process.env.MAJOR_SESSION_HOST = previousHost;
+    if (previousDshEnvironment === undefined) delete process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT;
+    else process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT = previousDshEnvironment;
+    if (previousDshProvider === undefined) delete process.env.MAJOR_DSH_PROVIDER;
+    else process.env.MAJOR_DSH_PROVIDER = previousDshProvider;
     for (const root of temporaryRoots.splice(0)) {
       rmSync(root, { recursive: true, force: true });
     }
@@ -588,5 +596,112 @@ describe('Major DSH workstation kernel', () => {
         signal: new AbortController().signal,
       }),
     ).resolves.toEqual({ kind: 'error', text: 'Usage: /major <task>' });
+  });
+
+  it('gets the local provider route from Major before invoking the DSH adapter', async () => {
+    process.env.MAJOR_SESSION_HOST = 'codex';
+    process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT = 'local';
+    const argv: string[][] = [];
+    let registered: KernelProvider | undefined;
+    const ctx = {
+      subprocess: {
+        spawn(spec: { argv: string[] }) {
+          argv.push(spec.argv);
+          if (spec.argv[1] === 'goal' && spec.argv[2] === 'admit') {
+            return processHandle(
+              JSON.stringify({ admitted: true, goalId: 'goal-native', ownLiveWork: true }),
+            );
+          }
+          if (spec.argv[1] === 'goal' && spec.argv[2] === 'route-execution') {
+            return processHandle(
+              JSON.stringify({
+                kind: 'route',
+                host: 'codex',
+                provider: 'codex#work-b',
+                accountLabel: 'work-b',
+                modelRef: 'gpt-5.6-codex',
+              }),
+            );
+          }
+          if (spec.argv[1] === 'goal' && spec.argv[2] === 'show') {
+            return processHandle(
+              JSON.stringify({
+                id: 'goal-native',
+                project: 'github.com/example/native-project',
+                repoPath: '/tmp/native-project',
+              }),
+            );
+          }
+          if (spec.argv[1] === 'resource' && spec.argv[2] === 'acquire') {
+            return processHandle(
+              JSON.stringify({ status: 'active', lease: { id: 'lease-native' } }),
+            );
+          }
+          return processHandle('goal goal-native: active');
+        },
+      },
+      subagents: {
+        registerProvider(provider: KernelProvider) {
+          registered = provider;
+        },
+        async start(provider: string, request: { prompt: Array<{ type: string; text: string }> }) {
+          expect(provider).toBe('codex');
+          expect(request.prompt[0]?.text).toContain('MAJOR LEAF WORKER CONTRACT');
+          expect(request.prompt[0]?.text).toContain('Do not run Major CLI commands');
+          expect(request.prompt[0]?.text).toContain('TASK:\nmake the mutation');
+          return {
+            result: Promise.resolve({
+              output: [{ type: 'text', text: 'mutated the requested file and tests passed' }],
+              stopReason: 'completed',
+            }),
+            async dispose() {},
+          };
+        },
+      },
+      commands: { register() {} },
+    };
+    const kernel = await loadKernel();
+    kernel.apply(ctx);
+    if (!registered) throw new Error('Major provider was not registered');
+    const run = await registered.start({
+      prompt: [{ type: 'text', text: 'make the mutation' }],
+      parent: { session: kernelSession('/tmp/native-project') },
+      signal: new AbortController().signal,
+    });
+
+    await expect(run.result).resolves.toMatchObject({
+      stopReason: 'completed',
+      output: [
+        {
+          text: expect.stringContaining(
+            'DSH runtime route: provider=codex#work-b; model=gpt-5.6-codex; ' +
+              'account=work-b; environment=local. Worker result: mutated the requested file and tests passed',
+          ),
+        },
+      ],
+    });
+    await run.dispose();
+    expect(argv.map((args) => args.slice(1, 4))).toEqual([
+      ['session', 'attach', '--cwd'],
+      ['goal', 'admit', '--cwd'],
+      ['goal', 'show', '--id'],
+      ['goal', 'route-execution', '--id'],
+      ['resource', 'acquire', '--kind'],
+      ['goal', 'report', '--id'],
+      ['resource', 'release', '--lease'],
+    ]);
+    expect(argv.flat()).not.toContain('run');
+    expect(argv[5]).toContain(
+      'DSH local/codex#work-b/gpt-5.6-codex completed: ' +
+        'mutated the requested file and tests passed',
+    );
+  });
+
+  it('maps routed Claude to the composed adapter and fails closed for unsupported hosts', async () => {
+    const kernel = await loadKernel();
+    expect(kernel.dshAdapterForMajorHost('codex')).toBe('codex');
+    expect(kernel.dshAdapterForMajorHost('codex', 'lima')).toBe('codex-lima');
+    expect(kernel.dshAdapterForMajorHost('claude')).toBe('claude-review');
+    expect(() => kernel.dshAdapterForMajorHost('cursor')).toThrow(/no live DSH adapter/);
   });
 });
