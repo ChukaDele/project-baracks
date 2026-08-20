@@ -115,7 +115,6 @@ PY
 disk_preflight() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[dry-run] disk preflight before DSH/Lima install"
-    require_disk_headroom >/dev/null
     return 0
   fi
   local stats
