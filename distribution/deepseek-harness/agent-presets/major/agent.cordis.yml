@@ -1,0 +1,3 @@
+# Major execution lives at the host LLM seam. This intentionally contributes
+# no standard-preset tools or persona a second time.
+[]

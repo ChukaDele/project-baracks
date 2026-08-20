@@ -14,6 +14,7 @@ DSH_CODEX_HOME="$DSH_HOME/providers/codex/default"
 CODEX_ACCOUNT_POLICY="${MAJOR_CODEX_ACCOUNT_POLICY:-$MAJOR_HOME/codex-account-policy.json}"
 KERNEL_SOURCE="$ROOT/distribution/deepseek-harness/bundles/major-kernel"
 KERNEL_DEST="$DSH_HOME/bundles/major-kernel"
+MAJOR_PRESET_SOURCE="$ROOT/distribution/deepseek-harness/agent-presets/major"
 DRY_RUN=0
 
 usage() {
@@ -327,6 +328,23 @@ install_runtime_packages() {
   [[ -x "$RUNTIME_DIR/node_modules/.bin/dsh" ]] || fail "pinned dsh executable missing after install"
 }
 
+stage_major_system_preset() {
+  local preset_root="$RUNTIME_DIR/node_modules/@deepseek-ai/dsh/config/agent-presets"
+  local destination="$preset_root/major"
+  [[ -f "$MAJOR_PRESET_SOURCE/agent.cordis.yml" ]] || \
+    fail "missing Major system preset composition: $MAJOR_PRESET_SOURCE/agent.cordis.yml"
+  [[ -f "$MAJOR_PRESET_SOURCE/preset.yml" ]] || \
+    fail "missing Major system preset metadata: $MAJOR_PRESET_SOURCE/preset.yml"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] stage Major system preset $MAJOR_PRESET_SOURCE -> $destination"
+    return 0
+  fi
+  [[ -d "$preset_root/standard" ]] || fail "pinned DSH system preset root missing: $preset_root"
+  mkdir -p "$destination"
+  cp -f "$MAJOR_PRESET_SOURCE/agent.cordis.yml" "$destination/agent.cordis.yml"
+  cp -f "$MAJOR_PRESET_SOURCE/preset.yml" "$destination/preset.yml"
+}
+
 link_shared_runtime() {
   local profile_id="$1"
   local dest="$DSH_HOME/profiles/$profile_id"
@@ -420,6 +438,7 @@ stage_codex_worker_home
 stage_named_codex_worker_homes
 write_runtime_manifest
 install_runtime_packages
+stage_major_system_preset
 link_kernel_runtime
 link_kernel_bundle
 link_shared_runtime major-workstation-web

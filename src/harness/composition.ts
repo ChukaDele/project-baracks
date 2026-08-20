@@ -24,7 +24,14 @@ export const DSH_CLAUDE_CODE_BUNDLE = '@deepseek-ai/dsh-subagent-claude-code';
 export const DSH_CODEX_BUNDLE = '@deepseek-ai/dsh-subagent-codex';
 export const MAJOR_KERNEL_LOCAL_SPEC = 'file:../../bundles/major-kernel';
 export const EMPTY_CORDIS_PATCH = '[]\n';
-export const MAJOR_KERNEL_PATCH = `- id: subagent-codex
+export const MAJOR_KERNEL_PATCH = `- id: agent-default-model
+  config:
+    provider: major
+    model: composer
+- id: agent-presets
+  config:
+    default: major
+- id: subagent-codex
   config:
     permissionMode: approve-for-me
     env:

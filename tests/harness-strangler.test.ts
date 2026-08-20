@@ -114,6 +114,18 @@ describe('DeepSeek Harness workstation composition', () => {
       missingRetainedCapabilities(CAPABILITY_REUSE.map((record) => record.capability)),
     ).toEqual([]);
     expect(majorKernelBundle().patch).toContain("name: '@major/dsh-kernel'");
+    expect(majorKernelBundle().patch).toContain('provider: major');
+    expect(majorKernelBundle().patch).toContain('model: composer');
+    expect(majorKernelBundle().patch).toContain('default: major');
+    expect(
+      readFileSync(
+        resolve('distribution/deepseek-harness/agent-presets/major/agent.cordis.yml'),
+        'utf8',
+      ).trimEnd(),
+    ).toMatch(/\[\]$/);
+    expect(
+      readFileSync(resolve('distribution/deepseek-harness/agent-presets/major/preset.yml'), 'utf8'),
+    ).toContain('name: Major');
     expect(majorKernelBundle().patch).toContain('providerName: claude-review');
     expect(majorKernelBundle().patch).toContain('id: subagent-codex');
     expect(majorKernelBundle().patch).toContain('permissionMode: approve-for-me');

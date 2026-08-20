@@ -59,6 +59,10 @@ function kernelSession(cwd?: string, seed: KernelSession['events'] = []): Kernel
 
 async function loadKernel(): Promise<{
   apply(ctx: unknown): void;
+  codexComposerReadiness(env?: NodeJS.ProcessEnv): { name: string; description: string };
+  createMajorComposerAdapter(ctx: unknown): {
+    stream(options: unknown): AsyncIterable<Record<string, unknown>>;
+  };
   dshAdapterForMajorHost(host: string, environment?: string, accountLabel?: string): string;
   foregroundDispatchHops(stdout: string): number;
   hashReviewWorkspace(root: string): string;
@@ -73,6 +77,10 @@ async function loadKernel(): Promise<{
   ).href;
   return (await import(url)) as {
     apply(ctx: unknown): void;
+    codexComposerReadiness(env?: NodeJS.ProcessEnv): { name: string; description: string };
+    createMajorComposerAdapter(ctx: unknown): {
+      stream(options: unknown): AsyncIterable<Record<string, unknown>>;
+    };
     dshAdapterForMajorHost(host: string, environment?: string, accountLabel?: string): string;
     foregroundDispatchHops(stdout: string): number;
     hashReviewWorkspace(root: string): string;
@@ -142,6 +150,115 @@ describe('Major DSH workstation kernel', () => {
     for (const root of temporaryRoots.splice(0)) {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('surfaces persisted Codex readiness without performing a live refresh', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-readiness-'));
+    temporaryRoots.push(root);
+    writeFileSync(
+      join(root, 'codex-usage.json'),
+      JSON.stringify({
+        fetchedAt: '2026-08-20T14:20:09.553Z',
+        methods: ['account/read', 'account/rateLimits/read'],
+        accounts: [
+          { accountLabel: 'COD-01', planType: 'prolite', primary: { usedPercent: 4 } },
+          { accountLabel: 'COD-02', planType: 'prolite', primary: { usedPercent: 4 } },
+        ],
+      }),
+    );
+    const { codexComposerReadiness } = await loadKernel();
+    expect(codexComposerReadiness({ MAJOR_HOME: root })).toEqual({
+      name: 'Major — Codex 2/2 ready',
+      description:
+        'COD-01, COD-02; fetched 2026-08-20T14:20:09.553Z; ' +
+        'live via account/read + account/rateLimits/read; refresh: major provider usage',
+    });
+  });
+
+  it('does not report an account without a primary rate-limit window as ready', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-dsh-readiness-'));
+    temporaryRoots.push(root);
+    writeFileSync(
+      join(root, 'codex-usage.json'),
+      JSON.stringify({
+        fetchedAt: '2026-08-20T14:20:09.553Z',
+        methods: ['account/read', 'account/rateLimits/read'],
+        accounts: [
+          { accountLabel: 'COD-01', planType: 'prolite' },
+          { accountLabel: 'COD-02', planType: 'prolite', primary: { usedPercent: 4 } },
+        ],
+      }),
+    );
+    const { codexComposerReadiness } = await loadKernel();
+    expect(codexComposerReadiness({ MAJOR_HOME: root })).toEqual({
+      name: 'Major — Codex 1/2 ready',
+      description:
+        'COD-02; fetched 2026-08-20T14:20:09.553Z; ' +
+        'live via account/read + account/rateLimits/read; refresh: major provider usage',
+    });
+  });
+
+  it('routes an ordinary composer message through the existing Major provider', async () => {
+    const { createMajorComposerAdapter } = await loadKernel();
+    const projectRoot = mkdtempSync(join(tmpdir(), 'major-dsh-composer-project-'));
+    temporaryRoots.push(projectRoot);
+    writeFileSync(join(projectRoot, 'reviewed.txt'), 'stable');
+    const parent = { session: kernelSession(projectRoot) };
+    const starts: string[] = [];
+    const adapter = createMajorComposerAdapter({
+      agents: { get: (id: string) => (id === 'session-1' ? parent : undefined) },
+      subagents: {
+        async start(provider: string, request: KernelRequest): Promise<KernelRun> {
+          starts.push(provider);
+          expect(request.parent).toBe(parent);
+          if (provider === 'major') {
+            expect(request.prompt).toEqual([{ type: 'text', text: 'ship the normal task' }]);
+            return {
+              result: Promise.resolve({
+                output: [{ type: 'text', text: 'Major routed native Codex successfully' }],
+                stopReason: 'completed',
+              }),
+              async dispose() {},
+            };
+          }
+          expect(provider).toBe('claude-review');
+          expect(request.prompt[0]?.text).toContain('Requested task: ship the normal task');
+          return {
+            result: Promise.resolve({
+              output: [{ type: 'text', text: 'VERDICT: PASS' }],
+              stopReason: 'completed',
+            }),
+            async dispose() {},
+          };
+        },
+      },
+    });
+    const chunks: Record<string, unknown>[] = [];
+    for await (const chunk of adapter.stream({
+      sessionId: 'session-1',
+      messages: [
+        {
+          role: 'user',
+          source: { kind: 'user' },
+          content: [{ type: 'text', text: 'ship the normal task' }],
+        },
+      ],
+      signal: new AbortController().signal,
+    })) {
+      chunks.push(chunk);
+    }
+    expect(starts).toEqual(['major', 'claude-review']);
+    expect(chunks).toContainEqual({
+      type: 'block-end',
+      index: 0,
+      block: {
+        type: 'text',
+        text:
+          'Major routed native Codex successfully\n\n' +
+          'Claude independent review:\nVERDICT: PASS',
+      },
+    });
+    expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } });
   });
 
   it('replays /major command input before its generic durable result without model messages', async () => {

@@ -11,7 +11,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { withRoutedExecutionContext } from './route-context.js';
 
 export const name = 'major-workstation';
-export const inject = ['commands', 'subagents', 'subprocess'];
+export const inject = ['agents', 'commands', 'llm', 'subagents', 'subprocess'];
 
 const OUTPUT_LIMIT = 256 * 1024;
 const RESULT_LIMIT = 8 * 1024;
@@ -144,6 +144,47 @@ function textContent(blocks) {
     .map((block) => block.text)
     .join('\n')
     .trim();
+}
+
+/** Read Major's last explicitly refreshed Codex snapshot for DSH's supported
+ * provider/model status surfaces. This is display-only: it never starts Codex,
+ * refreshes credentials, or changes Major routing eligibility. */
+export function codexComposerReadiness(env = process.env) {
+  const home = env.MAJOR_HOME || (env.HOME ? join(env.HOME, '.major') : undefined);
+  const path = env.MAJOR_CODEX_USAGE_PATH || (home ? join(home, 'codex-usage.json') : undefined);
+  if (!path || !existsSync(path)) {
+    return {
+      name: 'Major',
+      description: 'Codex readiness unavailable — refresh with major provider usage',
+    };
+  }
+  try {
+    const report = JSON.parse(readFileSync(path, 'utf8'));
+    if (!report || !Array.isArray(report.accounts) || typeof report.fetchedAt !== 'string') {
+      throw new Error('invalid snapshot');
+    }
+    const ready = report.accounts.filter(
+      (account) =>
+        account &&
+        typeof account.accountLabel === 'string' &&
+        !account.error &&
+        account.primary &&
+        (!Number.isFinite(account.primary?.usedPercent) || account.primary.usedPercent < 100),
+    );
+    const total = report.accounts.length;
+    const labels = ready.map((account) => account.accountLabel).join(', ');
+    return {
+      name: `Major — Codex ${ready.length}/${total} ready`,
+      description:
+        `${labels || 'no ready accounts'}; fetched ${report.fetchedAt}; ` +
+        'live via account/read + account/rateLimits/read; refresh: major provider usage',
+    };
+  } catch {
+    return {
+      name: 'Major',
+      description: 'Codex readiness snapshot is invalid — refresh with major provider usage',
+    };
+  }
 }
 
 function majorExecutable() {
@@ -577,6 +618,69 @@ export function createMajorProvider(ctx) {
   };
 }
 
+function latestComposerTask(messages) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== 'user' || message.source?.kind !== 'user') continue;
+    const task = textContent(message.content ?? []);
+    if (task) return task;
+  }
+  throw new Error('major-workstation: the composer request has no direct user text task');
+}
+
+/** Root DSH model adapter whose one response is an existing Major provider
+ * run. Keeping this at the LLM seam gives normal composer turns ordinary DSH
+ * durability, restart, chat, and trajectory behavior for free. */
+export function createMajorComposerAdapter(ctx) {
+  const metadata = () => codexComposerReadiness();
+  return {
+    providerInfo(provider) {
+      return { id: provider, name: metadata().name };
+    },
+    providerRetryPolicy() {
+      return undefined;
+    },
+    listModels(provider) {
+      return Promise.resolve([
+        {
+          provider,
+          id: 'composer',
+          name: metadata().name,
+          description: metadata().description,
+          inputModalities: ['text'],
+        },
+      ]);
+    },
+    resolveModel(provider, model) {
+      return Promise.resolve({
+        provider,
+        id: model,
+        name: metadata().name,
+        description: metadata().description,
+        inputModalities: ['text'],
+      });
+    },
+    async *stream(options) {
+      if (!options.sessionId) {
+        throw new Error('major-workstation: the composer request has no DSH session identity');
+      }
+      const parent = ctx.agents.get(options.sessionId);
+      if (!parent) {
+        throw new Error('major-workstation: the composer session has no live DSH agent');
+      }
+      const task = latestComposerTask(options.messages);
+      const result = await executeMajorWithClaudeReview(ctx, task, parent, options.signal);
+      if (result.kind !== 'success') throw new Error(result.text);
+      const output = result.text;
+      yield { type: 'block-start', index: 0, blockType: 'text' };
+      yield { type: 'text-delta', index: 0, text: output };
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: output } };
+      yield { type: 'usage', usage: { inputTokens: 0, outputTokens: 0 } };
+      yield { type: 'finish', reason: { kind: 'stop' } };
+    },
+  };
+}
+
 async function settleSubagent(ctx, provider, prompt, parent, signal) {
   const run = await ctx.subagents.start(provider, {
     prompt: [{ type: 'text', text: prompt }],
@@ -598,6 +702,47 @@ function failedResult(provider, result) {
   };
 }
 
+/** Execute one existing Major provider increment and bind an independent,
+ * plan-mode Claude review to the resulting workspace. Both ordinary composer
+ * turns and the diagnostic /major command use this exact execution boundary. */
+export async function executeMajorWithClaudeReview(ctx, task, parent, signal) {
+  const majorResult = await settleSubagent(ctx, 'major', task, parent, signal);
+  if (majorResult.stopReason !== 'completed') return failedResult('Major', majorResult);
+
+  const majorSummary = textContent(majorResult.output);
+  const cwd = parent.session.header.cwd;
+  if (!cwd) return { kind: 'error', text: 'The DSH session has no project directory.' };
+  const beforeReview = hashReviewWorkspace(cwd);
+  let reviewResult;
+  try {
+    reviewResult = await settleSubagent(
+      ctx,
+      'claude-review',
+      [
+        'Independently review the current repository after this Major increment.',
+        'You are running in native plan mode. Inspect the diff and relevant tests without modifying files.',
+        'Return a concise verdict with concrete findings.',
+        `Requested task: ${task}`,
+        `Major execution: ${majorSummary}`,
+      ].join('\n'),
+      parent,
+      signal,
+    );
+  } finally {
+    if (hashReviewWorkspace(cwd) !== beforeReview) {
+      throw new Error('major-workstation: Claude review changed the project workspace');
+    }
+  }
+  if (reviewResult.stopReason !== 'completed') return failedResult('Claude review', reviewResult);
+
+  return {
+    kind: 'success',
+    text: clip(
+      `${majorSummary}\n\nClaude independent review:\n${textContent(reviewResult.output)}`,
+    ),
+  };
+}
+
 /** Commands are log-only, but DSH rc.8 considers a persisted session blank
  * until its first turn/start. Use an otherwise empty, completed turn so the
  * upstream session list durably retains valid /major executions. */
@@ -615,6 +760,9 @@ function nextTurn(session) {
 
 export function apply(ctx) {
   ctx.subagents.registerProvider(createMajorProvider(ctx));
+  // Production composition guarantees `llm` through `inject`; the guard keeps
+  // the provider/command unit harness useful with its deliberately tiny ctx.
+  ctx.llm?.registerAdapter(['major'], createMajorComposerAdapter(ctx));
   ctx.commands.register({
     name: 'major',
     description: 'run one Major increment with Codex and an independent Claude review',
@@ -626,48 +774,7 @@ export function apply(ctx) {
       const turn = nextTurn(session);
       session.append('turn/start', { turn });
       try {
-        const majorResult = await settleSubagent(
-          ctx,
-          'major',
-          task,
-          invocation.agent,
-          invocation.signal,
-        );
-        if (majorResult.stopReason !== 'completed') return failedResult('Major', majorResult);
-
-        const majorSummary = textContent(majorResult.output);
-        const cwd = session.header.cwd;
-        if (!cwd) return { kind: 'error', text: 'The DSH session has no project directory.' };
-        const beforeReview = hashReviewWorkspace(cwd);
-        let reviewResult;
-        try {
-          reviewResult = await settleSubagent(
-            ctx,
-            'claude-review',
-            [
-              'Independently review the current repository after this Major increment.',
-              'You are running in native plan mode. Inspect the diff and relevant tests without modifying files.',
-              'Return a concise verdict with concrete findings.',
-              `Requested task: ${task}`,
-              `Major execution: ${majorSummary}`,
-            ].join('\n'),
-            invocation.agent,
-            invocation.signal,
-          );
-        } finally {
-          if (hashReviewWorkspace(cwd) !== beforeReview) {
-            throw new Error('major-workstation: Claude review changed the project workspace');
-          }
-        }
-        if (reviewResult.stopReason !== 'completed')
-          return failedResult('Claude review', reviewResult);
-
-        return {
-          kind: 'success',
-          text: clip(
-            `${majorSummary}\n\nClaude independent review:\n${textContent(reviewResult.output)}`,
-          ),
-        };
+        return await executeMajorWithClaudeReview(ctx, task, invocation.agent, invocation.signal);
       } finally {
         session.append('turn/end', { turn, reason: { kind: 'completed' } });
       }
