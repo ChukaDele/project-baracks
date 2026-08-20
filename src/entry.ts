@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { runProjectContextCli } from './context/project-integrity.js';
 import { runSessionContextCli } from './context/session-context.js';
+import { runHarnessCli } from './harness/cli.js';
 import { runLearningLifecycleCli } from './learning/lifecycle-cli.js';
 import { runSkillCli } from './skills/cli.js';
 import { runProviderLifecycleCli } from './providers/lifecycle-cli.js';
@@ -16,10 +17,13 @@ try {
       if (!learningLifecycleHandled) {
         const skillHandled = await runSkillCli(args);
         if (!skillHandled) {
-          const providerHandled = await runProviderLifecycleCli(args);
-          if (!providerHandled) {
-            const handled = await runSupervisorCli(args);
-            if (!handled) await import('./cli/index.js');
+          const harnessHandled = await runHarnessCli(args);
+          if (!harnessHandled) {
+            const providerHandled = await runProviderLifecycleCli(args);
+            if (!providerHandled) {
+              const handled = await runSupervisorCli(args);
+              if (!handled) await import('./cli/index.js');
+            }
           }
         }
       }

@@ -40,16 +40,17 @@ Major is the standalone cross-project engineering harness for Bredge, client, pe
 
 ## Remaining runtime work
 
-1. Integrate Ruflo as the orchestration/memory substrate.
-2. Implement/verify live worker adapters for Claude Code, Codex, Antigravity and Cursor.
-3. Enable bounded real execution, adaptive worktrees and continue-until loops.
-4. Import/index approved Major/project memories with namespace boundaries.
-5. Run the global communication/style installer on the development Mac and configure Cursor global User Rules.
-6. Bootstrap and execute a real managed project as the harness smoke test.
-7. Verify provider/rate-limit failover and objective completion evidence.
-8. Delete old v1 disabled execution gates, obsolete tests/schema/docs/flags that no longer serve the target runtime.
-9. Run the stale-reference, CI and end-to-end cleanup gate.
-10. Rename the repository from the legacy `project-baracks` name to `major` when the repo-control path is available.
+1. Attest the DeepSeek Harness pin (git commit + npm integrity) and install that exact version inside Lima; keep live traffic on the current CLI/ACP path until that shadow run is green (`docs/migrations/deepseek-harness-strangler.md`).
+2. Integrate Ruflo as optional orchestration/memory substrate. It is not the agent loop; DeepSeek Harness is.
+3. Implement/verify live worker adapters for Claude Code, Codex, Antigravity and Cursor, including as dsh model plugins when subscription auth is proved.
+4. Enable bounded real execution, adaptive worktrees and continue-until loops.
+5. Import/index approved Major/project memories with namespace boundaries.
+6. Run the global communication/style installer on the development Mac and configure Cursor global User Rules.
+7. Bootstrap and execute a real managed project as the harness smoke test (JSS assist pilot).
+8. Verify provider/rate-limit failover and objective completion evidence.
+9. Delete old v1 disabled execution gates, obsolete tests/schema/docs/flags that no longer serve the target runtime — only after successor proof.
+10. Run the stale-reference, CI and end-to-end cleanup gate.
+11. Rename the repository from the legacy `project-baracks` name to `major` when the repo-control path is available.
 
 ## Completion definition
 

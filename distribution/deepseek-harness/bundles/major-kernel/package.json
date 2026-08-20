@@ -1,0 +1,10 @@
+{
+  "name": "@major/dsh-kernel",
+  "private": true,
+  "version": "0.0.0-shadow",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
