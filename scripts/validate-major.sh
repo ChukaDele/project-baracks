@@ -207,7 +207,7 @@ grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts |
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
 grep -Fq "maxWorkers: 1" src/supervisor/policy.ts || fail "truthful project worker ceiling missing"
 grep -Fq "maxRunMinutes: 30" src/supervisor/policy.ts || fail "assist wall-clock ceiling missing"
-grep -Fq "workers: 1" src/supervisor/resources.ts || fail "single shared-Lima worker ceiling missing"
+grep -Fq "workers: 1" src/supervisor/resources.ts || fail "configured DSH worker ceiling missing"
 grep -Fq "GLOBAL_RESOURCE_LIMITS" src/supervisor/resources.ts || fail "global resource guard missing"
 grep -Fq "maxSubagentDepth: 1" src/supervisor/resources.ts || fail "subagent depth cap missing"
 grep -Fq "three consecutive independently graded shadow passes" src/supervisor/policy.ts || fail "observe-to-assist shadow gate missing"

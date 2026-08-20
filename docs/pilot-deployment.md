@@ -71,7 +71,7 @@ major run jss-tool \
   --foreground
 ```
 
-The v0.5.1 runtime is intentionally capped at one concurrent worker because it uses one shared Lima instance.
+The configured DSH runtime is intentionally capped at one concurrent worker across execution environments. Lima remains available as an optional isolation environment.
 
 ### Pass conditions
 

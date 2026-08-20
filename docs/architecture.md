@@ -66,11 +66,11 @@ Project classes:
 Trust levels:
 
 - `observe` — no delegated execution;
-- `assist` — foreground pilot, one concurrent worker for the shared v0.5.1 Lima runtime;
-- `build` — validated build mode, one concurrent worker for the shared v0.5.1 Lima runtime;
+- `assist` — foreground pilot, one concurrent worker through the DSH runtime;
+- `build` — validated build mode, one concurrent worker through the DSH runtime;
 - `unattended` — one concurrent worker plus background continuation. Unattended authority remains separately gated.
 
-The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. The shared v0.5.1 Lima runtime has a 1-worker cap. Browser leases have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
+The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. DSH execution has a 1-worker cap, whether it uses the default local environment or optional Lima isolation. Browser leases have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
 
 Unknown projects default to observe. Client/candidate/PII projects remain isolated until explicitly classified/promoted. Trust promotion beyond assist requires a passing independent grade.
 
