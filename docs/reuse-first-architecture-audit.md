@@ -211,3 +211,12 @@ provider-runtime and sandbox conclusions were re-checked and still hold.
 Current dependency surface, as evidence of a reuse-first posture: 5 runtime
 dependencies (`@agentclientprotocol/sdk`, `better-sqlite3`, `commander`,
 `drizzle-orm`, `zod`) across about 21,000 lines of TypeScript.
+
+## 2026-08-20 DeepSeek Harness strangler
+
+AI SDK `HarnessAgent` remains rejected for production. DeepSeek Harness is a
+different upstream: MIT, plugin-composed, and wrapped as a Major distribution
+without a live `package.json` dependency until the pin is integrity-attested.
+See `docs/prior-art-decisions.md` (2026-08-20) and
+`docs/migrations/deepseek-harness-strangler.md`. Lima stays the default
+execution backend during shadow.

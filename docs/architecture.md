@@ -276,6 +276,29 @@ Git history is the archive. After a successor path is independently validated on
 
 The thin-kernel runtime is **built**, not yet **ready**. The migration is incomplete until the JSS assist pilot and independent grade pass, then the old v1 runtime can be removed under `docs/migrations/major-v2-legacy-receipt.md`.
 
+Major is becoming an upstream-compatible DeepSeek Harness distribution through a recoverable strangler (`docs/migrations/deepseek-harness-strangler.md`). That overlay is in **shadow**: the pin and plugin composition exist, live execution still uses Lima plus official CLI/ACP adapters, and legacy paths stay until a representative project run and independent review pass.
+
+## 10.1 DeepSeek Harness distribution
+
+DeepSeek Harness is the adopted agent-loop/tool/session/UI substrate. Major does not fork it. Exact npm versions are pinned; `latest`, `next` and version ranges are refused.
+
+Major-specific capabilities remain on the live Major path during shadow. The
+`@major/dsh-kernel` bundle is a resolvable no-op seam after
+`@deepseek-ai/dsh-base`; each capability moves behind that seam only after its
+adapter and conformance proof exist:
+
+- durable goals, GBrain/learning, skill resolver and Toolsmith;
+- project trust, approval policy and kill switch;
+- independent evidence;
+- subscription routing and project-context integrity;
+- Lima isolation as the default execution backend.
+
+The proposed unified Mac workstation is two source profiles on that pin:
+loopback Web UI for the owner and headless for Major-driven runs. Neither
+profile starts a login daemon or attaches Ruflo globally. `major harness
+conformance` is the deterministic shadow gate for this source layer; it does
+not claim that dsh is installed, bootable, or ready.
+
 ## 11. Resource hygiene
 
 Resource efficiency is designed before creation, enforced during operation, reconciled after operation, and continuously verified.
@@ -316,4 +339,3 @@ GC roots are read, never guessed: `installed-release.json`, `install-history.jso
 | Lima workers | active + 1 rollback generation + unique credential-bearing; no VM per SHA |
 
 Dry-run reclaim is an explicit allocated-blocks **upper bound**. Apply reports the measured `df` free-bytes delta. A `du` sum is never presented as actual reclaimed space.
-

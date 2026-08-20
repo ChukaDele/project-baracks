@@ -159,3 +159,14 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Major-specific layer retained:** retention windows for host run-state dirs and worktrees
 - **Rejected alternatives:** writing a new run reaper
 - **Evidence:** lima-backend already reconciles pending run manifests and removes guest run/transfer paths.
+
+## 2026-08-20 — upstream-compatible coding-agent harness distribution
+
+- **Capability:** upstream-compatible, pinned coding-agent harness that Major can distribute on a Mac workstation without losing goals, GBrain, policy or evidence
+- **Date:** 2026-08-20
+- **Candidates:** DeepSeek Harness (`deepseek-ai/deepseek-harness`, MIT, `@deepseek-ai/dsh`); Vercel AI SDK `HarnessAgent` (already rejected for v0.5.1); keep Major's custom CLI/ACP adapters as the only runtime; goose; OpenCode
+- **Decision:** ADOPT DeepSeek Harness as the swappable agent-loop, tool, session and UI substrate. WRAP it as a Major distribution through the official profile, bundle and patch mechanism. Do not fork upstream. Do not install it as a live `package.json` dependency until the pin is integrity-attested. KEEP the Major kernel and Lima execution boundary as the default until a representative project run and independent review pass.
+- **Reason:** DeepSeek Harness is the maintained MIT plugin runtime whose explicit contract is that models, tools, sessions, sandboxes, storage, loops, scheduling and UI are replaceable plugins. That is the strangler seam Major needs. AI SDK HarnessAgent was already rejected on orphan-process, approval and inner-sandbox grounds. goose and OpenCode would add a second harness/UI on top of Major. Building another agent loop would duplicate a substantially solved problem. Developer-preview breakage is expected, so the distribution pins exact versions and refuses `latest`, `next` and range resolution.
+- **Major-specific layer retained:** durable goals, GBrain and learning, skill resolver, Toolsmith, project trust and policy, independent evidence, subscription routing, kill switch, project-context integrity, and Lima isolation with validated copy-back
+- **Rejected alternatives:** fork DeepSeek Harness; wrap AI SDK HarnessAgent; adopt goose or OpenCode wholesale; replace GBrain with the DSH session log; replace Lima with the default DSH sandbox before a seam proof; resolve unpinned `@deepseek-ai` dist-tags
+- **Evidence:** the official repository describes profile and plugin composition and warns that the developer preview will have compatibility-breaking changes. npm published `@deepseek-ai/dsh@0.1.0-rc.8` on 2026-08-19 with integrity `sha512-VQU5NlomrKLRgcXuOf+sxWFvqxPA8q9vMhrKPlPPXiOJEhGlGlAdiyxZvZxkCVI+v0zbhe21cY3/luLyxpSzzA==`. Official tag `dsh-v0.1.0-rc.8` resolves to commit `141eb6fef83422698aef7a981029e843e8161534`.

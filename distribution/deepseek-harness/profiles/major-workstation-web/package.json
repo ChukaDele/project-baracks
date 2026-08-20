@@ -1,0 +1,16 @@
+{
+  "name": "@major/dsh-profile-workstation-web",
+  "private": true,
+  "dependencies": {
+    "@major/dsh-kernel": "file:../../bundles/major-kernel"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@major/dsh-kernel"
+      ]
+    }
+  }
+}

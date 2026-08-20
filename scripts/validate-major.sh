@@ -282,4 +282,26 @@ grep -Fq "cp -c" scripts/major-clone-tree.sh || fail "clonefile copy helper miss
 grep -Fq "Resource hygiene" docs/architecture.md || fail "resource hygiene architecture section missing"
 grep -Fq "designed before creation" docs/architecture.md || fail "resource-efficiency lifecycle rule missing"
 
+[ -f src/harness/pin.ts ] || fail "DeepSeek Harness pin missing"
+[ -f src/harness/cli.ts ] || fail "major harness CLI missing"
+[ -f distribution/deepseek-harness/pin.json ] || fail "DeepSeek Harness pin artifact missing"
+[ -f docs/migrations/deepseek-harness-strangler.md ] || fail "DeepSeek Harness strangler receipt missing"
+grep -Fq "CURRENT_HARNESS_MIGRATION_PHASE" src/harness/composition.ts || fail "harness migration phase missing"
+grep -Fq "export async function runHarnessCli" src/harness/cli.ts || fail "harness CLI export missing"
+grep -Fq "runHarnessCli" src/entry.ts || fail "harness CLI not wired through entry"
+grep -Fq "return new LimaBackend" src/security/major-gateway.ts || fail "Lima must remain the default execution backend during shadow"
+grep -Fq "ADOPT DeepSeek Harness" docs/prior-art-decisions.md || fail "DeepSeek Harness prior-art decision missing"
+grep -Fq "Status: **shadow**" docs/migrations/deepseek-harness-strangler.md || fail "strangler must stay in shadow until successor proof"
+grep -Fq '"declaredTag": "dsh-v0.1.0-rc.8"' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness release tag is not attested"
+grep -Fq '"attestedCommit": "141eb6fef83422698aef7a981029e843e8161534"' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness commit is not attested"
+grep -Fq '"@deepseek-ai/dsh": "sha512-' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness npm integrity is not attested"
+grep -Fq '"bundle": {' distribution/deepseek-harness/bundles/major-kernel/package.json || fail "DeepSeek Harness bundle manifest has the wrong upstream shape"
+grep -Fq '"patch": "./cordis.patch.yml"' distribution/deepseek-harness/bundles/major-kernel/package.json || fail "DeepSeek Harness bundle patch declaration missing"
+grep -Fq '"@major/dsh-kernel": "file:../../bundles/major-kernel"' distribution/deepseek-harness/profiles/major-workstation-web/package.json || fail "DeepSeek Harness web profile cannot resolve the Major kernel bundle"
+grep -Fq '"@major/dsh-kernel": "file:../../bundles/major-kernel"' distribution/deepseek-harness/profiles/major-workstation-headless/package.json || fail "DeepSeek Harness headless profile cannot resolve the Major kernel bundle"
+grep -Fq "DeepSeek Harness distribution" docs/architecture.md || fail "architecture missing DeepSeek Harness distribution"
+if grep -Fq '"@deepseek-ai/' package.json; then
+  fail "DeepSeek Harness must stay pinned, not an unattested package.json dependency"
+fi
+
 echo "Major validation passed."
