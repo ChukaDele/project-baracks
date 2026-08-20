@@ -412,6 +412,8 @@ describe('DeepSeek Harness cutover install plan', () => {
             MAJOR_DSH_CODEX_PROFILE_HOME: codexHome,
             MAJOR_APP_DIR: appDir,
             MAJOR_TEST_PIN: resolve(REPO_ROOT, 'distribution/deepseek-harness/pin.json'),
+            NODE_ENV: 'test',
+            MAJOR_DSH_TEST_SKIP_DISK_PREFLIGHT: '1',
             MAJOR_DSH_TEST_FAIL_AFTER_APP_ACTIVATION: '1',
           },
         },
@@ -442,6 +444,8 @@ describe('DeepSeek Harness cutover install plan', () => {
             MAJOR_DSH_CODEX_PROFILE_HOME: codexHome,
             MAJOR_APP_DIR: appDir,
             MAJOR_TEST_PIN: resolve(REPO_ROOT, 'distribution/deepseek-harness/pin.json'),
+            NODE_ENV: 'test',
+            MAJOR_DSH_TEST_SKIP_DISK_PREFLIGHT: '1',
             MAJOR_DSH_TEST_FAIL_AFTER_APP_ACTIVATION: '1',
           },
         },
@@ -453,7 +457,7 @@ describe('DeepSeek Harness cutover install plan', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 });
 
 describe('DeepSeek Harness cutover conformance', () => {

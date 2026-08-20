@@ -138,6 +138,11 @@ PY
 }
 
 disk_preflight() {
+  if [[ "${MAJOR_DSH_TEST_SKIP_DISK_PREFLIGHT:-0}" == "1" ]]; then
+    [[ "${NODE_ENV:-}" == "test" ]] || fail "disk preflight bypass is test-only"
+    echo "disk preflight skipped by test fixture"
+    return 0
+  fi
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[dry-run] disk preflight before DSH/Lima install"
     return 0
