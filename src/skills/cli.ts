@@ -18,8 +18,8 @@ function flag(args: string[], name: string): string | undefined {
 export async function runSkillCli(args: string[]): Promise<boolean> {
   if (args[0] !== 'skill') return false;
   if (args[1] === 'sync') {
-    const source = flag(args, '--source') ?? process.cwd();
-    const result = syncMajorSkills({ sourceRoot: source });
+    const source = flag(args, '--source');
+    const result = syncMajorSkills(source ? { sourceRoot: source } : {});
     if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
     else {
       console.log(`Major hot skills activated: ${result.internalSkillCount} internal skills`);
