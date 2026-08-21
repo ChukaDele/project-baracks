@@ -248,6 +248,26 @@ describe('DeepSeek Harness cutover install plan', () => {
     }
   });
 
+  it('stages one co-versioned native control plane with the DSH app transaction', () => {
+    const installer = readFileSync(
+      resolve(REPO_ROOT, 'scripts/install-deepseek-harness-pin.sh'),
+      'utf8',
+    );
+    const launcher = readFileSync(resolve(REPO_ROOT, 'scripts/start-major-workstation.sh'), 'utf8');
+
+    expect(installer).toMatch(/MANAGED_PATHS=\([\s\S]*?"native-major"/);
+    expect(installer).toContain('stage_major_control_plane()');
+    expect(installer).toContain('stage_major_control_plane\nverify_profile_composition');
+    expect(installer).toContain('native-major/major-control-plane.json');
+    expect(installer).toContain('"installationId": installation_id');
+    expect(installer).toContain('"controlPlaneDistSha256": control_plane_sha');
+    expect(installer).toContain('"entrypoint": "native-major/bin/major"');
+    expect(launcher).toContain('MAJOR_BIN="$DSH_HOME/native-major/bin/major"');
+    expect(launcher).toContain('export MAJOR_BIN');
+    expect(launcher).toContain('co-versioned Major control-plane marker missing');
+    expect(launcher).not.toContain('MAJOR_SESSION_HOST=');
+  });
+
   it('stages the app without an empty array and propagates stager failures in both modes', () => {
     const root = mkdtempSync(join(tmpdir(), 'major-dsh-live-stage-'));
     const fakeBin = join(root, 'bin');
@@ -355,12 +375,14 @@ describe('DeepSeek Harness cutover install plan', () => {
     const app = join(appDir, 'Major.app');
     const runtimeMarker = join(dshHome, 'runtime/rollback-runtime.txt');
     const profileMarker = join(dshHome, 'profiles/major-workstation-web/prior-profile.txt');
+    const controlPlaneMarker = join(dshHome, 'native-major/prior-control-plane.txt');
     const sessionMarker = join(dshHome, 'sessions/preserved.txt');
     const chromeMarker = join(dshHome, 'chrome-profile/preserved.txt');
     try {
       for (const path of [
         join(dshHome, 'runtime'),
         join(dshHome, 'profiles/major-workstation-web'),
+        join(dshHome, 'native-major'),
         join(dshHome, 'sessions'),
         join(dshHome, 'chrome-profile'),
         codexHome,
@@ -371,6 +393,7 @@ describe('DeepSeek Harness cutover install plan', () => {
       }
       writeFileSync(runtimeMarker, 'installed rollback runtime\n');
       writeFileSync(profileMarker, 'prior managed profile\n');
+      writeFileSync(controlPlaneMarker, 'prior control plane\n');
       writeFileSync(sessionMarker, 'session state\n');
       writeFileSync(chromeMarker, 'chrome state\n');
       writeFileSync(
@@ -423,6 +446,7 @@ describe('DeepSeek Harness cutover install plan', () => {
       expect(result.stderr).toContain('prior installer-managed state restored');
       expect(readFileSync(runtimeMarker, 'utf8')).toBe('installed rollback runtime\n');
       expect(readFileSync(profileMarker, 'utf8')).toBe('prior managed profile\n');
+      expect(readFileSync(controlPlaneMarker, 'utf8')).toBe('prior control plane\n');
       expect(readFileSync(sessionMarker, 'utf8')).toBe('session state\n');
       expect(readFileSync(chromeMarker, 'utf8')).toBe('chrome state\n');
       expect(readFileSync(join(app, 'prior-app.txt'), 'utf8')).toBe('exact prior app\n');

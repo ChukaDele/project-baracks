@@ -244,6 +244,29 @@ describe('Major DSH workstation app', () => {
     expect(existsSync(join(home, 'run/workstation.lock'))).toBe(false);
   });
 
+  it('pins the app launcher to its co-versioned control plane without imposing a host', () => {
+    const home = isolatedHome();
+    const project = mkdtempSync(join(tmpdir(), 'major-project-'));
+    homes.push(project);
+    const inheritedMajorBin = join(home, 'ambient-major');
+    const result = bash([START, '--dry-run', '--project', project], {
+      MAJOR_DSH_HOME: home,
+      MAJOR_BIN: inheritedMajorBin,
+      MAJOR_SESSION_HOST: '',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(`major control plane: ${home}/native-major/bin/major`);
+    expect(result.stdout).not.toContain(inheritedMajorBin);
+    expect(
+      readFileSync(
+        resolve(REPO_ROOT, 'distribution/deepseek-harness/macos/Major.app/Contents/MacOS/Major'),
+        'utf8',
+      ),
+    ).toContain('export MAJOR_BIN="$DSH_HOME/native-major/bin/major"');
+    expect(readFileSync(START, 'utf8')).not.toContain('MAJOR_SESSION_HOST=');
+  });
+
   it('rejects a foreign listener without opening Chrome, killing it, or signalling stale lock PIDs', async () => {
     const home = isolatedHome();
     const project = mkdtempSync(join(tmpdir(), 'major-project-'));
@@ -251,6 +274,14 @@ describe('Major DSH workstation app', () => {
     const bin = join(home, 'fakes');
     const dshMarker = join(home, 'dsh-opened');
     const chromeMarker = join(home, 'chrome-opened');
+    const nativeMajorBin = join(home, 'native-major/bin/major');
+    mkdirSync(join(home, 'native-major/bin'), { recursive: true });
+    writeFileSync(nativeMajorBin, '#!/bin/sh\nexit 0\n');
+    chmodSync(nativeMajorBin, 0o755);
+    writeFileSync(
+      join(home, 'native-major/major-control-plane.json'),
+      '{"schemaVersion":1,"installationId":"test"}\n',
+    );
     fakeExec(bin, 'dsh', `touch "${dshMarker}"; sleep 60`);
     fakeExec(bin, 'chrome', `touch "${chromeMarker}"; sleep 60`);
 
@@ -311,6 +342,14 @@ describe('Major DSH workstation app', () => {
     const project = mkdtempSync(join(tmpdir(), 'major-project-'));
     homes.push(project);
     const bin = join(home, 'fakes');
+    const nativeMajorBin = join(home, 'native-major/bin/major');
+    mkdirSync(join(home, 'native-major/bin'), { recursive: true });
+    writeFileSync(nativeMajorBin, '#!/bin/sh\nexit 0\n');
+    chmodSync(nativeMajorBin, 0o755);
+    writeFileSync(
+      join(home, 'native-major/major-control-plane.json'),
+      '{"schemaVersion":1,"installationId":"test"}\n',
+    );
     fakeExec(
       bin,
       'dsh',

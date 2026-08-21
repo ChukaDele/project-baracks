@@ -27,6 +27,7 @@ IFS= read -r DSH_HOME < "$DSH_HOME_POINTER"
 }
 export MAJOR_DSH_HOME="$DSH_HOME"
 export DSH_HOME
+export MAJOR_BIN="$DSH_HOME/native-major/bin/major"
 LAUNCHER="$DSH_HOME/bin/start-major-workstation.sh"
 [[ -x "$LAUNCHER" ]] || {
   echo "Major workstation launcher missing: $LAUNCHER" >&2

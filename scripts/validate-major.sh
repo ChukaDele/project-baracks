@@ -355,13 +355,13 @@ grep -Fq '"defaultRuntime": "dsh-local"' scripts/install-deepseek-harness-pin.sh
 grep -Fq -- "--dump-config" scripts/install-deepseek-harness-pin.sh || fail "pin installer must verify composed profiles"
 grep -Fq "link_shared_runtime" scripts/install-deepseek-harness-pin.sh || fail "pin installer must share one DSH dependency closure"
 grep -Fq "disk preflight blocked" scripts/install-deepseek-harness-pin.sh || fail "pin installer must refuse DSH/Lima install on a full disk"
-grep -Fq "MAJOR_SESSION_HOST" distribution/deepseek-harness/bundles/major-kernel/index.js || fail "Major DSH kernel must take the attaching session host from the environment"
+grep -Fq "major-app/dsh" distribution/deepseek-harness/bundles/major-kernel/index.js || fail "Major DSH kernel must record the native app interaction origin"
 if grep -Eq "'--host', '(claude|codex|cursor|antigravity)'" distribution/deepseek-harness/bundles/major-kernel/index.js; then
   fail "Major DSH kernel must not hard-code a provider host"
 fi
 [ -f scripts/validate-dsh-field.sh ] || fail "DeepSeek Harness field validator missing"
 grep -Fq '"validate:dsh"' package.json || fail "package.json must expose validate:dsh"
-grep -Fq "sessionHostEnv" scripts/install-deepseek-harness-pin.sh || fail "install record must record MAJOR_SESSION_HOST"
+grep -Fq "externalSessionHostEnv" scripts/install-deepseek-harness-pin.sh || fail "install record must distinguish external host identity from native app origin"
 [ -f scripts/start-major-workstation.sh ] || fail "Major workstation launcher missing"
 [ -f scripts/stage-major-workstation-app.sh ] || fail "Major.app stager missing"
 [ -f distribution/deepseek-harness/macos/Major.app/Contents/Info.plist ] || fail "Major.app Info.plist missing"

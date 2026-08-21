@@ -105,12 +105,22 @@ const RECENT_SESSION_MS = 24 * 60 * 60 * 1000;
 /** Best-effort recovery of the session id an earlier `session attach`/`hook`
  * call already recorded for this host+project, so an ambient admission call
  * does not need its own separate identity scheme. */
-function mostRecentSessionId(host: WorkerHost, repoPath: string): string | undefined {
+function mostRecentSessionId(
+  identity: { host?: WorkerHost; interactionOrigin?: string },
+  repoPath: string,
+): string | undefined {
   const commonDir = gitCommonDir(resolve(repoPath));
   const now = Date.now();
   const cutoff = now - RECENT_SESSION_MS;
   const match = [...readSupervisorState().sessions].reverse().find((session) => {
-    if (session.host !== host || !session.sessionId) return false;
+    if (!session.sessionId) return false;
+    if (
+      (identity.host !== undefined && session.host !== identity.host) ||
+      (identity.interactionOrigin !== undefined &&
+        session.interactionOrigin !== identity.interactionOrigin)
+    ) {
+      return false;
+    }
     if (session.repoPath === undefined) return false;
     const attachedAtMs = Date.parse(session.attachedAt);
     // Fail closed: a malformed/missing timestamp must not read as "always
@@ -470,7 +480,13 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
 
   if (command === 'goal' && args[1] === 'admit') {
     const cwd = resolve(flag(args, '--cwd') ?? process.cwd());
-    const host = validHost(requireFlag(args, '--host'));
+    const hostValue = flag(args, '--host');
+    const interactionOrigin = flag(args, '--interaction-origin');
+    if (!hostValue && !interactionOrigin) {
+      throw new Error('goal admit requires --host for an external host or --interaction-origin');
+    }
+    const host = hostValue ? validHost(hostValue) : undefined;
+    const ownershipIdentity = interactionOrigin ?? host!;
     const outcome = requireFlag(args, '--outcome');
     const project = resolveProjectForCwd(cwd);
     if (!project) {
@@ -495,7 +511,15 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       );
       return true;
     }
-    const sessionId = flag(args, '--session-id') ?? mostRecentSessionId(host, project.repoPath);
+    const sessionId =
+      flag(args, '--session-id') ??
+      mostRecentSessionId(
+        {
+          ...(host ? { host } : {}),
+          ...(interactionOrigin ? { interactionOrigin } : {}),
+        },
+        project.repoPath,
+      );
     if (!sessionId) {
       throw new Error(
         'goal admit requires --session-id (no matching attached session found; run `major session attach`/`session hook` first)',
@@ -512,7 +536,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       project: project.project,
       repoPath: project.repoPath,
       outcome,
-      preferredCoordinator: host,
+      ...(host ? { preferredCoordinator: host } : {}),
       refine: hasFlag(args, '--refine'),
     });
     const workerLeases = resourceSnapshot().leases.filter(
@@ -522,18 +546,18 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       goalId: admittedGoal.goal.id,
       project: project.project,
       repoPath: project.repoPath,
-      host,
+      host: ownershipIdentity,
       sessionId,
       hasActiveWorkerLease: workerLeases.length > 0,
     });
     const goal = ownership.goal;
-    const claimResult = claimLiveWorker(goal.id, { host, sessionId });
+    const claimResult = claimLiveWorker(goal.id, { host: ownershipIdentity, sessionId });
     let authorityExpiresAt: string;
     try {
       authorityExpiresAt = resolveSupervisedWorkshopAuthority(project.repoPath).expiresAt;
     } catch {
       authorityExpiresAt = authorizeSessionWorkshop({
-        host,
+        host: ownershipIdentity,
         cwd: project.repoPath,
         project: project.project,
         repoPath: project.repoPath,
@@ -551,6 +575,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
           authority: { status: 'active', expiresAt: authorityExpiresAt },
           ownLiveWork: claimResult.owned,
           liveWorker: claimResult.claim,
+          ...(interactionOrigin ? { interactionOrigin } : {}),
           ...(ownership.reconciled
             ? { ownershipReconciled: goal.lastOwnershipReconciliation }
             : {}),

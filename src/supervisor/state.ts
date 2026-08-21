@@ -119,6 +119,8 @@ export interface SupervisorGoal {
 export interface SessionAttachment {
   id: string;
   host: string;
+  /** Interaction surface, when the attached session is not an external host. */
+  interactionOrigin?: string | undefined;
   cwd: string;
   project?: string | undefined;
   repoPath?: string | undefined;
@@ -545,6 +547,7 @@ export function activeGoals(project?: string, repoPath?: string): SupervisorGoal
 
 export function attachSession(input: {
   host: string;
+  interactionOrigin?: string;
   cwd: string;
   project?: string;
   repoPath?: string;
@@ -556,6 +559,7 @@ export function attachSession(input: {
       host: input.host,
       cwd: resolve(input.cwd),
       attachedAt: new Date().toISOString(),
+      ...(input.interactionOrigin ? { interactionOrigin: input.interactionOrigin } : {}),
       ...(input.project ? { project: input.project } : {}),
       ...(input.repoPath ? { repoPath: resolve(input.repoPath) } : {}),
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),

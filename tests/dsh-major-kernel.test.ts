@@ -373,6 +373,46 @@ describe('Major DSH workstation kernel', () => {
     expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } });
   });
 
+  it('answers a native DSH greeting directly without a host, goal, worker, or review', async () => {
+    delete process.env.MAJOR_SESSION_HOST;
+    const { createMajorComposerAdapter } = await loadKernel();
+    const parent = { session: kernelSession('/tmp/major-dsh-conversation') };
+    const starts: string[] = [];
+    const adapter = createMajorComposerAdapter({
+      agents: { get: (id: string) => (id === 'session-1' ? parent : undefined) },
+      subagents: {
+        async start(provider: string): Promise<KernelRun> {
+          starts.push(provider);
+          throw new Error('a direct conversation must not start a provider');
+        },
+      },
+    });
+    const chunks: Record<string, unknown>[] = [];
+    for await (const chunk of adapter.stream({
+      sessionId: 'session-1',
+      messages: [
+        {
+          role: 'user',
+          source: { kind: 'user' },
+          content: [{ type: 'text', text: 'how are you today major?' }],
+        },
+      ],
+      signal: new AbortController().signal,
+    })) {
+      chunks.push(chunk);
+    }
+    expect(starts).toEqual([]);
+    expect(chunks).toContainEqual({
+      type: 'block-end',
+      index: 0,
+      block: {
+        type: 'text',
+        text: expect.stringContaining("I'm doing well and ready to help"),
+      },
+    });
+    expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } });
+  });
+
   it('fails closed during composition when the DSH llm service is absent', async () => {
     const { apply } = await loadKernel();
     expect(() =>
@@ -883,7 +923,7 @@ describe('Major DSH workstation kernel', () => {
   });
 
   it('keeps completed local provider work successful when lease release exhausts retries', async () => {
-    process.env.MAJOR_SESSION_HOST = 'codex';
+    delete process.env.MAJOR_SESSION_HOST;
     process.env.MAJOR_DSH_EXECUTION_ENVIRONMENT = 'local';
     const argv: string[][] = [];
     let acquireAttempts = 0;
@@ -948,7 +988,7 @@ describe('Major DSH workstation kernel', () => {
           expect(request.prompt[0]?.text).toContain('MAJOR LEAF WORKER CONTRACT');
           expect(request.prompt[0]?.text).toContain('Do not run Major CLI commands');
           expect(request.prompt[0]?.text).toContain('MAJOR SKILL safe-edit (internal)');
-          expect(request.prompt[0]?.text).toContain('TASK:\nmake the mutation');
+          expect(request.prompt[0]?.text).toContain('"currentDirectUserTask":"make the mutation"');
           return {
             result: Promise.resolve({
               output: [{ type: 'text', text: 'mutated the requested file and tests passed' }],
@@ -963,8 +1003,11 @@ describe('Major DSH workstation kernel', () => {
     const kernel = await loadKernel();
     applyKernel(kernel, ctx);
     if (!registered) throw new Error('Major provider was not registered');
+    const task =
+      'MAJOR_DSH_COMPOSER_ENVELOPE_V1\n' +
+      JSON.stringify({ authority: { currentDirectUserTask: 'make the mutation' } });
     const run = await registered.start({
-      prompt: [{ type: 'text', text: 'make the mutation' }],
+      prompt: [{ type: 'text', text: task }],
       parent: { session: kernelSession('/tmp/native-project') },
       signal: new AbortController().signal,
     });
@@ -1004,6 +1047,12 @@ describe('Major DSH workstation kernel', () => {
       ],
     });
     expect(argv.flat()).not.toContain('run');
+    expect(argv[0]).not.toContain('--host');
+    expect(argv[0]).toContain('--interaction-origin');
+    expect(argv[0]).toContain('major-app/dsh');
+    expect(argv[1]).not.toContain('--host');
+    expect(argv[1]).toContain('--interaction-origin');
+    expect(argv[1]).toContain('major-app/dsh');
     expect(argv[3]).toContain('--environment');
     expect(argv[3]).toContain('local');
     expect(argv[4]).toContain('--ttl-minutes');

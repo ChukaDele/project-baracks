@@ -14,6 +14,8 @@ DSH_CODEX_HOME="$DSH_HOME/providers/codex/default"
 CODEX_ACCOUNT_POLICY="${MAJOR_CODEX_ACCOUNT_POLICY:-$MAJOR_HOME/codex-account-policy.json}"
 KERNEL_SOURCE="$ROOT/distribution/deepseek-harness/bundles/major-kernel"
 KERNEL_DEST="$DSH_HOME/bundles/major-kernel"
+MAJOR_CONTROL_PLANE_DEST="$DSH_HOME/native-major"
+MAJOR_CONTROL_PLANE_MARKER="$MAJOR_CONTROL_PLANE_DEST/major-control-plane.json"
 MAJOR_PRESET_SOURCE="$ROOT/distribution/deepseek-harness/agent-presets/major"
 APP_DIR="${MAJOR_APP_DIR:-/Applications}"
 APP_DEST="$APP_DIR/Major.app"
@@ -31,6 +33,7 @@ MANAGED_PATHS=(
   "profiles/major-workstation-web"
   "profiles/major-workstation-headless"
   "bundles/major-kernel"
+  "native-major"
   "providers/codex"
   "bin/start-major-workstation.sh"
   "major-install.json"
@@ -282,6 +285,95 @@ link_kernel_runtime() {
   fi
 }
 
+stage_major_control_plane() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "[dry-run] stage compiled Major control plane -> $MAJOR_CONTROL_PLANE_DEST"
+    echo "[dry-run] install production control-plane dependencies in $MAJOR_CONTROL_PLANE_DEST/node_modules"
+    return 0
+  fi
+  local source_path
+  for source_path in \
+    "$ROOT/dist/entry.js" \
+    "$ROOT/package.json" \
+    "$ROOT/pnpm-lock.yaml" \
+    "$ROOT/drizzle" \
+    "$ROOT/guidance/skills.registry.json" \
+    "$ROOT/skills/internal" \
+    "$ROOT/evals/skill-resolver"; do
+    [[ -e "$source_path" ]] || fail "compiled Major control-plane artifact is missing: $source_path (run pnpm build first)"
+  done
+  command -v pnpm >/dev/null 2>&1 || fail "pnpm is required to stage the Major control-plane dependencies"
+  mkdir -p "$MAJOR_CONTROL_PLANE_DEST"
+  cp -R "$ROOT/dist" "$MAJOR_CONTROL_PLANE_DEST/dist"
+  cp -f "$ROOT/package.json" "$MAJOR_CONTROL_PLANE_DEST/package.json"
+  cp -f "$ROOT/pnpm-lock.yaml" "$MAJOR_CONTROL_PLANE_DEST/pnpm-lock.yaml"
+  cp -R "$ROOT/drizzle" "$MAJOR_CONTROL_PLANE_DEST/drizzle"
+  mkdir -p "$MAJOR_CONTROL_PLANE_DEST/guidance" "$MAJOR_CONTROL_PLANE_DEST/skills" "$MAJOR_CONTROL_PLANE_DEST/evals"
+  cp -f "$ROOT/guidance/skills.registry.json" "$MAJOR_CONTROL_PLANE_DEST/guidance/skills.registry.json"
+  cp -R "$ROOT/skills/internal" "$MAJOR_CONTROL_PLANE_DEST/skills/internal"
+  cp -R "$ROOT/evals/skill-resolver" "$MAJOR_CONTROL_PLANE_DEST/evals/skill-resolver"
+  pnpm install --dir "$MAJOR_CONTROL_PLANE_DEST" --prod --offline --frozen-lockfile --ignore-scripts
+  mkdir -p "$MAJOR_CONTROL_PLANE_DEST/bin"
+  cat > "$MAJOR_CONTROL_PLANE_DEST/bin/major" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec node "$ROOT/dist/entry.js" "$@"
+EOF
+  chmod 755 "$MAJOR_CONTROL_PLANE_DEST/bin/major"
+  python3 - "$MAJOR_CONTROL_PLANE_MARKER" "$PIN_VERSION" "$PIN_COMMIT" "$ROOT" "$KERNEL_SOURCE/index.js" "$MAJOR_CONTROL_PLANE_DEST/dist" <<'PY'
+import hashlib, json, subprocess, sys, time
+from pathlib import Path
+
+marker = Path(sys.argv[1])
+version = sys.argv[2]
+pin_commit = sys.argv[3]
+source_root = Path(sys.argv[4])
+kernel_entry = Path(sys.argv[5])
+control_plane_dist = Path(sys.argv[6])
+
+def sha256_file(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def sha256_tree(root):
+    digest = hashlib.sha256()
+    for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+commit = subprocess.check_output(
+    ["git", "-C", str(source_root), "rev-parse", "HEAD"], text=True
+).strip()
+dirty = subprocess.run(
+    ["git", "-C", str(source_root), "diff", "--quiet", "--ignore-submodules", "--"],
+    check=False,
+).returncode != 0
+kernel_sha = sha256_file(kernel_entry)
+control_plane_sha = sha256_tree(control_plane_dist)
+installation_id = hashlib.sha256(
+    f"{version}\0{pin_commit}\0{kernel_sha}\0{control_plane_sha}".encode("utf-8")
+).hexdigest()
+payload = {
+    "schemaVersion": 1,
+    "installationId": installation_id,
+    "installedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "dshPin": {"version": version, "attestedCommit": pin_commit},
+    "source": {
+        "commit": commit,
+        "dirty": dirty,
+        "kernelEntrySha256": kernel_sha,
+        "controlPlaneDistSha256": control_plane_sha,
+    },
+    "artifact": {"entrypoint": "bin/major", "runtime": "node", "dependencies": "production"},
+}
+marker.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
 stage_codex_worker_home() {
   local source_auth="$CODEX_PROFILE_HOME/auth.json"
   local dest_auth="$DSH_CODEX_HOME/auth.json"
@@ -509,9 +601,10 @@ write_install_record() {
     return 0
   fi
   mkdir -p "$DSH_HOME"
-  python3 - "$INSTALL_RECORD" "$PIN_VERSION" "$PIN_COMMIT" "$DSH_HOME" <<'PY'
+  python3 - "$INSTALL_RECORD" "$PIN_VERSION" "$PIN_COMMIT" "$DSH_HOME" "$MAJOR_CONTROL_PLANE_MARKER" <<'PY'
 import json, sys, time
-path, version, commit, home = sys.argv[1:5]
+path, version, commit, home, control_plane_marker = sys.argv[1:6]
+control_plane = json.load(open(control_plane_marker, encoding="utf-8"))
 payload = {
     "schemaVersion": 1,
     "installedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -521,8 +614,16 @@ payload = {
     "phase": "cutover",
     "defaultRuntime": "dsh-local",
     "compatibilityRuntimes": ["dsh-lima", "legacy-major-lima"],
-    "sessionHostEnv": "MAJOR_SESSION_HOST",
-    "sessionHosts": ["claude", "codex", "cursor", "antigravity"],
+    "nativeInteractionOrigin": "major-app/dsh",
+    "externalSessionHostEnv": "MAJOR_SESSION_HOST",
+    "externalSessionHosts": ["claude", "codex", "cursor", "antigravity"],
+    "nativeControlPlane": {
+        "entrypoint": "native-major/bin/major",
+        "marker": "native-major/major-control-plane.json",
+        "installationId": control_plane["installationId"],
+        "sourceCommit": control_plane["source"]["commit"],
+        "sourceDirty": control_plane["source"]["dirty"],
+    },
 }
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(payload, handle, indent=2)
@@ -549,6 +650,7 @@ link_kernel_runtime
 link_kernel_bundle
 link_shared_runtime major-workstation-web
 link_shared_runtime major-workstation-headless
+stage_major_control_plane
 verify_profile_composition major-workstation-web
 if [[ "${MAJOR_DSH_TEST_FAIL_AFTER_COMPOSITION:-0}" == "1" ]]; then
   fail "injected failure after web profile composition"
@@ -564,4 +666,5 @@ commit_managed_transaction
 
 echo "DeepSeek Harness pin staged. Normal trusted repository execution defaults to DSH local."
 echo "DSH Lima and the legacy Major/Lima pipeline remain explicit compatibility choices."
-echo "Before /major, set MAJOR_SESSION_HOST to the attaching host (claude|codex|cursor|antigravity)."
+echo "Native Major.app records interaction origin major-app/dsh; MAJOR_SESSION_HOST is only for /major from an external host."
+echo "Native Major.app uses the co-versioned control plane at $MAJOR_CONTROL_PLANE_DEST/bin/major."

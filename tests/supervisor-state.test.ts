@@ -105,6 +105,25 @@ describe('Major supervisor state', () => {
     expect(readSupervisorState().sessions.at(-1)?.sessionId).toBe('session-123');
   });
 
+  it('records a native DSH interaction origin without inventing an external host', () => {
+    const repoPath = fakeRepo('major-app');
+    const project = resolveProjectForCwd(repoPath);
+    const attachment = attachSession({
+      host: 'unknown',
+      interactionOrigin: 'major-app/dsh',
+      cwd: repoPath,
+      project: project!.project,
+      repoPath: project!.repoPath,
+      sessionId: 'dsh-session-123',
+    });
+    expect(attachment.host).toBe('unknown');
+    expect(attachment.interactionOrigin).toBe('major-app/dsh');
+    expect(readSupervisorState().sessions.at(-1)).toMatchObject({
+      host: 'unknown',
+      interactionOrigin: 'major-app/dsh',
+    });
+  });
+
   it('resolves current project by remote repository name', () => {
     const repoPath = fakeRepo('jss-tool');
     expect(resolveProject('jss-tool', repoPath)).toEqual({

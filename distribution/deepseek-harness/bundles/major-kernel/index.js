@@ -17,6 +17,8 @@ const OUTPUT_LIMIT = 256 * 1024;
 const RESULT_LIMIT = 8 * 1024;
 const NO_START_CAPABILITIES = Object.freeze({});
 const SESSION_HOSTS = new Set(['claude', 'codex', 'cursor', 'antigravity']);
+const NATIVE_APP_INTERACTION_ORIGIN = 'major-app/dsh';
+const COMPOSER_ENVELOPE_PREFIX = 'MAJOR_DSH_COMPOSER_ENVELOPE_V1\n';
 const FOREGROUND_DISPATCH_PREFIX = 'MAJOR_FOREGROUND_DISPATCH:';
 const REVIEW_HASH_EXCLUSIONS = new Set(['node_modules']);
 const GIT_CONTROL_NAMES = ['HEAD', 'index', 'config', 'packed-refs', 'commondir', 'hooks', 'refs'];
@@ -135,6 +137,27 @@ function sessionHost() {
     );
   }
   return host;
+}
+
+function interactionOriginForTask(task) {
+  return task.startsWith(COMPOSER_ENVELOPE_PREFIX) ? NATIVE_APP_INTERACTION_ORIGIN : undefined;
+}
+
+/** Keep plainly conversational turns inside the DSH coordinator. This is
+ * deliberately small: other messages retain the existing execution path,
+ * where the coordinator can still escalate when work is actually required. */
+export function directCoordinatorResponse(task) {
+  const normalized = task
+    .trim()
+    .toLowerCase()
+    .replace(/[!?.,]+$/g, '');
+  if (/^how are you(?: today)?(?: major)?$/.test(normalized)) {
+    return "I'm doing well and ready to help. I can chat, answer straightforward questions, or take on a substantive project task when you need work done.";
+  }
+  if (/^(?:hi|hello|hey)(?: major)?$/.test(normalized)) {
+    return "Hello. I'm Major. What would you like to discuss or work on?";
+  }
+  return undefined;
 }
 
 function clip(value, limit = RESULT_LIMIT) {
@@ -425,30 +448,29 @@ TASK:
 ${task}`;
 }
 
-async function admitMajorTask(ctx, cwd, task, signal) {
+async function admitMajorTask(ctx, cwd, task, signal, interactionOrigin) {
   const major = majorExecutable();
-  const host = sessionHost();
-  await runProcess(ctx, cwd, [major, 'session', 'attach', '--cwd', cwd, '--host', host], signal);
-  const admitted = parseJson(
-    await runProcess(
-      ctx,
-      cwd,
-      [major, 'goal', 'admit', '--cwd', cwd, '--host', host, '--outcome', task],
-      signal,
-    ),
-    'goal admit',
-  );
+  const host = interactionOrigin ? undefined : sessionHost();
+  const attachArgs = [major, 'session', 'attach', '--cwd', cwd];
+  if (host) attachArgs.push('--host', host);
+  if (interactionOrigin) attachArgs.push('--interaction-origin', interactionOrigin);
+  await runProcess(ctx, cwd, attachArgs, signal);
+  const admissionArgs = [major, 'goal', 'admit', '--cwd', cwd];
+  if (host) admissionArgs.push('--host', host);
+  if (interactionOrigin) admissionArgs.push('--interaction-origin', interactionOrigin);
+  admissionArgs.push('--outcome', task);
+  const admitted = parseJson(await runProcess(ctx, cwd, admissionArgs, signal), 'goal admit');
   if (admitted.admitted !== true || typeof admitted.goalId !== 'string') {
     throw new Error(`major-workstation: ${String(admitted.reason ?? 'goal admission refused')}`);
   }
   if (admitted.ownLiveWork !== true) {
     throw new Error('major-workstation: another Major session owns live work for this goal');
   }
-  return { major, host, admitted };
+  return { major, admitted };
 }
 
-async function executeMajor(ctx, cwd, task, signal) {
-  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal);
+async function executeMajor(ctx, cwd, task, signal, interactionOrigin) {
+  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal, interactionOrigin);
   const beforeGoal = parseJson(
     await runProcess(ctx, cwd, [major, 'goal', 'show', '--id', admitted.goalId], signal),
     'goal show before run',
@@ -484,8 +506,8 @@ async function executeMajor(ctx, cwd, task, signal) {
   };
 }
 
-async function executeNativeDsh(ctx, cwd, task, parent, signal, route) {
-  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal);
+async function executeNativeDsh(ctx, cwd, task, parent, signal, route, interactionOrigin) {
+  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal, interactionOrigin);
   const goal = parseJson(
     await runProcess(ctx, cwd, [major, 'goal', 'show', '--id', admitted.goalId], signal),
     'goal show before native run',
@@ -616,12 +638,13 @@ export function createMajorProvider(ctx) {
       if (!cwd) throw new Error('major-workstation: the DSH session has no project directory');
       const task = textContent(request.prompt);
       if (!task) throw new Error('major-workstation: a non-empty text task is required');
+      const interactionOrigin = interactionOriginForTask(task);
       const localAbort = new AbortController();
       const signal = AbortSignal.any([request.signal, localAbort.signal]);
       const route = configuredRuntimeRoute();
       const execution = route
-        ? executeNativeDsh(ctx, cwd, task, request.parent, signal, route)
-        : executeMajor(ctx, cwd, task, signal);
+        ? executeNativeDsh(ctx, cwd, task, request.parent, signal, route, interactionOrigin)
+        : executeMajor(ctx, cwd, task, signal, interactionOrigin);
       const result = execution.then(
         (run) => {
           const route =
@@ -759,6 +782,15 @@ export function createMajorComposerAdapter(ctx) {
       const parent = ctx.agents.get(options.sessionId);
       if (!parent) {
         throw new Error('major-workstation: the composer session has no live DSH agent');
+      }
+      const direct = directCoordinatorResponse(latestComposerTask(options.messages));
+      if (direct) {
+        yield { type: 'block-start', index: 0, blockType: 'text' };
+        yield { type: 'text-delta', index: 0, text: direct };
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: direct } };
+        yield { type: 'usage', usage: { inputTokens: 0, outputTokens: 0 } };
+        yield { type: 'finish', reason: { kind: 'stop' } };
+        return;
       }
       const task = composerTaskWithContext(options.messages, options.system);
       const result = await executeMajorIncrement(ctx, task, parent, options.signal);

@@ -210,6 +210,7 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
   if (args[1] !== 'attach' && args[1] !== 'hook') return false;
 
   const host = flag(args, '--host') ?? 'unknown';
+  const interactionOrigin = flag(args, '--interaction-origin');
   const envelope = flag(args, '--envelope');
   let cwd = flag(args, '--cwd') ?? process.cwd();
   let sessionId =
@@ -269,6 +270,7 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
   const project = resolveProjectForCwd(cwd);
   attachSession({
     host,
+    ...(interactionOrigin ? { interactionOrigin } : {}),
     cwd,
     ...(project ? { project: project.project, repoPath: project.repoPath } : {}),
     ...(sessionId ? { sessionId } : {}),

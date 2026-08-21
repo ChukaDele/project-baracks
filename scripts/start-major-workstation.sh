@@ -14,6 +14,8 @@ LOG_FILE="$DSH_HOME/logs/workstation.log"
 CHROME_PROFILE="$DSH_HOME/chrome-profile"
 CURRENT_PROJECT_FILE="$DSH_HOME/run/current-project"
 DSH_BIN="${MAJOR_DSH_BIN:-$DSH_HOME/runtime/node_modules/.bin/dsh}"
+MAJOR_BIN="$DSH_HOME/native-major/bin/major"
+MAJOR_CONTROL_PLANE_MARKER="$DSH_HOME/native-major/major-control-plane.json"
 CHROME_BIN="${MAJOR_CHROME_BIN:-}"
 READY_TIMEOUT="${MAJOR_WORKSTATION_READY_TIMEOUT:-30}"
 DRY_RUN=0
@@ -36,6 +38,7 @@ Environment:
   MAJOR_HOME / MAJOR_DSH_HOME / DSH_HOME
   MAJOR_DSH_BIN    Override pinned dsh executable
   MAJOR_CHROME_BIN Override Chrome/Chromium binary
+  MAJOR_BIN        Set internally to the co-versioned Major control plane
 EOF
 }
 
@@ -50,6 +53,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 export DSH_HOME
+export MAJOR_BIN
 export PATH="$ORIGINAL_PATH"
 
 resolve_chrome() {
@@ -204,6 +208,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "log: $LOG_FILE"
   echo "lock: $LOCK_DIR"
   echo "dsh: ${DSH_CMD[*]}"
+  echo "major control plane: $MAJOR_BIN"
   echo "chrome app-mode: --app=${CHROME_URL} --user-data-dir=$CHROME_PROFILE"
   echo "preserve PATH (major CLI unchanged)"
   echo "normal trusted repository execution defaults to DSH local"
@@ -213,6 +218,9 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 [[ -x "$DSH_BIN" ]] || fail "pinned dsh missing: $DSH_BIN (install the attested pin first)"
+[[ -x "$MAJOR_BIN" ]] || fail "co-versioned Major control plane missing: $MAJOR_BIN (install the attested pin first)"
+[[ -f "$MAJOR_CONTROL_PLANE_MARKER" ]] || \
+  fail "co-versioned Major control-plane marker missing: $MAJOR_CONTROL_PLANE_MARKER"
 CHROME_BIN="$(resolve_chrome)"
 [[ "$PATH" == "$ORIGINAL_PATH" ]] || fail "refusing to start after PATH mutation"
 assert_port_unowned
@@ -273,6 +281,7 @@ echo "Major workstation listening on ${LISTEN_HOST}:${PORT}"
 echo "served boot graph includes @major/dsh-kernel"
 echo "Chrome app-mode: $CHROME_URL"
 echo "project: $PROJECT"
+echo "major control plane: $MAJOR_BIN"
 echo "log: $LOG_FILE"
 echo "normal trusted repository execution defaults to DSH local"
 echo "DSH Lima and legacy Major/Lima remain explicit compatibility choices"
