@@ -120,6 +120,16 @@ for phrase in \
 done
 
 grep -Fq "MVP is the default delivery strategy" guidance/mvp-speed-and-prioritisation.md || fail "MVP default doctrine missing"
+grep -Fq "Make it work, make it useful, then improve or harden it" guidance/global-worker-rules.md || fail "work-use-improve doctrine missing"
+grep -Fq "Maximise useful concurrency" guidance/global-worker-rules.md || fail "useful concurrency doctrine missing"
+grep -Fq "Serialize only actual conflicts" guidance/global-worker-rules.md || fail "conflict-only serialization doctrine missing"
+grep -Fq "current physical/runtime capacity" guidance/global-worker-rules.md || fail "physical capacity qualification missing"
+grep -Fq "Critical-path dependencies" templates/project/GOAL_STATE.md || fail "shared critical-path state template missing"
+grep -Fq "Ownership and interfaces" templates/project/GOAL_STATE.md || fail "shared ownership state template missing"
+grep -Fq "Evidence stages" templates/project/QUALITY.md || fail "FAST acceptance release template missing"
+grep -Fq "operating-principle enforcement" docs/prior-art-decisions.md || fail "operating principle prior-art record missing"
+grep -Fq "OPERATING PRINCIPLE:" distribution/deepseek-harness/bundles/major-kernel/index.js || fail "native DSH operating principle missing"
+grep -Fq "serialize only real write, interface, ordering or scarce-resource conflicts" distribution/deepseek-harness/bundles/major-kernel/index.js || fail "native DSH conflict policy missing"
 grep -Fq "Git history is the audit archive" guidance/instruction-precedence.md || fail "clean supersession doctrine missing"
 grep -Fiq "continue until" guidance/autonomy-and-progress.md || fail "continue-until autonomy doctrine missing"
 grep -Fq "ASD-STE100-inspired" guidance/communication-style.md || fail "communication standard missing"

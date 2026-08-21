@@ -452,6 +452,15 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('bin/structured-fetch');
     expect(prompt).toContain('A completed goal alone is not proof that a capability was used');
     expect(prompt).toContain('Speed and MVP are the default');
+    expect(prompt).toContain('Make it work, make it useful, then improve it');
+    expect(prompt).toContain(
+      'Reuse the existing project, validated capability, maintained library or skill before building a new subsystem',
+    );
+    expect(prompt).toContain('critical-path, ownership, interface, decision and evidence updates');
+    expect(prompt).toContain('Prefer deletion and simpler code over new moving parts');
+    expect(prompt).toContain(
+      'FAST checks while iterating, acceptance evidence for the critical path',
+    );
     expect(prompt).toContain('class: workshop');
     expect(prompt).toContain('trust: assist');
     expect(prompt).toContain('maximum concurrent workers: 1');

@@ -15,7 +15,7 @@ CODEX_ACCOUNT_POLICY="${MAJOR_CODEX_ACCOUNT_POLICY:-$MAJOR_HOME/codex-account-po
 KERNEL_SOURCE="$ROOT/distribution/deepseek-harness/bundles/major-kernel"
 KERNEL_DEST="$DSH_HOME/bundles/major-kernel"
 MAJOR_PRESET_SOURCE="$ROOT/distribution/deepseek-harness/agent-presets/major"
-APP_DIR="${MAJOR_APP_DIR:-$HOME/Applications}"
+APP_DIR="${MAJOR_APP_DIR:-/Applications}"
 APP_DEST="$APP_DIR/Major.app"
 APP_MARKER_REL="Contents/Resources/major-dsh-installer-owned"
 APP_MARKER_VALUE="major-dsh-workstation-app-v1"
@@ -50,7 +50,7 @@ Environment:
   MAJOR_DSH_HOME  Isolated harness home (default: $MAJOR_HOME/dsh-harness)
   MAJOR_DSH_CODEX_PROFILE_HOME  Existing authenticated Codex profile (default: ~/.codex)
   MAJOR_CODEX_ACCOUNT_POLICY  Owner-approved named Codex profiles (default: ~/.major/codex-account-policy.json)
-  MAJOR_APP_DIR   Major.app parent directory (default: ~/Applications)
+  MAJOR_APP_DIR   Major.app parent directory (default: /Applications)
 EOF
 }
 

@@ -411,6 +411,13 @@ export function nativeWorkerTask(task, resolvedSkills = [], skillResolutionDegra
   return `MAJOR LEAF WORKER CONTRACT:
 Major has already admitted this goal and selected you through the DSH runtime. You are the leased leaf worker, not the control-plane coordinator. Do not run Major CLI commands, admit or dispatch another goal, or delegate to another worker. Perform the task directly in the current workspace, run its verification, and report the observed result.
 
+OPERATING PRINCIPLE:
+- Start with the smallest credible end-to-end MVP. Make it work, make it useful, then improve or harden it.
+- Reuse an existing project pattern, maintained library, validated tool, skill or provider capability before building a new subsystem.
+- Keep the shared current-goal state useful: record the critical path, ownership, interfaces, decisions and objective evidence in the project context when the task changes them.
+- Work the critical path first. Parallel capacity belongs to the parent coordinator; serialize only real write, interface, ordering or scarce-resource conflicts.
+- Prefer deletion and a simpler design over new moving parts. Use FAST checks while iterating and prove the acceptance path before broader hardening.
+
 RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT:
 ${skillContext}
 
@@ -754,7 +761,7 @@ export function createMajorComposerAdapter(ctx) {
         throw new Error('major-workstation: the composer session has no live DSH agent');
       }
       const task = composerTaskWithContext(options.messages, options.system);
-      const result = await executeMajorWithClaudeReview(ctx, task, parent, options.signal);
+      const result = await executeMajorIncrement(ctx, task, parent, options.signal);
       if (result.kind !== 'success') throw new Error(result.text);
       const output = result.text;
       yield { type: 'block-start', index: 0, blockType: 'text' };
@@ -785,6 +792,16 @@ function failedResult(provider, result) {
     kind: 'error',
     text: `${provider} ended with ${result.stopReason}${detail}`,
   };
+}
+
+/** One normal composer message maps to one routed native Major increment.
+ * The worker's focused verification is returned directly; a mandatory second
+ * provider review would consume the only physical worker slot and turn every
+ * ordinary request into duplicate validation ceremony. */
+async function executeMajorIncrement(ctx, task, parent, signal) {
+  const result = await settleSubagent(ctx, 'major', task, parent, signal);
+  if (result.stopReason !== 'completed') return failedResult('Major', result);
+  return { kind: 'success', text: textContent(result.output) };
 }
 
 /** Execute one existing Major provider increment and bind an independent,

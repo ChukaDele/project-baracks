@@ -124,13 +124,18 @@ describe('Major DSH workstation app', () => {
     expect(existsSync(appDir)).toBe(false);
   });
 
-  it('defaults app placement to an isolated HOME/Applications', () => {
+  it('defaults app placement to the normal system Applications folder without mutating it in tests', () => {
     const root = isolatedHome();
     const home = join(root, 'dsh');
-    const result = bash([STAGE], { HOME: root, MAJOR_DSH_HOME: home, MAJOR_APP_DIR: '' });
+    const result = bash([STAGE, '--dry-run'], {
+      HOME: root,
+      MAJOR_DSH_HOME: home,
+      MAJOR_APP_DIR: '',
+    });
     expect(result.status).toBe(0);
-    expect(existsSync(join(root, 'Applications/Major.app/Contents/MacOS/Major'))).toBe(true);
-    expect(existsSync(join(home, 'bin/start-major-workstation.sh'))).toBe(true);
+    expect(result.stdout).toContain('/Applications/Major.app');
+    expect(existsSync(join(root, 'Applications/Major.app'))).toBe(false);
+    expect(existsSync(join(home, 'bin/start-major-workstation.sh'))).toBe(false);
   });
 
   it('stages the marked app separately, points it at DSH state, and removes only owned files', () => {

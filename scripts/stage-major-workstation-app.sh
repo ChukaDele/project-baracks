@@ -9,7 +9,7 @@ MAJOR_HOME="${MAJOR_HOME:-$HOME/.major}"
 DSH_HOME="${MAJOR_DSH_HOME:-$MAJOR_HOME/dsh-harness}"
 APP_SOURCE="$ROOT/distribution/deepseek-harness/macos/Major.app"
 LAUNCHER_SOURCE="$ROOT/scripts/start-major-workstation.sh"
-APP_DIR="${MAJOR_APP_DIR:-$HOME/Applications}"
+APP_DIR="${MAJOR_APP_DIR:-/Applications}"
 APP_DEST="$APP_DIR/Major.app"
 MARKER_REL="Contents/Resources/major-dsh-installer-owned"
 POINTER_REL="Contents/Resources/major-dsh-home"
@@ -30,7 +30,7 @@ stage-major-workstation-app.sh — installer-managed Major.app with isolated DSH
 Environment:
   MAJOR_HOME      Major state root (default: ~/.major)
   MAJOR_DSH_HOME  Isolated harness home (default: $MAJOR_HOME/dsh-harness)
-  MAJOR_APP_DIR   Major.app parent directory (default: ~/Applications)
+  MAJOR_APP_DIR   Major.app parent directory (default: /Applications)
 EOF
 }
 
