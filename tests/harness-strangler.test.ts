@@ -371,6 +371,7 @@ describe('DeepSeek Harness cutover install plan', () => {
     const dshHome = join(home, 'dsh-harness');
     const codexHome = join(root, 'codex');
     const fakeBin = join(root, 'bin');
+    const dependencySnapshot = join(root, 'immutable-major-snapshot');
     const appDir = join(root, 'Applications');
     const app = join(appDir, 'Major.app');
     const runtimeMarker = join(dshHome, 'runtime/rollback-runtime.txt');
@@ -385,6 +386,7 @@ describe('DeepSeek Harness cutover install plan', () => {
         join(dshHome, 'native-major'),
         join(dshHome, 'sessions'),
         join(dshHome, 'chrome-profile'),
+        join(dependencySnapshot, 'node_modules'),
         codexHome,
         fakeBin,
         join(app, 'Contents/Resources'),
@@ -396,6 +398,14 @@ describe('DeepSeek Harness cutover install plan', () => {
       writeFileSync(controlPlaneMarker, 'prior control plane\n');
       writeFileSync(sessionMarker, 'session state\n');
       writeFileSync(chromeMarker, 'chrome state\n');
+      writeFileSync(
+        join(dependencySnapshot, 'pnpm-lock.yaml'),
+        readFileSync(join(REPO_ROOT, 'pnpm-lock.yaml')),
+      );
+      writeFileSync(
+        join(home, 'installed-release.json'),
+        JSON.stringify({ releaseDir: dependencySnapshot }),
+      );
       writeFileSync(
         join(app, 'Contents/Resources/major-dsh-installer-owned'),
         'major-dsh-workstation-app-v1\n',

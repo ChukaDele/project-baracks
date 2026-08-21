@@ -288,7 +288,7 @@ link_kernel_runtime() {
 stage_major_control_plane() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "[dry-run] stage compiled Major control plane -> $MAJOR_CONTROL_PLANE_DEST"
-    echo "[dry-run] install production control-plane dependencies in $MAJOR_CONTROL_PLANE_DEST/node_modules"
+    echo "[dry-run] stage the matching immutable production dependency closure in $MAJOR_CONTROL_PLANE_DEST/node_modules"
     return 0
   fi
   local source_path
@@ -302,7 +302,26 @@ stage_major_control_plane() {
     "$ROOT/evals/skill-resolver"; do
     [[ -e "$source_path" ]] || fail "compiled Major control-plane artifact is missing: $source_path (run pnpm build first)"
   done
-  command -v pnpm >/dev/null 2>&1 || fail "pnpm is required to stage the Major control-plane dependencies"
+  local dependency_source
+  dependency_source="$(python3 - "$MAJOR_HOME/installed-release.json" "$ROOT/pnpm-lock.yaml" <<'PY'
+import json, os, sys
+record_path, source_lock = sys.argv[1:]
+try:
+    record = json.load(open(record_path, encoding="utf-8"))
+    release_dir = record["releaseDir"]
+except (OSError, ValueError, KeyError, TypeError) as error:
+    raise SystemExit(f"no immutable Major dependency snapshot is available: {error}")
+dependency_dir = os.path.join(release_dir, "node_modules")
+release_lock = os.path.join(release_dir, "pnpm-lock.yaml")
+if not os.path.isdir(dependency_dir):
+    raise SystemExit(f"immutable Major dependency snapshot is missing node_modules: {dependency_dir}")
+if not os.path.isfile(release_lock):
+    raise SystemExit(f"immutable Major dependency snapshot is missing its lockfile: {release_lock}")
+if open(release_lock, "rb").read() != open(source_lock, "rb").read():
+    raise SystemExit("immutable Major dependency snapshot lockfile does not match this control-plane build")
+print(dependency_dir)
+PY
+)" || fail "a matching immutable Major dependency snapshot is required to stage the control plane"
   mkdir -p "$MAJOR_CONTROL_PLANE_DEST"
   cp -R "$ROOT/dist" "$MAJOR_CONTROL_PLANE_DEST/dist"
   cp -f "$ROOT/package.json" "$MAJOR_CONTROL_PLANE_DEST/package.json"
@@ -312,7 +331,7 @@ stage_major_control_plane() {
   cp -f "$ROOT/guidance/skills.registry.json" "$MAJOR_CONTROL_PLANE_DEST/guidance/skills.registry.json"
   cp -R "$ROOT/skills/internal" "$MAJOR_CONTROL_PLANE_DEST/skills/internal"
   cp -R "$ROOT/evals/skill-resolver" "$MAJOR_CONTROL_PLANE_DEST/evals/skill-resolver"
-  pnpm install --dir "$MAJOR_CONTROL_PLANE_DEST" --prod --offline --frozen-lockfile --ignore-scripts
+  cp -R "$dependency_source" "$MAJOR_CONTROL_PLANE_DEST/node_modules"
   mkdir -p "$MAJOR_CONTROL_PLANE_DEST/bin"
   cat > "$MAJOR_CONTROL_PLANE_DEST/bin/major" <<'EOF'
 #!/usr/bin/env bash
