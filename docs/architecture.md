@@ -36,7 +36,7 @@ Used to make and ship software.
 - proof-first P0 MVP delivery;
 - worktree isolation and explicit write ownership;
 - code, browser QA, preview deployments, repair loops and objective runtime evidence;
-- project trust may lower concurrency, while one hard global resource guard caps the full task tree at 6;
+- project trust and current physical capacity may lower concurrency, while one hard global resource guard caps the full task tree at 6;
 - multi-agent graphs are created only when independent parallel work earns their coordination cost.
 
 ### Major Knowledge
@@ -66,11 +66,11 @@ Project classes:
 Trust levels:
 
 - `observe` — no delegated execution;
-- `assist` — foreground pilot, one concurrent worker through the DSH runtime;
-- `build` — validated build mode, one concurrent worker through the DSH runtime;
-- `unattended` — one concurrent worker plus background continuation. Unattended authority remains separately gated.
+- `assist` — foreground pilot through the DSH runtime;
+- `build` — validated build mode through the DSH runtime;
+- `unattended` — background continuation. Unattended authority remains separately gated.
 
-The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. DSH execution has a 1-worker cap, whether it uses the default local environment or optional Lima isolation. Browser leases have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
+The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. Current DSH execution has one worker slot, whether it uses the default local environment or optional Lima isolation. This is a physical runtime capacity limit, not a permanent one-worker governance model. Browser leases have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
 
 Unknown projects default to observe. Client/candidate/PII projects remain isolated until explicitly classified/promoted. Trust promotion beyond assist requires a passing independent grade.
 
@@ -90,8 +90,12 @@ Canonical rules live in `guidance/` and are selected by `guidance/instructions.r
 They define:
 
 - proof-first MVP delivery;
+- make-it-work, make-it-useful, then improve delivery;
+- reuse-first decisions and the critical path;
+- shared current-goal state, explicit ownership and interface boundaries;
+- useful concurrency with serialization only for real conflicts;
 - built/validated/ready language;
-- independent grading;
+- risk-proportionate validation and independent grading;
 - project trust/blast radius;
 - tool/source routing;
 - autonomy/recovery;

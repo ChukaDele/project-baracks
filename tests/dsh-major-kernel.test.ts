@@ -845,6 +845,11 @@ describe('Major DSH workstation kernel', () => {
       { id: 'release-gate', source: 'internal', content: '# Release gate\nRun the exact checks.' },
       { id: 'learned-fix', source: 'gbrain-generated', content: '# Learned fix\nReuse it.' },
     ]);
+    expect(prompt).toContain('Make it work, make it useful, then improve or harden it');
+    expect(prompt).toContain('Reuse an existing project pattern, maintained library, validated tool, skill or provider capability');
+    expect(prompt).toContain('record the critical path, ownership, interfaces, decisions and objective evidence');
+    expect(prompt).toContain('serialize only real write, interface, ordering or scarce-resource conflicts');
+    expect(prompt).toContain('Use FAST checks while iterating and prove the acceptance path');
     expect(prompt).toContain('RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT');
     expect(prompt).toContain('MAJOR SKILL release-gate (internal)');
     expect(prompt).toContain('MAJOR SKILL learned-fix (gbrain-generated)');

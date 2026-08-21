@@ -20,11 +20,21 @@ Apply these defaults across projects unless a project/user instruction is more s
 ## Trust levels
 
 - `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human/gstack driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
-- `assist`: visible foreground pilot, maximum 1 worker and maximum 30 minutes per coordinator run.
-- `build`: normal foreground working mode, maximum 1 worker and maximum 120 minutes per coordinator run. It may be reached either through evidence-based promotion or explicit owner approval.
-- `unattended`: maximum 1 worker with background continuation. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
+- `assist`: visible foreground pilot, subject to the current runtime capacity and a 30-minute coordinator limit.
+- `build`: normal foreground working mode, subject to the current runtime capacity and a 120-minute coordinator limit. It may be reached either through evidence-based promotion or explicit owner approval.
+- `unattended`: background continuation within the current runtime capacity. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
 
 For owner-approved build projects, do not re-introduce shadow runs, repeated permission prompts, or ceremonial review loops that block ordinary reversible engineering.
+
+## Operating principle
+
+- Start with the smallest credible end-to-end MVP that proves the value loop. Make it work, make it useful, then improve or harden it.
+- Reuse proven internal code, maintained libraries, existing tools, skills and provider capabilities before building a new subsystem. Record substantial ADOPT, WRAP, BORROW or BUILD decisions in `docs/prior-art-decisions.md`.
+- Maintain one shared current-goal state: outcome, acceptance evidence, critical-path dependencies, explicit ownership, interfaces, decisions and evidence. Keep it current as work changes.
+- Maximise useful concurrency. Parallelise independent work when the current capacity, trust policy and write ownership allow it. Serialize only actual conflicts: shared mutable state, incompatible interfaces, required ordering or a scarce physical resource.
+- Treat numeric worker and browser caps as current physical/runtime capacity, not a claim that one-worker delivery is the permanent governance model. Do not bypass them. Improve scheduling only when the runtime can safely support it.
+- Work from the critical path. Remove the smallest present constraint first. Prefer deletion, reuse and a simpler design over new machinery.
+- Match validation and independent review to risk. Use FAST checks while iterating, acceptance evidence for the critical path, and one frozen-candidate release gate. Do not add review loops that do not change the decision.
 
 ## Global resource guard
 
@@ -36,7 +46,7 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Build budget: one production build at a time. Build once per relevant commit. Reviewers inspect the same immutable remote preview.
 - Major admission checks the shared resource ledger and memory availability. Below the memory soft floor, new work queues instead of increasing pressure.
 - Use `major resource status` for lightweight telemetry: workers, browsers, builds, total active, queued and memory availability.
-- QA runs are serialized through the single v0.5.1 worker: review, consolidate and repair, then run the next reviewer and final verifier.
+- QA is currently scheduled through the single DSH worker slot: review, consolidate and repair, then run the next reviewer and final verifier. This is a temporary physical-capacity constraint, not a general rule against independent review.
 
 ## Communication
 

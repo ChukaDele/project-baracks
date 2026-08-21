@@ -4,6 +4,17 @@ Future Major agents must consult this log before rebuilding a capability or addi
 
 Record format: Capability, Date, Candidates, Decision, Reason, Major-specific layer retained, Rejected alternatives, Evidence.
 
+## 2026-08-21 — operating-principle enforcement
+
+- **Capability:** durable MVP-first, reuse-first, critical-path, shared-state, useful-concurrency and risk-proportionate validation policy
+- **Date:** 2026-08-21
+- **Candidates:** existing Major guidance registry and project templates; supervisor coordinator prompt; new scheduler or policy subsystem
+- **Decision:** ADOPT and extend the existing guidance, project-state templates and injected coordinator contract. KEEP the existing resource leases and exact-worktree integration lock. DEFER a multi-writer scheduler until the DSH runtime has more than one physical worker slot.
+- **Reason:** the required policy already has canonical delivery paths. A new policy engine or scheduler would add machinery without improving the P0. The current one-worker cap is a real runtime capacity limit, while worktree isolation, ownership and leases already define the safe future concurrency boundary.
+- **Major-specific layer retained:** durable goal context, skills, learning lifecycle, resource leases, project policy, exact-worktree lock and existing release attestation
+- **Rejected alternatives:** a second policy system; treating one-worker capacity as permanent governance; bypassing the resource guard; speculative multi-writer scheduling
+- **Evidence:** `guidance/global-worker-rules.md`, `templates/project/GOAL_STATE.md`, `templates/project/QUALITY.md`, `src/supervisor/runtime.ts`, `src/supervisor/resources.ts`, `src/supervisor/policy.ts` and focused runtime-template validation
+
 ## 2026-08-17 — compact live Codex usage monitor
 
 - **Capability:** compact live Codex usage for already-authenticated Major accounts

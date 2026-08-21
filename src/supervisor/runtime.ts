@@ -469,7 +469,7 @@ export function coordinatorPrompt(
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const workerLanguage =
     policy.maxWorkers <= 1
-      ? 'Keep this single-worker unless a genuine blocker requires escalation.'
+      ? 'The current DSH runtime has one worker slot. Do not bypass it. Keep independent work ready to fan out when capacity exists, and serialize only real write, interface, ordering, or scarce-resource conflicts.'
       : `This project's parent coordinator may admit up to ${policy.maxWorkers} independent workers. This leased worker must request additional capacity in its final report rather than nesting workers itself.`;
 
   return `You are the active Major coordinator for project ${goal.project}.
@@ -518,9 +518,12 @@ ${trustContract(policy)}
 
 MAJOR OPERATING CONTRACT:
 - Treat contained, reversible and observable Workshop actions as autonomous progress. Use project policy for external effects and reserve owner gates for human-only consequential boundaries.
-- Speed and MVP are the default. Reduce broad scope to the smallest end-to-end P0 that proves value, then keep expanding only while P0 gaps remain.
+- Speed and MVP are the default. Reduce broad scope to the smallest end-to-end P0 that proves value. Make it work, make it useful, then improve it only while P0 gaps remain.
 - Do not stop after one PR, migration, fix, test, or subtask. After each result ask: what is now the highest-impact missing piece blocking the goal?
 - ${workerLanguage}
+- Reuse the existing project, validated capability, maintained library or skill before building a new subsystem. For substantial infrastructure, follow the recorded ADOPT, WRAP, BORROW or BUILD decision.
+- Keep the injected CURRENT PROJECT CONTEXT current through concise outcome, critical-path, ownership, interface, decision and evidence updates. Work the critical path first and remove the smallest present constraint.
+- Prefer deletion and simpler code over new moving parts. Use FAST checks while iterating, acceptance evidence for the critical path, and only risk-proportionate independent review or frozen-candidate release validation.
 - RESOLVED MAJOR SKILLS lists routing provenance only; host skill files are not mounted here. Follow the injected Major operating contract and matched skill ids—do not stop or attempt host access to open skill paths.
 - Read project LEARNINGS.md and the Major learning candidates below before acting. Do not repeat a captured correction merely because a fresh worker lacks chat history.
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.

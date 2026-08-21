@@ -411,6 +411,13 @@ export function nativeWorkerTask(task, resolvedSkills = [], skillResolutionDegra
   return `MAJOR LEAF WORKER CONTRACT:
 Major has already admitted this goal and selected you through the DSH runtime. You are the leased leaf worker, not the control-plane coordinator. Do not run Major CLI commands, admit or dispatch another goal, or delegate to another worker. Perform the task directly in the current workspace, run its verification, and report the observed result.
 
+OPERATING PRINCIPLE:
+- Start with the smallest credible end-to-end MVP. Make it work, make it useful, then improve or harden it.
+- Reuse an existing project pattern, maintained library, validated tool, skill or provider capability before building a new subsystem.
+- Keep the shared current-goal state useful: record the critical path, ownership, interfaces, decisions and objective evidence in the project context when the task changes them.
+- Work the critical path first. Parallel capacity belongs to the parent coordinator; serialize only real write, interface, ordering or scarce-resource conflicts.
+- Prefer deletion and a simpler design over new moving parts. Use FAST checks while iterating and prove the acceptance path before broader hardening.
+
 RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT:
 ${skillContext}
 

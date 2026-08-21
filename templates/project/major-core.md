@@ -43,6 +43,8 @@ For MCP/connectors/plugins, load `mcp-integration-ops`. Distinguish `installed â
 
 **MVP and speed are the default.** For a broad request, reduce scope to P0 MVP / P1 next / P2 later. Test the biggest uncertainty in the fastest credible medium, then build P0 end to end before expanding breadth.
 
+Make it work. Make it useful. Then improve or harden it. Reuse a proven internal pattern, maintained library, tool, skill or provider capability before building a new subsystem. Record a substantial ADOPT, WRAP, BORROW or BUILD decision in `docs/prior-art-decisions.md`.
+
 A prototype may be UI, code, script, provider call, local slice or another fast proof. Figma is optional, not a required ceremony.
 
 For knowledge work, the equivalent is: define the decision, identify the biggest uncertainty, gather the minimum credible evidence, then recommend/act. Do not over-research reversible low-value choices.
@@ -106,8 +108,9 @@ For customer-facing web work, load `website-design-qa`; pair `responsive-motion-
 - Continue safe reversible work until the acceptance condition is met or a genuine owner-only gate is reached.
 - Do not stop because one command failed or one subtask ended when a safe next action exists.
 - After two materially unchanged failed approaches, change strategy/tool/model or isolate the failing boundary.
-- Parallelise genuinely independent work only within the current project trust-level worker ceiling.
-- Concurrent writers use isolated worktrees and explicit ownership. Avoid duplicate writers on the same files.
+- Keep one shared current-goal state: outcome, acceptance evidence, critical-path dependencies, explicit ownership, interfaces, decisions and evidence.
+- Parallelise genuinely independent work within current capacity and project trust. Serialize only actual write, interface, ordering or scarce-resource conflicts.
+- Concurrent writers use isolated worktrees and explicit ownership. Avoid duplicate writers on the same files. Current runtime caps are physical capacity, not a permanent one-worker governance rule.
 - Continue independent work around one blocked dependency.
 
 For knowledge work, parallelise materially different research angles rather than duplicating the same search. Use an independent skeptic/reviewer when consequence or uncertainty justifies it.
@@ -117,6 +120,8 @@ For knowledge work, parallelise materially different research angles rather than
 Completion requires objective evidence appropriate to the outcome: browser/runtime behavior, tests, persisted state, provider response, faithful primary-source content/transcript, exact commit/PR state, preview/deploy result or explicit human acceptance when the result is subjective. Agent self-report is not evidence.
 
 Use risk-proportional QA. Optimize confidence per minute, not test count.
+
+Use FAST checks while iterating. Prove the acceptance path before broader hardening. Run one release gate against a frozen candidate when the outcome needs release evidence. Add independent review when consequence, uncertainty or a changed high-risk boundary justifies it.
 
 - **BUILT** = implementation exists.
 - **VALIDATED** = relevant deterministic checks plus an independent grader support the claim.

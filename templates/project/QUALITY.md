@@ -2,6 +2,14 @@
 
 Goal: **confidence per minute**, not maximum checks.
 
+## Evidence stages
+
+- **FAST:** focused checks while editing. Use these to shorten feedback loops.
+- **ACCEPTANCE:** objective proof of the P0 critical path and any meaningful recovery path.
+- **RELEASE:** one frozen-candidate gate when a release decision needs it. Do not repeat it after unrelated status changes.
+
+Choose independent review and deeper checks in proportion to consequence, uncertainty and changed risk boundaries.
+
 ## Current outcome risk
 
 [Low / medium / high + why]
