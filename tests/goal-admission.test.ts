@@ -5,20 +5,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
 import { runSupervisorCli } from '../src/supervisor/cli.js';
 import { activeGoals, readSupervisorState, writeSupervisorState } from '../src/supervisor/state.js';
+import { requestResource } from '../src/supervisor/resources.js';
 
 let root = '';
 let priorStatePath: string | undefined;
 let priorPolicyPath: string | undefined;
 let priorDbPath: string | undefined;
+let priorResourcePath: string | undefined;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-goal-admission-'));
   priorStatePath = process.env.MAJOR_STATE_PATH;
   priorPolicyPath = process.env.MAJOR_POLICY_PATH;
   priorDbPath = process.env.MAJOR_DB_PATH;
+  priorResourcePath = process.env.MAJOR_RESOURCE_PATH;
   process.env.MAJOR_STATE_PATH = join(root, 'state.json');
   process.env.MAJOR_POLICY_PATH = join(root, 'policies.json');
   process.env.MAJOR_DB_PATH = join(root, 'major.db');
+  process.env.MAJOR_RESOURCE_PATH = join(root, 'resources.json');
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
 });
 
@@ -30,6 +34,8 @@ afterEach(() => {
   else process.env.MAJOR_POLICY_PATH = priorPolicyPath;
   if (priorDbPath === undefined) delete process.env.MAJOR_DB_PATH;
   else process.env.MAJOR_DB_PATH = priorDbPath;
+  if (priorResourcePath === undefined) delete process.env.MAJOR_RESOURCE_PATH;
+  else process.env.MAJOR_RESOURCE_PATH = priorResourcePath;
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -230,6 +236,101 @@ describe('major goal admit', () => {
     expect(result.authority.status).toBe('active');
     expect(result.guidance).toContain('codex');
     expect(activeGoals('jss-tool', repoPath)).toHaveLength(1);
+  });
+
+  it('automatically rebinds a goal from a deleted worktree after its cycle is conclusively dead', async () => {
+    const repoPath = repo();
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => logs.push(String(value)));
+    const admit = () =>
+      runSupervisorCli([
+        'goal',
+        'admit',
+        '--cwd',
+        repoPath,
+        '--host',
+        'codex',
+        '--outcome',
+        'Ship the MVP',
+        '--session-id',
+        'thread-a',
+      ]);
+
+    await admit();
+    const state = readSupervisorState();
+    const goal = state.goals[0]!;
+    const removedWorktree = join(root, 'removed-worktree');
+    goal.repoPath = removedWorktree;
+    goal.status = 'running';
+    goal.activePid = 999_999;
+    writeSupervisorState(state);
+
+    await admit();
+    const result = lastLog(logs) as {
+      ownLiveWork: boolean;
+      ownershipReconciled?: { previousRepoPath: string; repoPath: string };
+    };
+    expect(result.ownLiveWork).toBe(true);
+    expect(result.ownershipReconciled).toMatchObject({
+      previousRepoPath: removedWorktree,
+      repoPath,
+    });
+    const persisted = readSupervisorState().goals[0]!;
+    expect(persisted).toMatchObject({
+      repoPath,
+      status: 'active',
+      lastOwnershipReconciliation: { previousRepoPath: removedWorktree, repoPath },
+    });
+    expect(persisted.activePid).toBeUndefined();
+  });
+
+  it('does not rebind a deleted worktree while a real worker lease is live', async () => {
+    const repoPath = repo();
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => logs.push(String(value)));
+    const args = [
+      'goal',
+      'admit',
+      '--cwd',
+      repoPath,
+      '--host',
+      'codex',
+      '--outcome',
+      'Ship the MVP',
+      '--session-id',
+      'thread-a',
+    ];
+    await runSupervisorCli(args);
+    const state = readSupervisorState();
+    const removedWorktree = join(root, 'removed-worktree');
+    state.goals[0]!.repoPath = removedWorktree;
+    state.goals[0]!.activePid = undefined;
+    writeSupervisorState(state);
+    requestResource({
+      kind: 'worker',
+      owner: 'live-worker',
+      project: 'github.com/chukadele/jss-tool',
+      pid: process.pid,
+    });
+
+    await runSupervisorCli(args);
+    const result = lastLog(logs) as { ownershipReconciled?: unknown };
+    expect(result.ownershipReconciled).toBeUndefined();
+    expect(readSupervisorState().goals[0]!.repoPath).toBe(removedWorktree);
   });
 
   it('does not fall back to a stale (24h+) attached session id', async () => {

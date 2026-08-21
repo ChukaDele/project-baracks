@@ -761,7 +761,7 @@ export function createMajorComposerAdapter(ctx) {
         throw new Error('major-workstation: the composer session has no live DSH agent');
       }
       const task = composerTaskWithContext(options.messages, options.system);
-      const result = await executeMajorWithClaudeReview(ctx, task, parent, options.signal);
+      const result = await executeMajorIncrement(ctx, task, parent, options.signal);
       if (result.kind !== 'success') throw new Error(result.text);
       const output = result.text;
       yield { type: 'block-start', index: 0, blockType: 'text' };
@@ -792,6 +792,16 @@ function failedResult(provider, result) {
     kind: 'error',
     text: `${provider} ended with ${result.stopReason}${detail}`,
   };
+}
+
+/** One normal composer message maps to one routed native Major increment.
+ * The worker's focused verification is returned directly; a mandatory second
+ * provider review would consume the only physical worker slot and turn every
+ * ordinary request into duplicate validation ceremony. */
+async function executeMajorIncrement(ctx, task, parent, signal) {
+  const result = await settleSubagent(ctx, 'major', task, parent, signal);
+  if (result.stopReason !== 'completed') return failedResult('Major', result);
+  return { kind: 'success', text: textContent(result.output) };
 }
 
 /** Execute one existing Major provider increment and bind an independent,

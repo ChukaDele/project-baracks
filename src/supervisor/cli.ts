@@ -24,6 +24,7 @@ import {
   getGoal,
   gitCommonDir,
   heartbeatLiveWorker,
+  reconcileStaleGoalOwnership,
   resolveProject,
   resolveProjectForCwd,
   readSupervisorState,
@@ -507,13 +508,25 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     // step). admitGoal() does the find-or-create in one state mutation so
     // two concurrent admissions can never race each other into overwriting
     // one another's outcome.
-    const { goal, created } = admitGoal({
+    const admittedGoal = admitGoal({
       project: project.project,
       repoPath: project.repoPath,
       outcome,
       preferredCoordinator: host,
       refine: hasFlag(args, '--refine'),
     });
+    const workerLeases = resourceSnapshot().leases.filter(
+      (lease) => lease.kind === 'worker' && lease.project === project.project,
+    );
+    const ownership = reconcileStaleGoalOwnership({
+      goalId: admittedGoal.goal.id,
+      project: project.project,
+      repoPath: project.repoPath,
+      host,
+      sessionId,
+      hasActiveWorkerLease: workerLeases.length > 0,
+    });
+    const goal = ownership.goal;
     const claimResult = claimLiveWorker(goal.id, { host, sessionId });
     let authorityExpiresAt: string;
     try {
@@ -533,11 +546,14 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         {
           admitted: true,
           goalId: goal.id,
-          created,
+          created: admittedGoal.created,
           outcome: goal.goal,
           authority: { status: 'active', expiresAt: authorityExpiresAt },
           ownLiveWork: claimResult.owned,
           liveWorker: claimResult.claim,
+          ...(ownership.reconciled
+            ? { ownershipReconciled: goal.lastOwnershipReconciliation }
+            : {}),
           guidance: claimResult.owned
             ? 'proceed as the current worker for this goal'
             : `another session already holds live work on this goal (${claimResult.claim.host} ` +

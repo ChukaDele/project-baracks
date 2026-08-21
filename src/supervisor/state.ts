@@ -22,6 +22,16 @@ export interface LiveWorkerClaim {
   heartbeatAt: string;
 }
 
+/** Durable evidence that admission recovered a goal from a removed worktree.
+ * This is operational history, not an owner gate: a recovery only happens
+ * after the caller has proved that no cycle or worker lease is still live. */
+export interface OwnershipReconciliation {
+  reconciledAt: string;
+  previousRepoPath: string;
+  repoPath: string;
+  reason: string;
+}
+
 /** How long an interactive session's live-worker claim survives without a
  * heartbeat before another attaching session may reclaim it as abandoned.
  * Long enough to cover normal thinking/back-and-forth gaps in a
@@ -93,6 +103,10 @@ export interface SupervisorGoal {
    * call, while an attached conversational session can span a long
    * interaction with idle gaps between turns. */
   liveWorker?: LiveWorkerClaim | undefined;
+  /** The latest automatic stale-ownership repair, retained so status and
+   * subsequent sessions can distinguish recovered control state from a
+   * human-approved ownership transfer. */
+  lastOwnershipReconciliation?: OwnershipReconciliation | undefined;
   pendingCompletion?:
     | {
         summary: string;
@@ -310,6 +324,78 @@ export function admitGoal(input: {
     };
     state.goals.push(goal);
     return { goal, created: true };
+  });
+}
+
+function pidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EPERM') return true;
+    return code !== 'ESRCH';
+  }
+}
+
+/**
+ * Rebind an admitted goal only when its former worktree has gone away and
+ * every actual-writer signal is absent. This self-heals abandoned internal
+ * metadata without weakening the fence for a live, conflicting writer.
+ *
+ * Resource leases are observed by the CLI because its resource store owns
+ * their atomic pruning. The state mutation remains atomic with the goal
+ * update and records the repair durably for the next session and status view.
+ */
+export function reconcileStaleGoalOwnership(input: {
+  goalId: string;
+  project: string;
+  repoPath: string;
+  host: string;
+  sessionId: string;
+  hasActiveWorkerLease: boolean;
+  now?: () => Date;
+}): { goal: SupervisorGoal; reconciled: boolean } {
+  return mutateSupervisorState((state) => {
+    const goal = state.goals.find((candidate) => candidate.id === input.goalId);
+    if (!goal) throw new Error(`goal not found: ${input.goalId}`);
+
+    const nextRepoPath = resolve(input.repoPath);
+    const previousRepoPath = resolve(goal.repoPath);
+    if (goal.project !== input.project || previousRepoPath === nextRepoPath) {
+      return { goal, reconciled: false };
+    }
+    if (existsSync(previousRepoPath)) return { goal, reconciled: false };
+    if (goal.activePid !== undefined && pidAlive(goal.activePid)) {
+      return { goal, reconciled: false };
+    }
+    if (input.hasActiveWorkerLease) return { goal, reconciled: false };
+
+    const liveWorker = goal.liveWorker;
+    const isCurrentSession =
+      liveWorker?.host === input.host && liveWorker.sessionId === input.sessionId;
+    if (liveWorker && !isCurrentSession && isLiveWorkerFresh(liveWorker, input.now)) {
+      return { goal, reconciled: false };
+    }
+
+    const now = (input.now ?? (() => new Date()))();
+    const nowIso = now.toISOString();
+    goal.repoPath = nextRepoPath;
+    goal.activePid = undefined;
+    if (goal.status === 'running' && !goal.pendingCompletion) {
+      goal.status = 'active';
+      goal.nextRunAt = nowIso;
+    }
+    if (liveWorker && !isCurrentSession) goal.liveWorker = undefined;
+    goal.lastOwnershipReconciliation = {
+      reconciledAt: nowIso,
+      previousRepoPath,
+      repoPath: nextRepoPath,
+      reason: 'previous worktree is missing; no live cycle PID or worker lease remains',
+    };
+    goal.updatedAt = nowIso;
+    return { goal, reconciled: true };
   });
 }
 

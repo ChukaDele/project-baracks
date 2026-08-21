@@ -361,15 +361,13 @@ describe('Major DSH workstation kernel', () => {
     })) {
       chunks.push(chunk);
     }
-    expect(starts).toEqual(['major', 'claude-review']);
+    expect(starts).toEqual(['major']);
     expect(chunks).toContainEqual({
       type: 'block-end',
       index: 0,
       block: {
         type: 'text',
-        text:
-          'Major routed native Codex successfully\n\n' +
-          'Claude independent review:\nVERDICT: PASS',
+        text: 'Major routed native Codex successfully',
       },
     });
     expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } });
@@ -846,9 +844,15 @@ describe('Major DSH workstation kernel', () => {
       { id: 'learned-fix', source: 'gbrain-generated', content: '# Learned fix\nReuse it.' },
     ]);
     expect(prompt).toContain('Make it work, make it useful, then improve or harden it');
-    expect(prompt).toContain('Reuse an existing project pattern, maintained library, validated tool, skill or provider capability');
-    expect(prompt).toContain('record the critical path, ownership, interfaces, decisions and objective evidence');
-    expect(prompt).toContain('serialize only real write, interface, ordering or scarce-resource conflicts');
+    expect(prompt).toContain(
+      'Reuse an existing project pattern, maintained library, validated tool, skill or provider capability',
+    );
+    expect(prompt).toContain(
+      'record the critical path, ownership, interfaces, decisions and objective evidence',
+    );
+    expect(prompt).toContain(
+      'serialize only real write, interface, ordering or scarce-resource conflicts',
+    );
     expect(prompt).toContain('Use FAST checks while iterating and prove the acceptance path');
     expect(prompt).toContain('RESOLVED MAJOR SKILLS AND GBRAIN CONTEXT');
     expect(prompt).toContain('MAJOR SKILL release-gate (internal)');
