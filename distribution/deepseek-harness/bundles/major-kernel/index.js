@@ -448,16 +448,18 @@ TASK:
 ${task}`;
 }
 
-async function admitMajorTask(ctx, cwd, task, signal, interactionOrigin) {
+async function admitMajorTask(ctx, cwd, task, signal, interactionOrigin, sessionId) {
   const major = majorExecutable();
   const host = interactionOrigin ? undefined : sessionHost();
   const attachArgs = [major, 'session', 'attach', '--cwd', cwd];
   if (host) attachArgs.push('--host', host);
   if (interactionOrigin) attachArgs.push('--interaction-origin', interactionOrigin);
+  if (sessionId) attachArgs.push('--session-id', sessionId);
   await runProcess(ctx, cwd, attachArgs, signal);
   const admissionArgs = [major, 'goal', 'admit', '--cwd', cwd];
   if (host) admissionArgs.push('--host', host);
   if (interactionOrigin) admissionArgs.push('--interaction-origin', interactionOrigin);
+  if (sessionId) admissionArgs.push('--session-id', sessionId);
   admissionArgs.push('--outcome', task);
   const admitted = parseJson(await runProcess(ctx, cwd, admissionArgs, signal), 'goal admit');
   if (admitted.admitted !== true || typeof admitted.goalId !== 'string') {
@@ -469,8 +471,15 @@ async function admitMajorTask(ctx, cwd, task, signal, interactionOrigin) {
   return { major, admitted };
 }
 
-async function executeMajor(ctx, cwd, task, signal, interactionOrigin) {
-  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal, interactionOrigin);
+async function executeMajor(ctx, cwd, task, signal, interactionOrigin, sessionId) {
+  const { major, admitted } = await admitMajorTask(
+    ctx,
+    cwd,
+    task,
+    signal,
+    interactionOrigin,
+    sessionId,
+  );
   const beforeGoal = parseJson(
     await runProcess(ctx, cwd, [major, 'goal', 'show', '--id', admitted.goalId], signal),
     'goal show before run',
@@ -506,8 +515,24 @@ async function executeMajor(ctx, cwd, task, signal, interactionOrigin) {
   };
 }
 
-async function executeNativeDsh(ctx, cwd, task, parent, signal, route, interactionOrigin) {
-  const { major, admitted } = await admitMajorTask(ctx, cwd, task, signal, interactionOrigin);
+async function executeNativeDsh(
+  ctx,
+  cwd,
+  task,
+  parent,
+  signal,
+  route,
+  interactionOrigin,
+  sessionId,
+) {
+  const { major, admitted } = await admitMajorTask(
+    ctx,
+    cwd,
+    task,
+    signal,
+    interactionOrigin,
+    sessionId,
+  );
   const goal = parseJson(
     await runProcess(ctx, cwd, [major, 'goal', 'show', '--id', admitted.goalId], signal),
     'goal show before native run',
@@ -639,12 +664,22 @@ export function createMajorProvider(ctx) {
       const task = textContent(request.prompt);
       if (!task) throw new Error('major-workstation: a non-empty text task is required');
       const interactionOrigin = interactionOriginForTask(task);
+      const sessionId = request.parent.session.id;
       const localAbort = new AbortController();
       const signal = AbortSignal.any([request.signal, localAbort.signal]);
       const route = configuredRuntimeRoute();
       const execution = route
-        ? executeNativeDsh(ctx, cwd, task, request.parent, signal, route, interactionOrigin)
-        : executeMajor(ctx, cwd, task, signal, interactionOrigin);
+        ? executeNativeDsh(
+            ctx,
+            cwd,
+            task,
+            request.parent,
+            signal,
+            route,
+            interactionOrigin,
+            sessionId,
+          )
+        : executeMajor(ctx, cwd, task, signal, interactionOrigin, sessionId);
       const result = execution.then(
         (run) => {
           const route =

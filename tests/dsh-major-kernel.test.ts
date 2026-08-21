@@ -16,6 +16,7 @@ interface KernelRequest {
 }
 
 interface KernelSession {
+  id: string;
   header: { cwd?: string };
   events: Array<{ type: string; data: Record<string, unknown> }>;
   append(type: string, data: Record<string, unknown>): void;
@@ -49,6 +50,7 @@ interface CommandInputDefinition {
 function kernelSession(cwd?: string, seed: KernelSession['events'] = []): KernelSession {
   const events = [...seed];
   return {
+    id: 'session-native',
     header: { ...(cwd === undefined ? {} : { cwd }) },
     events,
     append(type, data) {
@@ -1050,9 +1052,13 @@ describe('Major DSH workstation kernel', () => {
     expect(argv[0]).not.toContain('--host');
     expect(argv[0]).toContain('--interaction-origin');
     expect(argv[0]).toContain('major-app/dsh');
+    expect(argv[0]).toContain('--session-id');
+    expect(argv[0]).toContain('session-native');
     expect(argv[1]).not.toContain('--host');
     expect(argv[1]).toContain('--interaction-origin');
     expect(argv[1]).toContain('major-app/dsh');
+    expect(argv[1]).toContain('--session-id');
+    expect(argv[1]).toContain('session-native');
     expect(argv[3]).toContain('--environment');
     expect(argv[3]).toContain('local');
     expect(argv[4]).toContain('--ttl-minutes');
