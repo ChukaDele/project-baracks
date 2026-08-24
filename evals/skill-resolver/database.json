@@ -1,0 +1,7 @@
+{
+  "skill": "database",
+  "should_trigger": [
+    "Plan a forward-only schema migration with data integrity checks and rollback constraints."
+  ],
+  "should_not_trigger": ["Draft a client email without sending it."]
+}

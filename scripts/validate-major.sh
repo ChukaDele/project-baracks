@@ -19,6 +19,8 @@ for p in Path('.').rglob('*.json'):
         raise SystemExit(f"invalid JSON: {p}: {e}")
 PY
 
+node scripts/validate-skills.mjs || fail "skills, YAML frontmatter, resolver fixtures, or reusable asset metadata"
+
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -162,7 +164,7 @@ grep -Fq "Three consecutive passing shadow grades" guidance/global-worker-rules.
 grep -Fq "Tools as Code" guidance/global-worker-rules.md || fail "Tools-as-Code rule missing"
 grep -Fq "skillify" guidance/global-worker-rules.md || fail "skillify rule missing"
 grep -Fq "Prior art before new infrastructure" guidance/global-worker-rules.md || fail "prior-art infrastructure rule missing"
-grep -Fq '"id":"prior-art-discovery"' guidance/skills.registry.json || fail "prior-art-discovery skill not registered"
+grep -Eq '"id"[[:space:]]*:[[:space:]]*"prior-art-discovery"' guidance/skills.registry.json || fail "prior-art-discovery skill not registered"
 [ -f skills/internal/prior-art-discovery/SKILL.md ] || fail "prior-art-discovery skill missing"
 [ -f docs/prior-art-decisions.md ] || fail "prior-art decision log missing"
 grep -Fq "Prior art before new infrastructure" guidance/stability-invariants.md || fail "prior-art stability invariant missing"

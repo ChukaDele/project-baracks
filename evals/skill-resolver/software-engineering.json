@@ -1,0 +1,7 @@
+{
+  "skill": "software-engineering",
+  "should_trigger": [
+    "Implement an authorized product change in the isolated repository and prove it with a focused regression test."
+  ],
+  "should_not_trigger": ["Review a frozen release candidate without changing its implementation."]
+}

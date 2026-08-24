@@ -45,6 +45,7 @@ import {
 } from '../routing/subscription-accounts.js';
 import { resolveSkills } from '../skills/resolver.js';
 import { observeSuccessfulWorkflow, recordSkillOutcome } from '../skills/lifecycle.js';
+import { formatReusableAssetDiscovery, observeReusableAssetCandidate } from '../skills/assets.js';
 import {
   assertExecutionAllowed,
   getProjectPolicy,
@@ -466,6 +467,13 @@ export function coordinatorPrompt(
     : resolvedSkills.length === 0
       ? '(No installed skill matched deterministically. Continue with the injected Major operating contract.)'
       : `${skillProvenance}\nHost skill paths above are routing provenance only; they are intentionally unavailable inside this guest. Continue from the Major operating contract already injected below—do not stop or attempt host access to load them. Report unavailable skill content as degraded in MAJOR_RESULT when it materially affects work.`;
+  let assetContext: string;
+  try {
+    assetContext = formatReusableAssetDiscovery({ task: goal.goal, cwd: goal.repoPath });
+  } catch {
+    assetContext =
+      'REUSABLE ASSET DISCOVERY (degraded): the metadata index is unavailable. Do not treat a repository search as the default reuse mechanism; report this degradation in MAJOR_RESULT if it materially affects work.';
+  }
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const workerLanguage =
     policy.maxWorkers <= 1
@@ -531,6 +539,7 @@ MAJOR OPERATING CONTRACT:
 - For MCP/connectors/plugins, distinguish installed → configured → exposed → authenticated → permissioned → operational → integrated. Use mcp-integration-ops and prove the needed state with a representative real operation.
 - For customer-facing website QA, use website-design-qa. Pair responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js or viewport-motion work. Respect remote-first-web-development for browser preview/acceptance unless the owner explicitly permits a local exception.
 - Reuse an existing tested skill when one matches. When a novel procedure succeeds and is likely reusable, Skillify rather than growing the permanent supervisor workflow.
+- Before building an implementation, follow the injected reusable-asset discovery order. Shared assets stay project-independent; keep domain composition in a project wrapper. If a verified implementation becomes reusable, report one optional \`assetCandidate\` object in MAJOR_RESULT with \`id\`, \`kind\`, \`summary\`, relative \`locator\`, \`tags\`, and proposed \`scope\` (\`project-local\` or \`shared\`). Major records it as a project-local \`REUSE_CANDIDATE\`; it never self-promotes.
 - An explicit user correction, repeated mistake, or credible user evidence contradicting the agent is a learning event: fix and verify the real task first, then add a project-local \`learning\` object to the final MAJOR_RESULT with \`source\`, \`summary\`, optional stable \`key\`, and optional \`evidence\`. The parent validates and captures it.
 - When a non-trivial reusable procedure succeeds, add a \`workflow\` object to MAJOR_RESULT with \`task\`, \`outcome\`, ordered \`steps\`, \`tools\`, objective \`validations\`, and \`scope\`. Major records, deduplicates, validates and promotes it; do not create a skill file directly.
 - You are the leased worker. Do not start nested workers, browsers, builds, or Major CLI delegation from this sandbox. Request any additional capacity in your final report; the parent owns resource admission and learning capture.
@@ -553,7 +562,7 @@ Never use these terms interchangeably.
 DURABLE CONTROL:
 You cannot access or mutate Major's global control state. Before ending, emit exactly one final
 single-line result for the parent coordinator to validate and apply:
-  MAJOR_RESULT: {"status":"active","summary":"what now works and next critical path"}
+  MAJOR_RESULT: {"status":"active","summary":"what now works and next critical path","assetCandidate":{"id":"reusable-id","kind":"module","summary":"what it implements","locator":"relative/path","tags":["tag"],"scope":"shared"}}
   MAJOR_RESULT: {"status":"done","summary":"objective completion evidence"}
   MAJOR_RESULT: {"status":"blocked","summary":"what is complete","ownerGate":"exact owner action"}
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
@@ -563,6 +572,8 @@ ${learningContext}
 
 RESOLVED MAJOR SKILLS:
 ${skillContext}
+
+${assetContext}
 
 CURRENT PROJECT CONTEXT:
 ${context || '(No canonical project context files found. Inspect the repository directly.)'}
@@ -895,6 +906,17 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         });
       } catch (error) {
         learningWarning += ` Skillification deferred: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
+      }
+    }
+    if (report?.assetCandidate && outcome.workspaceMutated) {
+      try {
+        observeReusableAssetCandidate({
+          ...report.assetCandidate,
+          sourceProject: goal.repoPath,
+          narrative: report.summary,
+        });
+      } catch (error) {
+        learningWarning += ` Asset candidate capture deferred: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
       }
     }
     if (report?.status === 'blocked') {

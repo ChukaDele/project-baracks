@@ -113,6 +113,8 @@ They define:
 - the resolver selects the smallest useful skill set;
 - positive/negative trigger examples and reachability/overlap checks are part of the skill lifecycle.
 - `major skill resolve --task "..."` returns paths and metadata only for installed, reachable skills;
+- `major skill assets --task "..."` retrieves verified reusable-asset metadata and locators without loading or executing asset bodies;
+- `major skill sync` activates an immutable Skills Library bundle and `major skill rollback` atomically restores the newest retained bundle without changing the active Harness;
 - `major skill audit` detects missing, duplicate and orphan internal skills. The immutable runtime ships the registry, skill bodies and resolver evals used by these commands.
 - successful workers may emit one bounded workflow observation. GBrain keeps it project-local, detects semantic recurrence, holds overlaps for an existing skill update, and promotes only recurring independently validated procedures;
 - generated skill state extends the existing project learning lifecycle. It is not a second registry. Active records are resolved by the canonical skill resolver;

@@ -1,0 +1,7 @@
+{
+  "skill": "ar-ap-invoice",
+  "should_trigger": [
+    "Prepare invoice, receivables, and payables follow-up from approved documents without posting a journal."
+  ],
+  "should_not_trigger": ["Perform the final bank and ledger close with statements tie-out."]
+}

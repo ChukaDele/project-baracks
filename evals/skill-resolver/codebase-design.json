@@ -1,0 +1,7 @@
+{
+  "skill": "codebase-design",
+  "should_trigger": [
+    "Map an unfamiliar repository into ownership boundaries and safe extension points before changing code."
+  ],
+  "should_not_trigger": ["Issue an invoice or post an accounting journal."]
+}

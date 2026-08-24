@@ -1,0 +1,7 @@
+{
+  "skill": "chief-of-staff-boundary",
+  "should_trigger": [
+    "Coordinate cross-functional priorities, decision owners, and executive tradeoffs without taking over logistics."
+  ],
+  "should_not_trigger": ["Book a meeting room and draft a calendar reminder."]
+}

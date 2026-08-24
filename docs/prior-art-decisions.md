@@ -4,6 +4,16 @@ Future Major agents must consult this log before rebuilding a capability or addi
 
 Record format: Capability, Date, Candidates, Decision, Reason, Major-specific layer retained, Rejected alternatives, Evidence.
 
+## 2026-08-24 — Skills Library and reusable implementation discovery
+
+- **Capability:** promote the reconciled Major Skills Library and retrieve a proven reusable implementation before starting a new build.
+- **Candidates:** the existing Major skill registry, resolver and immutable hot-bundle mechanism; project-local `.major` metadata; the GBrain source checkout and its skill trigger index; raw cross-repository search; a new package registry, database, vector store or source mirror.
+- **Decision:** EXTEND the existing Major registry, resolver and immutable bundle. BUILD only a small metadata-only reusable-asset registry, its GBrain projection file, deterministic resolver lookup, and project-local candidate capture. Do not create a new database, queue, memory system, package registry or source copy.
+- **Reason:** Major already has the canonical activation, integrity and rollback boundary for reusable procedures. Reusing that boundary means a package body remains at its canonical locator while the resolver returns scope, compatibility, ownership and evidence. Project output becomes a `REUSE_CANDIDATE`, not a shared asset, until an explicit reviewed promotion removes project assumptions.
+- **Major-specific layer retained:** canonical skill registry and hot bundle; project-local overlay; resolver evaluation; project policy and approval boundary; GBrain metadata-only projection.
+- **Rejected alternatives:** mass-importing third-party skill repositories; rebuilding a registry/resolver; indexing full implementation trees into GBrain; treating a procedure as an implementation asset; automatic global promotion; raw repository search before the ordered maps/indexes.
+- **Evidence:** `guidance/skills-reconciliation-ledger.json`, `guidance/reusable-assets.registry.json`, `guidance/gbrain-reusable-assets.index.json`, `src/skills/assets.ts`, `src/skills/sync.ts`, `tests/skill-hot-sync.test.ts`, `tests/reusable-assets.test.ts` and `tests/supervisor-runtime.test.ts`.
+
 ## 2026-08-21 — operating-principle enforcement
 
 - **Capability:** durable MVP-first, reuse-first, critical-path, shared-state, useful-concurrency and risk-proportionate validation policy

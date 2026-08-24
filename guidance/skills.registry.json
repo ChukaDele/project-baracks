@@ -1,5 +1,5 @@
 {
-  "version": 14,
+  "version": 15,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -19,63 +19,1312 @@
     "priorArtBeforeNewInfrastructure": true
   },
   "entries": [
-    {"id":"project-start","source":"major-internal","availability":"all-projects","load":"project-start"},
-    {"id":"project-context-integrity","source":"major-internal","availability":"all-projects","load":"named-project-repository-path-cross-project-edit-handoff-migration-wrong-project"},
-    {"id":"workspace-lifecycle-management","source":"major-internal","availability":"all-projects","load":"project-create-clone-locate-move-park-delete-archive-storage-disk-pressure-duplicate-repo-large-assets-local-cloud"},
-    {"id":"mvp-speed-prioritisation","source":"major-internal","availability":"all-projects","load":"always-on-project-and-large-feature-planning"},
-    {"id":"legacy-cleanup","source":"major-internal","availability":"all-projects","load":"rename-migration-provider-swap-architecture-replacement"},
-    {"id":"major-self-maintenance","source":"major-internal","availability":"major-repo","load":"major-self-change-skill-routing-learning-policy-runtime-installer"},
-    {"id":"skill-resolver","source":"major-internal","availability":"all-projects","load":"start-of-substantive-work-select-relevant-skills"},
-    {"id":"learning-capture","source":"major-internal","availability":"all-projects","load":"explicit-user-correction-repeated-mistake-recurring-failure-reusable-success"},
-    {"id":"skillify","source":"major-internal","availability":"all-projects","load":"reusable-successful-procedure-or-recurring-solved-failure"},
-    {"id":"tools-as-code","source":"major-internal","availability":"all-projects","load":"repeated-retrieval-filter-dedupe-rank-transform-tool-composition"},
-    {"id":"design-direction-and-taste","source":"major-internal","availability":"ui-projects","load":"substantial-ui-website-creation-redesign-art-direction-generic-ai-design-too-safe-too-loud-taste"},
-    {"id":"remote-first-web-development","source":"major-internal","availability":"web-projects","load":"all-web-project-ui-work-browser-preview-visual-qa-acceptance"},
-    {"id":"website-design-qa","source":"major-internal","availability":"web-projects","load":"website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"},
-    {"id":"seo-os","source":"major-internal","availability":"web-projects","load":"seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking"},
-    {"id":"responsive-motion-systems","source":"major-internal","availability":"web-projects","load":"gsap-scrolltrigger-sticky-pinned-scrollytelling-card-stacking-hero-video-parallax-threejs-zoom-motion"},
-    {"id":"human-blocker-orchestration","source":"major-internal","availability":"all-projects","load":"authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"},
-    {"id":"dev-server-management","source":"major-internal","availability":"web-projects","load":"explicit-owner-approved-localhost-exception-only"},
-    {"id":"mcp-integration-ops","source":"major-internal","availability":"all-projects","load":"mcp-connector-plugin-integration-authentication-tool-exposure-reconnect-permission-provider-operation"},
-    {"id":"source-ingestion","source":"major-internal","availability":"all-projects","load":"named-url-file-video-audio-document-primary-source"},
-    {"id":"knowledge-work","source":"major-internal","availability":"all-projects","load":"research-strategy-synthesis-comparison-decision-work"},
-    {"id":"presentation-storylining","source":"major-internal","availability":"all-projects","load":"presentation-slide-deck-board-deck-strategy-deck-consulting-deck-investor-deck-sales-deck-proposal-executive-update-pitch-storyline-action-title-ghost-deck"},
-    {"id":"competitive-product-audit","source":"major-internal","availability":"all-projects","load":"project-start-or-material-product-work"},
-    {"id":"open-source-leverage","source":"major-internal","availability":"all-projects","load":"project-start-or-commodity-build"},
-    {"id":"prior-art-discovery","source":"major-internal","availability":"all-projects","load":"new-subsystem-provider-integration-agent-runtime-sandbox-router-memory-auth-scraper-workflow-engine-browser-mcp-installation-deployment-major-dependency"},
-    {"id":"simple-modular-code","source":"major-internal","availability":"all-projects","load":"architecture-or-implementation"},
-    {"id":"vertical-slice-delivery","source":"major-internal","availability":"all-projects","load":"planning-or-implementation"},
-    {"id":"nontechnical-ux","source":"major-internal","availability":"all-product-projects","load":"operator-or-user-workflow"},
-    {"id":"lean-graph-engineering","source":"major-internal","availability":"all-projects","load":"complex-autonomous-or-parallel-work"},
-    {"id":"behavior-reward-system","source":"major-internal","availability":"all-projects","load":"autonomous-or-long-running-work"},
-    {"id":"root-cause-qa","source":"major-internal","availability":"all-projects","load":"bug-failure-regression"},
-    {"id":"ci-recovery","source":"major-internal","availability":"all-projects","load":"ci-github-actions-pr-check-failure"},
-    {"id":"lean-quality","source":"major-internal","availability":"all-projects","load":"test-strategy-verification-release-confidence"},
-    {"id":"performance-caching","source":"major-internal","availability":"all-projects","load":"measured-slow-workflow-page-query-build-integration"},
-    {"id":"exact-head-pr-review","source":"major-internal","availability":"all-projects","load":"pr-review-or-release"},
-    {"id":"rapid-ui-prototype","source":"major-internal","availability":"ui-projects","load":"multiple-credible-ui-options"},
-    {"id":"data-learning-loop","source":"major-internal","availability":"all-projects","load":"outcome-data-scoring-learning"},
-    {"id":"source-adapter-engineering","source":"major-internal","availability":"all-projects","load":"api-scraping-feed-external-data"},
-    {"id":"pdf-reporting-qa","source":"major-internal","availability":"all-projects","load":"generated-pdf-reporting"},
-    {"id":"cost-control","source":"major-internal","availability":"all-projects","load":"provider-model-browser-infrastructure-cost"},
-    {"id":"exploratory-creative-dev","source":"major-internal","availability":"ui-projects","load":"exploratory-awwwards-fwa-heavy-motion-immersive-illustrative"},
-
-    {"id":"emil-kowalski-complete","source":"github:emilkowalski/skills","availability":"all-ui-projects","load":"task-relevant","install":"entire-current-bundle"},
-
-    {"id":"frontend-design","source":"github:anthropics/skills","availability":"all-ui-projects","load":"frontend-design-work"},
-    {"id":"webapp-testing","source":"github:anthropics/skills","availability":"web-projects","load":"browser-or-webapp-qa"},
-    {"id":"mcp-builder","source":"github:anthropics/skills","availability":"all-projects","load":"build-or-improve-mcp-server"},
-    {"id":"skill-creator","source":"github:anthropics/skills","availability":"all-projects","load":"create-evaluate-or-improve-persistent-skill"},
-    {"id":"algorithmic-art","source":"github:anthropics/skills","availability":"exploratory-ui-projects","load":"generative-art-particles-flow-fields-p5"},
-
-    {"id":"playwright","source":"github:openai/skills","availability":"web-projects","load":"real-browser-automation-debugging-qa"},
-    {"id":"vercel-deploy","source":"github:openai/skills","availability":"vercel-projects","load":"preview-or-production-vercel-deployment"},
-    {"id":"figma-use","source":"github:openai/skills","availability":"figma-enabled-projects","load":"programmatic-figma-read-write"},
-    {"id":"figma-implement-design","source":"github:openai/skills","availability":"figma-enabled-projects","load":"implement-code-from-figma"},
-    {"id":"figma-generate-design","source":"github:openai/skills","availability":"figma-enabled-projects","load":"create-or-update-figma-screen"},
-    {"id":"security-threat-model","source":"github:openai/skills","availability":"all-projects","load":"material-security-risk"},
-    {"id":"pdf","source":"github:openai/skills","availability":"all-projects","load":"pdf-task"},
-
-    {"id":"graph-engineering","source":"github:codejunkie99/graph-engineering","availability":"all-projects","load":"deep-graph-orchestration"}
-  ]
+    {
+      "id": "project-start",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "project-start"
+    },
+    {
+      "id": "project-context-integrity",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "named-project-repository-path-cross-project-edit-handoff-migration-wrong-project"
+    },
+    {
+      "id": "workspace-lifecycle-management",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "project-create-clone-locate-move-park-delete-archive-storage-disk-pressure-duplicate-repo-large-assets-local-cloud"
+    },
+    {
+      "id": "mvp-speed-prioritisation",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "always-on-project-and-large-feature-planning"
+    },
+    {
+      "id": "legacy-cleanup",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "rename-migration-provider-swap-architecture-replacement"
+    },
+    {
+      "id": "major-self-maintenance",
+      "source": "major-internal",
+      "availability": "major-repo",
+      "load": "major-self-change-skill-routing-learning-policy-runtime-installer"
+    },
+    {
+      "id": "skill-resolver",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "start-of-substantive-work-select-relevant-skills"
+    },
+    {
+      "id": "learning-capture",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "explicit-user-correction-repeated-mistake-recurring-failure-reusable-success"
+    },
+    {
+      "id": "skillify",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "reusable-successful-procedure-or-recurring-solved-failure"
+    },
+    {
+      "id": "tools-as-code",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "repeated-retrieval-filter-dedupe-rank-transform-tool-composition"
+    },
+    {
+      "id": "design-direction-and-taste",
+      "source": "major-internal",
+      "availability": "ui-projects",
+      "load": "substantial-ui-website-creation-redesign-art-direction-generic-ai-design-too-safe-too-loud-taste"
+    },
+    {
+      "id": "remote-first-web-development",
+      "source": "major-internal",
+      "availability": "web-projects",
+      "load": "all-web-project-ui-work-browser-preview-visual-qa-acceptance"
+    },
+    {
+      "id": "website-design-qa",
+      "source": "major-internal",
+      "availability": "web-projects",
+      "load": "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"
+    },
+    {
+      "id": "seo-os",
+      "source": "major-internal",
+      "availability": "web-projects",
+      "load": "seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking"
+    },
+    {
+      "id": "responsive-motion-systems",
+      "source": "major-internal",
+      "availability": "web-projects",
+      "load": "gsap-scrolltrigger-sticky-pinned-scrollytelling-card-stacking-hero-video-parallax-threejs-zoom-motion"
+    },
+    {
+      "id": "human-blocker-orchestration",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"
+    },
+    {
+      "id": "dev-server-management",
+      "source": "major-internal",
+      "availability": "web-projects",
+      "load": "explicit-owner-approved-localhost-exception-only"
+    },
+    {
+      "id": "mcp-integration-ops",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "mcp-connector-plugin-integration-authentication-tool-exposure-reconnect-permission-provider-operation"
+    },
+    {
+      "id": "source-ingestion",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "named-url-file-video-audio-document-primary-source"
+    },
+    {
+      "id": "knowledge-work",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "research-strategy-synthesis-comparison-decision-work"
+    },
+    {
+      "id": "presentation-storylining",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "presentation-slide-deck-board-deck-strategy-deck-consulting-deck-investor-deck-sales-deck-proposal-executive-update-pitch-storyline-action-title-ghost-deck"
+    },
+    {
+      "id": "competitive-product-audit",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "project-start-or-material-product-work"
+    },
+    {
+      "id": "open-source-leverage",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "project-start-or-commodity-build"
+    },
+    {
+      "id": "prior-art-discovery",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "new-subsystem-provider-integration-agent-runtime-sandbox-router-memory-auth-scraper-workflow-engine-browser-mcp-installation-deployment-major-dependency"
+    },
+    {
+      "id": "simple-modular-code",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "architecture-or-implementation"
+    },
+    {
+      "id": "vertical-slice-delivery",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "planning-or-implementation"
+    },
+    {
+      "id": "nontechnical-ux",
+      "source": "major-internal",
+      "availability": "all-product-projects",
+      "load": "operator-or-user-workflow"
+    },
+    {
+      "id": "lean-graph-engineering",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "complex-autonomous-or-parallel-work"
+    },
+    {
+      "id": "behavior-reward-system",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "autonomous-or-long-running-work"
+    },
+    {
+      "id": "root-cause-qa",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "bug-failure-regression",
+      "aliases": [
+        "root-cause-analysis",
+        "failure-investigation"
+      ],
+      "category": "quality",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill diagnoses and verifies. Project policy owns corrective mutations."
+      },
+      "provenance": {
+        "kind": "merged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "localized-independent-content; historical hashes do not block this capability",
+        "disposition": "MERGE"
+      }
+    },
+    {
+      "id": "ci-recovery",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "ci-github-actions-pr-check-failure"
+    },
+    {
+      "id": "lean-quality",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "test-strategy-verification-release-confidence",
+      "aliases": [
+        "quality-gate",
+        "lean-verification"
+      ],
+      "category": "quality",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill sets evidence expectations. Project policy owns release and mutation authority."
+      },
+      "provenance": {
+        "kind": "merged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "localized-independent-content; historical hashes do not block this capability",
+        "disposition": "MERGE"
+      }
+    },
+    {
+      "id": "performance-caching",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "measured-slow-workflow-page-query-build-integration"
+    },
+    {
+      "id": "exact-head-pr-review",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "pr-review-or-release",
+      "aliases": [
+        "immutable-pr-review",
+        "frozen-candidate-review"
+      ],
+      "category": "quality",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "read-only",
+        "note": "This skill reviews an immutable candidate. It cannot issue its own implementation approval."
+      },
+      "provenance": {
+        "kind": "merged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "localized-independent-content; historical hashes do not block this capability",
+        "disposition": "MERGE"
+      }
+    },
+    {
+      "id": "rapid-ui-prototype",
+      "source": "major-internal",
+      "availability": "ui-projects",
+      "load": "multiple-credible-ui-options"
+    },
+    {
+      "id": "data-learning-loop",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "outcome-data-scoring-learning"
+    },
+    {
+      "id": "source-adapter-engineering",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "api-scraping-feed-external-data"
+    },
+    {
+      "id": "pdf-reporting-qa",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "generated-pdf-reporting"
+    },
+    {
+      "id": "cost-control",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "provider-model-browser-infrastructure-cost"
+    },
+    {
+      "id": "exploratory-creative-dev",
+      "source": "major-internal",
+      "availability": "ui-projects",
+      "load": "exploratory-awwwards-fwa-heavy-motion-immersive-illustrative"
+    },
+    {
+      "id": "emil-kowalski-complete",
+      "source": "github:emilkowalski/skills",
+      "availability": "all-ui-projects",
+      "load": "task-relevant",
+      "install": "entire-current-bundle"
+    },
+    {
+      "id": "frontend-design",
+      "source": "github:anthropics/skills",
+      "availability": "all-ui-projects",
+      "load": "frontend-design-work"
+    },
+    {
+      "id": "webapp-testing",
+      "source": "github:anthropics/skills",
+      "availability": "web-projects",
+      "load": "browser-or-webapp-qa"
+    },
+    {
+      "id": "mcp-builder",
+      "source": "github:anthropics/skills",
+      "availability": "all-projects",
+      "load": "build-or-improve-mcp-server"
+    },
+    {
+      "id": "skill-creator",
+      "source": "github:anthropics/skills",
+      "availability": "all-projects",
+      "load": "create-evaluate-or-improve-persistent-skill"
+    },
+    {
+      "id": "algorithmic-art",
+      "source": "github:anthropics/skills",
+      "availability": "exploratory-ui-projects",
+      "load": "generative-art-particles-flow-fields-p5"
+    },
+    {
+      "id": "playwright",
+      "source": "github:openai/skills",
+      "availability": "web-projects",
+      "load": "real-browser-automation-debugging-qa"
+    },
+    {
+      "id": "vercel-deploy",
+      "source": "github:openai/skills",
+      "availability": "vercel-projects",
+      "load": "preview-or-production-vercel-deployment"
+    },
+    {
+      "id": "figma-use",
+      "source": "github:openai/skills",
+      "availability": "figma-enabled-projects",
+      "load": "programmatic-figma-read-write"
+    },
+    {
+      "id": "figma-implement-design",
+      "source": "github:openai/skills",
+      "availability": "figma-enabled-projects",
+      "load": "implement-code-from-figma"
+    },
+    {
+      "id": "figma-generate-design",
+      "source": "github:openai/skills",
+      "availability": "figma-enabled-projects",
+      "load": "create-or-update-figma-screen"
+    },
+    {
+      "id": "security-threat-model",
+      "source": "github:openai/skills",
+      "availability": "all-projects",
+      "load": "material-security-risk"
+    },
+    {
+      "id": "pdf",
+      "source": "github:openai/skills",
+      "availability": "all-projects",
+      "load": "pdf-task"
+    },
+    {
+      "id": "graph-engineering",
+      "source": "github:codejunkie99/graph-engineering",
+      "availability": "all-projects",
+      "load": "deep-graph-orchestration"
+    },
+    {
+      "id": "software-engineering",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "software implementation feature bug code engineering",
+      "aliases": [
+        "software-engineering"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "planning",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "engineering implementation planning task breakdown",
+      "aliases": [
+        "planning"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "worktree",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "git worktree isolated concurrent writer branch",
+      "aliases": [
+        "worktree"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "tdd",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "test driven development regression test",
+      "aliases": [
+        "tdd"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "debugging",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "debug investigate root cause failure",
+      "aliases": [
+        "debugging"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "review",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "code review implementation review",
+      "aliases": [
+        "review"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "verification",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "verify validate acceptance evidence",
+      "aliases": [
+        "verification"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "dependency",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "dependency package upgrade vulnerability",
+      "aliases": [
+        "dependency"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "deployment",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "deployment release rollout rollback",
+      "aliases": [
+        "deployment"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "incident",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "production incident outage recovery",
+      "aliases": [
+        "incident"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "architecture",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "software architecture system design module boundary",
+      "aliases": [
+        "architecture"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "api",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "api endpoint contract integration",
+      "aliases": [
+        "api"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "database",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "database schema query migration",
+      "aliases": [
+        "database"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "frontend",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "frontend ui component interface",
+      "aliases": [
+        "frontend"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "performance",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "performance latency throughput optimize",
+      "aliases": [
+        "performance"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "observability",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "logging metrics tracing observability",
+      "aliases": [
+        "observability"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "auth-security",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "authentication authorization security access",
+      "aliases": [
+        "auth-security"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "migration",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "data schema platform migration",
+      "aliases": [
+        "migration"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "integration",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "third party integration adapter connector",
+      "aliases": [
+        "integration"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "concurrency",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "concurrency race condition parallel locking",
+      "aliases": [
+        "concurrency"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "engineering-design-doctrine",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "engineering design doctrine maintainable modular code",
+      "aliases": [
+        "engineering-design-doctrine"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "codebase-design",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "codebase design module ownership boundaries",
+      "aliases": [
+        "codebase-design"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "domain-modeling",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "domain model entities business rules",
+      "aliases": [
+        "domain-modeling"
+      ],
+      "category": "engineering",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "controller-bookkeeping",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "bookkeeping ledger journal controller accounting",
+      "aliases": [
+        "controller-bookkeeping"
+      ],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "ar-ap-invoice",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "accounts receivable payable invoice collections",
+      "aliases": [
+        "ar-ap-invoice"
+      ],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "reconciliation-close-statements",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "account reconciliation close financial statements",
+      "aliases": [
+        "reconciliation-close-statements"
+      ],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "fpa-forecasting-extrapolation",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "financial planning forecast extrapolation budget",
+      "aliases": [
+        "fpa-forecasting-extrapolation"
+      ],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "valuation-investment-ma",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "valuation investment merger acquisition financial model",
+      "aliases": [
+        "valuation-investment-ma"
+      ],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "deterministic-accounting-boundary",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "deterministic accounting arithmetic ledger balances",
+      "aliases": [
+        "deterministic-accounting-boundary"
+      ],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "executive-assistant",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "executive assistant calendar correspondence meeting preparation",
+      "aliases": [
+        "executive-assistant"
+      ],
+      "category": "management",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "chief-of-staff-boundary",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "chief of staff strategic coordination executive assistant boundary",
+      "aliases": [
+        "chief-of-staff-boundary"
+      ],
+      "category": "management",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "operations-improvement-core",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "operations process improvement workflow efficiency",
+      "aliases": [
+        "operations-improvement-core"
+      ],
+      "category": "operations",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "product-management-core",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "product management discovery roadmap prioritisation",
+      "aliases": [
+        "product-management-core"
+      ],
+      "category": "product",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "browser-release-qa",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "browser release quality assurance acceptance",
+      "aliases": [
+        "browser-release-qa"
+      ],
+      "category": "quality",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "security-audit",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "security audit vulnerability review",
+      "aliases": [
+        "security-audit"
+      ],
+      "category": "quality",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "staged-quality-controls",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "quality gate staged validation release controls",
+      "aliases": [
+        "staged-quality-controls"
+      ],
+      "category": "quality",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "cross-modal-review",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "cross modal visual document evidence review",
+      "aliases": [
+        "cross-modal-review"
+      ],
+      "category": "quality",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "sales-commercial-core",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "sales commercial pipeline customer revenue",
+      "aliases": [
+        "sales-commercial-core"
+      ],
+      "category": "sales",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "reusable-asset-discovery",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "reusable asset component template package discovery reuse",
+      "aliases": [
+        "reusable-asset-discovery"
+      ],
+      "category": "system",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    },
+    {
+      "id": "capability-freshness",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "capability freshness version compatibility evidence",
+      "aliases": [
+        "capability-freshness"
+      ],
+      "category": "system",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "This skill provides procedure guidance. Project policy owns authority."
+      },
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      }
+    }
+  ],
+  "reconciliation": {
+    "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+    "promoted": [
+      "software-engineering",
+      "planning",
+      "worktree",
+      "tdd",
+      "debugging",
+      "review",
+      "verification",
+      "dependency",
+      "deployment",
+      "incident",
+      "architecture",
+      "api",
+      "database",
+      "frontend",
+      "performance",
+      "observability",
+      "auth-security",
+      "migration",
+      "integration",
+      "concurrency",
+      "engineering-design-doctrine",
+      "codebase-design",
+      "domain-modeling",
+      "controller-bookkeeping",
+      "ar-ap-invoice",
+      "reconciliation-close-statements",
+      "fpa-forecasting-extrapolation",
+      "valuation-investment-ma",
+      "deterministic-accounting-boundary",
+      "executive-assistant",
+      "chief-of-staff-boundary",
+      "operations-improvement-core",
+      "product-management-core",
+      "browser-release-qa",
+      "security-audit",
+      "staged-quality-controls",
+      "cross-modal-review",
+      "sales-commercial-core",
+      "reusable-asset-discovery",
+      "capability-freshness"
+    ],
+    "mergedExisting": [
+      "lean-quality",
+      "root-cause-qa",
+      "exact-head-pr-review"
+    ],
+    "dispositionLedger": "guidance/skills-reconciliation-ledger.json"
+  }
 }

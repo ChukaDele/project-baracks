@@ -1,0 +1,7 @@
+{
+  "skill": "lean-quality",
+  "should_trigger": [
+    "Set the smallest credible test and runtime evidence required before this release candidate can pass its quality gate."
+  ],
+  "should_not_trigger": ["Trace the causal chain of a production defect after a failed deployment."]
+}

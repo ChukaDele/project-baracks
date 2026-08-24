@@ -1,0 +1,7 @@
+{
+  "skill": "staged-quality-controls",
+  "should_trigger": [
+    "Set a staged quality gate that blocks promotion until predicates, evidence, and reviewer independence are present."
+  ],
+  "should_not_trigger": ["Implement a new interface component from a design specification."]
+}

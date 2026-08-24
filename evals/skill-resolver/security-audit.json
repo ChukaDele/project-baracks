@@ -1,0 +1,7 @@
+{
+  "skill": "security-audit",
+  "should_trigger": [
+    "Conduct a scoped security audit of the proposed change and document exploitable paths and required fixes."
+  ],
+  "should_not_trigger": ["Reconcile an accounts-payable aging report."]
+}

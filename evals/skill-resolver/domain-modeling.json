@@ -1,0 +1,7 @@
+{
+  "skill": "domain-modeling",
+  "should_trigger": [
+    "Define the business entities, invariants, and lifecycle transitions for a new product capability."
+  ],
+  "should_not_trigger": ["Tune the time to first byte of a page."]
+}

@@ -1,0 +1,7 @@
+{
+  "skill": "controller-bookkeeping",
+  "should_trigger": [
+    "Prepare bookkeeping journals from approved source documents and verify the general-ledger balance."
+  ],
+  "should_not_trigger": ["Model a three-year strategic valuation from growth assumptions."]
+}

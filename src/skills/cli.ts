@@ -7,7 +7,8 @@ import {
   restoreGeneratedSkill,
   skillLifecycleMetrics,
 } from './lifecycle.js';
-import { syncMajorSkills } from './sync.js';
+import { rollbackMajorSkills, syncMajorSkills } from './sync.js';
+import { retrieveReusableAssets } from './assets.js';
 import { resolveProject } from '../supervisor/state.js';
 
 function flag(args: string[], name: string): string | undefined {
@@ -27,6 +28,25 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
       console.log(`registry version: ${result.registryVersion}`);
       console.log(`source: ${result.sourceRoot}`);
     }
+    return true;
+  }
+  if (args[1] === 'assets') {
+    const task = flag(args, '--task');
+    if (!task) throw new Error('missing required --task');
+    const result = retrieveReusableAssets({ task, cwd: flag(args, '--cwd') ?? process.cwd() });
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
+    else if (result.assets.length === 0) console.log('No verified reusable asset matched this task.');
+    else {
+      for (const asset of result.assets) {
+        console.log(`${asset.id}\t${asset.kind}\t${asset.locator}\t${asset.summary}`);
+      }
+    }
+    return true;
+  }
+  if (args[1] === 'rollback') {
+    const result = rollbackMajorSkills();
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
+    else console.log(`Major Skills Library rolled back to: ${result.bundleId}`);
     return true;
   }
   if (args[1] === 'resolve') {

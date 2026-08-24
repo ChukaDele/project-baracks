@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "kind": "gbrain-reusable-asset-metadata",
+  "sourceRegistry": "guidance/reusable-assets.registry.json",
+  "contentPolicy": "metadata-only; implementation bodies remain at the canonical locator",
+  "assets": [
+    {
+      "id": "project-goal-state-template",
+      "kind": "template",
+      "title": "Project goal-state template",
+      "summary": "A project-independent current-goal record with outcome, evidence, owners, decisions, risks, and next actions.",
+      "locator": "templates/project/GOAL_STATE.md",
+      "tags": ["template", "goal", "project", "state", "planning"],
+      "lifecycle": "PROMOTED",
+      "scope": "shared",
+      "owner": "Major",
+      "compatibility": ["markdown", "all-projects"],
+      "latestVerifiedVersion": "1.0.0",
+      "limitations": ["The consumer supplies project-specific facts."]
+    }
+  ]
+}

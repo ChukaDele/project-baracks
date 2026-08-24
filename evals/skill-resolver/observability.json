@@ -1,0 +1,7 @@
+{
+  "skill": "observability",
+  "should_trigger": [
+    "Add structured telemetry that makes a production failure diagnosable without exposing secrets."
+  ],
+  "should_not_trigger": ["Select a visual direction for a product redesign."]
+}

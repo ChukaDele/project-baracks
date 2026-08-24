@@ -14,6 +14,7 @@ const registryEntrySchema = z.object({
   source: z.string(),
   availability: z.string(),
   load: z.string(),
+  aliases: z.array(z.string().min(1)).default([]),
 });
 
 const registrySchema = z.object({
@@ -73,8 +74,10 @@ function readRegistry(path: string): z.infer<typeof registrySchema> {
  * Major's executable runtime is immutable, but reusable knowledge should not
  * require a full runtime/Lima reinstall. A hot bundle is trusted only when it
  * was activated through the skill-sync path (bundle marker + complete
- * registry/skill tree) and its registry is at least as new as the immutable
- * release registry. An older or partial bundle is ignored fail-closed.
+ * registry/skill tree). A retained older bundle is valid after an explicit
+ * rollback: it must continue to resolve its known-good registry rather than
+ * silently mixing in newer immutable skills. A partial or malformed bundle is
+ * ignored fail-closed.
  */
 function hotSkillBundleRoot(): string | undefined {
   const root = join(majorHome(), 'skill-bundles', 'current');
@@ -85,8 +88,7 @@ function hotSkillBundleRoot(): string | undefined {
   try {
     bundleSchema.parse(JSON.parse(readFileSync(marker, 'utf8')));
     const hot = readRegistry(registry);
-    const immutable = readRegistry(join(runtimeRoot(), 'guidance', 'skills.registry.json'));
-    return hot.version >= immutable.version ? root : undefined;
+    return hot.version >= 1 ? root : undefined;
   } catch {
     return undefined;
   }
@@ -101,6 +103,7 @@ function registryPath(): string {
 }
 
 function resolverEvalPath(): string {
+  if (process.env.MAJOR_SKILLS_EVALS) return resolve(process.env.MAJOR_SKILLS_EVALS);
   const hot = hotSkillBundleRoot();
   const hotPath = hot ? join(hot, 'evals', 'skill-resolver') : undefined;
   return hotPath && existsSync(hotPath) ? hotPath : join(runtimeRoot(), 'evals', 'skill-resolver');
@@ -182,19 +185,26 @@ function scoreEntry(
   examples: Map<string, ResolverExamples>,
 ): { score: number; reason: string } {
   const normalized = task.toLowerCase();
-  if (normalized.includes(entry.id.toLowerCase())) {
-    return { score: 100, reason: `explicit skill id: ${entry.id}` };
-  }
-  const taskWords = new Set(words(task));
-  const idMatches = words(entry.id).filter((word) => taskWords.has(word));
-  const triggerMatches = [...new Set(words(entry.load).filter((word) => taskWords.has(word)))];
-  const rareMatches = triggerMatches.filter((word) => word.length >= 8);
-  let score = idMatches.length * 5 + triggerMatches.length * 2 + rareMatches.length;
-  let exampleReason = '';
   const fixtures = examples.get(entry.id);
   if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
     return { score: 0, reason: 'matched a negative trigger example' };
   }
+  const explicitTerm = [entry.id, ...entry.aliases].find((term) => normalized.includes(term.toLowerCase()));
+  if (explicitTerm) {
+    // A short id can be a substring of a more specific explicit id, such as
+    // `integration` in `mcp-integration-ops`. Prefer the longer named skill.
+    return {
+      score: 100 + words(explicitTerm).length * 100,
+      reason: `explicit skill ${explicitTerm === entry.id ? 'id' : 'alias'}: ${explicitTerm}`,
+    };
+  }
+  const taskWords = new Set(words(task));
+  const idMatches = words(entry.id).filter((word) => taskWords.has(word));
+  const aliasMatches = entry.aliases.flatMap((alias) => words(alias)).filter((word) => taskWords.has(word));
+  const triggerMatches = [...new Set(words(entry.load).filter((word) => taskWords.has(word)))];
+  const rareMatches = triggerMatches.filter((word) => word.length >= 8);
+  let score = (idMatches.length + aliasMatches.length) * 5 + triggerMatches.length * 2 + rareMatches.length;
+  let exampleReason = '';
   for (const example of fixtures?.positive ?? []) {
     const exampleWords = new Set(words(example));
     const overlap = [...exampleWords].filter((word) => taskWords.has(word));
@@ -209,7 +219,7 @@ function scoreEntry(
   return {
     score,
     reason:
-      exampleReason || `matched: ${[...new Set([...idMatches, ...triggerMatches])].join(', ')}`,
+      exampleReason || `matched: ${[...new Set([...idMatches, ...aliasMatches, ...triggerMatches])].join(', ')}`,
   };
 }
 
@@ -231,6 +241,7 @@ export function resolveSkills(input: {
         source: 'gbrain-generated',
         availability: 'project',
         load: generated.trigger,
+        aliases: [],
       },
       generated,
     })),

@@ -1,0 +1,7 @@
+{
+  "skill": "migration",
+  "should_trigger": [
+    "Execute a controlled data migration plan with backups, validation, and a documented rollback condition."
+  ],
+  "should_not_trigger": ["Create a project briefing from a calendar and inbox."]
+}

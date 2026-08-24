@@ -1,0 +1,7 @@
+{
+  "skill": "auth-security",
+  "should_trigger": [
+    "Review an authentication flow for authorization boundaries, secret handling, and abuse cases."
+  ],
+  "should_not_trigger": ["Forecast next quarter revenue using a sensitivity model."]
+}

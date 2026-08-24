@@ -1,0 +1,7 @@
+{
+  "skill": "planning",
+  "should_trigger": [
+    "Break a bounded feature request into an acceptance contract, dependencies, and the smallest shippable sequence."
+  ],
+  "should_not_trigger": ["Investigate the root cause of an already reproducible failure."]
+}

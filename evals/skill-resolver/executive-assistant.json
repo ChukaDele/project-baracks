@@ -1,0 +1,9 @@
+{
+  "skill": "executive-assistant",
+  "should_trigger": [
+    "Prepare tomorrow’s executive calendar, meeting briefs, correspondence drafts, and follow-up list without sending anything."
+  ],
+  "should_not_trigger": [
+    "Resolve competing company priorities and make a strategic operating decision."
+  ]
+}

@@ -25,6 +25,14 @@ export interface WorkerReport {
     validations: string[];
     scope: 'project' | 'global';
   };
+  assetCandidate?: {
+    id: string;
+    kind: string;
+    summary: string;
+    locator: string;
+    tags: string[];
+    scope: 'shared' | 'project-local';
+  };
   capabilityUse?: { key: string; evidence: string }[];
 }
 
@@ -186,12 +194,59 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
         capabilityUse.push({ key, evidence: redactText(evidence).slice(0, 2_000) });
       }
     }
+    let assetCandidate: WorkerReport['assetCandidate'];
+    if (value.assetCandidate !== undefined) {
+      if (
+        !value.assetCandidate ||
+        typeof value.assetCandidate !== 'object' ||
+        Array.isArray(value.assetCandidate)
+      ) {
+        return undefined;
+      }
+      const candidate = value.assetCandidate as Record<string, unknown>;
+      const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
+      const kind = typeof candidate.kind === 'string' ? candidate.kind.trim() : '';
+      const summary = typeof candidate.summary === 'string' ? candidate.summary.trim() : '';
+      const locator = typeof candidate.locator === 'string' ? candidate.locator.trim() : '';
+      const tags = Array.isArray(candidate.tags)
+        ? [
+            ...new Set(
+              candidate.tags
+                .filter((tag): tag is string => typeof tag === 'string')
+                .map((tag) => tag.trim())
+                .filter(Boolean),
+            ),
+          ]
+        : [];
+      if (
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ||
+        !kind ||
+        !summary ||
+        !locator ||
+        locator.startsWith('/') ||
+        locator.includes('..') ||
+        tags.length === 0 ||
+        tags.length > 20 ||
+        !['shared', 'project-local'].includes(String(candidate.scope))
+      ) {
+        return undefined;
+      }
+      assetCandidate = {
+        id,
+        kind: redactText(kind).slice(0, 80),
+        summary: redactText(summary).slice(0, 2_000),
+        locator,
+        tags: tags.map((tag) => redactText(tag).slice(0, 80)),
+        scope: candidate.scope as 'shared' | 'project-local',
+      };
+    }
     return {
       status: value.status as WorkerReport['status'],
       summary,
       ...(ownerGate ? { ownerGate } : {}),
       ...(learning ? { learning } : {}),
       ...(workflow ? { workflow } : {}),
+      ...(assetCandidate ? { assetCandidate } : {}),
       ...(capabilityUse ? { capabilityUse } : {}),
     };
   } catch {

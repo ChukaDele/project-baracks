@@ -1,0 +1,7 @@
+{
+  "skill": "deterministic-accounting-boundary",
+  "should_trigger": [
+    "Classify an accounting question but require a deterministic system of record for arithmetic, posting, and balances."
+  ],
+  "should_not_trigger": ["Generate a creative visual concept for a landing page."]
+}

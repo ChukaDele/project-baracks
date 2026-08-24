@@ -1,0 +1,7 @@
+{
+  "skill": "worktree",
+  "should_trigger": [
+    "Create an isolated Git workspace for a second writer without touching the active branch."
+  ],
+  "should_not_trigger": ["Combine two approved commits into the canonical branch."]
+}

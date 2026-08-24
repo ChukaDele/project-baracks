@@ -1,0 +1,7 @@
+{
+  "skill": "performance",
+  "should_trigger": [
+    "Profile a slow query path, set a measurable budget, and prove the improvement."
+  ],
+  "should_not_trigger": ["Define the accounting treatment for a supplier invoice."]
+}

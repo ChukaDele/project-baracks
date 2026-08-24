@@ -1,0 +1,7 @@
+{
+  "skill": "review",
+  "should_trigger": [
+    "Assess a proposed implementation against its acceptance criteria and list actionable defects."
+  ],
+  "should_not_trigger": ["Implement the proposed change in the source repository."]
+}

@@ -1,0 +1,7 @@
+{
+  "skill": "fpa-forecasting-extrapolation",
+  "should_trigger": [
+    "Build a scenario-based forecast from sufficient historical evidence and state all assumptions."
+  ],
+  "should_not_trigger": ["Record a supplier bill in the accounts-payable register."]
+}

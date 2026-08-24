@@ -1,0 +1,7 @@
+{
+  "skill": "api",
+  "should_trigger": [
+    "Design a versioned endpoint contract with input validation, error behavior, and compatibility checks."
+  ],
+  "should_not_trigger": ["Review typography and visual hierarchy in a marketing page."]
+}

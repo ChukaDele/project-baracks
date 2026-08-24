@@ -1,0 +1,7 @@
+{
+  "skill": "incident",
+  "should_trigger": [
+    "Coordinate a service incident response with impact, containment, owner updates, and recovery evidence."
+  ],
+  "should_not_trigger": ["Estimate a long-range revenue forecast from historic statements."]
+}

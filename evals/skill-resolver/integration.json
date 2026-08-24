@@ -1,0 +1,7 @@
+{
+  "skill": "integration",
+  "should_trigger": [
+    "Integrate an external provider through a scoped adapter with permission, failure, and retry behavior."
+  ],
+  "should_not_trigger": ["Perform a read-only exact-head pull-request review."]
+}

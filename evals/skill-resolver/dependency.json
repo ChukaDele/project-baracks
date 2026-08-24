@@ -1,0 +1,7 @@
+{
+  "skill": "dependency",
+  "should_trigger": [
+    "Assess a proposed library upgrade for version compatibility, licensing, and lockfile impact."
+  ],
+  "should_not_trigger": ["Reconcile a bank statement against the general ledger."]
+}

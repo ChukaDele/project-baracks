@@ -1,0 +1,7 @@
+{
+  "skill": "concurrency",
+  "should_trigger": [
+    "Coordinate independent writers around shared state so their changes cannot race or overwrite each other."
+  ],
+  "should_not_trigger": ["Calculate a deterministic cash balance from ledger entries."]
+}

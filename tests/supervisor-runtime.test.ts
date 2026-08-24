@@ -499,6 +499,13 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('routing provenance only');
     expect(prompt).toContain('do not stop or attempt host access');
     expect(prompt).toContain('Report unavailable skill content as degraded in MAJOR_RESULT');
+    expect(prompt).toContain('REUSABLE ASSET DISCOVERY (required before implementation)');
+    expect(prompt).toContain(
+      'project-local -> GBrain organisation index -> canonical shared assets',
+    );
+    expect(prompt).toContain(
+      'Major records it as a project-local `REUSE_CANDIDATE`; it never self-promotes',
+    );
     expect(prompt).not.toContain('verify that the current Git root/remote');
     expect(prompt).not.toContain(
       'load the exact project or immutable-runtime skill paths it returns',
@@ -629,6 +636,33 @@ describe('Major coordinator contract', () => {
           type: 'result',
           result:
             'MAJOR_RESULT: {"status":"active","summary":"Inspection continues.","capabilityUse":[{"key":"invalid key","evidence":"x"}]}',
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('accepts a bounded reusable implementation candidate without promoting it', () => {
+    const report = parseWorkerReport(
+      JSON.stringify({
+        type: 'result',
+        result:
+          'MAJOR_RESULT: {"status":"active","summary":"Implementation verified.","assetCandidate":{"id":"shared-parser","kind":"module","summary":"Parses the shared input.","locator":"src/parser.ts","tags":["parser","input"],"scope":"shared"}}',
+      }),
+    );
+    expect(report?.assetCandidate).toEqual({
+      id: 'shared-parser',
+      kind: 'module',
+      summary: 'Parses the shared input.',
+      locator: 'src/parser.ts',
+      tags: ['parser', 'input'],
+      scope: 'shared',
+    });
+    expect(
+      parseWorkerReport(
+        JSON.stringify({
+          type: 'result',
+          result:
+            'MAJOR_RESULT: {"status":"active","summary":"x","assetCandidate":{"id":"bad","kind":"module","summary":"x","locator":"../escape.ts","tags":["x"],"scope":"shared"}}',
         }),
       ),
     ).toBeUndefined();
