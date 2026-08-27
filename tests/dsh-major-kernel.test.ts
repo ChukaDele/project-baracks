@@ -236,6 +236,25 @@ describe('Major DSH workstation kernel', () => {
     ).toBe(false);
   });
 
+  it('registers a bootable no-argument insight command', async () => {
+    const { apply } = await loadKernel();
+    const commands: Array<{ name: string; input?: { hint?: string } }> = [];
+    applyKernel(
+      { apply },
+      {
+        subagents: { registerProvider() {} },
+        commands: {
+          register(command: { name: string; input?: { hint?: string } }) {
+            commands.push(command);
+          },
+        },
+      },
+    );
+    expect(commands.find((command) => command.name === 'major-insight')).toMatchObject({
+      input: { hint: 'show latest receipt' },
+    });
+  });
+
   it('records evidence-qualified effects and compares only directly comparable observations', async () => {
     const { latestRunInsight, recordRunInsight } = await loadKernel();
     const session = kernelSession('/tmp/project');

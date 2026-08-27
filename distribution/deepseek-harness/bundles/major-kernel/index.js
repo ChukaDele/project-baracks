@@ -1206,7 +1206,7 @@ export function apply(ctx) {
   ctx.commands.register({
     name: 'major-insight',
     description: 'show the latest durable Major productive-work receipt',
-    input: { hint: '' },
+    input: { hint: 'show latest receipt' },
     handler: async (invocation) => {
       const insight = latestRunInsight(invocation.agent.session);
       if (!insight) {
