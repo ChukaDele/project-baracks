@@ -8,6 +8,7 @@ const PROVIDER_CONFIG_PATHS: Readonly<Record<string, readonly string[]>> = Objec
     // Claude Code stores its current auth state in this provider-owned file.
     // Keep the allowlist exact so histories, telemetry and project data stay
     // outside the host execution boundary.
+    '.claude/.credentials.json',
     '.claude/.claude.json',
     '.claude/CLAUDE.md',
     '.claude/major-global.md',

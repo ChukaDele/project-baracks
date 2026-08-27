@@ -7,6 +7,7 @@ import { providerReadOnlyRoots } from '../src/security/provider-access.js';
 function fixtureHome(): string {
   const home = mkdtempSync(join(tmpdir(), 'major-provider-home-'));
   for (const relative of [
+    '.claude/.credentials.json',
     '.claude/.claude.json',
     '.claude/settings.json',
     '.claude/projects/private.json',
@@ -29,6 +30,7 @@ describe('provider authentication read roots', () => {
     const roots = providerReadOnlyRoots('/trusted/bin/claude', home);
 
     expect(roots).toEqual([
+      join(home, '.claude/.credentials.json'),
       join(home, '.claude/.claude.json'),
       join(home, '.claude/settings.json'),
     ]);
