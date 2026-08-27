@@ -13,6 +13,7 @@ import {
   runForegroundGoal,
   routingDecisionGoalPatch,
   selectCoordinator,
+  supervisorRunInsight,
   tryAcquireRepoCycleLock,
 } from '../src/supervisor/runtime.js';
 import { getGoal, startGoal, updateGoal, type SupervisorGoal } from '../src/supervisor/state.js';
@@ -63,6 +64,127 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('builds a compact terminal receipt without inventing unavailable evidence', () => {
+    const receipt = supervisorRunInsight({
+      goal: { id: 'goal-1', goal: 'Ship the accepted Major increment' },
+      settled: {
+        status: 'blocked',
+        lastSummary: 'Worker completed; owner approval remains.',
+        ownerGate: 'Owner must approve production activation.',
+      },
+      selection: {
+        kind: 'route',
+        host: 'codex',
+        provider: 'codex#default',
+        accountLabel: 'default',
+        modelRef: 'gpt-5-codex',
+        reason: 'subscription route',
+      },
+      skills: ['tdd'],
+      outcome: {
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: 'MAJOR_RESULT: {"status":"blocked"}',
+        stderr: '',
+        durationMs: 80,
+        rateLimited: false,
+        exhausted: false,
+        workspaceMutated: true,
+      },
+      report: {
+        status: 'blocked',
+        summary: 'Worker completed; owner approval remains.',
+        ownerGate: 'Owner must approve production activation.',
+        assetCandidate: {
+          id: 'terminal-receipt',
+          kind: 'module',
+          summary: 'Emits a receipt.',
+          locator: 'src/supervisor/runtime.ts',
+          tags: ['insight'],
+          scope: 'project-local',
+        },
+      },
+      totalDurationMs: 100,
+    });
+
+    expect(receipt).toMatchObject({
+      schema: 'major.run-insight.v1',
+      goalId: 'goal-1',
+      outcome: 'blocked',
+      status: 'blocked',
+      runtime: 'major',
+      worker: { coordinator: 'codex', provider: 'codex#default', model: 'gpt-5-codex' },
+      skills: ['tdd'],
+      timing: {
+        durationMs: 100,
+        productiveWorkMs: 80,
+        productiveWorkRatio: 0.8,
+        majorOverheadMs: null,
+        infrastructureOverheadMs: null,
+        stages: { workerExecutionMs: 80, reviewMs: null },
+      },
+      failures: [],
+      recurrence: {
+        signature: expect.stringMatching(/^blocked:/),
+        priorOccurrences: null,
+        evidence: 'Owner must approve production activation.',
+      },
+      humanInterventions: ['Owner must approve production activation.'],
+      quality: { assessment: 'unknown', evidence: [] },
+      finalOutcome: 'Worker completed; owner approval remains.',
+      reuseStrategy: {
+        strategy: 'explicit_worker_asset_candidate',
+        reusableAssets: ['terminal-receipt'],
+      },
+      learning: {
+        disposition: 'observation_only',
+        promotionEligible: false,
+        durableMeaningOwner: 'gbrain',
+      },
+      telemetry: { highVolume: 'disabled_by_default', export: 'optional_async_best_effort' },
+    });
+    expect(receipt.effects).toEqual([]);
+  });
+
+  it.each([
+    ['failed', 'failed'],
+    ['timed_out', 'failed'],
+  ] as const)(
+    'classifies a %s worker receipt as %s and retains a recurrence signature',
+    (status, expected) => {
+      const receipt = supervisorRunInsight({
+        goal: { id: 'goal-1', goal: 'Ship the accepted Major increment' },
+        selection: {
+          kind: 'route',
+          host: 'codex',
+          provider: 'codex#default',
+          accountLabel: 'default',
+          modelRef: 'gpt-5-codex',
+          reason: 'subscription route',
+        },
+        skills: [],
+        outcome: {
+          host: 'codex',
+          status,
+          exitCode: status === 'failed' ? 1 : null,
+          stdout: '',
+          stderr: 'provider transport stopped',
+          durationMs: 80,
+          rateLimited: false,
+          exhausted: false,
+          workspaceMutated: false,
+        },
+        totalDurationMs: 100,
+      });
+      expect(receipt.outcome).toBe(expected);
+      expect(receipt.recurrence).toMatchObject({
+        signature: expect.stringMatching(new RegExp(`^${expected}:`)),
+        evidence: 'provider transport stopped',
+      });
+    },
+  );
+
   it('persists the provider, model, account, and host selected for execution', () => {
     expect(
       routingDecisionGoalPatch(

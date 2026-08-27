@@ -480,6 +480,7 @@ describe('major CLI', () => {
       'cleanup',
       'doctor',
       'help',
+      'history',
       'hosts',
       'project',
       'queue',

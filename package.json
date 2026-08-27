@@ -1,6 +1,6 @@
 {
   "name": "major",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Major — thin cross-project control plane with immutable runtime releases, project-context integrity, closed-loop learning and evidence-driven delivery",
   "type": "module",
   "private": true,

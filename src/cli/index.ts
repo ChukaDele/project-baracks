@@ -59,6 +59,11 @@ import {
   provisionCapability,
   validateCapability,
 } from '../capabilities/registry.js';
+import {
+  listPerformanceObservations,
+  performanceHistoryReport,
+  recordPerformanceObservation,
+} from '../insights/performance-history.js';
 
 /**
  * Exit codes (stable, documented in docs/architecture.md):
@@ -84,6 +89,47 @@ const JSON_SCHEMA_VERSION = 1;
 const program = new Command('major');
 program.description('Major — autonomous engineering supervisor');
 program.exitOverride();
+
+const history = program
+  .command('history')
+  .description('Record and report durable cross-run performance observations');
+
+history
+  .command('record')
+  .description('Persist one compact run-insight receipt (adapter command)')
+  .requiredOption('--project <identity>', 'canonical project identity')
+  .requiredOption('--receipt-base64 <json>', 'base64url-encoded major.run-insight.v1 receipt')
+  .option('--source <source>', 'observation adapter source', 'dsh')
+  .action((opts: { project: string; receiptBase64: string; source: string }) => {
+    if (opts.source !== 'major' && opts.source !== 'dsh') {
+      return fail('history source must be major or dsh', EXIT.usage);
+    }
+    let receipt: unknown;
+    try {
+      receipt = JSON.parse(Buffer.from(opts.receiptBase64, 'base64url').toString('utf8'));
+    } catch {
+      return fail('history receipt is not valid base64url JSON', EXIT.usage);
+    }
+    recordPerformanceObservation(db(), {
+      project: opts.project,
+      source: opts.source,
+      receipt,
+    });
+  });
+
+history
+  .command('report')
+  .description('Report evidence-qualified performance history across runs')
+  .requiredOption('--project <identity>', 'canonical project identity')
+  .option('--goal-id <id>', 'limit to one durable goal')
+  .option('--json', 'emit versioned JSON')
+  .action((opts: { project: string; goalId?: string; json?: boolean }) => {
+    const report = performanceHistoryReport(
+      listPerformanceObservations(db(), opts.project, opts.goalId),
+    );
+    if (opts.json) return emitJson('performance-history', report);
+    console.log(JSON.stringify(report, null, 2));
+  });
 
 function fail(message: string, code: number = EXIT.error): never {
   console.error(message);

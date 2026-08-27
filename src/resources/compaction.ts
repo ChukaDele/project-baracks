@@ -13,6 +13,7 @@ export const COMPACTION_EXCLUSIONS = [
   'provider-auth',
   'active-vm',
   'active-release',
+  'historical-evidence',
 ] as const;
 
 export type CompactionExclusion = (typeof COMPACTION_EXCLUSIONS)[number];
@@ -30,6 +31,13 @@ export function compactionExclusionFor(
   if (base === 'credentials' || resource.identity.includes('credential')) return 'credentials';
   if (base === 'provider-auth' || resource.identity.includes('provider-auth')) {
     return 'provider-auth';
+  }
+  if (
+    /^(?:run-insights?|run-receipts?|performance-history|incidents?|outcomes?|validated-learnings?)(?:[.\-_]|$)/i.test(
+      base,
+    )
+  ) {
+    return 'historical-evidence';
   }
   if (EXCLUDED_BASENAMES.has(base)) return base as CompactionExclusion;
   return undefined;

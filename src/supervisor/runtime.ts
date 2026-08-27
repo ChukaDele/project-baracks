@@ -68,6 +68,10 @@ import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integrat
 import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
 import { completedWorkflow, parseWorkerReport } from './worker-report.js';
+import {
+  RUN_INSIGHT_SCHEMA,
+  recordPerformanceObservation,
+} from '../insights/performance-history.js';
 
 export { parseWorkerReport } from './worker-report.js';
 
@@ -628,6 +632,91 @@ export interface GoalCycleOutcome {
   ranCycle: boolean;
 }
 
+export function supervisorRunInsight(input: {
+  goal: Pick<SupervisorGoal, 'id' | 'goal'>;
+  settled?: Pick<SupervisorGoal, 'status' | 'lastSummary' | 'ownerGate'>;
+  selection: Extract<CoordinatorSelection, { kind: 'route' }>;
+  skills: string[];
+  outcome: WorkerOutcome;
+  report?: ReturnType<typeof parseWorkerReport>;
+  totalDurationMs: number;
+}) {
+  const workerDurationMs = Number.isFinite(input.outcome.durationMs)
+    ? Math.max(0, input.outcome.durationMs)
+    : null;
+  const acceptedAsset =
+    input.report?.assetCandidate && input.outcome.workspaceMutated
+      ? [input.report.assetCandidate.id]
+      : [];
+  const diagnostic = trim(input.outcome.stderr || input.outcome.stdout, 2_000);
+  const classifiedOutcome =
+    input.report?.status === 'blocked' || input.settled?.status === 'blocked'
+      ? 'blocked'
+      : input.outcome.status === 'succeeded'
+        ? 'completed'
+        : 'failed';
+  const recurrenceEvidence =
+    classifiedOutcome === 'blocked'
+      ? (input.settled?.ownerGate ?? input.report?.ownerGate)
+      : diagnostic;
+  const recurrenceSignature =
+    classifiedOutcome === 'completed'
+      ? null
+      : `${classifiedOutcome}:${createHash('sha256')
+          .update(recurrenceEvidence || classifiedOutcome)
+          .digest('hex')
+          .slice(0, 16)}`;
+  return {
+    schema: RUN_INSIGHT_SCHEMA,
+    recordedAt: new Date().toISOString(),
+    goalId: input.goal.id,
+    goal: input.goal.goal,
+    outcome: classifiedOutcome,
+    status: input.report?.status ?? input.settled?.status ?? 'unknown',
+    runtime: 'major',
+    worker: {
+      coordinator: input.selection.host,
+      provider: input.selection.provider,
+      model: input.selection.modelRef,
+    },
+    skills: input.skills,
+    timing: {
+      durationMs: input.totalDurationMs,
+      productiveWorkMs: workerDurationMs,
+      productiveWorkRatio:
+        workerDurationMs === null || input.totalDurationMs === 0
+          ? null
+          : Math.min(1, workerDurationMs / input.totalDurationMs),
+      // The legacy supervisor worker reports one aggregate duration; it does
+      // not separately instrument orchestration, infrastructure, or review.
+      majorOverheadMs: null,
+      infrastructureOverheadMs: null,
+      stages: { workerExecutionMs: workerDurationMs, reviewMs: null },
+    },
+    productiveWork: input.report?.summary ?? '',
+    effects: [],
+    failures: input.outcome.status === 'succeeded' || !diagnostic ? [] : [diagnostic],
+    recurrence: {
+      signature: recurrenceSignature,
+      priorOccurrences: null,
+      evidence: recurrenceEvidence || null,
+    },
+    humanInterventions: input.settled?.ownerGate ? [input.settled.ownerGate] : [],
+    quality: { assessment: 'unknown' as const, evidence: [] },
+    finalOutcome: input.settled?.lastSummary ?? input.report?.summary ?? diagnostic,
+    reuseStrategy: {
+      strategy: acceptedAsset.length ? 'explicit_worker_asset_candidate' : null,
+      reusableAssets: acceptedAsset,
+    },
+    learning: {
+      disposition: 'observation_only',
+      promotionEligible: false,
+      durableMeaningOwner: 'gbrain',
+    },
+    telemetry: { highVolume: 'disabled_by_default', export: 'optional_async_best_effort' },
+  };
+}
+
 export async function runGoalCycle(
   goalId: string,
   options: { maxTimeoutMs?: number } = {},
@@ -734,6 +823,7 @@ export async function runForegroundGoal(
 }
 
 async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): Promise<void> {
+  const cycleStartedAtMs = Date.now();
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const selection = routeGoalExecution(goal);
   if (selection.kind === 'checkpoint') {
@@ -839,6 +929,32 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     accountLabel: routedSelection.accountLabel,
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
+  let terminalReport: ReturnType<typeof parseWorkerReport> = undefined;
+  const recordTerminalObservation = () => {
+    const settled = getGoal(goal.id);
+    try {
+      const observationState = openDb();
+      try {
+        recordPerformanceObservation(observationState.db, {
+          project: goal.project,
+          source: 'major',
+          receipt: supervisorRunInsight({
+            goal,
+            ...(settled ? { settled } : {}),
+            selection: routedSelection,
+            skills: routedSkillIds,
+            outcome,
+            ...(terminalReport ? { report: terminalReport } : {}),
+            totalDurationMs: Math.max(0, Date.now() - cycleStartedAtMs),
+          }),
+        });
+      } finally {
+        observationState.sqlite.close();
+      }
+    } catch {
+      // Historical observation is best effort and cannot reverse user work.
+    }
+  };
   try {
     recordSkillOutcome({
       project: goal.project,
@@ -863,19 +979,25 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     }
   }
   const after = getGoal(goal.id);
-  if (!after) return;
+  if (!after) {
+    recordTerminalObservation();
+    return;
+  }
   if (after.status === 'done' || after.status === 'blocked' || after.status === 'paused') {
     updateGoal(goal.id, { activePid: undefined, lastFinishedAt: new Date().toISOString() });
+    recordTerminalObservation();
     return;
   }
 
   if (outcome.status === 'succeeded') {
     const report = parseWorkerReport(outcome.stdout);
+    terminalReport = report;
     const mutationClaimRefusal = codexMutationClaimRefusal(outcome, report);
     if (mutationClaimRefusal) {
       // A rejected readiness claim is not a trusted source for capability-use
       // or learning self-reports. Refuse it before recording either one.
       updateGoal(goal.id, mutationClaimRefusalGoalPatch(after, mutationClaimRefusal, outcome));
+      recordTerminalObservation();
       return;
     }
     recordReportedCapabilityUses(capabilityResolution.capabilities, report?.capabilityUse);
@@ -931,6 +1053,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         retryImmediately: false,
         ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
       });
+      recordTerminalObservation();
       return;
     }
     if (report?.status === 'done') {
@@ -946,6 +1069,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         retryImmediately: false,
         ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
       });
+      recordTerminalObservation();
       return;
     }
     updateGoal(goal.id, {
@@ -961,6 +1085,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       retryImmediately: false,
       ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
     });
+    recordTerminalObservation();
   } else {
     const patch = nonSuccessCyclePatch({
       modelOutcome,
@@ -984,6 +1109,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       pendingCompletion: undefined,
       retryImmediately: patch.retryImmediately,
     });
+    recordTerminalObservation();
   }
 }
 
