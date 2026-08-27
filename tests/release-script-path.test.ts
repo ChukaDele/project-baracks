@@ -43,8 +43,8 @@ describe('clean-install release gate PATH', () => {
       'pnpm format:check',
       'pnpm lint',
       'pnpm typecheck',
-      'pnpm test',
       'pnpm build',
+      'pnpm test',
     ]);
     expect(readFileSync('tests/cli.test.ts', 'utf8')).toContain(
       "execFileSync('corepack', ['pnpm', 'build']",

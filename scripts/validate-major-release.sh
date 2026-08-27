@@ -23,8 +23,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-major-install-transaction.py
 corepack pnpm format:check
 corepack pnpm lint
 corepack pnpm typecheck
-corepack pnpm test
 corepack pnpm build
+corepack pnpm test
 bash scripts/build-major-runtime-snapshot.sh "$RUNTIME_DEST"
 
 echo "Major canonical release validation passed."
