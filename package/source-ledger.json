@@ -1,0 +1,125 @@
+{
+  "policy": "No external skill payload was copied. Unlicensed inputs are quarantined.",
+  "schemaVersion": 2,
+  "sourceLockDate": "2026-08-24",
+  "sources": [
+    {
+      "contentCopied": false,
+      "decision": "LOCALISE_REFERENCE",
+      "licence": "MIT",
+      "licenceStatus": "VERIFIED_COMPATIBLE",
+      "localisation": "Reference vocabulary and reference-not-driver boundary only. No source copied.",
+      "name": "mattpocock/skills",
+      "paths": ["docs/engineering/domain-modeling.md", "docs/engineering/codebase-design.md"],
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "6654f6b60cd9d5be8b54c6fafe44346dabeb3b76",
+      "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "LOCALISE_NARROW_PROCEDURES",
+      "licence": "MIT",
+      "licenceStatus": "VERIFIED_COMPATIBLE",
+      "localisation": "Debugging, TDD, verification and worktree discipline. Reject router, task state and mandatory ceremony.",
+      "name": "obra/superpowers",
+      "paths": [
+        "skills/systematic-debugging",
+        "skills/test-driven-development",
+        "skills/verification-before-completion",
+        "skills/using-git-worktrees"
+      ],
+      "repository": "https://github.com/obra/superpowers",
+      "revision": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+      "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "WRAP_EVAL_STRUCTURE_ONLY",
+      "licence": "MIT",
+      "licenceStatus": "VERIFIED_COMPATIBLE",
+      "localisation": "Static, semantic and behavioural evaluation concepts. Reject marketplace and orchestration.",
+      "name": "wshobson/agents",
+      "paths": ["plugins/plugin-eval", "selected specialist methods"],
+      "repository": "https://github.com/wshobson/agents",
+      "revision": "d82998e7df393c671ede2387a8435075f0b633f5",
+      "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "LOCALISE_FINANCE_METHOD_ONLY",
+      "licence": "Apache-2.0",
+      "licenceStatus": "VERIFIED_COMPATIBLE",
+      "localisation": "Close, cash and invoice-draft ideas. Connected systems remain adapters and approval gates.",
+      "name": "anthropics/knowledge-work-plugins",
+      "paths": [
+        "small-business/README.md",
+        "month-end-prep",
+        "cash-flow-snapshot",
+        "invoice-chase"
+      ],
+      "repository": "https://github.com/anthropics/knowledge-work-plugins",
+      "revision": "ca63801acfa6f986bbbe8c521efa71ca94ee2ce6",
+      "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "REFERENCE_FINANCIAL_ANALYSIS",
+      "licence": "Apache-2.0",
+      "licenceStatus": "VERIFIED_COMPATIBLE",
+      "localisation": "Financial analysis methodology only. Major retains deterministic ledger boundary.",
+      "name": "anthropics/financial-services",
+      "paths": ["financial-analysis"],
+      "repository": "https://github.com/anthropics/financial-services",
+      "revision": "33a3d8a9d6e5c3d4861731933a8857cc5e03315d",
+      "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "ADAPTER_MECHANICS_ONLY",
+      "licence": "Apache-2.0",
+      "licenceStatus": "VERIFIED_COMPATIBLE",
+      "localisation": "Gmail, Calendar, Drive and Chat mechanics become optional adapters. Sending and calendar changes stay gated.",
+      "name": "googleworkspace/cli",
+      "paths": ["skills/persona-exec-assistant/SKILL.md"],
+      "repository": "https://github.com/googleworkspace/cli",
+      "revision": "a3768d0e82ad83cca2da97724e46bea4ff0e6dbd",
+      "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "QUARANTINE_COMPARISON_ONLY",
+      "licence": "UNDECLARED",
+      "licenceStatus": "UNVERIFIED_NO_REUSE",
+      "localisation": "Task decomposition signal only. Do not copy content or import OpenClaw, cron, messaging, Gmail, Todoist or transcript assumptions.",
+      "name": "mgonto/executive-assistant-skills",
+      "paths": ["meeting-prep", "action-items-todoist", "email-drafting", "executive-digest"],
+      "repository": "https://github.com/mgonto/executive-assistant-skills",
+      "revision": "28f5065274b43360d7f564f5833c97f9377d3313",
+      "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "LOCALISE_OWNERSHIP_BOUNDARIES",
+      "licence": "SERVICE_TERMS_NO_CONTENT_COPIED",
+      "licenceStatus": "REFERENCE_ONLY",
+      "localisation": "Account plan, meeting preparation, follow-up and pipeline ownership map. CRM and communication remain adapters.",
+      "name": "OpenAI Sales plugin and Academy",
+      "paths": ["account plan", "meeting prep", "follow-up", "pipeline review"],
+      "repository": "https://openai.com/business/plugins/sales/",
+      "revision": "web-observed-2026-08-24",
+      "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "RISK_SIGNAL_ONLY",
+      "licence": "NOT_FOR_COPY",
+      "licenceStatus": "REFERENCE_ONLY",
+      "localisation": "Non-authoritative bloat, trigger-quality and adapter-risk signals. Validate via local fixtures.",
+      "name": "community feedback",
+      "paths": ["Matt Pocock customisation", "Google Workspace trigger feedback"],
+      "repository": "https://www.reddit.com",
+      "revision": "web-observed-2026-08-24",
+      "status": "EXAMINED"
+    }
+  ]
+}

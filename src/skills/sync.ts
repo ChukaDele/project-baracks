@@ -9,11 +9,13 @@ import {
   renameSync,
   rmSync,
   symlinkSync,
+  realpathSync,
   writeFileSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { basename, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { parseDocument } from 'yaml';
 import { majorHome } from '../supervisor/state.js';
 import { cloneGitBranch } from '../resources/tools.js';
 
@@ -29,12 +31,24 @@ interface Registry {
   entries: RegistryEntry[];
 }
 
+interface BundleMarker {
+  version: 1;
+  sha: string;
+  previousBundle?: string;
+}
+
 export interface SkillSyncResult {
   sourceRoot: string;
   bundleId: string;
   registryVersion: number;
   activeBundle: string;
   internalSkillCount: number;
+}
+
+export interface SkillRollbackResult {
+  previousBundle: string;
+  activeBundle: string;
+  bundleId: string;
 }
 
 const DEFAULT_SKILLS_REPO_URL = 'https://github.com/ChukaDele/project-baracks.git';
@@ -65,6 +79,25 @@ function assertRegistry(value: unknown): Registry {
   return { version: Number(record.version), entries };
 }
 
+function readBundleMarker(path: string): BundleMarker {
+  const value = JSON.parse(readFileSync(join(path, 'bundle.json'), 'utf8')) as Record<string, unknown>;
+  if (
+    value.version !== 1 ||
+    typeof value.sha !== 'string' ||
+    !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value.sha) ||
+    (value.previousBundle !== undefined &&
+      (typeof value.previousBundle !== 'string' ||
+        !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value.previousBundle)))
+  ) {
+    throw new Error('invalid Major Skills Library bundle marker');
+  }
+  return {
+    version: 1,
+    sha: value.sha,
+    ...(typeof value.previousBundle === 'string' ? { previousBundle: value.previousBundle } : {}),
+  };
+}
+
 function filesBelow(root: string): string[] {
   const files: string[] = [];
   const walk = (dir: string) => {
@@ -81,18 +114,96 @@ function filesBelow(root: string): string[] {
 function validateSource(sourceRoot: string): {
   registry: Registry;
   registryPath: string;
+  reconciliationLedgerPath: string;
+  sourceLedgerPath: string;
+  capabilityMatrixPath: string;
   internalRoot: string;
   evalRoot: string;
   internalIds: string[];
+  assetPaths: string[];
 } {
   const registryPath = join(sourceRoot, 'guidance', 'skills.registry.json');
+  const reconciliationLedgerPath = join(sourceRoot, 'guidance', 'skills-reconciliation-ledger.json');
+  const sourceLedgerPath = join(sourceRoot, 'package', 'source-ledger.json');
+  const capabilityMatrixPath = join(sourceRoot, 'guidance', 'worker-capability-matrix.json');
   const internalRoot = join(sourceRoot, 'skills', 'internal');
   const evalRoot = join(sourceRoot, 'evals', 'skill-resolver');
-  for (const path of [registryPath, internalRoot, evalRoot]) {
+  const assetRegistryPath = join(sourceRoot, 'guidance', 'reusable-assets.registry.json');
+  for (const path of [
+    registryPath,
+    reconciliationLedgerPath,
+    sourceLedgerPath,
+    capabilityMatrixPath,
+    assetRegistryPath,
+    internalRoot,
+    evalRoot,
+  ]) {
     if (!existsSync(path)) throw new Error(`required skill-bundle source missing: ${path}`);
   }
 
+  const sourceLedger = JSON.parse(readFileSync(sourceLedgerPath, 'utf8')) as {
+    schemaVersion?: unknown;
+    sourceLockDate?: unknown;
+    sources?: unknown;
+  };
+  if (
+    !Number.isInteger(sourceLedger.schemaVersion) ||
+    typeof sourceLedger.sourceLockDate !== 'string' ||
+    !Array.isArray(sourceLedger.sources)
+  ) {
+    throw new Error('invalid Major Skills Library source ledger');
+  }
+
   const registry = assertRegistry(JSON.parse(readFileSync(registryPath, 'utf8')));
+  const reconciliationLedger = JSON.parse(readFileSync(reconciliationLedgerPath, 'utf8')) as {
+    entries?: unknown;
+  };
+  if (!Array.isArray(reconciliationLedger.entries)) {
+    throw new Error('invalid Major Skills Library reconciliation ledger');
+  }
+  const assetCatalog = JSON.parse(readFileSync(assetRegistryPath, 'utf8')) as {
+    version?: unknown;
+    assets?: unknown;
+  };
+  if (!Number.isInteger(assetCatalog.version) || !Array.isArray(assetCatalog.assets)) {
+    throw new Error('invalid reusable asset registry schema');
+  }
+  const assetIds = new Set<string>();
+  for (const [index, value] of assetCatalog.assets.entries()) {
+    if (!value || typeof value !== 'object') throw new Error(`invalid reusable asset ${index}`);
+    const asset = value as Record<string, unknown>;
+    for (const field of ['id', 'kind', 'title', 'summary', 'locator'] as const) {
+      if (typeof asset[field] !== 'string' || asset[field].trim() === '') {
+        throw new Error(`reusable asset ${index} missing ${field}`);
+      }
+    }
+    if (
+      typeof asset.lifecycle !== 'string' ||
+      !['LOCAL', 'REUSE_CANDIDATE', 'EVALUATED', 'PROMOTED', 'MONITORED', 'UPDATED', 'DEPRECATED'].includes(asset.lifecycle) ||
+      !Array.isArray(asset.tags) ||
+      !asset.provenance ||
+      !asset.evidence
+    ) {
+      throw new Error(`reusable asset ${index} has incomplete lifecycle metadata`);
+    }
+    if (assetIds.has(asset.id as string)) throw new Error('duplicate reusable asset ids');
+    assetIds.add(asset.id as string);
+    const target = resolve(sourceRoot, asset.locator as string);
+    if (!target.startsWith(`${sourceRoot}${sep}`) || !existsSync(target)) {
+      throw new Error(`reusable asset locator is unavailable or escapes source: ${asset.locator as string}`);
+    }
+    if (!realpathSync(target).startsWith(`${realpathSync(sourceRoot)}${sep}`)) {
+      throw new Error(`reusable asset locator escapes source through a symlink: ${asset.locator as string}`);
+    }
+  }
+  const assetPaths = assetCatalog.assets.map((asset) =>
+    resolve(sourceRoot, (asset as Record<string, unknown>).locator as string),
+  );
+  for (const name of ['gbrain-reusable-assets.index.json', 'reusable-assets.candidates.json']) {
+    if (!existsSync(join(sourceRoot, 'guidance', name))) {
+      throw new Error(`required reusable asset metadata missing: ${name}`);
+    }
+  }
   const registered = registry.entries
     .filter((entry) => entry.source === 'major-internal')
     .map((entry) => entry.id)
@@ -113,11 +224,19 @@ function validateSource(sourceRoot: string): {
     if (!text.startsWith('---\n')) throw new Error(`${skillId}/SKILL.md missing frontmatter`);
     const end = text.indexOf('\n---\n', 4);
     if (end < 0) throw new Error(`${skillId}/SKILL.md has malformed frontmatter`);
-    const frontmatter = text.slice(4, end);
-    const name = frontmatter.match(/^name:\s*(.+?)\s*$/m)?.[1]?.trim();
-    const description = frontmatter.match(/^description:\s*(.+?)\s*$/m)?.[1]?.trim();
-    if (name !== skillId) throw new Error(`${skillId}/SKILL.md frontmatter name mismatch`);
-    if (!description) throw new Error(`${skillId}/SKILL.md missing description`);
+    const document = parseDocument(text.slice(4, end));
+    if (document.errors.length) {
+      throw new Error(`${skillId}/SKILL.md has invalid YAML frontmatter: ${document.errors[0]?.message}`);
+    }
+    const frontmatter: unknown = document.toJS();
+    if (!frontmatter || typeof frontmatter !== 'object' || Array.isArray(frontmatter)) {
+      throw new Error(`${skillId}/SKILL.md frontmatter must be a mapping`);
+    }
+    const fields = frontmatter as Record<string, unknown>;
+    if (fields.name !== skillId) throw new Error(`${skillId}/SKILL.md frontmatter name mismatch`);
+    if (typeof fields.description !== 'string' || !fields.description.trim()) {
+      throw new Error(`${skillId}/SKILL.md missing description`);
+    }
   }
 
   const known = new Set(registry.entries.map((entry) => entry.id));
@@ -135,12 +254,24 @@ function validateSource(sourceRoot: string): {
     }
   }
 
-  return { registry, registryPath, internalRoot, evalRoot, internalIds: installed };
+  return {
+    registry,
+    registryPath,
+    reconciliationLedgerPath,
+    sourceLedgerPath,
+    capabilityMatrixPath,
+    internalRoot,
+    evalRoot,
+    internalIds: installed,
+    assetPaths,
+  };
 }
 
 function bundleHash(sourceRoot: string, roots: string[]): string {
   const hash = createHash('sha256');
-  const files = roots.flatMap((root) => filesBelow(root)).sort();
+  const files = roots
+    .flatMap((root) => (lstatSync(root).isDirectory() ? filesBelow(root) : [root]))
+    .sort();
   for (const file of files) {
     hash.update(relative(sourceRoot, file));
     hash.update('\0');
@@ -150,15 +281,37 @@ function bundleHash(sourceRoot: string, roots: string[]): string {
   return hash.digest('hex');
 }
 
-function retainRollbackBundles(bundlesRoot: string, activeId: string): void {
+function retainRollbackBundles(
+  bundlesRoot: string,
+  activeId: string,
+  previousBundle?: string,
+): void {
   const rows = readdirSync(bundlesRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== activeId && !entry.name.startsWith('.'))
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        !entry.isSymbolicLink() &&
+        entry.name !== activeId &&
+        !entry.name.startsWith('.'),
+    )
     .map((entry) => {
       const path = join(bundlesRoot, entry.name);
-      return { path, mtime: lstatSync(path).mtimeMs };
+      try {
+        return { path, marker: readBundleMarker(path), mtime: lstatSync(path).mtimeMs };
+      } catch {
+        return undefined;
+      }
     })
+    .filter((row): row is { path: string; marker: BundleMarker; mtime: number } => Boolean(row))
     .sort((left, right) => right.mtime - left.mtime);
-  for (const row of rows.slice(2)) rmSync(row.path, { recursive: true, force: true });
+  const retained = [
+    ...rows.filter((row) => row.marker.sha === previousBundle),
+    ...rows.filter((row) => row.marker.sha !== previousBundle),
+  ].slice(0, 2);
+  const keep = new Set(retained.map((row) => row.path));
+  for (const row of rows) {
+    if (!keep.has(row.path)) rmSync(row.path, { recursive: true, force: true });
+  }
 }
 
 function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyncResult {
@@ -166,19 +319,54 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   const validated = validateSource(sourceRoot);
   const bundleId = bundleHash(sourceRoot, [
     join(sourceRoot, 'guidance'),
+    validated.sourceLedgerPath,
     validated.internalRoot,
     validated.evalRoot,
+    ...validated.assetPaths,
   ]);
 
   const bundlesRoot = join(majorHome(), 'skill-bundles');
   const destination = join(bundlesRoot, bundleId);
   const staged = join(bundlesRoot, `.stage-${bundleId}-${process.pid}`);
   mkdirSync(bundlesRoot, { recursive: true, mode: 0o700 });
+  const current = join(bundlesRoot, 'current');
+  let previousBundle: string | undefined;
+  if (existsSync(current)) {
+    try {
+      previousBundle = readBundleMarker(realpathSync(current)).sha;
+    } catch {
+      // A malformed predecessor is not retained or referenced by a new bundle.
+    }
+  }
   rmSync(staged, { recursive: true, force: true });
   mkdirSync(join(staged, 'guidance'), { recursive: true });
+  mkdirSync(join(staged, 'package'), { recursive: true });
   mkdirSync(join(staged, 'skills'), { recursive: true });
   mkdirSync(join(staged, 'evals'), { recursive: true });
   cpSync(validated.registryPath, join(staged, 'guidance', 'skills.registry.json'));
+  cpSync(
+    validated.reconciliationLedgerPath,
+    join(staged, 'guidance', 'skills-reconciliation-ledger.json'),
+  );
+  cpSync(validated.capabilityMatrixPath, join(staged, 'guidance', 'worker-capability-matrix.json'));
+  cpSync(validated.sourceLedgerPath, join(staged, 'package', 'source-ledger.json'));
+  cpSync(
+    join(sourceRoot, 'guidance', 'reusable-assets.registry.json'),
+    join(staged, 'guidance', 'reusable-assets.registry.json'),
+  );
+  cpSync(
+    join(sourceRoot, 'guidance', 'gbrain-reusable-assets.index.json'),
+    join(staged, 'guidance', 'gbrain-reusable-assets.index.json'),
+  );
+  cpSync(
+    join(sourceRoot, 'guidance', 'reusable-assets.candidates.json'),
+    join(staged, 'guidance', 'reusable-assets.candidates.json'),
+  );
+  for (const path of validated.assetPaths) {
+    const destination = join(staged, relative(sourceRoot, path));
+    mkdirSync(dirname(destination), { recursive: true });
+    cpSync(path, destination);
+  }
   cpSync(validated.internalRoot, join(staged, 'skills', 'internal'), { recursive: true });
   cpSync(validated.evalRoot, join(staged, 'evals', 'skill-resolver'), { recursive: true });
   writeFileSync(
@@ -190,6 +378,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
         registryVersion: validated.registry.version,
         source: sourceLabel ?? sourceRoot,
         installedAt: new Date().toISOString(),
+        ...(previousBundle ? { previousBundle } : {}),
       },
       null,
       2,
@@ -202,7 +391,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   rmSync(next, { force: true });
   symlinkSync(basename(destination), next);
   renameSync(next, join(bundlesRoot, 'current'));
-  retainRollbackBundles(bundlesRoot, bundleId);
+  retainRollbackBundles(bundlesRoot, bundleId, previousBundle);
 
   return {
     sourceRoot: sourceLabel ?? sourceRoot,
@@ -211,6 +400,42 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
     activeBundle: destination,
     internalSkillCount: validated.internalIds.length,
   };
+}
+
+/** Atomically reactivate the exact predecessor recorded by the active bundle. */
+export function rollbackMajorSkills(): SkillRollbackResult {
+  const bundlesRoot = join(majorHome(), 'skill-bundles');
+  const current = join(bundlesRoot, 'current');
+  if (!existsSync(current)) throw new Error('no active Major Skills Library bundle');
+  const active = realpathSync(current);
+  const activeMarker = readBundleMarker(active);
+  const candidates = readdirSync(bundlesRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink() && !entry.name.startsWith('.'))
+    .map((entry) => join(bundlesRoot, entry.name))
+    .filter((path) => realpathSync(path) !== active)
+    .map((path) => {
+      if (
+        !existsSync(join(path, 'guidance', 'skills.registry.json')) ||
+        !existsSync(join(path, 'skills', 'internal'))
+      ) {
+        return undefined;
+      }
+      try {
+        return { path, marker: readBundleMarker(path), mtime: lstatSync(path).mtimeMs };
+      } catch {
+        return undefined;
+      }
+    })
+    .filter((row): row is { path: string; marker: BundleMarker; mtime: number } => Boolean(row))
+    .sort((left, right) => right.mtime - left.mtime);
+  const target =
+    candidates.find((candidate) => candidate.marker.sha === activeMarker.previousBundle) ?? candidates[0];
+  if (!target) throw new Error('no retained Major Skills Library rollback bundle');
+  const next = join(bundlesRoot, `.current-rollback-${process.pid}`);
+  rmSync(next, { force: true });
+  symlinkSync(basename(target.path), next);
+  renameSync(next, current);
+  return { previousBundle: active, activeBundle: target.path, bundleId: target.marker.sha };
 }
 
 /**

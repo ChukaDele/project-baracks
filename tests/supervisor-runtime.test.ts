@@ -13,6 +13,7 @@ import {
   runForegroundGoal,
   routingDecisionGoalPatch,
   selectCoordinator,
+  supervisorRunInsight,
   tryAcquireRepoCycleLock,
 } from '../src/supervisor/runtime.js';
 import { getGoal, startGoal, updateGoal, type SupervisorGoal } from '../src/supervisor/state.js';
@@ -29,11 +30,13 @@ const roots: string[] = [];
 let priorPolicyPath: string | undefined;
 let priorLearningRoot: string | undefined;
 let priorMajorHome: string | undefined;
+let priorExecutionPath: string | undefined;
 
 beforeEach(() => {
   priorPolicyPath = process.env.MAJOR_POLICY_PATH;
   priorLearningRoot = process.env.MAJOR_LEARNING_ROOT;
   priorMajorHome = process.env.MAJOR_HOME;
+  priorExecutionPath = process.env.MAJOR_EXECUTION_PATH;
 });
 
 afterEach(() => {
@@ -43,6 +46,8 @@ afterEach(() => {
   else process.env.MAJOR_LEARNING_ROOT = priorLearningRoot;
   if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
   else process.env.MAJOR_HOME = priorMajorHome;
+  if (priorExecutionPath === undefined) delete process.env.MAJOR_EXECUTION_PATH;
+  else process.env.MAJOR_EXECUTION_PATH = priorExecutionPath;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -63,6 +68,127 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('builds a compact terminal receipt without inventing unavailable evidence', () => {
+    const receipt = supervisorRunInsight({
+      goal: { id: 'goal-1', goal: 'Ship the accepted Major increment' },
+      settled: {
+        status: 'blocked',
+        lastSummary: 'Worker completed; owner approval remains.',
+        ownerGate: 'Owner must approve production activation.',
+      },
+      selection: {
+        kind: 'route',
+        host: 'codex',
+        provider: 'codex#default',
+        accountLabel: 'default',
+        modelRef: 'gpt-5-codex',
+        reason: 'subscription route',
+      },
+      skills: ['tdd'],
+      outcome: {
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: 'MAJOR_RESULT: {"status":"blocked"}',
+        stderr: '',
+        durationMs: 80,
+        rateLimited: false,
+        exhausted: false,
+        workspaceMutated: true,
+      },
+      report: {
+        status: 'blocked',
+        summary: 'Worker completed; owner approval remains.',
+        ownerGate: 'Owner must approve production activation.',
+        assetCandidate: {
+          id: 'terminal-receipt',
+          kind: 'module',
+          summary: 'Emits a receipt.',
+          locator: 'src/supervisor/runtime.ts',
+          tags: ['insight'],
+          scope: 'project-local',
+        },
+      },
+      totalDurationMs: 100,
+    });
+
+    expect(receipt).toMatchObject({
+      schema: 'major.run-insight.v1',
+      goalId: 'goal-1',
+      outcome: 'blocked',
+      status: 'blocked',
+      runtime: 'major',
+      worker: { coordinator: 'codex', provider: 'codex#default', model: 'gpt-5-codex' },
+      skills: ['tdd'],
+      timing: {
+        durationMs: 100,
+        productiveWorkMs: 80,
+        productiveWorkRatio: 0.8,
+        majorOverheadMs: null,
+        infrastructureOverheadMs: null,
+        stages: { workerExecutionMs: 80, reviewMs: null },
+      },
+      failures: [],
+      recurrence: {
+        signature: expect.stringMatching(/^blocked:/),
+        priorOccurrences: null,
+        evidence: 'Owner must approve production activation.',
+      },
+      humanInterventions: ['Owner must approve production activation.'],
+      quality: { assessment: 'unknown', evidence: [] },
+      finalOutcome: 'Worker completed; owner approval remains.',
+      reuseStrategy: {
+        strategy: 'explicit_worker_asset_candidate',
+        reusableAssets: ['terminal-receipt'],
+      },
+      learning: {
+        disposition: 'observation_only',
+        promotionEligible: false,
+        durableMeaningOwner: 'gbrain',
+      },
+      telemetry: { highVolume: 'disabled_by_default', export: 'optional_async_best_effort' },
+    });
+    expect(receipt.effects).toEqual([]);
+  });
+
+  it.each([
+    ['failed', 'failed'],
+    ['timed_out', 'failed'],
+  ] as const)(
+    'classifies a %s worker receipt as %s and retains a recurrence signature',
+    (status, expected) => {
+      const receipt = supervisorRunInsight({
+        goal: { id: 'goal-1', goal: 'Ship the accepted Major increment' },
+        selection: {
+          kind: 'route',
+          host: 'codex',
+          provider: 'codex#default',
+          accountLabel: 'default',
+          modelRef: 'gpt-5-codex',
+          reason: 'subscription route',
+        },
+        skills: [],
+        outcome: {
+          host: 'codex',
+          status,
+          exitCode: status === 'failed' ? 1 : null,
+          stdout: '',
+          stderr: 'provider transport stopped',
+          durationMs: 80,
+          rateLimited: false,
+          exhausted: false,
+          workspaceMutated: false,
+        },
+        totalDurationMs: 100,
+      });
+      expect(receipt.outcome).toBe(expected);
+      expect(receipt.recurrence).toMatchObject({
+        signature: expect.stringMatching(new RegExp(`^${expected}:`)),
+        evidence: 'provider transport stopped',
+      });
+    },
+  );
+
   it('persists the provider, model, account, and host selected for execution', () => {
     expect(
       routingDecisionGoalPatch(
@@ -488,17 +614,23 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('RESOLVED MAJOR SKILLS');
     expect(prompt).toContain('mvp-speed-prioritisation');
     expect(prompt).toContain('Codex capacity:');
-    expect(prompt).toContain('ISOLATED WORKSPACE CONTRACT');
-    expect(prompt).toContain("Major's verified source mirror of the canonical target");
-    expect(prompt).toContain('synthetic Git repo here with no remote or history');
-    expect(prompt).toContain('it is not mounted inside this guest');
-    expect(prompt).toContain('expected isolation, not a project-identity blocker');
-    expect(prompt).toContain('applies it back to the canonical host worktree');
+    expect(prompt).toContain('HOST WORKSPACE CONTRACT');
+    expect(prompt).toContain('canonical Major-verified worktree for the target above');
+    expect(prompt).toContain('macOS Seatbelt boundary confines provider reads and writes');
+    expect(prompt).not.toContain('synthetic Git repo here with no remote or history');
+    expect(prompt).not.toContain('applies it back to the canonical host worktree');
     expect(prompt).toContain('binds every mutable dispatch to an internal source-tree digest');
     expect(prompt).toContain('The digest is not sent to the provider');
     expect(prompt).toContain('routing provenance only');
     expect(prompt).toContain('do not stop or attempt host access');
     expect(prompt).toContain('Report unavailable skill content as degraded in MAJOR_RESULT');
+    expect(prompt).toContain('REUSABLE ASSET DISCOVERY (required before implementation)');
+    expect(prompt).toContain(
+      'project-local -> GBrain organisation index -> canonical shared assets',
+    );
+    expect(prompt).toContain(
+      'Major records it as a project-local `REUSE_CANDIDATE`; it never self-promotes',
+    );
     expect(prompt).not.toContain('verify that the current Git root/remote');
     expect(prompt).not.toContain(
       'load the exact project or immutable-runtime skill paths it returns',
@@ -510,6 +642,7 @@ describe('Major coordinator contract', () => {
     roots.push(repo);
     process.env.MAJOR_HOME = join(repo, '.major');
     process.env.MAJOR_POLICY_PATH = join(repo, 'policies.json');
+    process.env.MAJOR_EXECUTION_PATH = 'lima';
     mkdirSync(join(repo, '.git'));
     writeFileSync(join(repo, 'README.md'), '# Mirror project\n');
     const hostCanonicalPath = '/Users/owner/canonical/jss-tool';
@@ -629,6 +762,33 @@ describe('Major coordinator contract', () => {
           type: 'result',
           result:
             'MAJOR_RESULT: {"status":"active","summary":"Inspection continues.","capabilityUse":[{"key":"invalid key","evidence":"x"}]}',
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('accepts a bounded reusable implementation candidate without promoting it', () => {
+    const report = parseWorkerReport(
+      JSON.stringify({
+        type: 'result',
+        result:
+          'MAJOR_RESULT: {"status":"active","summary":"Implementation verified.","assetCandidate":{"id":"shared-parser","kind":"module","summary":"Parses the shared input.","locator":"src/parser.ts","tags":["parser","input"],"scope":"shared"}}',
+      }),
+    );
+    expect(report?.assetCandidate).toEqual({
+      id: 'shared-parser',
+      kind: 'module',
+      summary: 'Parses the shared input.',
+      locator: 'src/parser.ts',
+      tags: ['parser', 'input'],
+      scope: 'shared',
+    });
+    expect(
+      parseWorkerReport(
+        JSON.stringify({
+          type: 'result',
+          result:
+            'MAJOR_RESULT: {"status":"active","summary":"x","assetCandidate":{"id":"bad","kind":"module","summary":"x","locator":"../escape.ts","tags":["x"],"scope":"shared"}}',
         }),
       ),
     ).toBeUndefined();

@@ -1,0 +1,7 @@
+{
+  "skill": "engineering-design-doctrine",
+  "should_trigger": [
+    "Evaluate a proposed code design for clear modules, explicit boundaries, and the minimum moving parts."
+  ],
+  "should_not_trigger": ["Execute a browser-based release smoke test."]
+}

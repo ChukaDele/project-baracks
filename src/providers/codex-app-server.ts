@@ -43,7 +43,7 @@ export interface CodexAppServerClientInfo {
 const DEFAULT_CLIENT_INFO: CodexAppServerClientInfo = {
   name: 'major',
   title: 'Major',
-  version: '0.5.2',
+  version: '0.5.3',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

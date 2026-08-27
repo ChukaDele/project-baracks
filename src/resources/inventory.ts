@@ -437,6 +437,17 @@ export function classifyResource(
   }
 
   if (kind === 'log') {
+    if (
+      /^(?:run-insights?|run-receipts?|performance-history|incidents?|outcomes?|validated-learnings?)(?:[.\-_]|$)/i.test(
+        identity,
+      )
+    ) {
+      return {
+        class: 'active',
+        reason: 'durable run evidence/history is retained; cleanup must not delete or compact it',
+        reclaimable: false,
+      };
+    }
     if (withinAgeWindow(createdAtMs, RETENTION.logs.maxAgeMs, nowMs)) {
       return { class: 'ephemeral', reason: 'log within 7-day retention', reclaimable: false };
     }

@@ -1,0 +1,7 @@
+{
+  "skill": "operations-improvement-core",
+  "should_trigger": [
+    "Map an internal workflow bottleneck and stage a reversible automation improvement without activating it."
+  ],
+  "should_not_trigger": ["Publish a paid advertising campaign."]
+}

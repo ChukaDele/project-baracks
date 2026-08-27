@@ -1,0 +1,7 @@
+{
+  "skill": "tdd",
+  "should_trigger": [
+    "Write the failing focused test for a pricing rule before adding the smallest implementation that makes it pass."
+  ],
+  "should_not_trigger": ["Define the release evidence after implementation is already complete."]
+}

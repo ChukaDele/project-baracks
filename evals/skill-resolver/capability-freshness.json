@@ -1,0 +1,7 @@
+{
+  "skill": "capability-freshness",
+  "should_trigger": [
+    "Assess whether a routed capability remains current using verification age, evidence, compatibility, and incidents."
+  ],
+  "should_not_trigger": ["Create a new reusable asset from a single unverified project file."]
+}

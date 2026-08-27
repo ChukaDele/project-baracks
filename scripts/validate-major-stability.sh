@@ -18,7 +18,7 @@ for skill in \
   website-design-qa \
   responsive-motion-systems; do
   [ -f "skills/internal/$skill/SKILL.md" ] || fail "required stability skill missing: $skill"
-  grep -Fq "\"id\":\"$skill\"" guidance/skills.registry.json || fail "stability skill not registered: $skill"
+  grep -Eq "\"id\"[[:space:]]*:[[:space:]]*\"$skill\"" guidance/skills.registry.json || fail "stability skill not registered: $skill"
   [ -f "evals/skill-resolver/$skill.json" ] || fail "resolver eval missing: $skill"
 done
 
@@ -29,7 +29,7 @@ grep -Fq 'workspaceLifecyclePolicy' guidance/skills.registry.json || fail "works
 grep -Fq 'priorArtBeforeNewInfrastructure' guidance/skills.registry.json || fail "prior-art infrastructure policy flag missing"
 
 grep -Fq "Prior art before new infrastructure" guidance/global-worker-rules.md || fail "prior-art infrastructure rule missing"
-grep -Fq '"id":"prior-art-discovery"' guidance/skills.registry.json || fail "prior-art-discovery skill not registered"
+grep -Eq '"id"[[:space:]]*:[[:space:]]*"prior-art-discovery"' guidance/skills.registry.json || fail "prior-art-discovery skill not registered"
 [ -f skills/internal/prior-art-discovery/SKILL.md ] || fail "prior-art-discovery skill missing"
 [ -f docs/prior-art-decisions.md ] || fail "prior-art decision log missing"
 grep -Fq "Prior art before new infrastructure" guidance/stability-invariants.md || fail "prior-art stability invariant missing"

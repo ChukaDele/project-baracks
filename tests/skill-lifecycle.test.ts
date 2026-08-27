@@ -374,6 +374,10 @@ describe('GBrain skill lifecycle', () => {
     const promoted = validateGoal(taskB).promoted[0]!;
     writeFileSync(promoted.path!, '\nTampered instructions.\n');
     expect(loadActiveGeneratedSkills(repository)).toEqual([]);
-    expect(resolveSkills({ task: `Use ${promoted.skillId}.`, cwd: repository }).skills).toEqual([]);
+    expect(
+      resolveSkills({ task: `Use ${promoted.skillId}.`, cwd: repository }).skills.map(
+        (skill) => skill.id,
+      ),
+    ).not.toContain(promoted.skillId);
   });
 });

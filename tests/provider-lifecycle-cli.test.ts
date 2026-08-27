@@ -24,13 +24,18 @@ import { eq } from 'drizzle-orm';
 
 let dbPath = '';
 let priorDbPath: string | undefined;
+let priorExecutionPath: string | undefined;
 let logs: string[] = [];
 let logSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   dbPath = join(mkdtempSync(join(tmpdir(), 'major-provider-cli-')), 'major.db');
   priorDbPath = process.env.MAJOR_DB_PATH;
+  priorExecutionPath = process.env.MAJOR_EXECUTION_PATH;
   process.env.MAJOR_DB_PATH = dbPath;
+  // These tests exercise the legacy isolated backend mock. Host-path behavior
+  // is covered by the live CLI probe tests.
+  process.env.MAJOR_EXECUTION_PATH = 'lima';
   logs = [];
   logSpy = vi.spyOn(console, 'log').mockImplementation((line: string) => {
     logs.push(line);
@@ -41,6 +46,8 @@ afterEach(() => {
   logSpy.mockRestore();
   if (priorDbPath === undefined) delete process.env.MAJOR_DB_PATH;
   else process.env.MAJOR_DB_PATH = priorDbPath;
+  if (priorExecutionPath === undefined) delete process.env.MAJOR_EXECUTION_PATH;
+  else process.env.MAJOR_EXECUTION_PATH = priorExecutionPath;
   rmSync(dbPath, { force: true });
 });
 

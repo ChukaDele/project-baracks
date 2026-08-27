@@ -1,4 +1,13 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  symlinkSync,
+} from 'node:fs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
@@ -6,8 +15,8 @@ import { basename, dirname, join, resolve } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
 import { providerWorkshopArgs } from '../providers/commands.js';
-import { assertCapabilityAvailable, isCapabilityAvailable } from './capabilities.js';
-import { darwinSeatbeltContainment } from './containment.js';
+import { assertCapabilityAvailable } from './capabilities.js';
+import { darwinSeatbeltContainment, detectContainment } from './containment.js';
 import { ExecutionGateway, type ExecutionPolicyDecision } from './gateway.js';
 import { TrustedExecutableRegistry } from './trusted-executables.js';
 import { providerReadOnlyRoots } from './provider-access.js';
@@ -42,6 +51,8 @@ import {
   resolveSupervisedWorkshopAuthority,
   type SupervisedWorkshopExecutionAuthority,
 } from './supervised-workshop.js';
+import { configuredExecutionPath, executionPathStatus } from '../execution/path.js';
+import type { BackendStatus } from '../execution/backend.js';
 
 class StagedEventQueue implements AsyncIterable<ProviderEvent> {
   private readonly values: ProviderEvent[] = [];
@@ -91,6 +102,28 @@ export function majorExecutionBackend(configPath?: string): LimaBackend {
   return new LimaBackend(loadLimaExecutionConfig(configPath));
 }
 
+/** Report the active execution boundary without conflating host containment
+ * with the retired Lima compatibility path. */
+export async function inspectMajorExecutionPath(): Promise<BackendStatus> {
+  const path = configuredExecutionPath();
+  if (path === 'host') {
+    const containment = detectContainment();
+    return {
+      kind: 'host',
+      available: containment.liveExecutionReady,
+      filesystemIsolation: containment.filesystemIsolation,
+      networkIsolation: containment.networkIsolation,
+      lifecycleIsolation: containment.processTreeTermination,
+      detail: containment.detail,
+    };
+  }
+  return majorExecutionBackend().inspect();
+}
+
+export function activeExecutionPathStatus() {
+  return executionPathStatus();
+}
+
 export function verifyProviderDecision(input: {
   cwd: string;
   provider: BackendProviderRequest['host'];
@@ -122,6 +155,31 @@ export function verifyProviderDecision(input: {
 /** Fixed, read-only host probe used by the global admission guard on macOS. */
 function majorHome(): string {
   return process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
+}
+
+/** Give the host Codex CLI a writable, Major-owned home without copying its
+ * credential. The one approved host auth file is exposed through a fixed
+ * symlink; all other Codex runtime state stays inside the contained root. */
+function prepareHostCodexHome(runtimeData: string): string {
+  const codexHome = join(runtimeData, 'codex-home');
+  mkdirSync(codexHome, { recursive: true, mode: 0o700 });
+  const hostAuth = join(homedir(), '.codex', 'auth.json');
+  const runtimeAuth = join(codexHome, 'auth.json');
+  let runtimeAuthExists = false;
+  try {
+    const entry = lstatSync(runtimeAuth);
+    runtimeAuthExists = true;
+    if (!entry.isSymbolicLink() || readlinkSync(runtimeAuth) !== hostAuth) {
+      throw new Error('Major refuses an unexpected Codex runtime auth entry');
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  if (existsSync(hostAuth) && !runtimeAuthExists) symlinkSync(hostAuth, runtimeAuth);
+  if (!existsSync(hostAuth) && runtimeAuthExists) {
+    throw new Error('Major refuses a stale Codex runtime auth link without host auth');
+  }
+  return codexHome;
 }
 
 function recordExecution(decision: ExecutionPolicyDecision): void {
@@ -222,8 +280,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
     });
   }
   const backendEnabled =
-    (isCapabilityAvailable('live-agent-execution') || Boolean(staged) || Boolean(workshop)) &&
-    executable !== 'git';
+    (Boolean(staged) || configuredExecutionPath() === 'lima') && executable !== 'git';
   let admittedStaged = false;
   let stagedExpiresAt: string | undefined;
   let stagedExpectedStatus: 'succeeded' | 'cancelled' | undefined;
@@ -391,6 +448,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       ...process.env,
       ...(executable === 'git' ? { HOME: executionRoot, GIT_CONFIG_NOSYSTEM: '1' } : {}),
       MAJOR_HOME: runtimeHome,
+      ...(executable === 'codex' ? { CODEX_HOME: prepareHostCodexHome(runtimeData) } : {}),
       TMPDIR: runtimeTmp,
       XDG_CACHE_HOME: runtimeCache,
       XDG_CONFIG_HOME: runtimeConfig,
@@ -402,11 +460,11 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
     ? executable === 'git'
       ? trustedExecutableRegistry(request.executable)
       : new TrustedExecutableRegistry()
-    : new TrustedExecutableRegistry();
+    : trustedExecutableRegistry(request.executable);
   const trusted =
-    backendEnabled && executable === 'git'
-      ? trustedExecutables.verify(request.executable)
-      : undefined;
+    backendEnabled && executable !== 'git'
+      ? undefined
+      : trustedExecutables.verify(request.executable);
   const backend = backendEnabled ? majorExecutionBackend(stagedExecutionConfigPath) : undefined;
   const approvalConsumerId = `provider-action-${randomUUID()}`;
   const gateway = new ExecutionGateway({

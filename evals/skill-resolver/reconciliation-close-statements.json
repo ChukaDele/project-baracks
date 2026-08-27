@@ -1,0 +1,7 @@
+{
+  "skill": "reconciliation-close-statements",
+  "should_trigger": [
+    "Reconcile bank activity, close the period, and tie each financial statement to its supporting ledger."
+  ],
+  "should_not_trigger": ["Draft a customer invoice and accounts-receivable aging reminder."]
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Start or stop one loopback-only pinned DSH web process and a Chrome app-mode
-# window for a real project. Installer-managed; not a daemon or Electron app.
+# Start or stop one loopback-only pinned legacy DSH web process and a Chrome
+# app-mode window for a real project. Installer-managed; not a daemon or
+# Electron app. Normal execution uses headless Major host execution.
 set -euo pipefail
 
 MAJOR_HOME="${MAJOR_HOME:-$HOME/.major}"
@@ -27,7 +28,7 @@ fail() { echo "MAJOR WORKSTATION FAILED: $*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-start-major-workstation.sh — one loopback DSH web process + Chrome app-mode window
+start-major-workstation.sh — legacy loopback DSH web process + Chrome app-mode window
 
   --project PATH   Real project directory (default workspace for DSH)
   --dry-run        Print planned actions without starting processes
@@ -211,7 +212,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "major control plane: $MAJOR_BIN"
   echo "chrome app-mode: --app=${CHROME_URL} --user-data-dir=$CHROME_PROFILE"
   echo "preserve PATH (major CLI unchanged)"
-  echo "normal trusted repository execution defaults to DSH local"
+  echo "normal trusted repository execution defaults to headless Major host execution"
   echo "DSH Lima and legacy Major/Lima remain explicit compatibility choices"
   echo "no Electron, Tauri, LaunchAgent, or login daemon"
   exit 0
@@ -283,7 +284,7 @@ echo "Chrome app-mode: $CHROME_URL"
 echo "project: $PROJECT"
 echo "major control plane: $MAJOR_BIN"
 echo "log: $LOG_FILE"
-echo "normal trusted repository execution defaults to DSH local"
+echo "normal trusted repository execution defaults to headless Major host execution"
 echo "DSH Lima and legacy Major/Lima remain explicit compatibility choices"
 
 wait "$DSH_PID" || true

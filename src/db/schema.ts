@@ -830,6 +830,30 @@ export const usageObservations = sqliteTable(
   ],
 );
 
+/** Compact, append-only cross-run performance observations. DSH may emit a
+ * receipt, but Major/GBrain owns the durable query surface and learning
+ * meaning. Receipt JSON is kept intact so schema-v1 can evolve without a
+ * second DSH-owned learning model. */
+export const runPerformanceObservations = sqliteTable(
+  'run_performance_observations',
+  {
+    id: id(),
+    project: text('project').notNull(),
+    goalId: text('goal_id').notNull(),
+    source: text('source', { enum: ['major', 'dsh'] }).notNull(),
+    schema: text('schema').notNull(),
+    receiptJson: text('receipt_json').notNull(),
+    recordedAt: text('recorded_at').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('run_performance_observations_project_time').on(t.project, t.recordedAt),
+    index('run_performance_observations_goal_time').on(t.project, t.goalId, t.recordedAt),
+    enumCheck('run_performance_observations_source_valid', 'source', ['major', 'dsh']),
+    check('run_performance_observations_schema_v1', sql`schema = 'major.run-insight.v1'`),
+  ],
+);
+
 /** A persisted routing checkpoint: the preferred model was unavailable or
  * only paid options remained, and Major paused instead of proceeding. */
 export const routingCheckpoints = sqliteTable(

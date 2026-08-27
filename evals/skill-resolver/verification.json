@@ -1,0 +1,7 @@
+{
+  "skill": "verification",
+  "should_trigger": [
+    "Run deterministic checks and collect runtime evidence before declaring the repair complete."
+  ],
+  "should_not_trigger": ["Design a brand-new product information architecture."]
+}

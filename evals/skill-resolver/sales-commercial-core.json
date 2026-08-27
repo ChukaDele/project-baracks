@@ -1,0 +1,7 @@
+{
+  "skill": "sales-commercial-core",
+  "should_trigger": [
+    "Prepare a non-binding account plan, commercial recommendation, and pipeline review without sending or committing terms."
+  ],
+  "should_not_trigger": ["Post a customer payment into the accounting system."]
+}

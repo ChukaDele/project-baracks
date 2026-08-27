@@ -51,7 +51,7 @@ export interface DoctorReport {
   liveExecutionBlockers: string[];
   /** Immutable build capability status (hard-coded, not configurable). */
   capabilities: CapabilityStatus[];
-  /** Core platform safety: isolated runner containment + required prerequisites.
+  /** Core platform safety: selected execution-boundary containment + required prerequisites.
    * Independent of any single provider's auth/billing state. */
   core: CoreReadiness;
   /** Per-provider actionable status. One provider's failure never changes
@@ -192,9 +192,8 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
   const liveExecutionCapabilityAvailable = isCapabilityAvailable('live-agent-execution');
   let backendStatus: BackendStatus | undefined;
   if (liveExecutionCapabilityAvailable && inputs.inspectExecutionBackend) {
-    // A missing/malformed ~/.major/execution.json, or a stale limactl path,
-    // throws before inspect()'s own try/catch ever runs (config loading and
-    // LimaBackend construction both happen synchronously first). That must
+    // A missing/malformed execution-path config, or a stale compatibility
+    // backend path, throws before inspect()'s own try/catch ever runs. That must
     // degrade to "core not ready" with a clear reason, never crash the whole
     // report — this is exactly the fresh-machine / stale-config case a
     // friend hits before Lima is fully set up.
@@ -202,7 +201,7 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
       backendStatus = await inputs.inspectExecutionBackend();
     } catch (error) {
       backendStatus = {
-        kind: 'lima',
+        kind: 'unknown',
         available: false,
         filesystemIsolation: false,
         networkIsolation: false,
@@ -213,7 +212,7 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
   }
   const containment = backendStatus
     ? {
-        platform: 'lima',
+        platform: backendStatus.kind,
         available: backendStatus.available,
         enforced: backendStatus.available,
         filesystemIsolation: backendStatus.filesystemIsolation,

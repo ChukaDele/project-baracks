@@ -1,0 +1,7 @@
+{
+  "skill": "reusable-asset-discovery",
+  "should_trigger": [
+    "Before implementation, search the project map, organisational index, canonical catalog, candidates, and prior art for a reusable module."
+  ],
+  "should_not_trigger": ["Turn a repeated procedure into a documented operating skill."]
+}

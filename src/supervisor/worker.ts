@@ -5,8 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { openDb } from '../db/client.js';
 import { createDecisionRequest } from '../domain/decision-service.js';
 import { executeMajorCommand } from '../security/major-gateway.js';
-import { isCapabilityAvailable } from '../security/capabilities.js';
 import { loadLimaExecutionConfig } from '../execution/lima-config.js';
+import { configuredExecutionPath } from '../execution/path.js';
 import { redactText } from '../security/redact.js';
 import {
   EXHAUSTION_PATTERN,
@@ -81,6 +81,14 @@ export interface WorkerOutcome {
   stdout: string;
   stderr: string;
   durationMs: number;
+  /** Time spent waiting for Major's shared resource lease. */
+  resourceWaitMs?: number;
+  /** Time spent constructing and admitting the gateway request. */
+  gatewaySetupMs?: number;
+  /** Time spent in the provider process and its structured event stream. */
+  providerExecutionMs?: number;
+  /** Measured non-provider dispatch overhead. */
+  infrastructureOverheadMs?: number;
   rateLimited: boolean;
   exhausted: boolean;
   runId?: string;
@@ -100,6 +108,9 @@ export interface GatewayCommandOutcome {
   stdout: string;
   stderr: string;
   durationMs: number;
+  gatewaySetupMs?: number;
+  providerExecutionMs?: number;
+  infrastructureOverheadMs?: number;
   rateLimited: boolean;
   exhausted: boolean;
   runId?: string;
@@ -114,6 +125,18 @@ export interface GatewayCommandOutcome {
 }
 
 const OUTPUT_LIMIT = 200_000;
+
+/** A failed vendor resume is recoverable when the provider no longer has the
+ * referenced rollout. The durable Major goal summary remains the continuity
+ * source, so a fresh provider session can continue the same goal. */
+export function isMissingCodexResumeFailure(
+  outcome: Pick<GatewayCommandOutcome, 'status' | 'stdout' | 'stderr'>,
+): boolean {
+  if (outcome.status === 'succeeded') return false;
+  return /(?:no rollout found|thread\/resume failed|rollout .*not found)/i.test(
+    `${outcome.stderr}\n${outcome.stdout}`,
+  );
+}
 
 export function workerCommand(
   host: WorkerHost,
@@ -143,7 +166,7 @@ function trustedExecutableInstalled(name: string): boolean {
 
 export function hostAvailable(host: WorkerHost): boolean {
   const executable = workerCommand(host, '').command;
-  if (isCapabilityAvailable('live-agent-execution')) {
+  if (configuredExecutionPath() === 'lima') {
     try {
       return existsSync(loadLimaExecutionConfig().limactlPath);
     } catch {
@@ -188,6 +211,7 @@ export async function runGatewayCommand(input: {
   };
 }): Promise<GatewayCommandOutcome> {
   const started = Date.now();
+  let gatewaySetupMs: number | undefined;
   let stdout = '';
   let reportEnvelope = '';
   let reportEnvelopeCount = 0;
@@ -212,6 +236,8 @@ export async function runGatewayCommand(input: {
           }
         : {}),
     });
+    gatewaySetupMs = Math.max(0, Date.now() - started);
+    const providerStarted = Date.now();
 
     const stopWatcher = setInterval(() => {
       if (globalStopRequested()) handle.cancel();
@@ -269,6 +295,9 @@ export async function runGatewayCommand(input: {
           outcome.stderrTail ??
           (globalStopRequested() ? 'Major global kill switch cancelled execution.' : ''),
         durationMs: Date.now() - started,
+        ...(gatewaySetupMs !== undefined ? { gatewaySetupMs } : {}),
+        providerExecutionMs: Math.max(0, Date.now() - providerStarted),
+        infrastructureOverheadMs: gatewaySetupMs ?? 0,
         rateLimited: outcome.rateLimited,
         exhausted: outcome.exhausted,
         ...(outcome.runId ? { runId: outcome.runId } : {}),
@@ -344,30 +373,73 @@ export async function runWorker(input: {
       request.status === 'active'
         ? request.lease
         : await waitForResource(request.request, input.timeoutMs);
-    const spec = workerCommand(input.host, input.prompt, input.modelRef, input.resumeSessionRef);
+    const resourceWaitMs = Math.max(0, Date.now() - started);
     const allowGuestMutation = allowGuestMutationForHost(input.host, input.cwd);
     const workspaceHash = mutationWorkspaceHashForHost(input.host, input.cwd, allowGuestMutation);
-    const outcome = await runGatewayCommand({
-      executable: spec.command,
-      args: spec.args,
-      cwd: input.cwd,
-      resourceLeaseId: lease.id,
-      resourceLeaseTtlMs: leaseTtlMs,
-      providerRequest: {
-        host: input.host,
-        prompt: input.prompt,
-        allowGuestMutation,
-        ...(workspaceHash ? { workspaceHash } : {}),
-        // Batch CLI providers expose no per-tool approval callback. Ordinary
-        // worker runs therefore carry no sensitive-action authority.
-        approvalAuthority: input.approvalAuthority ?? { decisions: [] },
-        ...(input.modelRef ? { modelRef: input.modelRef } : {}),
-        ...(input.accountLabel ? { accountLabel: input.accountLabel } : {}),
-        ...(input.resumeSessionRef ? { resumeSessionRef: input.resumeSessionRef } : {}),
-      },
-      ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
-    });
-    return { host: input.host, ...outcome };
+    const providerRequest = {
+      host: input.host,
+      prompt: input.prompt,
+      allowGuestMutation,
+      ...(workspaceHash ? { workspaceHash } : {}),
+      // Batch CLI providers expose no per-tool approval callback. Ordinary
+      // worker runs therefore carry no sensitive-action authority.
+      approvalAuthority: input.approvalAuthority ?? { decisions: [] },
+      ...(input.modelRef ? { modelRef: input.modelRef } : {}),
+      ...(input.accountLabel ? { accountLabel: input.accountLabel } : {}),
+    };
+    const runProvider = (resumeSessionRef?: string) => {
+      const spec = workerCommand(input.host, input.prompt, input.modelRef, resumeSessionRef);
+      return runGatewayCommand({
+        executable: spec.command,
+        args: spec.args,
+        cwd: input.cwd,
+        resourceLeaseId: lease!.id,
+        resourceLeaseTtlMs: leaseTtlMs,
+        providerRequest: {
+          ...providerRequest,
+          ...(resumeSessionRef ? { resumeSessionRef } : {}),
+        },
+        ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+      });
+    };
+    let outcome = await runProvider(input.resumeSessionRef);
+    if (input.host === 'codex' && input.resumeSessionRef && isMissingCodexResumeFailure(outcome)) {
+      const resumeFailure = `${outcome.stderr}\n${outcome.stdout}`.trim();
+      const freshOutcome = await runProvider();
+      outcome = {
+        ...freshOutcome,
+        durationMs: outcome.durationMs + freshOutcome.durationMs,
+        ...(outcome.gatewaySetupMs !== undefined || freshOutcome.gatewaySetupMs !== undefined
+          ? { gatewaySetupMs: (outcome.gatewaySetupMs ?? 0) + (freshOutcome.gatewaySetupMs ?? 0) }
+          : {}),
+        ...(outcome.providerExecutionMs !== undefined ||
+        freshOutcome.providerExecutionMs !== undefined
+          ? {
+              providerExecutionMs:
+                (outcome.providerExecutionMs ?? 0) + (freshOutcome.providerExecutionMs ?? 0),
+            }
+          : {}),
+        infrastructureOverheadMs:
+          (outcome.infrastructureOverheadMs ?? 0) + (freshOutcome.infrastructureOverheadMs ?? 0),
+        stderr: [
+          'Codex vendor resume was unavailable; Major continued with a fresh session.',
+          resumeFailure,
+          freshOutcome.stderr,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        stdout: appendLimited(
+          `Major continuity fallback: stale Codex vendor session was not resumed.\n${outcome.stdout}`,
+          freshOutcome.stdout,
+        ),
+      };
+    }
+    return {
+      host: input.host,
+      ...outcome,
+      resourceWaitMs,
+      infrastructureOverheadMs: resourceWaitMs + (outcome.infrastructureOverheadMs ?? 0),
+    };
   } catch (error) {
     return {
       host: input.host,

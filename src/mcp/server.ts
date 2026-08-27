@@ -1,0 +1,197 @@
+import { createInterface } from 'node:readline';
+import { answerMajorMessage, buildMajorDashboard, type MajorDashboard } from '../ui/dashboard.js';
+
+const MCP_PROTOCOL_VERSION = '2024-11-05';
+const SERVER_VERSION = '0.5.3';
+
+type JsonRpcId = string | number | null;
+
+export interface MajorMcpRequest {
+  jsonrpc?: string;
+  id?: JsonRpcId;
+  method?: string;
+  params?: Record<string, unknown>;
+}
+
+interface MajorMcpResponse {
+  jsonrpc: '2.0';
+  id: JsonRpcId;
+  result?: unknown;
+  error?: { code: number; message: string };
+}
+
+const TOOLS = [
+  {
+    name: 'major_context',
+    description:
+      'Read the current Major project, GBrain context, selected skills, execution state, providers and durable run-insight history.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'major_ask',
+    description:
+      'Ask a bounded question answered from Major’s current project context and durable run-insight history.',
+    inputSchema: {
+      type: 'object',
+      properties: { question: { type: 'string', minLength: 1, maxLength: 2_000 } },
+      required: ['question'],
+      additionalProperties: false,
+    },
+  },
+] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function response(id: JsonRpcId, result: unknown): MajorMcpResponse {
+  return { jsonrpc: '2.0', id, result };
+}
+
+function errorResponse(id: JsonRpcId, code: number, message: string): MajorMcpResponse {
+  return { jsonrpc: '2.0', id, error: { code, message } };
+}
+
+function compactHistory(dashboard: MajorDashboard) {
+  return {
+    runs: dashboard.history.runs,
+    timeSpent: dashboard.history.timeSpent,
+    overhead: dashboard.history.overhead,
+    bestWorker: dashboard.history.bestWorker,
+    bestWorkerEvidence: dashboard.history.bestWorkerEvidence,
+    latestChange: dashboard.history.latestChange,
+    repeatedFailures: dashboard.history.repeatedFailures,
+    skillPerformance: dashboard.history.skillPerformance,
+    humanInterventions: dashboard.history.humanInterventions,
+    reuse: dashboard.history.reuse,
+    recurrence: dashboard.history.recurrence,
+    recentRuns: dashboard.recentRuns,
+  };
+}
+
+function contextResult(dashboard: MajorDashboard) {
+  return {
+    schemaVersion: 1,
+    kind: 'major.context.v1',
+    project: dashboard.project,
+    objective: dashboard.objective,
+    gbrain: dashboard.gbrain,
+    context: dashboard.context,
+    execution: dashboard.execution,
+    skills: dashboard.skills,
+    providers: dashboard.providers,
+    workers: dashboard.workers,
+    history: compactHistory(dashboard),
+  };
+}
+
+function textToolResult(value: unknown, isError = false) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(value) }],
+    ...(isError ? { isError: true } : {}),
+  };
+}
+
+function requestArguments(request: MajorMcpRequest): Record<string, unknown> {
+  const args = request.params?.arguments;
+  if (args === undefined) return {};
+  if (!isRecord(args)) throw new Error('tool arguments must be an object');
+  return args;
+}
+
+async function callTool(
+  name: string,
+  args: Record<string, unknown>,
+  cwd: string,
+): Promise<ReturnType<typeof textToolResult>> {
+  if (name === 'major_context') {
+    return textToolResult(contextResult(await buildMajorDashboard(cwd)));
+  }
+  if (name === 'major_ask') {
+    const question = args.question;
+    if (typeof question !== 'string' || question.trim().length === 0 || question.length > 2_000) {
+      return textToolResult(
+        { error: 'question must be a non-empty string of at most 2,000 characters' },
+        true,
+      );
+    }
+    const result = await answerMajorMessage(question.trim(), cwd);
+    return textToolResult({
+      schemaVersion: 1,
+      kind: 'major.answer.v1',
+      answer: result.answer,
+      project: result.dashboard.project,
+      gbrain: result.dashboard.gbrain,
+      skills: result.dashboard.skills,
+      history: compactHistory(result.dashboard),
+    });
+  }
+  return textToolResult({ error: `unknown Major tool: ${name}` }, true);
+}
+
+/** Handle one MCP JSON-RPC request. Notifications return undefined. */
+export async function handleMajorMcpRequest(
+  request: MajorMcpRequest,
+  cwd = process.cwd(),
+): Promise<MajorMcpResponse | undefined> {
+  const id = request.id ?? null;
+  if (request.id === undefined) return undefined;
+  if (request.jsonrpc !== undefined && request.jsonrpc !== '2.0') {
+    return errorResponse(id, -32600, 'jsonrpc must be 2.0');
+  }
+  if (typeof request.method !== 'string') return errorResponse(id, -32600, 'method is required');
+
+  try {
+    switch (request.method) {
+      case 'initialize':
+        return response(id, {
+          protocolVersion: MCP_PROTOCOL_VERSION,
+          capabilities: { tools: {} },
+          serverInfo: { name: 'major', version: SERVER_VERSION },
+          instructions:
+            'Major is the durable project context, policy and run-insight layer. Use major_context before bounded work.',
+        });
+      case 'ping':
+        return response(id, {});
+      case 'tools/list':
+        return response(id, { tools: TOOLS });
+      case 'tools/call': {
+        const name = request.params?.name;
+        if (typeof name !== 'string')
+          return errorResponse(id, -32602, 'tools/call requires a tool name');
+        return response(id, await callTool(name, requestArguments(request), cwd));
+      }
+      case 'resources/list':
+        return response(id, { resources: [] });
+      case 'prompts/list':
+        return response(id, { prompts: [] });
+      case 'shutdown':
+        return response(id, null);
+      default:
+        return errorResponse(id, -32601, `method not found: ${request.method}`);
+    }
+  } catch (error) {
+    return errorResponse(id, -32603, error instanceof Error ? error.message : String(error));
+  }
+}
+
+/** Run the standard newline-delimited stdio MCP server used by Cursor. */
+export async function runMajorMcpServer(cwd = process.cwd()): Promise<void> {
+  const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  for await (const line of input) {
+    if (!line.trim()) continue;
+    let request: MajorMcpRequest;
+    try {
+      const parsed: unknown = JSON.parse(line);
+      if (!isRecord(parsed)) throw new Error('request must be a JSON object');
+      request = parsed;
+    } catch (error) {
+      process.stdout.write(
+        `${JSON.stringify(errorResponse(null, -32700, error instanceof Error ? error.message : String(error)))}\n`,
+      );
+      continue;
+    }
+    const result = await handleMajorMcpRequest(request, cwd);
+    if (result) process.stdout.write(`${JSON.stringify(result)}\n`);
+  }
+}

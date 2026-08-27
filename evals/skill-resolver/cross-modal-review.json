@@ -1,0 +1,7 @@
+{
+  "skill": "cross-modal-review",
+  "should_trigger": [
+    "Review a user-facing experience across copy, visuals, interaction, and accessibility using rendered evidence."
+  ],
+  "should_not_trigger": ["Select a database index from query analysis."]
+}

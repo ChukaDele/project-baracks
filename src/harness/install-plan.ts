@@ -84,7 +84,7 @@ export function buildHarnessInstallPlan(
     `# stages ${profiles.map((p) => p.id).join(' and ')} under ${dshHome}`,
     `# stages reversible Major.app launcher (loopback web + Chrome app-mode) under ${dshHome}`,
     `# installs exact npm packages: ${exactArgs}`,
-    '# normal trusted repository work runs through DSH with the local environment',
+    '# DSH is explicit reference infrastructure; normal work runs through headless Major host execution',
     '# Lima and the legacy Major/Lima pipeline remain explicit compatibility choices',
   ];
 

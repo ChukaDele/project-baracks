@@ -33,14 +33,20 @@ else
 fi
 
 REGISTRY="$SOURCE_ROOT/guidance/skills.registry.json"
+RECONCILIATION_LEDGER="$SOURCE_ROOT/guidance/skills-reconciliation-ledger.json"
 INTERNAL="$SOURCE_ROOT/skills/internal"
 EVALS="$SOURCE_ROOT/evals/skill-resolver"
-for required in "$REGISTRY" "$INTERNAL" "$EVALS"; do
+ASSETS="$SOURCE_ROOT/guidance/reusable-assets.registry.json"
+GBRAIN_ASSETS="$SOURCE_ROOT/guidance/gbrain-reusable-assets.index.json"
+ASSET_CANDIDATES="$SOURCE_ROOT/guidance/reusable-assets.candidates.json"
+CAPABILITY_MATRIX="$SOURCE_ROOT/guidance/worker-capability-matrix.json"
+SOURCE_LEDGER="$SOURCE_ROOT/package/source-ledger.json"
+for required in "$REGISTRY" "$RECONCILIATION_LEDGER" "$ASSETS" "$GBRAIN_ASSETS" "$ASSET_CANDIDATES" "$CAPABILITY_MATRIX" "$SOURCE_LEDGER" "$INTERNAL" "$EVALS"; do
   [ -e "$required" ] || { echo "ERROR: required skill-bundle source missing: $required" >&2; exit 1; }
 done
 
 # Validate the complete knowledge bundle before mutating active Major state.
-REGISTRY_VERSION="$(python3 - "$REGISTRY" "$INTERNAL" "$EVALS" <<'PY'
+REGISTRY_VERSION="$(python3 - "$REGISTRY" "$INTERNAL" "$EVALS" "$ASSETS" <<'PY'
 import json
 import re
 import sys
@@ -49,6 +55,7 @@ from pathlib import Path
 registry_path = Path(sys.argv[1])
 internal_root = Path(sys.argv[2])
 evals_root = Path(sys.argv[3])
+assets_path = Path(sys.argv[4])
 registry = json.loads(registry_path.read_text())
 version = registry.get('version')
 entries = registry.get('entries')
@@ -104,6 +111,26 @@ for path in evals_root.glob('*.json'):
     if not isinstance(data.get('should_trigger'), list) or not isinstance(data.get('should_not_trigger'), list):
         raise SystemExit(f'ERROR: malformed resolver eval: {path.name}')
 
+asset_catalog = json.loads(assets_path.read_text())
+assets = asset_catalog.get('assets')
+if not isinstance(asset_catalog.get('version'), int) or not isinstance(assets, list):
+    raise SystemExit('ERROR: invalid reusable asset registry schema')
+asset_ids = []
+source_root = registry_path.parent.parent.resolve()
+for asset in assets:
+    if not isinstance(asset, dict) or asset.get('lifecycle') not in {
+        'LOCAL', 'REUSE_CANDIDATE', 'EVALUATED', 'PROMOTED', 'MONITORED', 'UPDATED', 'DEPRECATED'
+    } or not isinstance(asset.get('tags'), list) or not isinstance(asset.get('provenance'), dict) or not isinstance(asset.get('evidence'), dict):
+        raise SystemExit('ERROR: reusable asset has incomplete lifecycle metadata')
+    if not all(isinstance(asset.get(k), str) and asset.get(k) for k in ('id','kind','title','summary','locator')):
+        raise SystemExit('ERROR: incomplete reusable asset metadata')
+    asset_ids.append(asset['id'])
+    target = (source_root / asset['locator']).resolve()
+    if source_root not in target.parents or not target.is_file():
+        raise SystemExit(f"ERROR: reusable asset locator is unavailable or escapes source: {asset['locator']}")
+if len(asset_ids) != len(set(asset_ids)):
+    raise SystemExit('ERROR: duplicate reusable asset ids')
+
 print(version)
 PY
 )"
@@ -112,12 +139,41 @@ BUNDLES="$MAJOR_HOME/skill-bundles"
 DEST="$BUNDLES/$SHA"
 STAGED="$BUNDLES/.stage-$SHA-$$"
 mkdir -p "$BUNDLES"
+PREVIOUS_BUNDLE="$(python3 - "$BUNDLES/current" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+current = Path(sys.argv[1])
+try:
+    marker = json.loads((current.resolve() / 'bundle.json').read_text())
+    sha = marker.get('sha')
+    print(sha if isinstance(sha, str) and re.fullmatch(r'[0-9a-f]{40}(?:[0-9a-f]{24})?', sha) else '')
+except Exception:
+    print('')
+PY
+)"
 rm -rf "$STAGED"
-mkdir -p "$STAGED/guidance" "$STAGED/skills" "$STAGED/evals"
+mkdir -p "$STAGED/guidance" "$STAGED/package" "$STAGED/skills" "$STAGED/evals"
 cp "$REGISTRY" "$STAGED/guidance/skills.registry.json"
+cp "$RECONCILIATION_LEDGER" "$STAGED/guidance/skills-reconciliation-ledger.json"
+cp "$CAPABILITY_MATRIX" "$STAGED/guidance/worker-capability-matrix.json"
+cp "$SOURCE_LEDGER" "$STAGED/package/source-ledger.json"
+cp "$ASSETS" "$STAGED/guidance/reusable-assets.registry.json"
+cp "$GBRAIN_ASSETS" "$STAGED/guidance/gbrain-reusable-assets.index.json"
+cp "$ASSET_CANDIDATES" "$STAGED/guidance/reusable-assets.candidates.json"
 cp -R "$INTERNAL" "$STAGED/skills/internal"
 cp -R "$EVALS" "$STAGED/evals/skill-resolver"
-python3 - "$STAGED/bundle.json" "$SHA" "$REGISTRY_VERSION" "$SOURCE_ROOT" <<'PY'
+python3 - "$ASSETS" <<'PY' | while IFS= read -r locator; do
+import json
+import sys
+for asset in json.load(open(sys.argv[1])).get('assets', []):
+    print(asset['locator'])
+PY
+  mkdir -p "$STAGED/$(dirname "$locator")"
+  cp "$SOURCE_ROOT/$locator" "$STAGED/$locator"
+done
+python3 - "$STAGED/bundle.json" "$SHA" "$REGISTRY_VERSION" "$SOURCE_ROOT" "$PREVIOUS_BUNDLE" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
@@ -128,6 +184,7 @@ Path(sys.argv[1]).write_text(json.dumps({
     'registryVersion': int(sys.argv[3]),
     'source': sys.argv[4],
     'installedAt': datetime.now(timezone.utc).isoformat(),
+    **({'previousBundle': sys.argv[5]} if sys.argv[5] else {}),
 }, indent=2) + '\n')
 PY
 
@@ -147,20 +204,31 @@ PY
 
 # Keep the active bundle plus the two most recent rollback bundles. Skill bundles
 # are small, but Major still owns their lifecycle and should converge in space.
-python3 - "$BUNDLES" "$SHA" <<'PY'
+python3 - "$BUNDLES" "$SHA" "$PREVIOUS_BUNDLE" <<'PY'
+import json
+import re
 import shutil
 import sys
 from pathlib import Path
 root = Path(sys.argv[1])
 active = sys.argv[2]
+previous = sys.argv[3]
 rows = []
 for path in root.iterdir():
     if not path.is_dir() or path.is_symlink() or path.name.startswith('.'):
         continue
     if path.name == active:
         continue
-    rows.append((path.stat().st_mtime, path))
-for _, path in sorted(rows, reverse=True)[2:]:
+    try:
+        marker = json.loads((path / 'bundle.json').read_text())
+        sha = marker.get('sha')
+        if not isinstance(sha, str) or not re.fullmatch(r'[0-9a-f]{40}(?:[0-9a-f]{24})?', sha):
+            continue
+        rows.append((sha == previous, path.stat().st_mtime, path))
+    except Exception:
+        continue
+rows.sort(key=lambda row: (row[0], row[1]), reverse=True)
+for _, _, path in rows[2:]:
     shutil.rmtree(path)
 PY
 

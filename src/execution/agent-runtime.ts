@@ -29,7 +29,8 @@ export interface AgentRuntimeResult {
   actualModel?: string;
 }
 
-/** Provider protocol boundary below Major policy and above Lima isolation. */
+/** Provider protocol boundary below Major policy and above host or Lima
+ * execution containment. */
 export interface AgentRuntimePort {
   execute(request: AgentRuntimeRequest): Promise<AgentRuntimeResult>;
 }

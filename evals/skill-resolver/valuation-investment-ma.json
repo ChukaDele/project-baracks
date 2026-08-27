@@ -1,0 +1,7 @@
+{
+  "skill": "valuation-investment-ma",
+  "should_trigger": [
+    "Compare a potential acquisition using valuation assumptions, sensitivities, and non-binding recommendations."
+  ],
+  "should_not_trigger": ["Prepare a daily executive calendar brief."]
+}

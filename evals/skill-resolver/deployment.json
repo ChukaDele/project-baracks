@@ -1,0 +1,7 @@
+{
+  "skill": "deployment",
+  "should_trigger": [
+    "Prepare a reversible release plan with an exact artifact, health check, and rollback gate."
+  ],
+  "should_not_trigger": ["Create a reusable UI primitive for unrelated projects."]
+}

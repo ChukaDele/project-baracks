@@ -1,0 +1,7 @@
+{
+  "skill": "frontend",
+  "should_trigger": [
+    "Implement an accessible responsive interaction with loading, error, and keyboard behavior."
+  ],
+  "should_not_trigger": ["Prepare a month-end reconciliation and financial statement tie-out."]
+}

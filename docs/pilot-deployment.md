@@ -1,10 +1,15 @@
-# Major v0.4 pilot deployment
+# Major pilot deployment
 
 ## Bottom line
 
 Deploy Major as an **always-present control plane with scoped execution**, not an always-running autonomous daemon.
 
 The pilot is successful only when Major advances a real JSS outcome correctly and an independent provider grades the result. CLI/attachment health alone is plumbing evidence.
+
+Normal execution uses the headless Major core, trusted provider CLIs and the
+host Seatbelt boundary. Orca owns the operational workspace, worktrees,
+terminals and agent-status surfaces. The old DSH/Lima route is explicit
+compatibility only.
 
 ## Install
 
@@ -71,7 +76,10 @@ major run jss-tool \
   --foreground
 ```
 
-The configured DSH runtime is intentionally capped at one concurrent worker across execution environments. Lima remains available as an optional isolation environment.
+The live resource guard has a hard worker ceiling of four and derives the
+usable count from current CPU and memory. It may queue work under pressure. This
+is a safety limit, not a permanent one-worker architecture. Orca worktrees
+provide isolation when independent work can safely run in parallel.
 
 ### Pass conditions
 
@@ -81,7 +89,7 @@ At minimum:
 
 1. Major reads the actual current JSS project state rather than restarting completed work.
 2. It chooses one real P0 bottleneck on the source → assess → tailor → apply/record → track → learn loop.
-3. It performs or delegates useful work within the single-worker ceiling.
+3. It performs or delegates useful work within the live resource guard.
 4. Later multi-instance runtimes must use isolated worktrees for concurrent writers.
 5. It changes strategy rather than repeating materially unchanged failures.
 6. It does not fabricate employer submissions, provider state, credentials or production success.

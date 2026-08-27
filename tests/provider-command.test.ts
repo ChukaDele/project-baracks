@@ -52,12 +52,36 @@ describe('provider command authority', () => {
   it('pins Codex read-only sandboxing and ignores ambient user execution policy', () => {
     const { gateway, requests } = capturingGateway();
     const provider = new CodexProvider({ gateway });
-    expect(() => provider.execute({ prompt: 'work', cwd: '/project' })).toThrow('captured');
-    expect(requests[0]?.args).toEqual(
-      expect.arrayContaining(['--sandbox', 'read-only', '--ignore-user-config', '--ephemeral']),
-    );
+    const priorPath = process.env.MAJOR_EXECUTION_PATH;
+    try {
+      process.env.MAJOR_EXECUTION_PATH = 'lima';
+      expect(() => provider.execute({ prompt: 'work', cwd: '/project' })).toThrow('captured');
+      expect(requests[0]?.args).toEqual(
+        expect.arrayContaining(['--sandbox', 'read-only', '--ignore-user-config', '--ephemeral']),
+      );
+    } finally {
+      if (priorPath === undefined) delete process.env.MAJOR_EXECUTION_PATH;
+      else process.env.MAJOR_EXECUTION_PATH = priorPath;
+    }
     expect(requests[0]?.args).not.toContain('code_mode_host');
     expect(requests[0]?.args).not.toContain('--dangerously-bypass-approvals-and-sandbox');
+  });
+
+  it('persists fresh host Codex sessions inside Major-owned state', () => {
+    const { gateway, requests } = capturingGateway();
+    const provider = new CodexProvider({ gateway });
+    const priorPath = process.env.MAJOR_EXECUTION_PATH;
+    try {
+      process.env.MAJOR_EXECUTION_PATH = 'host';
+      expect(() => provider.execute({ prompt: 'work', cwd: '/project' })).toThrow('captured');
+      expect(requests[0]?.args).toEqual(
+        expect.arrayContaining(['--sandbox', 'read-only', '--ignore-user-config']),
+      );
+      expect(requests[0]?.args).not.toContain('--ephemeral');
+    } finally {
+      if (priorPath === undefined) delete process.env.MAJOR_EXECUTION_PATH;
+      else process.env.MAJOR_EXECUTION_PATH = priorPath;
+    }
   });
 
   it('uses the provider default for the stable Codex auto alias', () => {
@@ -71,13 +95,28 @@ describe('provider command authority', () => {
 
   it('disables only Codex inner sandboxing after Workshop admission', () => {
     const args = ['exec', '--sandbox', 'read-only', '--ignore-user-config', '--ephemeral'];
-    expect(providerWorkshopArgs('codex', args)).toEqual([
-      'exec',
-      '--sandbox',
-      'danger-full-access',
-      '--ignore-user-config',
-      '--ephemeral',
-    ]);
+    const priorPath = process.env.MAJOR_EXECUTION_PATH;
+    try {
+      process.env.MAJOR_EXECUTION_PATH = 'host';
+      expect(providerWorkshopArgs('codex', args)).toEqual([
+        'exec',
+        '--sandbox',
+        'danger-full-access',
+        '--ignore-user-config',
+        '--ephemeral',
+      ]);
+      process.env.MAJOR_EXECUTION_PATH = 'lima';
+      expect(providerWorkshopArgs('codex', args)).toEqual([
+        'exec',
+        '--sandbox',
+        'danger-full-access',
+        '--ignore-user-config',
+        '--ephemeral',
+      ]);
+    } finally {
+      if (priorPath === undefined) delete process.env.MAJOR_EXECUTION_PATH;
+      else process.env.MAJOR_EXECUTION_PATH = priorPath;
+    }
     expect(providerWorkshopArgs('codex', args)).not.toContain(
       '--dangerously-bypass-approvals-and-sandbox',
     );

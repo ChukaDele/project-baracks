@@ -79,8 +79,9 @@ export interface SupervisorGoal {
   /** Vendor session id from the last successful hop on lastAccountLabel. */
   lastSessionRef?: string | undefined;
   /** Most recent provider/account/model decision made by Major's router.
-   * This is persisted before either the Lima worker or a provider-native DSH
-   * adapter starts, so both runtimes have the same control-plane provenance. */
+   * This is persisted before the headless Major host worker or an explicit
+   * Lima compatibility worker starts, so every runtime has the same
+   * control-plane provenance. */
   lastRoutingDecision?:
     | {
         host: WorkerHost;

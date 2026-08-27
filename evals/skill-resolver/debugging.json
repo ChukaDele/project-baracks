@@ -1,0 +1,7 @@
+{
+  "skill": "debugging",
+  "should_trigger": [
+    "Reproduce an intermittent import failure, narrow the causal chain, and verify the repair."
+  ],
+  "should_not_trigger": ["Draft an executive meeting agenda and calendar briefing."]
+}

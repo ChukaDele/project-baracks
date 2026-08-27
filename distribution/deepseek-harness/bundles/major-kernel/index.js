@@ -31,6 +31,10 @@ const LEASE_RELEASE_ATTEMPTS = 3;
 const CODEX_SNAPSHOT_MAX_AGE_MS = 15 * 60 * 1000;
 const COMPOSER_CONTEXT_LIMIT = 32 * 1024;
 const CODEX_USAGE_METHODS = ['account/read', 'account/rateLimits/read'];
+export const RUN_INSIGHT_EVENT = 'major/run-insight';
+export const RUN_INSIGHT_SCHEMA = 'major.run-insight.v1';
+const INSIGHT_TEXT_LIMIT = 12_000;
+const INSIGHT_LIST_LIMIT = 32;
 
 /** Bind the independent review to one immutable workspace view. The upstream
  * Claude provider runs in plan mode; this second boundary detects any file,
@@ -164,6 +168,190 @@ function clip(value, limit = RESULT_LIMIT) {
   return value.length <= limit ? value : value.slice(value.length - limit);
 }
 
+/** Persist a compact productive-work receipt in DSH's own session log. This is
+ * deliberately best-effort: insight/observability must never turn completed
+ * user work into a failed run. No Major-owned trajectory store is introduced. */
+function finiteNonNegative(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function boundedStrings(values) {
+  return Array.isArray(values)
+    ? values
+        .filter((value) => typeof value === 'string' && value.trim())
+        .slice(0, INSIGHT_LIST_LIMIT)
+        .map((value) => clip(value.trim(), 1_000))
+    : [];
+}
+
+function evidenceQualifiedEffects(values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .filter(
+      (value) =>
+        value &&
+        (value.effect === 'helped' || value.effect === 'hurt') &&
+        typeof value.subject === 'string' &&
+        value.subject.trim() &&
+        typeof value.evidence === 'string' &&
+        value.evidence.trim(),
+    )
+    .slice(0, INSIGHT_LIST_LIMIT)
+    .map((value) => ({
+      subject: clip(value.subject.trim(), 500),
+      effect: value.effect,
+      evidence: clip(value.evidence.trim(), 2_000),
+    }));
+}
+
+function priorRunInsight(session) {
+  return session?.events?.findLast?.(
+    (candidate) =>
+      candidate?.type === RUN_INSIGHT_EVENT && candidate?.data?.schema === RUN_INSIGHT_SCHEMA,
+  )?.data;
+}
+
+function conservativeComparison(current, prior) {
+  if (!prior) return { basis: 'none', result: 'no_prior_run' };
+  const changes = {};
+  if (current.outcome !== prior.outcome) {
+    changes.outcome = { previous: prior.outcome, current: current.outcome };
+  }
+  for (const key of ['durationMs', 'productiveWorkRatio']) {
+    const previous = prior?.timing?.[key];
+    const next = current?.timing?.[key];
+    if (typeof previous === 'number' && typeof next === 'number') {
+      changes[key] = { previous, current: next, delta: next - previous };
+    }
+  }
+  return Object.keys(changes).length
+    ? { basis: 'latest_observed_run', result: 'observed_change_only', changes }
+    : { basis: 'latest_observed_run', result: 'insufficient_comparable_evidence' };
+}
+
+/** Construct a deliberately conservative, compact receipt. Unknown values are
+ * null/empty rather than inferred from prose. Helped/hurt claims require an
+ * explicit evidence string, and every receipt remains an observation rather
+ * than a learning candidate. */
+export function buildRunInsight(insight, prior, nowMs = Date.now()) {
+  const durationMs = finiteNonNegative(insight.durationMs);
+  const stages = insight.stageTiming ?? {};
+  const measuredStages = {
+    admissionAndRoutingMs: finiteNonNegative(stages.admissionAndRoutingMs),
+    leaseWaitMs: finiteNonNegative(stages.leaseWaitMs),
+    workerExecutionMs: finiteNonNegative(stages.workerExecutionMs),
+    goalReportMs: finiteNonNegative(stages.goalReportMs),
+    leaseReleaseMs: finiteNonNegative(stages.leaseReleaseMs),
+    reviewMs: finiteNonNegative(stages.reviewMs),
+  };
+  const measuredSum = (keys) =>
+    keys.every((key) => measuredStages[key] !== null)
+      ? keys.reduce((sum, key) => sum + measuredStages[key], 0)
+      : null;
+  const productiveWorkMs =
+    finiteNonNegative(insight.productiveWorkMs) ?? measuredStages.workerExecutionMs;
+  const explicitMajorOverheadMs = finiteNonNegative(insight.majorOverheadMs);
+  const explicitInfrastructureOverheadMs = finiteNonNegative(insight.infrastructureOverheadMs);
+  const derivedMajorOverheadMs = measuredSum(['admissionAndRoutingMs', 'goalReportMs', 'reviewMs']);
+  const derivedInfrastructureOverheadMs = measuredSum(['leaseWaitMs', 'leaseReleaseMs']);
+  const majorOverheadMs = explicitMajorOverheadMs ?? derivedMajorOverheadMs;
+  const infrastructureOverheadMs =
+    explicitInfrastructureOverheadMs ?? derivedInfrastructureOverheadMs;
+  const overheadBasis =
+    explicitMajorOverheadMs !== null || explicitInfrastructureOverheadMs !== null
+      ? 'explicit_measurements'
+      : derivedMajorOverheadMs !== null || derivedInfrastructureOverheadMs !== null
+        ? 'measured_stage_sums'
+        : null;
+  const productiveWorkRatio =
+    durationMs !== null && durationMs > 0 && productiveWorkMs !== null
+      ? Math.min(1, productiveWorkMs / durationMs)
+      : null;
+  const receipt = {
+    schema: RUN_INSIGHT_SCHEMA,
+    recordedAt: new Date(nowMs).toISOString(),
+    goalId: String(insight.goalId ?? 'unadmitted'),
+    outcome: ['completed', 'blocked', 'failed', 'cancelled'].includes(insight.outcome)
+      ? insight.outcome
+      : 'completed',
+    status: typeof insight.status === 'string' ? insight.status : 'unknown',
+    runtime: typeof insight.runtime === 'string' ? insight.runtime : 'major',
+    worker: {
+      coordinator: typeof insight.coordinator === 'string' ? insight.coordinator : null,
+      account: typeof insight.account === 'string' ? insight.account : null,
+      provider: typeof insight.provider === 'string' ? insight.provider : null,
+      model: typeof insight.model === 'string' ? insight.model : null,
+      environment: typeof insight.environment === 'string' ? insight.environment : null,
+    },
+    timing: {
+      durationMs,
+      productiveWorkMs,
+      productiveWorkRatio,
+      productiveWorkRatioLabel:
+        productiveWorkRatio === null
+          ? null
+          : 'worker_execution_ms / total_duration_ms (bounded 0..1)',
+      majorOverheadMs,
+      infrastructureOverheadMs,
+      overheadBasis,
+      stages: measuredStages,
+    },
+    productiveWork: clip(String(insight.summary ?? ''), INSIGHT_TEXT_LIMIT),
+    skills: boundedStrings(insight.skills),
+    effects: evidenceQualifiedEffects(insight.effects),
+    failures: boundedStrings(insight.failures),
+    recurrence: {
+      signature:
+        typeof insight.failureSignature === 'string' ? clip(insight.failureSignature, 500) : null,
+      priorOccurrences: finiteNonNegative(insight.priorOccurrences),
+      evidence:
+        typeof insight.recurrenceEvidence === 'string'
+          ? clip(insight.recurrenceEvidence, 2_000)
+          : null,
+    },
+    humanInterventions: boundedStrings(insight.humanInterventions),
+    quality: {
+      assessment: ['passed', 'failed', 'mixed'].includes(insight.qualityAssessment)
+        ? insight.qualityAssessment
+        : 'unknown',
+      evidence: boundedStrings(insight.qualityEvidence),
+    },
+    finalOutcome: clip(String(insight.finalOutcome ?? insight.summary ?? ''), INSIGHT_TEXT_LIMIT),
+    reuseStrategy: {
+      strategy: typeof insight.strategy === 'string' ? clip(insight.strategy, 1_000) : null,
+      reusableAssets: boundedStrings(insight.reusableAssets),
+    },
+    learning: {
+      disposition: 'observation_only',
+      promotionEligible: false,
+      durableMeaningOwner: 'gbrain',
+    },
+    telemetry: { highVolume: 'disabled_by_default', export: 'optional_async_best_effort' },
+  };
+  return { ...receipt, latestChange: conservativeComparison(receipt, prior) };
+}
+
+export function recordRunInsight(session, insight, durableAdapter) {
+  if (!session || typeof session.append !== 'function') return false;
+  try {
+    const receipt = buildRunInsight(insight, priorRunInsight(session));
+    session.append(RUN_INSIGHT_EVENT, receipt);
+    try {
+      durableAdapter?.(receipt);
+    } catch {
+      // The DSH receipt adapter is deliberately non-blocking. Major's durable
+      // store being temporarily unavailable cannot reverse completed work.
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function latestRunInsight(session) {
+  return priorRunInsight(session);
+}
+
 function textContent(blocks) {
   return blocks
     .filter((block) => block && block.type === 'text' && typeof block.text === 'string')
@@ -253,6 +441,34 @@ function majorExecutable() {
   const home = process.env.HOME;
   if (!home) throw new Error('major-workstation: HOME is required to resolve the Major CLI');
   return join(home, '.local', 'bin', 'major');
+}
+
+/** Forward a compact receipt to Major's SQLite/GBrain observation path. This
+ * is intentionally fire-and-forget; the DSH session receipt remains useful
+ * operational evidence, but is never a second learning store. */
+function persistRunInsight(ctx, cwd, project, receipt) {
+  if (!project || process.env.MAJOR_RUN_INSIGHT_DURABLE_ADAPTER === '0') return;
+  try {
+    const child = ctx.subprocess.spawn({
+      argv: [
+        majorExecutable(),
+        'history',
+        'record',
+        '--project',
+        project,
+        '--source',
+        'dsh',
+        '--receipt-base64',
+        Buffer.from(JSON.stringify(receipt)).toString('base64url'),
+      ],
+      cwd,
+      stdio: { stdin: 'ignore', stdout: { maxBytes: 4_096 }, stderr: { maxBytes: 4_096 } },
+      graceMs: 3_000,
+    });
+    child.done?.catch?.(() => undefined);
+  } catch {
+    // Best-effort adapter: never fail the user task for insight persistence.
+  }
 }
 
 async function runProcess(ctx, cwd, argv, signal) {
@@ -508,6 +724,7 @@ async function executeMajor(ctx, cwd, task, signal, interactionOrigin, sessionId
     throw new Error('major-workstation: Major run completed without advancing the goal cycle');
   }
   return {
+    project: beforeGoal.project,
     goalId: admitted.goalId,
     status: typeof goal.status === 'string' ? goal.status : 'unknown',
     coordinator: typeof goal.lastCoordinator === 'string' ? goal.lastCoordinator : 'unknown',
@@ -525,6 +742,7 @@ async function executeNativeDsh(
   interactionOrigin,
   sessionId,
 ) {
+  const admissionAndRoutingStartedAtMs = Date.now();
   const { major, admitted } = await admitMajorTask(
     ctx,
     cwd,
@@ -575,14 +793,19 @@ async function executeNativeDsh(
     route.environment,
     selection.accountLabel,
   );
+  const admissionAndRoutingMs = Date.now() - admissionAndRoutingStartedAtMs;
+  const leaseWaitStartedAtMs = Date.now();
   const lease = await acquireWorkerLease(ctx, major, goal, selection.maxRunMinutes, signal);
+  const leaseWaitMs = Date.now() - leaseWaitStartedAtMs;
   const executionSignal = AbortSignal.any([
     signal,
     AbortSignal.timeout(selection.maxRunMinutes * 60 * 1_000),
   ]);
   let executionError;
   let completedResult;
+  let leaseReleaseMs = null;
   try {
+    const workerExecutionStartedAtMs = Date.now();
     const run = await withRoutedContext(selection, admitted.goalId, lease, () =>
       settleSubagent(
         ctx,
@@ -592,6 +815,7 @@ async function executeNativeDsh(
         executionSignal,
       ),
     );
+    const workerExecutionMs = Date.now() - workerExecutionStartedAtMs;
     if (run.stopReason !== 'completed') {
       throw new Error(
         `major-workstation: ${dshProviderName} ended with ${run.stopReason}` +
@@ -599,6 +823,7 @@ async function executeNativeDsh(
       );
     }
     const summary = textContent(run.output) || `${dshProviderName} completed without text output`;
+    const goalReportStartedAtMs = Date.now();
     await runProcess(
       ctx,
       cwd,
@@ -618,7 +843,9 @@ async function executeNativeDsh(
       ],
       signal,
     );
+    const goalReportMs = Date.now() - goalReportStartedAtMs;
     completedResult = {
+      project: goal.project,
       goalId: admitted.goalId,
       status: 'active',
       coordinator: selection.host,
@@ -628,11 +855,21 @@ async function executeNativeDsh(
       model: selection.modelRef,
       environment: route.environment,
       summary,
+      skills: boundedStrings(selection.resolvedSkills?.map((skill) => skill?.id)),
+      stageTiming: {
+        admissionAndRoutingMs,
+        leaseWaitMs,
+        workerExecutionMs,
+        goalReportMs,
+        leaseReleaseMs: null,
+        reviewMs: null,
+      },
     };
   } catch (error) {
     executionError = error;
     throw error;
   } finally {
+    const leaseReleaseStartedAtMs = Date.now();
     try {
       await releaseWorkerLease(ctx, major, cwd, lease);
     } catch (releaseError) {
@@ -648,6 +885,9 @@ async function executeNativeDsh(
           'the lease remains bounded by its configured TTL.',
         12_000,
       );
+    } finally {
+      leaseReleaseMs = Date.now() - leaseReleaseStartedAtMs;
+      if (completedResult) completedResult.stageTiming.leaseReleaseMs = leaseReleaseMs;
     }
   }
   return completedResult;
@@ -659,6 +899,7 @@ export function createMajorProvider(ctx) {
     capabilities: NO_START_CAPABILITIES,
     inheritsParentContext: false,
     async start(request) {
+      const startedAtMs = Date.now();
       const cwd = request.parent.session.header.cwd;
       if (!cwd) throw new Error('major-workstation: the DSH session has no project directory');
       const task = textContent(request.prompt);
@@ -688,23 +929,50 @@ export function createMajorProvider(ctx) {
                 ` account=${run.account}; environment=${run.environment}.` +
                 ` Worker result: ${run.summary}`
               : '';
+          const text =
+            `Major goal ${run.goalId} finished this increment with ${run.coordinator}` +
+            ` account ${run.account}; goal status ${run.status}.${route}`;
+          recordRunInsight(
+            request.parent.session,
+            {
+              ...run,
+              outcome: 'completed',
+              summary: run.summary ?? text,
+              durationMs: Date.now() - startedAtMs,
+              finalOutcome: text,
+            },
+            (receipt) => persistRunInsight(ctx, cwd, run.project, receipt),
+          );
           return {
             output: [
               {
                 type: 'text',
-                text:
-                  `Major goal ${run.goalId} finished this increment with ${run.coordinator}` +
-                  ` account ${run.account}; goal status ${run.status}.${route}`,
+                text,
               },
             ],
             stopReason: 'completed',
           };
         },
-        (error) => ({
-          output: [],
-          stopReason: signal.aborted ? 'aborted' : 'error',
-          diagnostic: clip(error instanceof Error ? error.message : String(error)),
-        }),
+        (error) => {
+          const diagnostic = clip(error instanceof Error ? error.message : String(error));
+          recordRunInsight(request.parent.session, {
+            outcome: signal.aborted ? 'cancelled' : 'failed',
+            status: signal.aborted ? 'aborted' : 'failed',
+            runtime: route ? 'dsh' : 'major',
+            provider: route?.provider,
+            environment: route?.environment,
+            durationMs: Date.now() - startedAtMs,
+            summary: diagnostic,
+            finalOutcome: diagnostic,
+            failures: [diagnostic],
+            failureSignature: signal.aborted ? 'cancelled' : 'execution_error',
+          });
+          return {
+            output: [],
+            stopReason: signal.aborted ? 'aborted' : 'error',
+            diagnostic,
+          };
+        },
       );
       return {
         id: randomUUID(),
@@ -935,6 +1203,18 @@ export function apply(ctx) {
   }
   ctx.subagents.registerProvider(createMajorProvider(ctx));
   ctx.llm.registerAdapter(['major'], createMajorComposerAdapter(ctx));
+  ctx.commands.register({
+    name: 'major-insight',
+    description: 'show the latest durable Major productive-work receipt',
+    input: { hint: 'show latest receipt' },
+    handler: async (invocation) => {
+      const insight = latestRunInsight(invocation.agent.session);
+      if (!insight) {
+        return { kind: 'error', text: 'No Major run insight is recorded in this session yet.' };
+      }
+      return { kind: 'success', text: JSON.stringify(insight, null, 2) };
+    },
+  });
   ctx.commands.register({
     name: 'major',
     description: 'run one Major increment with Codex and an independent Claude review',

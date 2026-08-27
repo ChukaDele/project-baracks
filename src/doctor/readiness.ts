@@ -113,10 +113,10 @@ export interface CoreReadiness {
 }
 
 /**
- * Core platform safety: the isolated runner mechanism itself (containment,
- * release/runtime integrity, required prerequisites). This is deliberately
- * NOT about any one provider's auth/billing state — a provider being
- * unauthenticated does not make the core unsafe.
+ * Core platform safety: the selected execution boundary itself (containment,
+ * release/runtime integrity, required prerequisites). This is deliberately NOT
+ * about any one provider's auth/billing state - a provider being unauthenticated
+ * does not make the core unsafe.
  */
 export function computeCoreReadiness(input: {
   runnerCapabilityAvailable: boolean;
@@ -126,7 +126,7 @@ export function computeCoreReadiness(input: {
 }): CoreReadiness {
   const issues: string[] = [];
   if (!input.runnerCapabilityAvailable) {
-    issues.push('isolated runner capability is disabled in this build');
+    issues.push('execution boundary capability is disabled in this build');
   }
   if (!input.containmentReady) {
     issues.push(`containment insufficient: ${input.containmentDetail}`);

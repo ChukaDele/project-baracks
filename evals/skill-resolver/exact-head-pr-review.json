@@ -1,0 +1,9 @@
+{
+  "skill": "exact-head-pr-review",
+  "should_trigger": [
+    "Review the frozen pull-request commit only and issue a read-only verdict against its acceptance contract."
+  ],
+  "should_not_trigger": [
+    "Implement the requested feature in an isolated workspace and write its regression test."
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "skill": "root-cause-qa",
+  "should_trigger": [
+    "Investigate a reproducible payment-import failure, identify its causal chain, and verify the regression test."
+  ],
+  "should_not_trigger": [
+    "Define the minimal acceptance evidence for a new feature before implementation starts."
+  ]
+}

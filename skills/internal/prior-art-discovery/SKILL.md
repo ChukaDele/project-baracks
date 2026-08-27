@@ -1,6 +1,6 @@
 ---
 name: prior-art-discovery
-description: Required gate before substantial new infrastructure: search existing implementations and record an ADOPT, WRAP, BORROW or BUILD decision.
+description: "Required gate before substantial new infrastructure: search existing implementations and record an ADOPT, WRAP, BORROW or BUILD decision."
 ---
 
 # Prior-Art Discovery

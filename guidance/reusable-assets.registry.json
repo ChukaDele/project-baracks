@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "ownership": {
+    "canonicalImplementation": "repository file named by locator",
+    "gbrainProjection": "guidance/gbrain-reusable-assets.index.json",
+    "projectLocalOverlay": ".major/reusable-assets.registry.json",
+    "historicalCandidates": "guidance/reusable-assets.candidates.json"
+  },
+  "assets": [
+    {
+      "id": "project-goal-state-template",
+      "kind": "template",
+      "title": "Project goal-state template",
+      "summary": "A project-independent current-goal record with outcome, evidence, owners, decisions, risks, and next actions.",
+      "locator": "templates/project/GOAL_STATE.md",
+      "tags": ["template", "goal", "project", "state", "planning"],
+      "aliases": ["goal-state", "project-goal-record"],
+      "lifecycle": "PROMOTED",
+      "provenance": {
+        "sourceProject": "Major",
+        "sourceVersion": "6b1235d19ecd0c6a5ea59b4d3af4346159ec5e55",
+        "owner": "Major",
+        "license": "internal",
+        "lineage": ["templates/project/GOAL_STATE.md"]
+      },
+      "compatibility": ["markdown", "all-projects"],
+      "dependencies": [],
+      "evidence": {
+        "tests": ["tests/skill-hot-sync.test.ts"],
+        "latestVerifiedVersion": "1.0.0"
+      },
+      "limitations": ["The consumer supplies project-specific facts.", "Do not place client-private information in the shared template."],
+      "scope": "shared",
+      "usage": {
+        "successfulProjects": 1,
+        "latestVerifiedVersion": "1.0.0",
+        "incidents": 0
+      },
+      "wrapperPolicy": "Use a project wrapper or composition file for business-specific fields. Do not edit the shared template for one project."
+    }
+  ]
+}

@@ -10,7 +10,8 @@ export const HARNESS_MIGRATION_PHASES = [
 
 export type HarnessMigrationPhase = (typeof HARNESS_MIGRATION_PHASES)[number];
 
-/** DSH owns live execution. Local is the default environment; Lima is optional. */
+/** Retained DSH compatibility composition. Normal execution belongs to the
+ * headless Major host path; this bundle is explicit reference infrastructure. */
 export const CURRENT_HARNESS_MIGRATION_PHASE: HarnessMigrationPhase = 'cutover';
 
 export const DEFAULT_EXECUTION_BACKEND = 'dsh' as const;

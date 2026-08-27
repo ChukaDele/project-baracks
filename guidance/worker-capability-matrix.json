@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "skillsAreGuidanceOnly": true,
+    "accountingSystemOfRecordRequired": true,
+    "externalMutationRequiresProjectAuthority": true,
+    "independentVerdictRequiresSeparateReviewer": true
+  },
+  "roles": [
+    {
+      "id": "chief-of-staff",
+      "kind": "manager",
+      "requiredSkills": ["chief-of-staff-boundary"],
+      "optionalSkills": ["planning", "staged-quality-controls"],
+      "permissionProfile": "recommend-no-bind",
+      "boundary": "Coordinates decisions and priorities. Does not perform Executive Assistant logistics or bind an executive decision.",
+      "qualityGate": "Decision owner, alternatives, and unresolved authority are explicit.",
+      "gaps": ["verified decision adapter"]
+    },
+    {
+      "id": "commercial-revenue-director",
+      "kind": "manager",
+      "requiredSkills": ["sales-commercial-core"],
+      "optionalSkills": ["valuation-investment-ma", "fpa-forecasting-extrapolation"],
+      "permissionProfile": "recommend-no-bind",
+      "boundary": "Creates commercial recommendations. Does not send, bind terms, invoice, or move money.",
+      "qualityGate": "Finance and legal review where the recommendation is consequential.",
+      "gaps": []
+    },
+    {
+      "id": "controller-bookkeeper",
+      "kind": "worker",
+      "requiredSkills": ["controller-bookkeeping", "deterministic-accounting-boundary"],
+      "optionalSkills": ["ar-ap-invoice", "reconciliation-close-statements"],
+      "permissionProfile": "proposal-no-post",
+      "boundary": "Interprets documents and prepares proposals. The ledger system of record owns arithmetic, posting, balances, and statements.",
+      "qualityGate": "Balanced entries, source documents, and approval are present before any downstream posting.",
+      "gaps": []
+    },
+    {
+      "id": "design-director",
+      "kind": "manager",
+      "requiredSkills": ["design-direction-and-taste", "cross-modal-review"],
+      "optionalSkills": ["browser-release-qa"],
+      "permissionProfile": "review-recommend",
+      "boundary": "Sets direction and reviews evidence. Does not publish or deploy.",
+      "qualityGate": "Rendered multi-modal evidence and accessibility considerations are reviewed.",
+      "gaps": []
+    },
+    {
+      "id": "engineering-manager",
+      "kind": "manager",
+      "requiredSkills": ["software-engineering", "planning", "review", "engineering-design-doctrine"],
+      "optionalSkills": ["worktree", "exact-head-pr-review"],
+      "permissionProfile": "workspace-write-no-deploy",
+      "boundary": "Coordinates implementation and verification. Does not deploy or self-issue an independent verdict.",
+      "qualityGate": "Acceptance contract, isolated ownership, tests, and reviewer separation are established.",
+      "gaps": []
+    },
+    {
+      "id": "executive-assistant",
+      "kind": "worker",
+      "requiredSkills": ["executive-assistant"],
+      "optionalSkills": ["lean-quality"],
+      "permissionProfile": "draft-no-send",
+      "boundary": "Prepares logistics, briefs, drafts, and follow-up. Chief of Staff owns strategic prioritisation.",
+      "qualityGate": "Recipients, dates, commitments, and missing authority are confirmed before any external action.",
+      "gaps": ["authenticated productivity adapters"]
+    },
+    {
+      "id": "finance-accounting-director",
+      "kind": "manager",
+      "requiredSkills": ["deterministic-accounting-boundary", "reconciliation-close-statements"],
+      "optionalSkills": ["fpa-forecasting-extrapolation", "valuation-investment-ma"],
+      "permissionProfile": "read-draft-approval-gated",
+      "boundary": "Reviews analysis and close proposals. The accounting system remains the source of record and no money movement is permitted.",
+      "qualityGate": "Tie-outs, period policy, deterministic totals, and independent review are present.",
+      "gaps": []
+    },
+    {
+      "id": "finance-operations-analyst",
+      "kind": "worker",
+      "requiredSkills": ["fpa-forecasting-extrapolation", "deterministic-accounting-boundary"],
+      "optionalSkills": ["ar-ap-invoice"],
+      "permissionProfile": "read-calculate-draft",
+      "boundary": "Calculates and drafts from approved data. Does not post journals or alter balances.",
+      "qualityGate": "History sufficiency, assumptions, and deterministic totals are recorded.",
+      "gaps": []
+    },
+    {
+      "id": "growth-marketing-director",
+      "kind": "manager",
+      "requiredSkills": ["sales-commercial-core", "product-management-core"],
+      "optionalSkills": ["lean-quality"],
+      "permissionProfile": "draft-no-spend",
+      "boundary": "Plans experiments and claims. Does not launch campaigns or spend budget.",
+      "qualityGate": "Claims, metrics, audience assumptions, and approval limit are explicit.",
+      "gaps": []
+    },
+    {
+      "id": "growth-commercial-analyst",
+      "kind": "worker",
+      "requiredSkills": ["sales-commercial-core", "fpa-forecasting-extrapolation"],
+      "optionalSkills": ["verification"],
+      "permissionProfile": "read-calculate-draft",
+      "boundary": "Analyses commercial evidence. Does not mutate CRM data or bind commercial terms.",
+      "qualityGate": "Metric definitions and pipeline source evidence are retained.",
+      "gaps": []
+    },
+    {
+      "id": "independent-verifier",
+      "kind": "worker",
+      "requiredSkills": ["exact-head-pr-review"],
+      "optionalSkills": ["security-audit", "cross-modal-review"],
+      "permissionProfile": "read-only-verdict",
+      "boundary": "Reviews the frozen candidate only. The candidate author cannot act as this role.",
+      "qualityGate": "Candidate digest, acceptance contract, and independent reviewer identity are explicit.",
+      "gaps": ["external independent provider remains required"]
+    },
+    {
+      "id": "operations-automation-director",
+      "kind": "manager",
+      "requiredSkills": ["operations-improvement-core"],
+      "optionalSkills": ["integration", "staged-quality-controls"],
+      "permissionProfile": "stage-no-activate",
+      "boundary": "Stages process improvements. Does not activate automations or alter production state.",
+      "qualityGate": "Process owner, dry-run evidence, and rollback sequence are present.",
+      "gaps": []
+    },
+    {
+      "id": "product-designer",
+      "kind": "worker",
+      "requiredSkills": ["design-direction-and-taste", "cross-modal-review"],
+      "optionalSkills": ["browser-release-qa"],
+      "permissionProfile": "design-no-publish",
+      "boundary": "Designs and evaluates flows. Does not publish or deploy.",
+      "qualityGate": "User need, brand context, accessibility, and rendered evidence are reviewed.",
+      "gaps": []
+    },
+    {
+      "id": "product-manager",
+      "kind": "manager",
+      "requiredSkills": ["product-management-core", "planning"],
+      "optionalSkills": ["lean-quality"],
+      "permissionProfile": "draft-recommend",
+      "boundary": "Creates product requirements and decisions. Does not alter production systems.",
+      "qualityGate": "Customer evidence, acceptance criteria, and outcome metric are explicit.",
+      "gaps": []
+    },
+    {
+      "id": "quality-risk-director",
+      "kind": "manager",
+      "requiredSkills": ["staged-quality-controls", "security-audit"],
+      "optionalSkills": ["root-cause-qa", "browser-release-qa"],
+      "permissionProfile": "read-reject",
+      "boundary": "Assesses evidence and rejects missing predicates. Does not self-approve a produced change.",
+      "qualityGate": "Release predicates, risk policy, and frozen candidate evidence are complete.",
+      "gaps": []
+    },
+    {
+      "id": "research-intelligence-director",
+      "kind": "manager",
+      "requiredSkills": ["knowledge-work", "source-ingestion"],
+      "optionalSkills": ["chief-of-staff-boundary"],
+      "permissionProfile": "read-recommend",
+      "boundary": "Synthesises research and recommendations. Does not bind decisions or external communications.",
+      "qualityGate": "Primary sources, provenance, uncertainty, and decision relevance are explicit.",
+      "gaps": []
+    },
+    {
+      "id": "research-analyst",
+      "kind": "worker",
+      "requiredSkills": ["knowledge-work", "source-ingestion"],
+      "optionalSkills": ["root-cause-qa"],
+      "permissionProfile": "read-draft",
+      "boundary": "Retrieves and compares evidence. Does not submit, publish, or communicate externally.",
+      "qualityGate": "Claims have traceable sources and uncertainty is labelled.",
+      "gaps": []
+    },
+    {
+      "id": "software-engineer",
+      "kind": "worker",
+      "requiredSkills": ["software-engineering", "tdd", "verification"],
+      "optionalSkills": ["debugging", "database", "frontend", "reusable-asset-discovery"],
+      "permissionProfile": "workspace-write-no-deploy",
+      "boundary": "Changes only the authorized isolated workspace. Does not deploy, merge, or alter credentials.",
+      "qualityGate": "Tests plus runtime evidence are required before completion.",
+      "gaps": []
+    }
+  ]
+}

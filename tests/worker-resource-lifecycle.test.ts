@@ -17,7 +17,7 @@ vi.mock('../src/security/major-gateway.js', () => ({
 }));
 
 import { resourceSnapshot } from '../src/supervisor/resources.js';
-import { runWorker } from '../src/supervisor/worker.js';
+import { isMissingCodexResumeFailure, runWorker } from '../src/supervisor/worker.js';
 
 let root = '';
 let priorResourcePath: string | undefined;
@@ -43,6 +43,23 @@ afterEach(() => {
 });
 
 describe('worker resource lifecycle', () => {
+  it('only treats a missing Codex rollout as a recoverable resume failure', () => {
+    expect(
+      isMissingCodexResumeFailure({
+        status: 'failed',
+        stdout: '',
+        stderr: 'thread/resume failed: no rollout found',
+      }),
+    ).toBe(true);
+    expect(
+      isMissingCodexResumeFailure({
+        status: 'failed',
+        stdout: '',
+        stderr: 'provider authentication failed',
+      }),
+    ).toBe(false);
+  });
+
   it('propagates returned-tree evidence from the gateway outcome to the worker outcome', async () => {
     const running = runWorker({ host: 'codex', cwd: root, prompt: 'read only' });
     await Promise.resolve();

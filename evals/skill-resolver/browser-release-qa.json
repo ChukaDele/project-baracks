@@ -1,0 +1,7 @@
+{
+  "skill": "browser-release-qa",
+  "should_trigger": [
+    "Validate the deployed release in a browser against the critical user journey and record observed evidence."
+  ],
+  "should_not_trigger": ["Create a static unit test plan without running a browser."]
+}

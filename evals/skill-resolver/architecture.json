@@ -1,0 +1,7 @@
+{
+  "skill": "architecture",
+  "should_trigger": [
+    "Choose the smallest service boundary for a new capability and record the decision with tradeoffs."
+  ],
+  "should_not_trigger": ["Diagnose a single failing unit test in an existing component."]
+}

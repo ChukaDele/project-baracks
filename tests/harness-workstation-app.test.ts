@@ -160,7 +160,9 @@ describe('Major DSH workstation app', () => {
     expect(removed.status).toBe(0);
     expect(existsSync(app)).toBe(false);
     expect(existsSync(join(home, 'runtime', 'keep-pin'))).toBe(true);
-    expect(removed.stdout).toContain('normal trusted repository execution defaults to DSH local');
+    expect(removed.stdout).toContain(
+      'normal trusted repository execution defaults to headless Major host execution',
+    );
   });
 
   it('refuses to overwrite or remove a pre-existing unmarked Major.app', () => {

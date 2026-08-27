@@ -171,6 +171,23 @@ function distributionMatches(repoRoot: string): ConformanceCheck[] {
       '/major must reuse the upstream command-input renderer before the generic result after replay',
     ),
     check(
+      'bundle.run-insight',
+      kernelManifest.files.includes('index.js') &&
+        readRepoFile(
+          repoRoot,
+          'distribution/deepseek-harness/bundles/major-kernel/index.js',
+        ).includes("export const RUN_INSIGHT_EVENT = 'major/run-insight'") &&
+        readRepoFile(
+          repoRoot,
+          'distribution/deepseek-harness/bundles/major-kernel/index.js',
+        ).includes("name: 'major-insight'") &&
+        readRepoFile(
+          repoRoot,
+          'distribution/deepseek-harness/bundles/major-kernel/index.js',
+        ).includes('recordRunInsight(request.parent.session'),
+      'native runs must leave a queryable DSH-owned productive-work receipt',
+    ),
+    check(
       'runtime.local-major-routed-checkpoint',
       runtimeCheckpoint.defaultEnvironment === 'local' &&
         runtimeCheckpoint.defaultPath === 'dsh-native' &&

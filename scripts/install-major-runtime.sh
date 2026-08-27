@@ -177,24 +177,33 @@ WRAPPER_TMP="$INSTALL_STAGE/major"
 RECORD_TMP="$INSTALL_STAGE/installed-release.json"
 RULES_RECORD_TMP="$INSTALL_STAGE/installed-global-rules.json"
 EXECUTION_CONFIG_TMP="$INSTALL_STAGE/execution.json"
+EXECUTION_PATH="host"
+LIMA_COMPATIBILITY="${MAJOR_INSTALL_LIMA_COMPATIBILITY:-0}"
+case "$LIMA_COMPATIBILITY" in
+  0|1) ;;
+  *) echo "ERROR: MAJOR_INSTALL_LIMA_COMPATIBILITY must be 0 or 1" >&2; exit 2 ;;
+esac
 
-LIMACTL_PATH="$(command -v limactl || true)"
-if [ -z "$LIMACTL_PATH" ]; then
-  echo "ERROR: Lima 2.2.x is required for Major provider execution." >&2
-  echo "Install Lima, then rerun the Major installer." >&2
-  exit 1
-fi
-LIMACTL_PATH="$(python3 - "$LIMACTL_PATH" <<'PY'
+if [ "$LIMA_COMPATIBILITY" = "1" ]; then
+  EXECUTION_PATH="lima"
+  EXECUTION_CONFIG_TMP="$INSTALL_STAGE/execution.json"
+  LIMACTL_PATH="$(command -v limactl || true)"
+  if [ -z "$LIMACTL_PATH" ]; then
+    echo "ERROR: Lima compatibility was requested, but limactl is not installed." >&2
+    echo "Install Lima or rerun without MAJOR_INSTALL_LIMA_COMPATIBILITY=1." >&2
+    exit 1
+  fi
+  LIMACTL_PATH="$(python3 - "$LIMACTL_PATH" <<'PY'
 from pathlib import Path
 import sys
 print(Path(sys.argv[1]).resolve())
 PY
-)"
-if ! "$LIMACTL_PATH" --version | grep -Eq '(^|[^0-9])2\.2\.[0-9]+'; then
-  echo "ERROR: Major requires Lima >=2.2.0 and <2.3.0." >&2
-  exit 1
-fi
-python3 - "$INSTALL_STAGE/runtime/templates/major/execution.json" "$EXECUTION_CONFIG_TMP" "$LIMACTL_PATH" "$WORKER_INSTANCE" <<'PY'
+  )"
+  if ! "$LIMACTL_PATH" --version | grep -Eq '(^|[^0-9])2\.2\.[0-9]+'; then
+    echo "ERROR: Major requires Lima >=2.2.0 and <2.3.0 for compatibility execution." >&2
+    exit 1
+  fi
+  python3 - "$INSTALL_STAGE/runtime/templates/major/execution.json" "$EXECUTION_CONFIG_TMP" "$LIMACTL_PATH" "$WORKER_INSTANCE" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -207,29 +216,29 @@ PY
 
 # Provision and verify a release-specific isolated worker before changing the
 # active wrapper or user state. The current release's worker is never mutated.
-WORKER_LIST_TMP="$INSTALL_STAGE/worker-list.jsonl"
-if ! "$LIMACTL_PATH" list --json > "$WORKER_LIST_TMP"; then
-  echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
-  exit 1
-fi
-set +e
-python3 -c '
+  WORKER_LIST_TMP="$INSTALL_STAGE/worker-list.jsonl"
+  if ! "$LIMACTL_PATH" list --json > "$WORKER_LIST_TMP"; then
+    echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
+    exit 1
+  fi
+  set +e
+  python3 -c '
 import json, sys
 name = sys.argv[1]
 rows = [json.loads(line) for line in sys.stdin if line.strip()]
 raise SystemExit(0 if any(row.get("name") == name for row in rows) else 3)
 ' "$WORKER_INSTANCE" < "$WORKER_LIST_TMP"
-worker_inspection=$?
-set -e
-if [[ $worker_inspection -eq 3 ]]; then
-  WORKER_CREATED=1
-elif [[ $worker_inspection -ne 0 ]]; then
-  echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
-  exit 1
-fi
-if [ -f "$MAJOR_HOME/execution.json" ] && [ ! -L "$MAJOR_HOME/execution.json" ] && \
+  worker_inspection=$?
+  set -e
+  if [[ $worker_inspection -eq 3 ]]; then
+    WORKER_CREATED=1
+  elif [[ $worker_inspection -ne 0 ]]; then
+    echo "ERROR: could not inspect existing Major Lima workers; refusing installation." >&2
+    exit 1
+  fi
+  if [ -f "$MAJOR_HOME/execution.json" ] && [ ! -L "$MAJOR_HOME/execution.json" ] && \
    [ -f "$RELEASE_RECORD" ] && [ ! -L "$RELEASE_RECORD" ]; then
-  AUTH_SOURCE_FIELDS="$(python3 - "$MAJOR_HOME/execution.json" "$RELEASE_RECORD" <<'PY'
+    AUTH_SOURCE_FIELDS="$(python3 - "$MAJOR_HOME/execution.json" "$RELEASE_RECORD" <<'PY'
 import json
 import re
 import sys
@@ -243,16 +252,16 @@ if not re.fullmatch(r"[0-9a-f]{40}", sha) or instance != f"major-worker-{sha[:12
     raise SystemExit("ERROR: installed Major provider-auth source identity is invalid")
 print(f"{instance}\t{sha}")
 PY
-)"
-  IFS=$'\t' read -r AUTH_SOURCE_INSTANCE AUTH_SOURCE_SHA <<< "$AUTH_SOURCE_FIELDS"
-  if [ "$AUTH_SOURCE_INSTANCE" = "$WORKER_INSTANCE" ]; then
-    AUTH_SOURCE_INSTANCE="major-worker"
-    AUTH_SOURCE_SHA=""
+    )"
+    IFS=$'\t' read -r AUTH_SOURCE_INSTANCE AUTH_SOURCE_SHA <<< "$AUTH_SOURCE_FIELDS"
+    if [ "$AUTH_SOURCE_INSTANCE" = "$WORKER_INSTANCE" ]; then
+      AUTH_SOURCE_INSTANCE="major-worker"
+      AUTH_SOURCE_SHA=""
+    fi
   fi
-fi
-if [ -f "$INSTALL_STAGE/runtime/dist/resources/reconcile.js" ]; then
-  echo "Reconciling stale Major resources before creating a new worker..."
-  MAJOR_HOME="$MAJOR_HOME" node --input-type=module - "$INSTALL_STAGE/runtime" "$WORKER_INSTANCE" <<'NODE'
+  if [ -f "$INSTALL_STAGE/runtime/dist/resources/reconcile.js" ]; then
+    echo "Reconciling stale Major resources before creating a new worker..."
+    MAJOR_HOME="$MAJOR_HOME" node --input-type=module - "$INSTALL_STAGE/runtime" "$WORKER_INSTANCE" <<'NODE'
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 const root = process.argv[2];
@@ -264,13 +273,17 @@ if (plan.action === 'block') {
   process.exit(2);
 }
 NODE
-fi
-MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE="$AUTH_SOURCE_INSTANCE" \
+  fi
+  MAJOR_PROVIDER_AUTH_SOURCE_INSTANCE="$AUTH_SOURCE_INSTANCE" \
 MAJOR_PROVIDER_AUTH_SOURCE_SHA="$AUTH_SOURCE_SHA" \
 MAJOR_WORKSHOP_AUTH_CWD="$WORKSHOP_AUTH_CWD" \
 MAJOR_WORKSHOP_SESSION_ID="$WORKSHOP_SESSION_ID" \
   bash "$INSTALL_STAGE/runtime/scripts/provision-major-lima-worker.sh" \
     "$LIMACTL_PATH" "$WORKER_INSTANCE" "$INSTALL_SHA"
+else
+  EXECUTION_CONFIG_TMP=""
+  echo "Normal host execution selected; Lima compatibility worker provisioning skipped."
+fi
 
 # Build and execute-smoke the same immutable runtime shape used in production.
 if [ ! -d "$RELEASE_DIR" ]; then
@@ -370,9 +383,10 @@ MANIFEST="$(python3 "$SNAPSHOT_ROOT/scripts/stage-major-user-state.py" \
   --major-bin "$BIN_DIR/major" \
   --record "$RECORD_TMP" \
   --global-rules-record "$RULES_RECORD_TMP" \
-  --execution-config "$EXECUTION_CONFIG_TMP" \
+  --execution-path "$EXECUTION_PATH" \
   --wrapper "$WRAPPER_TMP" \
-  --legacy-plist "$LEGACY_PLIST")"
+  --legacy-plist "$LEGACY_PLIST" \
+  ${EXECUTION_CONFIG_TMP:+--execution-config "$EXECUTION_CONFIG_TMP"})"
 
 python3 "$SNAPSHOT_ROOT/scripts/activate-major-user-state.py" --manifest "$MANIFEST"
 RELEASE_CREATED=0
@@ -473,7 +487,7 @@ cat <<EOF
 Installed Major v${INSTALL_VERSION} ($INSTALL_SHA)
 
 ✓ release integrity  (content manifest verified)
-✓ worker              (isolated runner core ready: $CORE_READY)
+✓ execution          (headless $EXECUTION_PATH path; core ready: $CORE_READY)
 ✓ database            ($DB_OK)
 ✓ provider setup available
 
@@ -506,7 +520,7 @@ RUNTIME INTEGRITY:
 NORMAL WORK MODE:
 - Major is present by default across supported agent tools.
 - The owner can explicitly fast-track trusted projects to foreground build mode.
-- build = one concurrent DSH worker using the local environment by default, with Lima available for optional isolation; 120-minute coordinator ceiling and no repeated shadow/assist ceremony.
+- build = headless Major host execution through live CLIs and Orca worktrees by default; Lima remains an explicit compatibility boundary; 120-minute coordinator ceiling and no repeated shadow/assist ceremony.
 - --allow-external-writes authorizes normal project writes such as branches, PRs, previews and already-authorized integrations.
 - client projects remain isolated from cross-project/global memory even in build mode.
 - no new paid spend, destructive production-data changes, credential/ownership/DNS changes, or production security-policy changes without explicit authority.

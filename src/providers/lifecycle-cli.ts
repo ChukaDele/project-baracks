@@ -5,6 +5,7 @@ import { computeProviderReadiness } from '../doctor/readiness.js';
 import { trustedExecutableRegistry } from '../security/major-gateway.js';
 import { majorExecutionBackend } from '../security/major-gateway.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
+import { configuredExecutionPath } from '../execution/path.js';
 import { ExecutableTrustError } from '../security/trusted-executables.js';
 import { checkHostCredential, fingerprintCredentialFile } from './host-credential.js';
 import { hostProviderVersion } from './host-provider-version.js';
@@ -27,6 +28,7 @@ import {
 import { readApprovedCodexProfileUsage } from './codex-profile-reader.js';
 import { syncApprovedCodexProfiles } from './codex-profile-sync.js';
 import { classifyModel, loadModelRegistry } from './registry.js';
+import { probeHostProvider } from './host-probe.js';
 
 const ATTESTABLE_PROVIDERS = Object.freeze({
   'claude-code': 'claude',
@@ -70,16 +72,19 @@ function attestableProvider(value: string): AttestableProvider {
 }
 
 /**
- * Real isolated probe when core safety is active, else a presence-only
+ * Real probe through the selected Major boundary when core safety is active, else a presence-only
  * fallback that can never itself assert authentication. Persists the result
  * and returns it — the single code path `probe` and `connect` both use so
  * their reported state can never drift apart.
  */
 async function probeAndPersist(providerName: AttestableProvider, note?: string) {
   const executableName = ATTESTABLE_PROVIDERS[providerName];
-  const backendProbe = isCapabilityAvailable('live-agent-execution')
-    ? await majorExecutionBackend().probeProvider(executableName)
-    : undefined;
+  const backendProbe =
+    configuredExecutionPath() === 'host'
+      ? await probeHostProvider(PROVIDER_TO_HOST[providerName])
+      : isCapabilityAvailable('live-agent-execution')
+        ? await majorExecutionBackend().probeProvider(executableName)
+        : undefined;
   let trustedSpawnPath: string | undefined;
   if (!backendProbe) {
     try {
@@ -238,7 +243,7 @@ Commands:
                                                       version-compatible, else fall back to native sign-in
                                                       (--provider <name> also accepted; --relogin re-authenticates
                                                       even when already READY)
-  probe --provider <name>                            re-check a provider through the isolated runner (e.g. after an account swap)
+  probe --provider <name>                            re-check a provider through the selected Major boundary (e.g. after an account swap)
   attest-billing --provider <p> --model <m> --billing <mode> --evidence <text>
                                                       record the owner-confirmed billing mode for a model
   attest-availability --provider <p> --model <m> --evidence <text>
@@ -292,6 +297,18 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
       opened.sqlite.close();
     }
     let accounts: CodexUsageAccount[];
+    if (configuredExecutionPath() === 'host') {
+      accounts = labels.map((accountLabel) => ({
+        accountLabel,
+        error:
+          'live host usage is not available from the approved CLI status surface; use the cached approved Codex profile usage or run a normal Major task',
+      }));
+      const report = codexUsageReport(accounts);
+      writeCodexUsageReport(report);
+      if (args.includes('--json')) console.log(JSON.stringify(report, null, 2));
+      else console.log(formatCodexUsage(report));
+      return true;
+    }
     try {
       accounts = labels.length === 0 ? [] : await majorExecutionBackend().readCodexUsage(labels);
     } catch (error) {
@@ -305,6 +322,16 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     return true;
   }
   if (args[1] === 'sync-profiles') {
+    if (configuredExecutionPath() === 'host') {
+      const result = {
+        status: 'not-applicable',
+        path: 'host',
+        detail:
+          'host-path Major execution uses the provider CLI credentials directly; no Lima profile sync is required',
+      };
+      console.log(JSON.stringify(result, null, 2));
+      return true;
+    }
     const opened = openDb();
     try {
       const report = await syncApprovedCodexProfiles(majorExecutionBackend(), opened.db);
@@ -348,6 +375,33 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     const assumeNo = args.includes('--no');
     const relogin = args.includes('--relogin') || args.includes('--force');
 
+    if (configuredExecutionPath() === 'host') {
+      const result = await probeAndPersist(
+        providerName,
+        relogin ? 'connect: host-path recheck requested' : 'connect: host-path status check',
+      );
+      if (result.authenticated) {
+        console.log(JSON.stringify({ ...result, status: 'ready' }, null, 2));
+        await promptBillingIfNeeded(providerName);
+        return true;
+      }
+      console.log(
+        JSON.stringify(
+          {
+            provider: providerName,
+            status: 'login-required',
+            detail:
+              `Major could not confirm the host CLI login. Complete the provider's supported native login (` +
+              `${executableName} auth login, or the provider's documented equivalent), then run ` +
+              `major provider probe --provider ${providerName}.`,
+          },
+          null,
+          2,
+        ),
+      );
+      return true;
+    }
+
     // Step 1: never touch a credential that's already genuinely working.
     if (!relogin) {
       const opened = openDb();
@@ -365,7 +419,8 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
       }
     }
 
-    // Step 2: host-credential reuse, gated by proven version compatibility.
+    // Step 2: host-credential reuse is only relevant to explicit Lima
+    // compatibility. The normal host path uses the CLI's own credential store.
     const check = checkHostCredential(host);
     let hostReuseSucceeded = false;
     let fallbackReason: string | undefined;
@@ -539,14 +594,17 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     // verifies that the fixed canonical installation exists and is executable;
     // neither PATH nor a user-supplied executable path can confer trust.
     const executableName = ATTESTABLE_PROVIDERS[providerName];
-    const backendProbe = isCapabilityAvailable('live-agent-execution')
-      ? await majorExecutionBackend().probeProvider(executableName)
-      : undefined;
+    const backendProbe =
+      configuredExecutionPath() === 'host'
+        ? await probeHostProvider(PROVIDER_TO_HOST[providerName])
+        : isCapabilityAvailable('live-agent-execution')
+          ? await majorExecutionBackend().probeProvider(executableName)
+          : undefined;
     const trusted = backendProbe
       ? undefined
       : trustedExecutableRegistry(executableName).verify(executableName);
     if (backendProbe && (!backendProbe.installed || !backendProbe.authenticated)) {
-      throw new Error(`isolated provider probe failed for ${providerName}: ${backendProbe.detail}`);
+      throw new Error(`provider probe failed for ${providerName}: ${backendProbe.detail}`);
     }
     const classification = classifyModel(loadModelRegistry(), providerName, modelRef);
     if (classification.routingClass === 'unknown') {

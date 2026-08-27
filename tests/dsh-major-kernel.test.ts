@@ -69,6 +69,13 @@ async function loadKernel(): Promise<{
   dshAdapterForMajorHost(host: string, environment?: string, accountLabel?: string): string;
   foregroundDispatchHops(stdout: string): number;
   hashReviewWorkspace(root: string): string;
+  buildRunInsight(
+    insight: Record<string, unknown>,
+    prior?: Record<string, unknown>,
+    nowMs?: number,
+  ): Record<string, unknown>;
+  latestRunInsight(session: KernelSession): Record<string, unknown> | undefined;
+  recordRunInsight(session: KernelSession, insight: Record<string, unknown>): boolean;
   nativeWorkerTask(
     task: string,
     resolvedSkills?: Array<{ id: string; source: string; content: string }>,
@@ -88,6 +95,13 @@ async function loadKernel(): Promise<{
     dshAdapterForMajorHost(host: string, environment?: string, accountLabel?: string): string;
     foregroundDispatchHops(stdout: string): number;
     hashReviewWorkspace(root: string): string;
+    buildRunInsight(
+      insight: Record<string, unknown>,
+      prior?: Record<string, unknown>,
+      nowMs?: number,
+    ): Record<string, unknown>;
+    latestRunInsight(session: KernelSession): Record<string, unknown> | undefined;
+    recordRunInsight(session: KernelSession, insight: Record<string, unknown>): boolean;
     nativeWorkerTask(
       task: string,
       resolvedSkills?: Array<{ id: string; source: string; content: string }>,
@@ -158,6 +172,174 @@ describe('Major DSH workstation kernel', () => {
     for (const root of temporaryRoots.splice(0)) {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('records a compact DSH-owned run insight and never blocks work when persistence fails', async () => {
+    const { latestRunInsight, recordRunInsight } = await loadKernel();
+    const session = kernelSession('/tmp/project');
+    expect(
+      recordRunInsight(session, {
+        goalId: 'goal-1',
+        outcome: 'completed',
+        status: 'active',
+        runtime: 'dsh',
+        provider: 'codex',
+        model: 'gpt-5-codex',
+        account: 'COD-01',
+        environment: 'local',
+        summary: 'Changed one real project file and its focused test passed.',
+      }),
+    ).toBe(true);
+    expect(latestRunInsight(session)).toMatchObject({
+      schema: 'major.run-insight.v1',
+      goalId: 'goal-1',
+      outcome: 'completed',
+      status: 'active',
+      runtime: 'dsh',
+      worker: {
+        coordinator: null,
+        provider: 'codex',
+        model: 'gpt-5-codex',
+        account: 'COD-01',
+        environment: 'local',
+      },
+      timing: {
+        durationMs: null,
+        productiveWorkMs: null,
+        productiveWorkRatio: null,
+        majorOverheadMs: null,
+        infrastructureOverheadMs: null,
+      },
+      productiveWork: 'Changed one real project file and its focused test passed.',
+      skills: [],
+      effects: [],
+      failures: [],
+      humanInterventions: [],
+      quality: { assessment: 'unknown', evidence: [] },
+      learning: {
+        disposition: 'observation_only',
+        promotionEligible: false,
+        durableMeaningOwner: 'gbrain',
+      },
+      latestChange: { basis: 'none', result: 'no_prior_run' },
+    });
+    expect(
+      recordRunInsight(
+        {
+          ...session,
+          append: () => {
+            throw new Error('session log unavailable');
+          },
+        },
+        { goalId: 'goal-2', summary: 'user work still completed' },
+      ),
+    ).toBe(false);
+  });
+
+  it('registers a bootable no-argument insight command', async () => {
+    const { apply } = await loadKernel();
+    const commands: Array<{ name: string; input?: { hint?: string } }> = [];
+    applyKernel(
+      { apply },
+      {
+        subagents: { registerProvider() {} },
+        commands: {
+          register(command: { name: string; input?: { hint?: string } }) {
+            commands.push(command);
+          },
+        },
+      },
+    );
+    expect(commands.find((command) => command.name === 'major-insight')).toMatchObject({
+      input: { hint: 'show latest receipt' },
+    });
+  });
+
+  it('records evidence-qualified effects and compares only directly comparable observations', async () => {
+    const { latestRunInsight, recordRunInsight } = await loadKernel();
+    const session = kernelSession('/tmp/project');
+    recordRunInsight(session, {
+      goalId: 'goal-1',
+      durationMs: 100,
+      productiveWorkMs: 40,
+      effects: [
+        { subject: 'resolver', effect: 'helped', evidence: 'focused resolver test passed' },
+        { subject: 'unsupported guess', effect: 'hurt' },
+      ],
+      skills: ['software-engineering'],
+      summary: 'first',
+    });
+    recordRunInsight(session, {
+      goalId: 'goal-1',
+      durationMs: 80,
+      productiveWorkMs: 40,
+      effects: [{ subject: 'provider', effect: 'hurt', evidence: 'one retry was observed' }],
+      summary: 'second',
+    });
+    expect(latestRunInsight(session)).toMatchObject({
+      timing: { durationMs: 80, productiveWorkMs: 40, productiveWorkRatio: 0.5 },
+      effects: [{ subject: 'provider', effect: 'hurt', evidence: 'one retry was observed' }],
+      latestChange: {
+        basis: 'latest_observed_run',
+        result: 'observed_change_only',
+        changes: {
+          durationMs: { previous: 100, current: 80, delta: -20 },
+          productiveWorkRatio: { previous: 0.4, current: 0.5 },
+        },
+      },
+    });
+    const latest = latestRunInsight(session);
+    if (!latest) throw new Error('expected the latest run insight');
+    expect(latest.latestChange).toMatchObject({
+      changes: { productiveWorkRatio: { delta: expect.closeTo(0.1) } },
+    });
+    expect(session.events[0]?.data.effects).toHaveLength(1);
+  });
+
+  it('classifies non-success receipts and derives labelled bounded DSH timing from measured stages', async () => {
+    const { buildRunInsight } = await loadKernel();
+    const receipt = buildRunInsight({
+      goalId: 'goal-1',
+      outcome: 'cancelled',
+      status: 'cancelled',
+      runtime: 'dsh',
+      durationMs: 100,
+      stageTiming: {
+        admissionAndRoutingMs: 10,
+        leaseWaitMs: 20,
+        workerExecutionMs: 50,
+        goalReportMs: 10,
+        leaseReleaseMs: 5,
+        reviewMs: 5,
+      },
+      failureSignature: 'owner_cancelled',
+      recurrenceEvidence: 'abort signal observed',
+    });
+    expect(receipt).toMatchObject({
+      outcome: 'cancelled',
+      timing: {
+        productiveWorkMs: 50,
+        productiveWorkRatio: 0.5,
+        productiveWorkRatioLabel: 'worker_execution_ms / total_duration_ms (bounded 0..1)',
+        majorOverheadMs: 25,
+        infrastructureOverheadMs: 25,
+        overheadBasis: 'measured_stage_sums',
+      },
+      recurrence: {
+        signature: 'owner_cancelled',
+        evidence: 'abort signal observed',
+      },
+    });
+
+    const unknown = buildRunInsight({ goalId: 'goal-2', outcome: 'blocked' });
+    expect(unknown.outcome).toBe('blocked');
+    expect(unknown.timing).toMatchObject({
+      productiveWorkMs: null,
+      productiveWorkRatio: null,
+      majorOverheadMs: null,
+      infrastructureOverheadMs: null,
+      overheadBasis: null,
+    });
   });
 
   it('surfaces persisted Codex health without claiming a live refresh or routing readiness', async () => {
@@ -670,15 +852,25 @@ describe('Major DSH workstation kernel', () => {
       ['goal', 'show', '--id'],
       ['run', 'github.com/example/project', '--goal-id'],
       ['goal', 'show', '--id'],
+      ['history', 'record', '--project'],
     ]);
     expect(argv[0]?.includes('--host') && argv[0]?.includes('cursor')).toBe(true);
     expect(argv[1]?.includes('--host') && argv[1]?.includes('cursor')).toBe(true);
     expect(argv[3]?.includes('--host')).toBe(false);
-    expect(session.events.slice(-2)).toEqual([
+    expect(session.events.slice(-3)).toEqual([
       { type: 'turn/start', data: { turn: 5 } },
+      {
+        type: 'major/run-insight',
+        data: expect.objectContaining({
+          schema: 'major.run-insight.v1',
+          goalId: 'goal-1',
+          outcome: 'completed',
+          worker: expect.objectContaining({ account: 'work-b' }),
+        }),
+      },
       { type: 'turn/end', data: { turn: 5, reason: { kind: 'completed' } } },
     ]);
-    expect(JSON.stringify(session.events.slice(-2))).not.toMatch(
+    expect(JSON.stringify(session.events.slice(-3))).not.toMatch(
       /user\/message|assistant\/message|step\/start|step\/end/,
     );
   });
@@ -748,6 +940,14 @@ describe('Major DSH workstation kernel', () => {
     expect(providersStarted).toEqual(['major']);
     expect(session.events).toEqual([
       { type: 'turn/start', data: { turn: 1 } },
+      {
+        type: 'major/run-insight',
+        data: expect.objectContaining({
+          schema: 'major.run-insight.v1',
+          outcome: 'failed',
+          failures: [expect.stringContaining('without dispatching a cycle')],
+        }),
+      },
       { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
     ]);
   });
@@ -829,6 +1029,14 @@ describe('Major DSH workstation kernel', () => {
       ).rejects.toThrow(/Claude review changed the project workspace/);
       expect(session.events).toEqual([
         { type: 'turn/start', data: { turn: 1 } },
+        {
+          type: 'major/run-insight',
+          data: expect.objectContaining({
+            schema: 'major.run-insight.v1',
+            goalId: 'goal-1',
+            outcome: 'completed',
+          }),
+        },
         { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
       ]);
     } finally {
@@ -1008,9 +1216,10 @@ describe('Major DSH workstation kernel', () => {
     const task =
       'MAJOR_DSH_COMPOSER_ENVELOPE_V1\n' +
       JSON.stringify({ authority: { currentDirectUserTask: 'make the mutation' } });
+    const session = kernelSession('/tmp/native-project');
     const run = await registered.start({
       prompt: [{ type: 'text', text: task }],
-      parent: { session: kernelSession('/tmp/native-project') },
+      parent: { session },
       signal: new AbortController().signal,
     });
 
@@ -1025,6 +1234,20 @@ describe('Major DSH workstation kernel', () => {
         },
       ],
     });
+    expect(kernel.latestRunInsight(session)).toMatchObject({
+      skills: ['safe-edit'],
+      timing: {
+        durationMs: expect.any(Number),
+        stages: {
+          admissionAndRoutingMs: expect.any(Number),
+          leaseWaitMs: expect.any(Number),
+          workerExecutionMs: expect.any(Number),
+          goalReportMs: expect.any(Number),
+          leaseReleaseMs: expect.any(Number),
+          reviewMs: null,
+        },
+      },
+    });
     await run.dispose();
     expect(argv.map((args) => args.slice(1, 4))).toEqual([
       ['session', 'attach', '--cwd'],
@@ -1037,6 +1260,7 @@ describe('Major DSH workstation kernel', () => {
       ['resource', 'release', '--lease'],
       ['resource', 'release', '--lease'],
       ['resource', 'release', '--lease'],
+      ['history', 'record', '--project'],
     ]);
     await expect(run.result).resolves.toMatchObject({
       stopReason: 'completed',

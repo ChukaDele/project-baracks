@@ -1,4 +1,5 @@
 import type { ExecuteRequest } from './types.js';
+import { configuredExecutionPath } from '../execution/path.js';
 
 export type ProviderCommandHost = 'claude' | 'codex' | 'cursor' | 'antigravity';
 export type ProviderOutputMode = 'batch' | 'stream';
@@ -22,10 +23,10 @@ export function providerSupportsVendorResume(host: ProviderCommandHost): boolean
     case 'claude':
       return false;
     case 'codex':
-      // Each Lima run gets a fresh ephemeral Codex home, so a vendor session
-      // reference cannot be resumed across runs even though the CLI has a
-      // resume subcommand for environments that persist its local state.
-      return false;
+      // The host path keeps the provider-owned session store readable for
+      // explicit resume. Lima runs remain ephemeral and must continue from
+      // Major's durable goal summary instead.
+      return configuredExecutionPath() === 'host';
   }
 }
 
@@ -64,6 +65,7 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
       return args;
     }
     case 'codex': {
+      const persistenceArgs = configuredExecutionPath() === 'host' ? [] : ['--ephemeral'];
       const args = request.resumeSessionRef
         ? [
             'exec',
@@ -80,7 +82,7 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
             '--sandbox',
             'read-only',
             '--ignore-user-config',
-            '--ephemeral',
+            ...persistenceArgs,
             '--json',
             request.prompt,
           ];
@@ -117,10 +119,10 @@ export function providerExecuteArgs(host: ProviderCommandHost, request: ExecuteR
   return providerArgs(host, { ...request, outputMode: 'stream' });
 }
 
-/** Codex's Bubblewrap sandbox cannot create its network namespace inside the
- * Lima guest. Workshop execution already has an external VM and project
- * boundary, so disable only the nested OS sandbox after Workshop authority is
- * established. Approval bypass remains forbidden. */
+/** Codex cannot apply a second macOS sandbox inside Major's Seatbelt. The
+ * selected Major boundary remains authoritative on the host path, so disable
+ * only Codex's nested sandbox there. Lima has its own VM and project boundary,
+ * and retains the same compatibility mode. Approval bypass remains forbidden. */
 export function providerWorkshopArgs(
   host: ProviderCommandHost,
   args: readonly string[],

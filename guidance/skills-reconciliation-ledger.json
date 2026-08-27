@@ -1,0 +1,703 @@
+{
+  "version": 1,
+  "candidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+  "policy": {
+    "sourceHashes": "Historical source hashes gate only capabilities that materially copy or depend on unverifiable source. Every staged promoted skill is a localized internal procedure and retains the source-ledger reference.",
+    "activation": "Registry, body, resolver fixture and immutable bundle are atomic. Project policy retains all mutation authority."
+  },
+  "entries": [
+    {
+      "id": "project-start",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "project-context-integrity",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "workspace-lifecycle-management",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "mvp-speed-prioritisation",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "legacy-cleanup",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "major-self-maintenance",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "skill-resolver",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "learning-capture",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "skillify",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "tools-as-code",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "design-direction-and-taste",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "remote-first-web-development",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "website-design-qa",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "seo-os",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "responsive-motion-systems",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "human-blocker-orchestration",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "dev-server-management",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "mcp-integration-ops",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "source-ingestion",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "knowledge-work",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "presentation-storylining",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "competitive-product-audit",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "open-source-leverage",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "prior-art-discovery",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "simple-modular-code",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "vertical-slice-delivery",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "nontechnical-ux",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "lean-graph-engineering",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "behavior-reward-system",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "root-cause-qa",
+      "disposition": "MERGE",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "ci-recovery",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "lean-quality",
+      "disposition": "MERGE",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "performance-caching",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "exact-head-pr-review",
+      "disposition": "MERGE",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "rapid-ui-prototype",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "data-learning-loop",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "source-adapter-engineering",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "pdf-reporting-qa",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "cost-control",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "exploratory-creative-dev",
+      "disposition": "KEEP_AS_IS",
+      "source": "major-internal",
+      "status": "active"
+    },
+    {
+      "id": "emil-kowalski-complete",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:emilkowalski/skills",
+      "status": "active"
+    },
+    {
+      "id": "frontend-design",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:anthropics/skills",
+      "status": "active"
+    },
+    {
+      "id": "webapp-testing",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:anthropics/skills",
+      "status": "active"
+    },
+    {
+      "id": "mcp-builder",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:anthropics/skills",
+      "status": "active"
+    },
+    {
+      "id": "skill-creator",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:anthropics/skills",
+      "status": "active"
+    },
+    {
+      "id": "algorithmic-art",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:anthropics/skills",
+      "status": "active"
+    },
+    {
+      "id": "playwright",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:openai/skills",
+      "status": "active"
+    },
+    {
+      "id": "vercel-deploy",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:openai/skills",
+      "status": "active"
+    },
+    {
+      "id": "figma-use",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:openai/skills",
+      "status": "active"
+    },
+    {
+      "id": "figma-implement-design",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:openai/skills",
+      "status": "active"
+    },
+    {
+      "id": "figma-generate-design",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:openai/skills",
+      "status": "active"
+    },
+    {
+      "id": "security-threat-model",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:openai/skills",
+      "status": "active"
+    },
+    {
+      "id": "pdf",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:openai/skills",
+      "status": "active"
+    },
+    {
+      "id": "graph-engineering",
+      "disposition": "KEEP_AS_IS",
+      "source": "github:codejunkie99/graph-engineering",
+      "status": "active"
+    },
+    {
+      "id": "software-engineering",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "planning",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "worktree",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "tdd",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "debugging",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "review",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "verification",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "dependency",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "deployment",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "incident",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "architecture",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "api",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "database",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "frontend",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "performance",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "observability",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "auth-security",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "migration",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "integration",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "concurrency",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "engineering-design-doctrine",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "codebase-design",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "domain-modeling",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "controller-bookkeeping",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "ar-ap-invoice",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "reconciliation-close-statements",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "fpa-forecasting-extrapolation",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "valuation-investment-ma",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "deterministic-accounting-boundary",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "executive-assistant",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "chief-of-staff-boundary",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "operations-improvement-core",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "product-management-core",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "browser-release-qa",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "security-audit",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "staged-quality-controls",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "cross-modal-review",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "sales-commercial-core",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "reusable-asset-discovery",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "capability-freshness",
+      "disposition": "UPDATE_CANONICAL",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+      "sourceHashDisposition": "localized-independent-content"
+    }
+  ]
+}

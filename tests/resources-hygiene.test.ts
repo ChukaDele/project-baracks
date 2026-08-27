@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   classifyResource,
   isProtectedClass,
+  readGcRoots,
   scanInventory,
   workerInstanceForSha,
   type ClassifiedResource,
@@ -444,6 +445,28 @@ describe('Major resource hygiene', () => {
     expect(freshCache.class).toBe('cache');
   });
 
+  it('retains evidence-bearing receipts, performance history, incidents, outcomes and validated learning', () => {
+    const dir = home();
+    writeRoots(dir);
+    const now = Date.parse('2026-08-17T12:00:00.000Z');
+    for (const identity of [
+      'run-receipts.jsonl',
+      'performance-history.jsonl',
+      'incidents.jsonl',
+      'outcomes.jsonl',
+      'validated-learnings.jsonl',
+    ]) {
+      const result = classifyResource(
+        { kind: 'log', identity, createdAtMs: now - 365 * 24 * 60 * 60 * 1000 },
+        readGcRoots(dir),
+        { byInstance: {}, complete: true },
+        now,
+      );
+      expect(result).toMatchObject({ class: 'active', reclaimable: false });
+      expect(result.reason).toMatch(/durable run evidence\/history/);
+    }
+  });
+
   it('converges repeated installs to a bounded footprint', () => {
     const dir = home();
     writeRoots(dir);
@@ -550,6 +573,7 @@ describe('Major resource hygiene', () => {
         'provider-auth',
         'active-vm',
         'active-release',
+        'historical-evidence',
       ]),
     );
     const activeRelease: ClassifiedResource = {

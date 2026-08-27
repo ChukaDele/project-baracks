@@ -1,0 +1,7 @@
+{
+  "skill": "product-management-core",
+  "should_trigger": [
+    "Turn customer evidence into a bounded product requirement, acceptance criteria, and outcome measure."
+  ],
+  "should_not_trigger": ["Write the database migration for the requested field."]
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Install the attested DeepSeek Harness pin into an isolated DSH_HOME.
-# Normal trusted repository work runs through native DSH providers on the Mac.
+# Install the attested DeepSeek Harness pin into an isolated legacy DSH_HOME.
+# Normal trusted repository work runs through headless Major host execution.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -683,7 +683,7 @@ fi
 write_install_record
 commit_managed_transaction
 
-echo "DeepSeek Harness pin staged. Normal trusted repository execution defaults to DSH local."
+echo "DeepSeek Harness pin staged for explicit compatibility use. Normal trusted repository execution defaults to headless Major host execution."
 echo "DSH Lima and the legacy Major/Lima pipeline remain explicit compatibility choices."
 echo "Native Major.app records interaction origin major-app/dsh; MAJOR_SESSION_HOST is only for /major from an external host."
 echo "Native Major.app uses the co-versioned control plane at $MAJOR_CONTROL_PLANE_DEST/bin/major."

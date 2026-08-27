@@ -1,6 +1,6 @@
 {
   "name": "major",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Major — thin cross-project control plane with immutable runtime releases, project-context integrity, closed-loop learning and evidence-driven delivery",
   "type": "module",
   "private": true,
@@ -36,6 +36,7 @@
     "better-sqlite3": "^12.2.0",
     "commander": "^14.0.0",
     "drizzle-orm": "^0.44.4",
+    "yaml": "2.8.1",
     "zod": "^4.0.14"
   },
   "devDependencies": {

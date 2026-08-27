@@ -9,19 +9,27 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { auditSkillReachability, resolveSkills } from '../src/skills/resolver.js';
 import { runSkillCli } from '../src/skills/cli.js';
 
 const roots: string[] = [];
 const priorMajorHome = process.env.MAJOR_HOME;
 const priorSkillsRegistry = process.env.MAJOR_SKILLS_REGISTRY;
+const priorSkillEvals = process.env.MAJOR_SKILLS_EVALS;
+
+beforeEach(() => {
+  process.env.MAJOR_SKILLS_REGISTRY = join(process.cwd(), 'guidance', 'skills.registry.json');
+  process.env.MAJOR_SKILLS_EVALS = join(process.cwd(), 'evals', 'skill-resolver');
+});
 
 afterEach(() => {
   if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
   else process.env.MAJOR_HOME = priorMajorHome;
   if (priorSkillsRegistry === undefined) delete process.env.MAJOR_SKILLS_REGISTRY;
   else process.env.MAJOR_SKILLS_REGISTRY = priorSkillsRegistry;
+  if (priorSkillEvals === undefined) delete process.env.MAJOR_SKILLS_EVALS;
+  else process.env.MAJOR_SKILLS_EVALS = priorSkillEvals;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -61,6 +69,15 @@ describe('runtime skill resolver', () => {
     }
   });
 
+  it('resolves a canonical skill by a retained non-ID alias', () => {
+    expect(
+      resolveSkills({
+        task: 'Perform a root cause analysis for this regression.',
+        limit: 3,
+      }).skills.map((skill) => skill.id),
+    ).toContain('root-cause-qa');
+  });
+
   it('prefers the immutable runtime skill over an untrusted legacy mutable global copy', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-mutable-skills-'));
     roots.push(home);
@@ -77,6 +94,8 @@ describe('runtime skill resolver', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-hot-skills-'));
     roots.push(home);
     process.env.MAJOR_HOME = home;
+    delete process.env.MAJOR_SKILLS_REGISTRY;
+    delete process.env.MAJOR_SKILLS_EVALS;
     const bundle = join(home, 'skill-bundles', '0123456789abcdef0123456789abcdef01234567');
     mkdirSync(join(bundle, 'guidance'), { recursive: true });
     mkdirSync(join(bundle, 'skills', 'internal', 'hot-skill'), { recursive: true });
@@ -113,7 +132,7 @@ describe('runtime skill resolver', () => {
     );
   });
 
-  it('ignores a stale hot bundle whose registry predates the immutable release', () => {
+  it('ignores a malformed hot bundle even when it declares an older registry version', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-stale-hot-skills-'));
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -122,7 +141,7 @@ describe('runtime skill resolver', () => {
     mkdirSync(join(bundle, 'skills', 'internal', 'stale-hot-skill'), { recursive: true });
     writeFileSync(
       join(bundle, 'bundle.json'),
-      JSON.stringify({ version: 1, sha: 'fedcba9876543210fedcba9876543210fedcba98' }),
+      JSON.stringify({ version: 1, sha: 'not-a-valid-bundle-hash' }),
     );
     writeFileSync(
       join(bundle, 'guidance', 'skills.registry.json'),
