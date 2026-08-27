@@ -144,7 +144,9 @@ git worktree add --detach "$BUILD_WORKTREE" "$INSTALL_SHA" >/dev/null
   cd "$BUILD_WORKTREE"
   corepack enable >/dev/null 2>&1 || true
   corepack pnpm install --frozen-lockfile
-  bash scripts/validate-major-release.sh "$INSTALL_STAGE/runtime"
+  RELEASE_GATE_HOME="$INSTALL_STAGE/test-major-home"
+  mkdir -p "$RELEASE_GATE_HOME"
+  MAJOR_HOME="$RELEASE_GATE_HOME" bash scripts/validate-major-release.sh "$INSTALL_STAGE/runtime"
 )
 git worktree remove --force "$BUILD_WORKTREE"
 BUILD_WORKTREE=""
