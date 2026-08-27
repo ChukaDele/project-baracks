@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { handleMajorMcpRequest } from '../src/mcp/server.js';
+import { handleMajorMcpRequest, resolveMajorMcpCwd } from '../src/mcp/server.js';
 
 describe('Major MCP server', () => {
+  it('accepts an explicit client working directory without changing the default', () => {
+    expect(resolveMajorMcpCwd([], '/Users/example/project')).toBe('/Users/example/project');
+    expect(resolveMajorMcpCwd(['--cwd', '/Users/example/other'], '/Users/example/project')).toBe(
+      '/Users/example/other',
+    );
+    expect(() => resolveMajorMcpCwd(['--cwd'], '/Users/example/project')).toThrow(
+      'usage: major mcp serve [--cwd <repo>]',
+    );
+  });
+
   it('negotiates the standard MCP initialize request', async () => {
     const result = await handleMajorMcpRequest({
       jsonrpc: '2.0',
