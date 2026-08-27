@@ -6,13 +6,14 @@ import { runLearningLifecycleCli } from './learning/lifecycle-cli.js';
 import { runSkillCli } from './skills/cli.js';
 import { runProviderLifecycleCli } from './providers/lifecycle-cli.js';
 import { runSupervisorCli } from './supervisor/cli.js';
-import { runMajorMcpServer } from './mcp/server.js';
+import { resolveMajorMcpCwd, runMajorMcpServer } from './mcp/server.js';
 
 try {
   const args = process.argv.slice(2);
   if (args[0] === 'mcp') {
     if (args[1] !== 'serve') throw new Error('usage: major mcp serve');
-    await runMajorMcpServer(process.cwd());
+    const mcpArgs = args.slice(2);
+    await runMajorMcpServer(resolveMajorMcpCwd(mcpArgs));
   } else {
     const projectContextHandled = await runProjectContextCli(args);
     if (!projectContextHandled) {

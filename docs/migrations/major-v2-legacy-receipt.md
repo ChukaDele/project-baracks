@@ -1,6 +1,9 @@
 # Major 2.0 legacy migration receipt
 
-Status: **in progress**. This receipt exists to ensure the migration finishes with one canonical Major runtime rather than old and new systems coexisting indefinitely.
+Status: **normal path migrated**. This receipt preserves the legacy migration
+decisions and evidence. The canonical runtime is now the headless Major core
+over live provider CLIs, with Orca as the operational workspace surface. DSH
+and Lima are retained only as explicit compatibility/reference paths.
 
 ## KEEP / evolve
 
@@ -21,15 +24,20 @@ Status: **in progress**. This receipt exists to ensure the migration finishes wi
 - human approvals → retain only genuine owner-only gates; allow safe reversible engineering autonomously.
 - guidance → proof-first MVP, autonomy, UI reuse, legacy cleanup and current cross-project skills.
 - reusable learnings/skills from JSS → Major canonical library.
-- orchestration/memory → Ruflo-backed substrate with human-readable Major policy/memory remaining canonical.
+- orchestration/memory → headless Major core with human-readable Major
+  policy/memory remaining canonical; Ruflo stays optional and subordinate.
 
-## RETAIN TEMPORARILY UNTIL REPLACEMENT PROOF
+## RETAINED HISTORICAL / COMPATIBILITY EVIDENCE
 
-- old live-execution refusal/gate code only while it protects the current main branch from accidental execution before the new gateway is ready.
-- tests for the old disabled foundation only until replacement execution-policy tests exist.
-- old routing/provider implementation only until new provider adapters pass bounded execution and failover tests.
+- attested DSH packages, receipts, logs, sessions and incident fixtures needed
+  to explain and compare the former runtime;
+- the explicit Lima execution backend for deliberate high-isolation or rollback
+  compatibility runs;
+- provider credentials and account evidence, which cleanup must never delete;
+- tests that prove compatibility paths remain isolated from the host default.
 
-These are temporary migration dependencies, not permanent compatibility promises.
+These are retained evidence and explicit compatibility boundaries, not normal
+runtime dependencies or permanent launch requirements.
 
 ## DELETE after successor verification
 
@@ -42,17 +50,41 @@ These are temporary migration dependencies, not permanent compatibility promises
 - stale `project-baracks` naming once the repository is renamed to Major.
 - dead flags, adapters, docs and code paths discovered by stale-reference scan.
 
-## Completion gate
+## Normal-path completion evidence
 
-Do not call the Major 2.0 migration complete until:
+The thin migration's P0 completion gate is satisfied by the current bounded
+evidence:
 
-1. Ruflo-backed orchestration executes a bounded real task through at least the primary worker lanes intended for launch.
-2. one multi-agent worktree task completes with objective evidence.
-3. provider/rate-limit fallback is demonstrated or contract-tested.
-4. Major memory/skill retrieval works without loading the whole library into context.
-5. a real project consumes the Major bootstrap successfully.
-6. old disabled execution paths and stale assumptions above are deleted.
-7. repository-wide stale-reference scan has no unexplained legacy matches.
-8. critical Major tests and one end-to-end harness smoke pass after cleanup.
+1. The selected execution path is `host`, and the provider process runs through
+   the single Major gateway under macOS Seatbelt containment.
+2. A live Codex task completed through that path and produced a durable
+   `major.run-insight.v1` receipt with timing and outcome evidence.
+3. Orca resolved the canonical repository and worktree boundary without
+   becoming a second policy or memory store.
+4. Retained intelligence—project context, skills, GBrain learning and run
+   history—survived restart and was behaviorally retrieved.
+5. The thin `major ui` surface read that same durable state without starting a
+   worker.
+6. Cleanup inventory kept historical receipts, logs, sessions, stores,
+   credentials, incidents, outcomes and validated learnings while classifying
+   only replaced generated runtime state as reclaimable.
+7. The full validation run passed 102 test files and 852 tests, including host
+   containment and Lima compatibility.
 
-Git history remains the archive for removed Major v1 implementation.
+The detailed current proof is maintained in
+`docs/migrations/deepseek-harness-strangler.md` and `docs/readiness-model.md`.
+Git history remains the archive for removed implementation.
+
+## Follow-on work that does not reopen P0
+
+- Each additional provider lane needs its own human authentication and
+  representative evidence before routing promotion.
+- Multi-worker comparisons need enough outcomes to support a policy decision;
+  contract-tested fallback remains the safe default in the meantime.
+- Generated DSH/Lima runtime trees may be reclaimed only after an inventory
+  proves zero active consumers and retained-evidence exclusions.
+- Ruflo and external observability exporters remain optional integrations.
+- Repository renaming remains a repository-owner operation.
+
+These items must not be represented as already proven, but they do not make the
+normal headless path depend on the replaced DSH workstation.

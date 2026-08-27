@@ -1,4 +1,6 @@
 import { createInterface } from 'node:readline';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { answerMajorMessage, buildMajorDashboard, type MajorDashboard } from '../ui/dashboard.js';
 
 const MCP_PROTOCOL_VERSION = '2024-11-05';
@@ -11,6 +13,8 @@ export interface MajorMcpRequest {
   id?: JsonRpcId;
   method?: string;
   params?: Record<string, unknown>;
+  result?: unknown;
+  error?: { code?: number; message?: string };
 }
 
 interface MajorMcpResponse {
@@ -90,6 +94,28 @@ function textToolResult(value: unknown, isError = false) {
     content: [{ type: 'text' as const, text: JSON.stringify(value) }],
     ...(isError ? { isError: true } : {}),
   };
+}
+
+/** Resolve the optional explicit working directory used by clients that do not pass workspace roots. */
+export function resolveMajorMcpCwd(args: readonly string[], baseCwd = process.cwd()): string {
+  if (args.length === 0) return resolve(baseCwd);
+  if (args.length === 2 && args[0] === '--cwd' && args[1]?.trim()) {
+    return resolve(baseCwd, args[1]);
+  }
+  throw new Error('usage: major mcp serve [--cwd <repo>]');
+}
+
+function rootPathFromResult(value: unknown): string | undefined {
+  if (!isRecord(value) || !Array.isArray(value.roots)) return undefined;
+  for (const root of value.roots) {
+    if (!isRecord(root) || typeof root.uri !== 'string') continue;
+    try {
+      if (new URL(root.uri).protocol === 'file:') return resolve(fileURLToPath(root.uri));
+    } catch {
+      // Ignore malformed or non-local roots and fall back to the explicit/default cwd.
+    }
+  }
+  return undefined;
 }
 
 function requestArguments(request: MajorMcpRequest): Record<string, unknown> {
@@ -178,6 +204,53 @@ export async function handleMajorMcpRequest(
 /** Run the standard newline-delimited stdio MCP server used by Cursor. */
 export async function runMajorMcpServer(cwd = process.cwd()): Promise<void> {
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  let clientSupportsRoots = false;
+  let rootCwd: string | undefined;
+  let pendingRoots:
+    | {
+        id: string;
+        promise: Promise<string | undefined>;
+        resolve: (cwd: string | undefined) => void;
+      }
+    | undefined;
+  let nextRequestId = 1;
+
+  const requestRoots = (): void => {
+    if (pendingRoots || !clientSupportsRoots) return;
+    let resolveRoots!: (cwd: string | undefined) => void;
+    const promise = new Promise<string | undefined>((resolvePromise) => {
+      resolveRoots = resolvePromise;
+    });
+    const id = `major-roots-${nextRequestId++}`;
+    pendingRoots = { id, promise, resolve: resolveRoots };
+    const timeout = setTimeout(() => {
+      if (pendingRoots?.id !== id) return;
+      pendingRoots = undefined;
+      resolveRoots(undefined);
+    }, 1_500);
+    promise.then(
+      () => clearTimeout(timeout),
+      () => clearTimeout(timeout),
+    );
+    process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id, method: 'roots/list' })}\n`);
+  };
+
+  const processRequest = async (request: MajorMcpRequest): Promise<void> => {
+    if (request.method === 'initialize') {
+      const capabilities = request.params?.capabilities;
+      clientSupportsRoots = isRecord(capabilities) && isRecord(capabilities.roots);
+    }
+    if (request.method === 'notifications/initialized') requestRoots();
+    if (request.method === 'notifications/roots/list_changed') {
+      rootCwd = undefined;
+      requestRoots();
+    }
+    if (request.method === 'tools/call' && pendingRoots) rootCwd = await pendingRoots.promise;
+    const result = await handleMajorMcpRequest(request, rootCwd ?? cwd);
+    if (result) process.stdout.write(`${JSON.stringify(result)}\n`);
+  };
+
+  let queue = Promise.resolve();
   for await (const line of input) {
     if (!line.trim()) continue;
     let request: MajorMcpRequest;
@@ -191,7 +264,19 @@ export async function runMajorMcpServer(cwd = process.cwd()): Promise<void> {
       );
       continue;
     }
-    const result = await handleMajorMcpRequest(request, cwd);
-    if (result) process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (
+      pendingRoots &&
+      request.id === pendingRoots.id &&
+      request.method === undefined &&
+      (request.result !== undefined || request.error !== undefined)
+    ) {
+      const resolver = pendingRoots.resolve;
+      pendingRoots = undefined;
+      rootCwd = request.error ? undefined : rootPathFromResult(request.result);
+      resolver(rootCwd);
+      continue;
+    }
+    queue = queue.then(() => processRequest(request));
   }
+  await queue;
 }
