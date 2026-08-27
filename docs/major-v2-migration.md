@@ -1,6 +1,6 @@
 # Major 2.0 migration
 
-**Bottom line:** the Major 2.0 policy, skills, bootstrap, communication standard and reusable knowledge are being made canonical in this branch. The migration is **not runtime-complete** until Ruflo-backed execution replaces the old disabled Major v1 execution path and the remaining v1 code is deleted.
+**Bottom line:** the normal Major 2.0 path is now a headless Major core that uses live provider CLIs and Orca worktrees. The former DeepSeek Harness workstation and Lima worker are compatibility/reference surfaces, not the normal execution path. Ruflo and Langfuse remain optional future integrations. They are not blockers for the current intelligence loop because Major already persists structured run evidence and GBrain-backed meaning locally.
 
 ## Target
 
@@ -16,14 +16,14 @@ Major is the standalone cross-project engineering harness for Bredge, client, pe
 - **MVP/speed is the default.** Large briefs become P0 MVP / P1 next / P2 later; P0 is built end to end before broad expansion.
 - **Proof-first, not Figma-first.** Use the fastest credible medium for the biggest uncertainty.
 - **Visible progress matters.** UI/interaction proof may lead backend via explicit replaceable mocks/contracts.
-- **Normal substantive concurrency:** 3–4 useful workers, with a hard global ceiling of 6 active resources across the full task tree.
-- **Worker pools:** Claude, Codex, Antigravity and Cursor; route by task fit, subscription capacity and observed outcomes.
+- **Normal substantive concurrency:** Major derives worker, browser and build ceilings from live resource availability and task economics. The current guard permits up to four workers and six total active resources, but it does not promise that capacity or fill it automatically.
+- **Worker pools:** Claude, Codex, Antigravity and Cursor when installed, authenticated and operational. Major routes by task fit, subscription capacity and observed outcomes. Codex is the currently proven host lane in this migration.
 - **Skills:** Major internal catalog + complete current Emil bundle for UI + selected Anthropic/OpenAI/graph skills by profile/trigger.
 - **Communication:** BLUF + ASD-STE100-inspired simplified technical English across supported worker global/project instructions.
 - **Security:** minimum safety floor plus risk-proportional hardening, not enterprise ceremony before proof.
 - **Autonomy:** safe reversible work continues until acceptance or a genuine owner-only gate.
-- **Legacy:** Git is the archive; verified replacements delete obsolete active code/docs/config/names.
-- **Memory:** Major Git/Markdown is human-reviewable truth; Ruflo/AgentDB is a derived retrieval/index layer; project-sensitive knowledge stays isolated.
+- **Legacy:** Git and retained run evidence are the archive. Verified replacements remove obsolete active runtime state while keeping receipts, logs, sessions, stores, credentials and historical explanations.
+- **Memory:** GBrain is the durable organizational and project knowledge layer. The local run-insight store keeps compact receipts and performance history. Langfuse/OpenTelemetry can later receive high-volume telemetry without replacing GBrain.
 
 ## Completed in this migration layer
 
@@ -36,22 +36,21 @@ Major is the standalone cross-project engineering harness for Bredge, client, pe
 - global communication installer for Claude Code, Codex and Antigravity, with Cursor User Rule handoff;
 - explicit legacy cleanup protocol and migration receipt;
 - static Major validation script wired into CI;
-- removal/replacement of stale v1 docs and Surface Talent-specific core examples.
+- removal/replacement of stale v1 docs and Surface Talent-specific core examples;
+- headless host execution through the Major gateway, with the explicit Lima compatibility boundary retained;
+- Orca repository, worktree and terminal integration;
+- thin Major UI for intelligence and control;
+- structured run receipts, performance history, recurrence detection and evidence thresholds for learning;
+- preserved historical DSH receipts, logs, sessions, stores and provider-auth evidence.
 
-## Remaining runtime work
+## Remaining bounded work
 
-1. Keep the attested DeepSeek Harness pin current and verify the local-default workstation plus the optional Lima environment (`docs/migrations/deepseek-harness-strangler.md`).
-2. Integrate Ruflo as optional orchestration/memory substrate. It is not the agent loop; DeepSeek Harness is.
-3. Extend provider-native DSH adapters only when official subscription-backed integrations are proved.
-4. Enable bounded real execution, adaptive worktrees and continue-until loops.
-5. Import/index approved Major/project memories with namespace boundaries.
-6. Run the global communication/style installer on the development Mac and configure Cursor global User Rules.
-7. Bootstrap and execute a real managed project as the harness smoke test (JSS assist pilot).
-8. Verify provider/rate-limit failover and objective completion evidence.
-9. Delete old v1 disabled execution gates, obsolete tests/schema/docs/flags that no longer serve the target runtime — only after successor proof.
-10. Run the stale-reference, CI and end-to-end cleanup gate.
-11. Rename the repository from the legacy `project-baracks` name to `major` when the repo-control path is available.
+1. Complete human authentication for any provider lane that the owner wants to activate. Major must not copy credentials or claim field proof before that action.
+2. Gather comparable multi-worker outcome evidence before promoting a worker, skill or infrastructure change into routing policy.
+3. Finish the exact cleanup of any remaining generated DSH/Lima runtime trees after active-consumer and evidence-retention checks.
+4. Add a Langfuse/OpenTelemetry exporter only when high-volume telemetry needs an external observability sink. This is an additive seam, not a prerequisite for execution or learning.
+5. Rename the repository from the legacy `project-baracks` name to `major` when the repo-control path is available.
 
 ## Completion definition
 
-Use `docs/migrations/major-v2-legacy-receipt.md` as the migration gate. Major 2.0 is ready only when the new runtime completes a real bounded multi-agent task with evidence **and** the obsolete v1 execution path has been removed.
+Use `docs/migrations/major-v2-legacy-receipt.md` as the historical migration record and the current readiness evidence in `docs/readiness-model.md`. Normal Major 2.0 execution is ready when the headless path completes a bounded real task with a receipt, the intended provider/Orca boundary is behaviorally proven, and obsolete runtime state is removed only after its replacement and retained evidence are verified.

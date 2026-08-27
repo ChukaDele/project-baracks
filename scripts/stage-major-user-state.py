@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 MANAGED_START = "<!-- MAJOR-GLOBAL-START -->"
@@ -430,6 +431,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--record")
     parser.add_argument("--global-rules-record")
     parser.add_argument("--legacy-plist")
+    parser.add_argument("--execution-path", choices=("host", "lima"))
     parser.add_argument("--execution-config")
     return parser.parse_args()
 
@@ -454,6 +456,11 @@ def main() -> None:
 
     rules = global_base.read_text().rstrip() + "\n\n" + stability.read_text().strip() + "\n"
     entries: list[dict[str, str]] = []
+
+    if args.execution_path == "lima" and not args.execution_config:
+        raise SystemExit("Lima execution path requires an execution config")
+    if args.execution_path == "host" and args.execution_config:
+        raise SystemExit("host execution path must not stage a Lima execution config")
 
     stage_learning_state(stage, home, entries)
 
@@ -571,6 +578,27 @@ def main() -> None:
             ),
             home / ".gemini" / "config" / "plugins.json",
         )
+
+    if args.execution_path:
+        execution_path_stage = write_stage_file(
+            stage,
+            "execution-path.json",
+            json.dumps(
+                {
+                    "version": 1,
+                    "path": args.execution_path,
+                    "configuredAt": datetime.now(timezone.utc).isoformat(),
+                },
+                indent=2,
+            )
+            + "\n",
+        )
+        add_file(entries, execution_path_stage, home / ".major" / "execution-path.json")
+        if args.execution_path == "host":
+            # The host path does not consult Lima configuration. Remove a
+            # stale config during the same atomic swap so diagnostics and
+            # future rollback logic cannot mistake it for the active path.
+            add_absent(entries, home / ".major" / "execution.json")
 
     for label, source_arg, target in (
         ("execution-config", args.execution_config, home / ".major" / "execution.json"),

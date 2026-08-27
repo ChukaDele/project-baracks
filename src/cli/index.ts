@@ -49,7 +49,8 @@ import { dbDecisionRecorder } from '../security/audit.js';
 import { ExecutionGateway } from '../security/gateway.js';
 import { TrustedExecutableRegistry } from '../security/trusted-executables.js';
 import type { RunPurpose } from '../db/schema.js';
-import { majorExecutionBackend } from '../security/major-gateway.js';
+import { activeExecutionPathStatus, inspectMajorExecutionPath } from '../security/major-gateway.js';
+import { EXECUTION_PATHS, persistExecutionPath, type ExecutionPath } from '../execution/path.js';
 import {
   capabilityCandidateSchema,
   capabilityValidationSubject,
@@ -90,6 +91,44 @@ const program = new Command('major');
 program.description('Major — autonomous engineering supervisor');
 program.exitOverride();
 
+const execution = program
+  .command('execution')
+  .description('Select and inspect the active headless Major execution boundary');
+
+execution
+  .command('status')
+  .description('Report the selected execution boundary and its live containment')
+  .option('--json', 'emit versioned JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const selection = activeExecutionPathStatus();
+    const boundary = await inspectMajorExecutionPath();
+    const result = { selection, boundary };
+    if (opts.json) emitJson('execution-status', result);
+    else {
+      console.log(`path: ${selection.path}`);
+      console.log(`source: ${selection.source}`);
+      console.log(`config: ${selection.configPath}`);
+      console.log(`boundary: ${boundary.kind}`);
+      console.log(`available: ${boundary.available ? 'yes' : 'no'}`);
+      console.log(`filesystem isolation: ${boundary.filesystemIsolation ? 'yes' : 'no'}`);
+      console.log(`network isolation: ${boundary.networkIsolation ? 'yes' : 'no'}`);
+      console.log(`lifecycle isolation: ${boundary.lifecycleIsolation ? 'yes' : 'no'}`);
+      console.log(`detail: ${boundary.detail}`);
+    }
+  });
+
+execution
+  .command('select')
+  .description('Persist host as the normal path or lima as an explicit compatibility path')
+  .requiredOption('--path <path>', 'host or lima')
+  .action((opts: { path: string }) => {
+    if (!EXECUTION_PATHS.includes(opts.path as ExecutionPath)) {
+      return fail(`execution path must be host or lima, received ${opts.path}`, EXIT.usage);
+    }
+    const result = persistExecutionPath(opts.path as ExecutionPath);
+    console.log(JSON.stringify(result, null, 2));
+  });
+
 const history = program
   .command('history')
   .description('Record and report durable cross-run performance observations');
@@ -99,7 +138,7 @@ history
   .description('Persist one compact run-insight receipt (adapter command)')
   .requiredOption('--project <identity>', 'canonical project identity')
   .requiredOption('--receipt-base64 <json>', 'base64url-encoded major.run-insight.v1 receipt')
-  .option('--source <source>', 'observation adapter source', 'dsh')
+  .option('--source <source>', 'observation adapter source', 'major')
   .action((opts: { project: string; receiptBase64: string; source: string }) => {
     if (opts.source !== 'major' && opts.source !== 'dsh') {
       return fail('history source must be major or dsh', EXIT.usage);
@@ -254,7 +293,7 @@ program
         repoPath: p.repoPath,
       })),
       resolve: (name) => gateway.resolveExecutable(name),
-      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
+      inspectExecutionBackend: inspectMajorExecutionPath,
     });
     for (const info of freshReport.providers) {
       persistProviderDiscovery(database, info, { source: 'cli' });
@@ -378,7 +417,7 @@ async function buildSetupReport(database: Db) {
     providers: providers(gateway),
     configuredProjects: listProjects(database).map((p) => ({ name: p.name, repoPath: p.repoPath })),
     resolve: (name) => gateway.resolveExecutable(name),
-    inspectExecutionBackend: () => majorExecutionBackend().inspect(),
+    inspectExecutionBackend: inspectMajorExecutionPath,
   });
   for (const info of freshReport.providers) {
     persistProviderDiscovery(database, info, { source: 'cli' });
@@ -398,7 +437,7 @@ async function buildSetupReport(database: Db) {
 function printSetupReport(report: DoctorReport): void {
   console.log('MAJOR SETUP\n');
   console.log('Core');
-  console.log(`  isolated runner       ${report.core.ready ? '✓' : '✗'}`);
+  console.log(`  execution boundary    ${report.core.ready ? '✓' : '✗'}`);
   if (!report.core.ready) {
     for (const issue of report.core.issues) console.log(`  - ${issue}`);
   }
@@ -552,7 +591,7 @@ program
         repoPath: p.repoPath,
       })),
       resolve: (name) => gateway.resolveExecutable(name),
-      inspectExecutionBackend: () => majorExecutionBackend().inspect(),
+      inspectExecutionBackend: inspectMajorExecutionPath,
     });
     for (const info of freshReport.providers) {
       persistProviderDiscovery(database, info, { source: 'cli' });

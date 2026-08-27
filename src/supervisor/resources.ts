@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { freemem, totalmem } from 'node:os';
+import { availableParallelism, freemem, totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { majorHome } from './state.js';
 import { readSystemMemoryAvailablePercent } from '../security/system-memory.js';
@@ -29,8 +29,9 @@ export interface ResourceLimits {
 
 export const GLOBAL_RESOURCE_LIMITS: ResourceLimits = {
   total: 6,
-  // The configured DSH concurrency policy permits one worker slot.
-  workers: 1,
+  // Hard ceiling only. The active worker limit is derived from live host
+  // capacity by currentResourceLimits(); it is not a fixed governance count.
+  workers: 4,
   browsers: 2,
   builds: 1,
   maxSubagentDepth: 1,
@@ -174,6 +175,24 @@ export function availableMemoryPercent(): number {
   return Math.round((freemem() / totalmem()) * 100);
 }
 
+/**
+ * Derive the active resource ceiling from the current host instead of the
+ * retired DSH one-worker limit. The optional override is deliberately narrow:
+ * it is useful for deterministic validation and an owner-controlled
+ * workstation cap, but it can never exceed Major's hard ceiling.
+ */
+export function currentResourceLimits(): ResourceLimits {
+  const override = Number.parseInt(process.env.MAJOR_WORKER_LIMIT ?? '', 10);
+  const cpuLimit = Math.max(1, Math.min(GLOBAL_RESOURCE_LIMITS.workers, availableParallelism()));
+  const memory = availableMemoryPercent();
+  const memoryLimit = memory < 40 ? 1 : memory < 60 ? 2 : GLOBAL_RESOURCE_LIMITS.workers;
+  const workers =
+    Number.isInteger(override) && override > 0
+      ? Math.min(GLOBAL_RESOURCE_LIMITS.workers, override)
+      : Math.min(cpuLimit, memoryLimit);
+  return { ...GLOBAL_RESOURCE_LIMITS, workers };
+}
+
 function prune(store: ResourceStore, now = Date.now()): void {
   store.leases = store.leases.filter((lease) => {
     if (Date.parse(lease.expiresAt) <= now) return false;
@@ -188,7 +207,7 @@ function countKind(store: ResourceStore, kind: ResourceKind): number {
 function telemetry(
   store: ResourceStore,
   memoryAvailable = availableMemoryPercent(),
-  limits = GLOBAL_RESOURCE_LIMITS,
+  limits = currentResourceLimits(),
 ): ResourceTelemetry {
   return {
     workers: { active: countKind(store, 'worker'), limit: limits.workers },
@@ -205,7 +224,7 @@ function capacityReason(
   store: ResourceStore,
   kind: ResourceKind,
   memoryAvailable: number,
-  limits = GLOBAL_RESOURCE_LIMITS,
+  limits = currentResourceLimits(),
 ): string | undefined {
   if (memoryAvailable < limits.softMemoryAvailablePercent) {
     return `memory available ${memoryAvailable}% is below the ${limits.softMemoryAvailablePercent}% soft floor`;
@@ -236,7 +255,7 @@ function leaseFrom(request: QueuedResourceRequest, now = Date.now()): ResourceLe
 function promoteQueued(
   store: ResourceStore,
   memoryAvailable: number,
-  limits = GLOBAL_RESOURCE_LIMITS,
+  limits = currentResourceLimits(),
 ): void {
   for (let index = 0; index < store.queue.length;) {
     const request = store.queue[index]!;
@@ -257,7 +276,7 @@ function requestDepth(
   store: ResourceStore,
   kind: ResourceKind,
   parentLeaseId: string | undefined,
-  limits = GLOBAL_RESOURCE_LIMITS,
+  limits = currentResourceLimits(),
 ): { depth: number; rejection?: string } {
   if (!parentLeaseId) return { depth: 0 };
   if (kind !== 'worker')
@@ -286,18 +305,27 @@ export function requestResource(input: {
 }): ResourceRequestResult {
   return withStoreLock((store) => {
     const memoryAvailable = availableMemoryPercent();
+    const limits = currentResourceLimits();
     prune(store);
-    promoteQueued(store, memoryAvailable);
+    promoteQueued(store, memoryAvailable, limits);
     const existing = store.leases.find(
       (lease) => lease.kind === input.kind && lease.owner === input.owner,
     );
     if (existing)
-      return { status: 'active', lease: existing, telemetry: telemetry(store, memoryAvailable) };
+      return {
+        status: 'active',
+        lease: existing,
+        telemetry: telemetry(store, memoryAvailable, limits),
+      };
     const queued = store.queue.find(
       (request) => request.kind === input.kind && request.owner === input.owner,
     );
     if (queued)
-      return { status: 'queued', request: queued, telemetry: telemetry(store, memoryAvailable) };
+      return {
+        status: 'queued',
+        request: queued,
+        telemetry: telemetry(store, memoryAvailable, limits),
+      };
 
     const parentLeaseId = input.parentLeaseId ?? process.env.MAJOR_RESOURCE_LEASE_ID;
     const depth = requestDepth(store, input.kind, parentLeaseId);
@@ -305,7 +333,7 @@ export function requestResource(input: {
       return {
         status: 'rejected',
         reason: depth.rejection,
-        telemetry: telemetry(store, memoryAvailable),
+        telemetry: telemetry(store, memoryAvailable, limits),
       };
     }
     const request: QueuedResourceRequest = {
@@ -320,15 +348,19 @@ export function requestResource(input: {
       ...(parentLeaseId ? { parentLeaseId } : {}),
       ...(input.pid !== undefined ? { pid: input.pid } : {}),
     };
-    const reason = capacityReason(store, input.kind, memoryAvailable);
+    const reason = capacityReason(store, input.kind, memoryAvailable, limits);
     if (reason) {
       request.reason = reason;
       store.queue.push(request);
-      return { status: 'queued', request, telemetry: telemetry(store, memoryAvailable) };
+      return {
+        status: 'queued',
+        request,
+        telemetry: telemetry(store, memoryAvailable, limits),
+      };
     }
     const lease = leaseFrom(request);
     store.leases.push(lease);
-    return { status: 'active', lease, telemetry: telemetry(store, memoryAvailable) };
+    return { status: 'active', lease, telemetry: telemetry(store, memoryAvailable, limits) };
   });
 }
 
@@ -339,12 +371,13 @@ export function resourceSnapshot(): {
 } {
   return withStoreLock((store) => {
     const memoryAvailable = availableMemoryPercent();
+    const limits = currentResourceLimits();
     prune(store);
-    promoteQueued(store, memoryAvailable);
+    promoteQueued(store, memoryAvailable, limits);
     return {
       leases: [...store.leases],
       queue: [...store.queue],
-      telemetry: telemetry(store, memoryAvailable),
+      telemetry: telemetry(store, memoryAvailable, limits),
     };
   });
 }
@@ -409,8 +442,9 @@ export function releaseResource(leaseId: string): ResourceTelemetry {
     }
     store.leases = store.leases.filter((lease) => lease.id !== leaseId);
     const memoryAvailable = availableMemoryPercent();
-    promoteQueued(store, memoryAvailable);
-    return telemetry(store, memoryAvailable);
+    const limits = currentResourceLimits();
+    promoteQueued(store, memoryAvailable, limits);
+    return telemetry(store, memoryAvailable, limits);
   });
 }
 
@@ -419,8 +453,9 @@ export function cancelResourceRequest(requestId: string): ResourceTelemetry {
     prune(store);
     store.queue = store.queue.filter((request) => request.id !== requestId);
     const memoryAvailable = availableMemoryPercent();
-    promoteQueued(store, memoryAvailable);
-    return telemetry(store, memoryAvailable);
+    const limits = currentResourceLimits();
+    promoteQueued(store, memoryAvailable, limits);
+    return telemetry(store, memoryAvailable, limits);
   });
 }
 

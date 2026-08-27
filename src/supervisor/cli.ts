@@ -161,6 +161,24 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   const command = args[0];
   if (!command) return false;
 
+  if (command === 'ui') {
+    if (hasFlag(args, '--help') || hasFlag(args, '-h')) {
+      console.log('major ui [--port <port>]  start the thin local Major intelligence surface');
+      return true;
+    }
+    const portRaw = flag(args, '--port');
+    const port = portRaw === undefined ? undefined : Number.parseInt(portRaw, 10);
+    if (
+      portRaw !== undefined &&
+      (port === undefined || !Number.isInteger(port) || port < 0 || port > 65_535)
+    ) {
+      throw new Error('--port must be an integer from 0 to 65535');
+    }
+    const { startMajorUi } = await import('../ui/server.js');
+    await startMajorUi({ ...(port !== undefined ? { port } : {}) });
+    return true;
+  }
+
   if (command === 'stop') {
     requestGlobalStop(flag(args, '--reason') ?? 'manual kill switch');
     console.log('Major global kill switch: ACTIVE');

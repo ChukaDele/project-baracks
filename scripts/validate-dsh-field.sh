@@ -32,6 +32,6 @@ bash scripts/install-deepseek-harness-pin.sh --dry-run
 cat <<'EOF'
 
 DSH source validation passed.
-Normal trusted repository work defaults to native DSH providers in the local environment.
+Normal trusted repository work defaults to headless Major host execution.
 DSH Lima and legacy Major/Lima remain explicit compatibility choices.
 EOF

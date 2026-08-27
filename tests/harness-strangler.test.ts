@@ -240,7 +240,9 @@ describe('DeepSeek Harness cutover install plan', () => {
       expect(output).toContain('compose pinned profile major-workstation-web');
       expect(output).toContain('stage isolated Codex worker home');
       expect(output).toContain('Major.app');
-      expect(output).toContain('Normal trusted repository execution defaults to DSH local');
+      expect(output).toContain(
+        'Normal trusted repository execution defaults to headless Major host execution.',
+      );
       expect(output).toContain('MAJOR_SESSION_HOST');
       expect(existsSync(target)).toBe(false);
     } finally {
@@ -626,7 +628,7 @@ describe('major harness CLI', () => {
     capture();
     expect(await runHarnessCli(['harness', 'status'])).toBe(true);
     expect(logs.join('\n')).toMatch(/phase: cutover/);
-    expect(logs.join('\n')).toMatch(/live execution backend: dsh/);
+    expect(logs.join('\n')).toMatch(/historical DSH execution backend: dsh/);
     logs.length = 0;
     expect(await runHarnessCli(['harness', 'compose'])).toBe(true);
     expect(logs.join('\n')).toContain(

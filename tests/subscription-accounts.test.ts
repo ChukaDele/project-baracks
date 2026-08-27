@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   contextContinuity,
   lastCapacityKey,
@@ -7,6 +7,19 @@ import {
 import type { ProviderInfo } from '../src/providers/types.js';
 import { HOST_PROVIDERS } from '../src/supervisor/runtime.js';
 import { model } from './helpers.js';
+
+let priorExecutionPath: string | undefined;
+
+beforeEach(() => {
+  priorExecutionPath = process.env.MAJOR_EXECUTION_PATH;
+  // Existing compatibility assertions describe the ephemeral Lima adapter.
+  process.env.MAJOR_EXECUTION_PATH = 'lima';
+});
+
+afterEach(() => {
+  if (priorExecutionPath === undefined) delete process.env.MAJOR_EXECUTION_PATH;
+  else process.env.MAJOR_EXECUTION_PATH = priorExecutionPath;
+});
 
 function codexAccount(
   label: 'default' | 'work-b' | 'work-c',
@@ -199,6 +212,21 @@ describe('context continuity', () => {
     expect(hop.promptBlock).toMatch(/without resuming a vendor session/);
     expect(hop.promptBlock).toContain('wired the provider router');
     expect(hop.promptBlock).not.toContain('sess-codex');
+  });
+
+  it('resumes a Codex session on the persistent host path when the account is unchanged', () => {
+    process.env.MAJOR_EXECUTION_PATH = 'host';
+    const host = contextContinuity({
+      lastCoordinator: 'codex',
+      lastAccountLabel: 'default',
+      lastSessionRef: 'sess-host-codex',
+      lastSummary: 'continued the migration',
+      nextHost: 'codex',
+      nextAccountLabel: 'default',
+    });
+    expect(host.resumeSessionRef).toBe('sess-host-codex');
+    expect(host.promptBlock).toMatch(/Resuming the vendor session/);
+    expect(host.promptBlock).not.toContain('sess-host-codex');
   });
 
   it('encodes last coordinator plus account as a capacity key', () => {

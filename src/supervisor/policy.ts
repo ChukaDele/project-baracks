@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
+import { GLOBAL_RESOURCE_LIMITS } from './resources.js';
 import { gitCommonDir, majorHome } from './state.js';
 import type { WorkerHost } from './state.js';
 
@@ -71,9 +72,20 @@ function limitsFor(
     case 'assist':
       return { maxWorkers: 1, maxRunMinutes: 30, allowBackground: false };
     case 'build':
-      return { maxWorkers: 1, maxRunMinutes: 120, allowBackground: false };
+      return {
+        // Policy stores the hard project ceiling. The resource ledger applies
+        // the current CPU/memory limit at admission, so transient pressure
+        // cannot permanently rewrite a build policy to one worker.
+        maxWorkers: GLOBAL_RESOURCE_LIMITS.workers,
+        maxRunMinutes: 120,
+        allowBackground: false,
+      };
     case 'unattended':
-      return { maxWorkers: 1, maxRunMinutes: 480, allowBackground: true };
+      return {
+        maxWorkers: GLOBAL_RESOURCE_LIMITS.workers,
+        maxRunMinutes: 480,
+        allowBackground: true,
+      };
   }
 }
 

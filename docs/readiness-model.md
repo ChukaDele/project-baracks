@@ -1,4 +1,4 @@
-# Readiness model (v0.5.2)
+# Readiness model (v0.5.3)
 
 This document replaces the earlier mental model where a single global `live-agent-execution`
 capability boolean meant "every provider has passed release field validation." That conflated
@@ -22,14 +22,13 @@ one-shot action.
 
 Three independent layers, computed in `src/doctor/readiness.ts`:
 
-1. **Core platform safety** (`computeCoreReadiness`) — is the isolated Lima runner mechanism
-   itself sound: containment (filesystem/network/lifecycle isolation), the credential broker,
-   guest-user isolation, required prerequisites. This is what `live-agent-execution` now gates
-   (see `src/security/capabilities.ts`) — a property of the *code*, not of any provider's auth
-   state. It was independently verified this session: `LimaBackend.inspect()` reports isolation
-   sound, the provider-auth staging/broker (`scripts/manage-major-provider-state.py`) enforces
-   root-only credential handling with correct ownership, and guest users are isolated from each
-   other's homes.
+1. **Core platform safety** (`computeCoreReadiness`) — is the selected execution boundary
+   sound: macOS Seatbelt containment for the normal host path, or filesystem/network/lifecycle
+   isolation plus the credential broker and guest-user isolation for explicit Lima compatibility?
+   This is what `live-agent-execution` now gates (see `src/security/capabilities.ts`) — a
+   property of the *code and selected boundary*, not of any provider's auth state. The host
+   boundary is inspected by `inspectMajorExecutionPath()`. The Lima boundary remains available
+   only when `major execution select --path lima` is explicit.
 
 2. **Per-provider health** (`computeProviderReadiness`) — one of `READY`, `AUTH_REQUIRED`,
    `RATE_LIMITED`, `EXHAUSTED`, `UNAVAILABLE`, `UNSUPPORTED_VERSION`, `NOT_CONFIGURED` per
@@ -54,8 +53,9 @@ a live, biometric Secretive/Secure-Enclave signature tied to the exact release S
 
 Once `live-agent-execution` is active, `issueStagedValidationLease` refuses immediately
 (`'staged validation is unavailable after supervised activation'`) — see the retirement test in
-`tests/activated-capabilities.test.ts`. This is by design: real execution now goes through the
-normal supervised path (`executeMajorCommand` → `LimaBackend`), and the maintainer bootstrap has
+`tests/activated-capabilities.test.ts`. This is by design: normal execution now goes through the
+supervised host path (`executeMajorCommand` → trusted CLI under macOS Seatbelt). Explicit Lima
+compatibility still uses the same Major gateway and `LimaBackend`. The maintainer bootstrap has
 done its job. Historical leases (including Claude's genuine `FAILED` attempt on this exact SHA)
 remain forever in the append-only `validation_leases` table — never rewritten, never deleted
 (`validation_leases_no_delete`/`validation_leases_terminal_immutable` triggers).
@@ -97,3 +97,28 @@ major provider probe claude-code       # → READY
 
 `major doctor` / `major setup` reflect the same state on their next run. No reinstall, no new
 release SHA, no M1 reset, no database edit.
+
+## Normal host-path operation
+
+The normal path is intentionally smaller than the retired DSH/Lima workstation:
+
+```text
+Major policy and resource lease
+→ trusted provider CLI
+→ macOS Seatbelt host containment
+→ compact Major run receipt
+→ GBrain/project learning and repeated-evidence decisions
+```
+
+Use `major execution status --json` to inspect the selected path and its live
+containment. Use `major execution select --path lima` only for an explicit
+compatibility run. Host provider probes use the CLI's supported read-only status
+surface. They do not copy credentials, start a login daemon or require a DSH
+runtime.
+
+The local run-insight store is sufficient for this migration. It preserves
+append-only evidence, useful-work and infrastructure timing, worker/provider
+performance, skills and evidence-qualified effects, failures, interventions,
+quality, outcomes and recurrence. An optional Langfuse/OpenTelemetry exporter
+can consume high-volume telemetry later. Exporter health must never block the
+active objective or invalidate the durable Major receipt.

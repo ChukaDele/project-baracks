@@ -6,23 +6,29 @@ import { runLearningLifecycleCli } from './learning/lifecycle-cli.js';
 import { runSkillCli } from './skills/cli.js';
 import { runProviderLifecycleCli } from './providers/lifecycle-cli.js';
 import { runSupervisorCli } from './supervisor/cli.js';
+import { runMajorMcpServer } from './mcp/server.js';
 
 try {
   const args = process.argv.slice(2);
-  const projectContextHandled = await runProjectContextCli(args);
-  if (!projectContextHandled) {
-    const sessionContextHandled = await runSessionContextCli(args);
-    if (!sessionContextHandled) {
-      const learningLifecycleHandled = await runLearningLifecycleCli(args);
-      if (!learningLifecycleHandled) {
-        const skillHandled = await runSkillCli(args);
-        if (!skillHandled) {
-          const harnessHandled = await runHarnessCli(args);
-          if (!harnessHandled) {
-            const providerHandled = await runProviderLifecycleCli(args);
-            if (!providerHandled) {
-              const handled = await runSupervisorCli(args);
-              if (!handled) await import('./cli/index.js');
+  if (args[0] === 'mcp') {
+    if (args[1] !== 'serve') throw new Error('usage: major mcp serve');
+    await runMajorMcpServer(process.cwd());
+  } else {
+    const projectContextHandled = await runProjectContextCli(args);
+    if (!projectContextHandled) {
+      const sessionContextHandled = await runSessionContextCli(args);
+      if (!sessionContextHandled) {
+        const learningLifecycleHandled = await runLearningLifecycleCli(args);
+        if (!learningLifecycleHandled) {
+          const skillHandled = await runSkillCli(args);
+          if (!skillHandled) {
+            const harnessHandled = await runHarnessCli(args);
+            if (!harnessHandled) {
+              const providerHandled = await runProviderLifecycleCli(args);
+              if (!providerHandled) {
+                const handled = await runSupervisorCli(args);
+                if (!handled) await import('./cli/index.js');
+              }
             }
           }
         }

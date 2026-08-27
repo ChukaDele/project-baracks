@@ -17,10 +17,15 @@ const source = pathToFileURL(
 ).href;
 let priorResourcePath: string | undefined;
 let priorMemoryPercent: string | undefined;
+let priorWorkerLimit: string | undefined;
 
 beforeEach(() => {
   priorResourcePath = process.env.MAJOR_RESOURCE_PATH;
   priorMemoryPercent = process.env.MAJOR_MEMORY_AVAILABLE_PERCENT;
+  priorWorkerLimit = process.env.MAJOR_WORKER_LIMIT;
+  // Keep legacy guard tests deterministic. Production uses the live host
+  // capacity calculation and no longer has this one-worker ceiling.
+  process.env.MAJOR_WORKER_LIMIT = '1';
   const root = mkdtempSync(join(tmpdir(), 'major-resources-'));
   roots.push(root);
   process.env.MAJOR_RESOURCE_PATH = join(root, 'resources.json');
@@ -32,6 +37,8 @@ afterEach(() => {
   else process.env.MAJOR_RESOURCE_PATH = priorResourcePath;
   if (priorMemoryPercent === undefined) delete process.env.MAJOR_MEMORY_AVAILABLE_PERCENT;
   else process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = priorMemoryPercent;
+  if (priorWorkerLimit === undefined) delete process.env.MAJOR_WORKER_LIMIT;
+  else process.env.MAJOR_WORKER_LIMIT = priorWorkerLimit;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 

@@ -2,9 +2,9 @@
  * Build-level capability availability. The five v0.5.1 capability boundaries
  * remain immutable code gates.
  *
- * `live-agent-execution` gates CORE PLATFORM SAFETY ONLY: is the isolated
- * Lima runner mechanism itself (containment, credential broker, guest user
- * isolation, release/runtime integrity) sound enough to let ANY provider
+ * `live-agent-execution` gates CORE PLATFORM SAFETY ONLY: is the selected
+ * execution boundary (macOS Seatbelt host containment for the normal path, or
+ * the explicit Lima compatibility runner) sound enough to let ANY provider
  * execute inside it. It is deliberately NOT "have all providers passed
  * field validation" — that would conflate a build-wide safety property with
  * per-provider auth/billing/quota health, which changes constantly (account
@@ -25,10 +25,11 @@ export const CAPABILITY_DEFINITIONS = Object.freeze({
   'live-agent-execution': Object.freeze({
     available: true,
     reason:
-      'isolated Lima runner mechanism (containment, credential broker, guest isolation, ' +
-      'release integrity) independently verified safe; per-provider auth/billing/field ' +
+      'host Seatbelt or explicit Lima execution boundary (containment, credential ' +
+      'broker, guest isolation where applicable, release integrity) independently verified safe; ' +
+      'per-provider auth/billing/field ' +
       'health is tracked separately in src/doctor/readiness.ts and never gates this flag',
-    milestone: 'M1 — core runner activated for v0.5.2',
+    milestone: 'M1 — core execution boundary activated for v0.5.3',
   }),
   'paid-provider-execution': Object.freeze({
     available: true,

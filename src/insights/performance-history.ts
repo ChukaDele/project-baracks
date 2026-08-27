@@ -223,6 +223,7 @@ export function performanceHistoryReport(receipts: Receipt[]) {
     { signature: string; occurrences: number; evidence: string[] }
   >();
   const workers = new Map<string, { runs: number; successes: number; durations: number[] }>();
+  const skillPerformance = new Map<string, { runs: number; successes: number; failures: number }>();
   let totalDurationMs = 0;
   let observedDurationRuns = 0;
   let infrastructureWasteMs = 0;
@@ -273,7 +274,14 @@ export function performanceHistoryReport(receipts: Receipt[]) {
       failures.set(signature, row);
     }
     humanInterventions.push(...(receipt.humanInterventions ?? []));
-    for (const skill of receipt.skills ?? []) usedSkills.add(skill);
+    for (const skill of receipt.skills ?? []) {
+      usedSkills.add(skill);
+      const row = skillPerformance.get(skill) ?? { runs: 0, successes: 0, failures: 0 };
+      row.runs += 1;
+      if (receipt.outcome === 'completed') row.successes += 1;
+      if (receipt.outcome === 'failed' || receipt.outcome === 'blocked') row.failures += 1;
+      skillPerformance.set(skill, row);
+    }
     for (const asset of receipt.reuseStrategy?.reusableAssets ?? []) reusedAssets.add(asset);
   }
 
@@ -325,6 +333,25 @@ export function performanceHistoryReport(receipts: Receipt[]) {
         : `insufficient evidence; need at least two workers with minimum ${BEST_WORKER_MIN_RUNS} observed runs each`,
     skillAndToolEffects: [...effects.values()],
     skillsUsed: [...usedSkills],
+    skillPerformance: [...skillPerformance.entries()]
+      .map(([skill, row]) => ({
+        skill,
+        runs: row.runs,
+        successes: row.successes,
+        failures: row.failures,
+        successRate: row.runs === 0 ? 0 : row.successes / row.runs,
+        effect:
+          row.runs < 3
+            ? 'insufficient_evidence'
+            : row.successes / row.runs >= 0.8
+              ? 'helped'
+              : row.successes / row.runs < 0.5
+                ? 'hurt'
+                : 'mixed',
+        evidenceBasis:
+          'observed run outcomes; causal policy or skill promotion requires repeated validated evidence',
+      }))
+      .sort((left, right) => left.skill.localeCompare(right.skill)),
     repeatedFailures: [...failures.values()].filter((row) => row.occurrences >= 2),
     humanInterventions,
     infrastructureWasteMs: observedInfrastructureRuns ? infrastructureWasteMs : null,

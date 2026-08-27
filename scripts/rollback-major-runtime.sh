@@ -124,6 +124,7 @@ WRAPPER_TMP="$INSTALL_STAGE/major"
 RECORD_TMP="$INSTALL_STAGE/installed-release.json"
 RULES_RECORD_TMP="$INSTALL_STAGE/installed-global-rules.json"
 EXECUTION_CONFIG_TMP="$INSTALL_STAGE/execution.json"
+EXECUTION_PATH="lima"
 TARGET_BRANCH="$(python3 -c "import json; print(json.load(open('$TARGET_DIR/release.json')).get('branch','main'))")"
 
 cat > "$WRAPPER_TMP" <<EOF
@@ -187,6 +188,7 @@ MANIFEST="$(python3 "$TARGET_DIR/scripts/stage-major-user-state.py" \
   --major-bin "$BIN_DIR/major" \
   --record "$RECORD_TMP" \
   --global-rules-record "$RULES_RECORD_TMP" \
+  --execution-path "$EXECUTION_PATH" \
   --execution-config "$EXECUTION_CONFIG_TMP" \
   --wrapper "$WRAPPER_TMP")"
 

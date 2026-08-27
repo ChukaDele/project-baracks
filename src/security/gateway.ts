@@ -341,6 +341,13 @@ export class ExecutionGateway {
             : {}),
           executionAuthorityKind: request.executionAuthority?.kind ?? 'supervised',
           isolatedBackend: this.options.backend?.kind === 'lima',
+          hostContainment:
+            !this.options.backend &&
+            Boolean(
+              this.options.containment?.enforced &&
+              this.options.containment.filesystemIsolation &&
+              this.options.containment.networkIsolation,
+            ),
         });
       } catch (error) {
         this.refuse(

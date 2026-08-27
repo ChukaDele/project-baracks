@@ -479,6 +479,7 @@ describe('major CLI', () => {
       // refuses active, rollback, credential-bearing and unknown ones.
       'cleanup',
       'doctor',
+      'execution',
       'help',
       'history',
       'hosts',

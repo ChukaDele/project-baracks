@@ -32,6 +32,7 @@ describe('reuse-first provider runtime', () => {
     expect(commands).toContain("'--safe-mode'");
     expect(commands).toContain("'read-only'");
     expect(commands).toContain("'--sandbox'");
+    expect(commands).toContain("configuredExecutionPath() === 'host' ? [] : ['--ephemeral']");
     expect(commands).toContain("next[sandbox + 1] = 'danger-full-access'");
     expect(commands).toContain("if (host !== 'codex') return args");
     expect(commands).toContain('Codex approval bypass is forbidden');

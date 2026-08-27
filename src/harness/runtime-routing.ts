@@ -7,9 +7,10 @@ export interface DshRuntimeRoute {
 
 /**
  * Provider selection and execution environment are deliberately independent.
- * Local DSH execution is the default. Lima selects the same native provider
- * adapter behind the high-isolation environment. Legacy selects the old
- * Major/Lima CLI compatibility path and is never implicit.
+ * This route is retained for explicit DSH compatibility operations. Normal
+ * execution uses the headless Major host path. Lima selects the same native
+ * provider adapter behind the high-isolation environment. Legacy selects the
+ * old Major/Lima CLI compatibility path and is never implicit.
  */
 export function configuredDshRuntimeRoute(
   env: NodeJS.ProcessEnv = process.env,

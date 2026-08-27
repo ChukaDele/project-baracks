@@ -141,13 +141,17 @@ describe('discovery is process-free', () => {
   });
 
   it('pins non-bypass modes for Claude and Codex and native ACP for Cursor workers', () => {
+    vi.stubEnv('MAJOR_EXECUTION_PATH', 'host');
     process.env.MAJOR_CLAUDE_PERMISSION_MODE = 'bypassPermissions';
     const claude = workerCommand('claude', 'work').args;
     const codex = workerCommand('codex', 'work').args;
     const cursor = workerCommand('cursor', 'work').args;
     expect(claude).toContain('auto');
     expect(claude).not.toContain('bypassPermissions');
-    expect(codex).toEqual(expect.arrayContaining(['--sandbox', 'read-only', '--ephemeral']));
+    expect(codex).toEqual(
+      expect.arrayContaining(['--sandbox', 'read-only', '--ignore-user-config']),
+    );
+    expect(codex).not.toContain('--ephemeral');
     expect(cursor).toEqual(['acp']);
   });
 });

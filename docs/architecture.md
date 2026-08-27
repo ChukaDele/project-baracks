@@ -66,11 +66,11 @@ Project classes:
 Trust levels:
 
 - `observe` — no delegated execution;
-- `assist` — foreground pilot through the DSH runtime;
-- `build` — validated build mode through the DSH runtime;
+- `assist` — foreground pilot through the headless Major path;
+- `build` — validated build mode through the headless Major path;
 - `unattended` — background continuation. Unattended authority remains separately gated.
 
-The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. Current DSH execution has one worker slot, whether it uses the default local environment or optional Lima isolation. This is a physical runtime capacity limit, not a permanent one-worker governance model. Browser leases have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
+The resource guard is a durable cross-process lease queue. Workers, browser contexts and builds share a 6-slot global ceiling. Workers have a hard project ceiling of four, while the live CPU and memory guard may lower the usable count at admission. This is a resource safeguard, not a permanent one-worker governance model. Browser leases have a 2-context cap. Build leases have a 1-build cap. Worker parent links enforce `subagent_depth <= 1`. New requests queue when a cap is full or available memory falls below the configured soft floor.
 
 Unknown projects default to observe. Client/candidate/PII projects remain isolated until explicitly classified/promoted. Trust promotion beyond assist requires a passing independent grade.
 
@@ -78,7 +78,7 @@ The global kill switch (`major stop`) cancels active Major gateway work and bloc
 
 Foreground execution has two separate authorization modes:
 
-- `SUPERVISED_WORKSHOP` is an expiring controller-session capability for one owner-approved build project. The gateway and Lima backend recheck the session, project identity, worker resource lease and kill switch. It permits project-local autonomous work across multiple Git SHAs. It does not grant unattended execution or bypass provider action policy.
+- `SUPERVISED_WORKSHOP` is an expiring controller-session capability for one owner-approved build project. The gateway and selected execution boundary recheck the session, project identity, worker resource lease and kill switch. It permits project-local autonomous work across multiple Git SHAs. It does not grant unattended execution or bypass provider action policy.
 - `FINAL_RELEASE_ATTESTATION` is the existing exact-SHA Secure Enclave authority. It applies only after a candidate is frozen. Any code change ends that attestation; the next frozen candidate requires one new signature.
 
 The Workshop session may authorize the existing provider-state broker to copy only the four fixed provider authentication files from a prior isolated worker to a new release worker. The transfer stays VM-to-VM, is provider-scoped and audited, and never promotes project/session/workspace state.
@@ -280,16 +280,61 @@ Git history is the archive. After a successor path is independently validated on
 
 ## Migration status
 
-The thin-kernel runtime is the default live workstation. The migration remains
-recoverable under `docs/migrations/deepseek-harness-strangler.md`: Lima and the
-old Major/Lima pipeline stay available as explicit compatibility paths until
-their active consumers reach zero.
-Migration cleanup is incomplete until those consumers reach zero and the
-canonical installed workstation passes its release gates.
+The thin headless Major runtime is the default live workstation. It runs
+approved provider CLIs through the host containment boundary and uses Orca for
+workspaces, worktrees, terminals, agent operations and operational status. The
+local Major UI is an intelligence and control surface only. The migration
+remains recoverable under `docs/migrations/deepseek-harness-strangler.md`:
+Lima and the old DSH pipeline are explicit compatibility/reference paths, not
+the normal execution route, until their active consumers reach zero.
 
-## 10.1 DeepSeek Harness distribution
+Major keeps compact append-only run receipts and project learning in its own
+durable store. High-volume provider/session telemetry remains an observability
+concern with an exporter seam. Langfuse or OpenTelemetry is optional and is not
+required for active work. GBrain stores the meaning derived from evidence, and
+Major uses repeated validated evidence to change routing, policy, skills or
+resource decisions.
 
-DeepSeek Harness is the adopted agent-loop/tool/session/UI substrate. Major does not fork it. Exact npm versions are pinned; `latest`, `next` and version ranges are refused.
+Migration cleanup is incomplete until obsolete active consumers reach zero and
+the canonical installed workstation passes its release gates.
+
+## 10.1 Normal headless Major path
+
+Normal execution is selected and inspected with:
+
+```sh
+major execution status --json
+major execution select --path host
+```
+
+The `host` path is the default. Major resolves a trusted provider executable,
+applies the project policy and resource lease, and runs it through macOS
+Seatbelt with explicit project/runtime roots and outbound-only networking.
+Codex, Claude Code, Cursor and Antigravity remain official CLI adapters. A
+provider's CLI owns its credentials. Major does not copy credentials into a
+second runtime on this path.
+
+`major provider probe --provider <name>` records an append-only live CLI
+observation. `major history report --project <identity>` reports compact run
+receipts with useful-work duration, infrastructure overhead, worker/provider,
+skills, failures, interventions, quality and outcome. The UI reads these same
+Major interfaces and never starts a worker or embeds a second memory store.
+
+Orca is the primary operational substrate. Its supported UI, CLI, MCP and
+worktree facilities own terminal, Git, browser, agent-status, notification and
+workspace operations. Major remains the headless intelligence, policy,
+continuity and learning layer above them.
+
+`major execution select --path lima` is an explicit compatibility choice for
+the retained Lima backend. It is not selected by the normal host path and its
+historical receipts remain protected.
+
+## 10.2 DeepSeek Harness distribution (retained compatibility/reference)
+
+DeepSeek Harness is retained as a historical, reference and explicit
+compatibility substrate. It is not the normal Major worker backend. Major does
+not fork it. Exact npm versions are pinned; `latest`, `next` and version ranges
+are refused.
 
 Major-specific capabilities remain behind a thin control-plane seam. The
 `@major/dsh-kernel` bundle is the thin integration seam after
@@ -302,24 +347,16 @@ its adapter and conformance proof exist:
 - project trust, approval policy and kill switch;
 - independent evidence;
 - subscription routing and project-context integrity;
-- provider-independent execution-environment policy, with local as the default
-  and Lima as optional high isolation.
+- provider-independent execution-environment policy, with the host Seatbelt
+  path as the normal route and Lima as optional compatibility isolation.
 
-The proposed unified Mac workstation is two source profiles on that pin:
+The historical unified Mac workstation used two source profiles on that pin:
 loopback Web UI for the owner and headless for Major-driven runs. Neither
-profile starts a login daemon or attaches Ruflo globally. `major harness
-conformance` is the deterministic source gate. `major harness install-plan`
-and `scripts/install-deepseek-harness-pin.sh` install the attested pin into an
-isolated harness home. One shared runtime owns the pinned packages; profiles symlink that
-closure. The installer refuses a full disk and proves both profiles with
-`--dump-config`. `major harness workstation-app` is the installer-managed
-`Major.app` launcher: an installer-marked bundle in `~/Applications` (or
-`MAJOR_APP_DIR`) points to one loopback DSH web process, Chrome `--app` for a real
-project, logs and lock under the DSH home, no Electron/Tauri/login daemon, and
-the `major` PATH unchanged. `/major` takes `MAJOR_SESSION_HOST`, asks Major for
-the provider/model/account routing decision, then invokes the provider through
-DSH. DSH Claude Code performs independent review. `pnpm validate:dsh` is the
-one-hop source validation script.
+profile starts a login daemon or attaches Ruflo globally. Its conformance,
+install-plan, pinned package and marked-app checks remain useful provenance and
+recovery evidence. `major harness workstation-app` and `pnpm validate:dsh` are
+therefore compatibility/reference operations only. They must not be used as an
+invisible second production path or as a prerequisite for normal host work.
 
 ## 11. Resource hygiene
 
@@ -358,6 +395,6 @@ GC roots are read, never guessed: `installed-release.json`, `install-history.jso
 | Toolsmith provisional capabilities | 24h if never validated |
 | Diagnostic artifacts | 14 days |
 | Failed destination workers | remove immediately |
-| Lima workers | active + 1 rollback generation + unique credential-bearing; no VM per SHA |
+| Lima compatibility workers | active + 1 rollback generation + unique credential-bearing; no VM per SHA |
 
 Dry-run reclaim is an explicit allocated-blocks **upper bound**. Apply reports the measured `df` free-bytes delta. A `du` sum is never presented as actual reclaimed space.

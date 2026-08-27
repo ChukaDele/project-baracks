@@ -219,7 +219,8 @@ grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts |
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
 grep -Fq "maxWorkers: 1" src/supervisor/policy.ts || fail "truthful project worker ceiling missing"
 grep -Fq "maxRunMinutes: 30" src/supervisor/policy.ts || fail "assist wall-clock ceiling missing"
-grep -Fq "workers: 1" src/supervisor/resources.ts || fail "configured DSH worker ceiling missing"
+grep -Fq "workers: 4" src/supervisor/resources.ts || fail "durable worker hard ceiling missing"
+grep -Fq "currentResourceLimits" src/supervisor/resources.ts || fail "live worker capacity calculation missing"
 grep -Fq "GLOBAL_RESOURCE_LIMITS" src/supervisor/resources.ts || fail "global resource guard missing"
 grep -Fq "maxSubagentDepth: 1" src/supervisor/resources.ts || fail "subagent depth cap missing"
 grep -Fq "three consecutive independently graded shadow passes" src/supervisor/policy.ts || fail "observe-to-assist shadow gate missing"
@@ -249,6 +250,11 @@ grep -Fq "startup|resume|clear|compact" scripts/stage-major-user-state.py || fai
 grep -Fq "no auto-start daemon" scripts/install-major-runtime.sh || fail "pilot installer must avoid login autonomy"
 grep -Fq "Ruflo is NOT attached globally" scripts/install-major-runtime.sh || fail "pilot installer must avoid global Ruflo blast radius"
 grep -Fq "trust observe" scripts/install-major-runtime.sh || fail "optional observe pilot path must remain available"
+grep -Fq "MAJOR_INSTALL_LIMA_COMPATIBILITY" scripts/install-major-runtime.sh || fail "Lima must be an explicit installer compatibility option"
+grep -Fq "Normal host execution selected" scripts/install-major-runtime.sh || fail "normal installer path must select host execution"
+if grep -Fq "Lima 2.2.x is required for Major provider execution" scripts/install-major-runtime.sh; then
+  fail "normal Major installation must not require Lima"
+fi
 python3 - <<'PY'
 import re
 from pathlib import Path
@@ -303,7 +309,7 @@ grep -Fq "export async function runHarnessCli" src/harness/cli.ts || fail "harne
 grep -Fq "runHarnessCli" src/entry.ts || fail "harness CLI not wired through entry"
 grep -Fq "return new LimaBackend" src/security/major-gateway.ts || fail "the explicit legacy Lima compatibility backend must remain available"
 grep -Fq "ADOPT DeepSeek Harness" docs/prior-art-decisions.md || fail "DeepSeek Harness prior-art decision missing"
-grep -Fq "Status: **cutover**" docs/migrations/deepseek-harness-strangler.md || fail "DeepSeek Harness cutover receipt missing"
+grep -Fq "Status: **normal path migrated**" docs/migrations/deepseek-harness-strangler.md || fail "headless Major migration receipt missing"
 grep -Fq '"declaredTag": "dsh-v0.1.0-rc.8"' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness release tag is not attested"
 grep -Fq '"attestedCommit": "141eb6fef83422698aef7a981029e843e8161534"' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness commit is not attested"
 grep -Fq '"@deepseek-ai/dsh": "sha512-' distribution/deepseek-harness/pin.json || fail "DeepSeek Harness npm integrity is not attested"

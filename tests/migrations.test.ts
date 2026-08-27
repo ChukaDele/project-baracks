@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { openDb } from '../src/db/client.js';
+import { defaultDbPath, openDb } from '../src/db/client.js';
 import { tempDbPath } from './helpers.js';
 
 const MIGRATIONS_DIR = join(import.meta.dirname, '..', 'drizzle');
@@ -24,6 +24,22 @@ function applyRaw(sqlite: Database.Database, file: string) {
 }
 
 describe('migrations', () => {
+  it('keeps the default database inside an explicitly selected Major home', () => {
+    const priorMajorHome = process.env.MAJOR_HOME;
+    const priorDbPath = process.env.MAJOR_DB_PATH;
+    const runtimeHome = join(import.meta.dirname, '.major-runtime-test');
+    try {
+      process.env.MAJOR_HOME = runtimeHome;
+      delete process.env.MAJOR_DB_PATH;
+      expect(defaultDbPath()).toBe(join(runtimeHome, 'major.db'));
+    } finally {
+      if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+      else process.env.MAJOR_HOME = priorMajorHome;
+      if (priorDbPath === undefined) delete process.env.MAJOR_DB_PATH;
+      else process.env.MAJOR_DB_PATH = priorDbPath;
+    }
+  });
+
   it('apply cleanly to a fresh database and are idempotent on reopen', () => {
     const path = tempDbPath();
     const first = openDb(path);

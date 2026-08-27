@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { checkArgv } from '../src/security/commands.js';
 import { CapabilityUnavailableError } from '../src/security/capabilities.js';
 
+const capabilityGate = vi.hoisted(() => ({ liveAgentExecution: false }));
+
 // 'M1 execution gateway release gate' and the capability-gate assertion in
 // 'policy decision audit trail' below exercise ExecutionGateway's own
 // pre-activation defense-in-depth ordering, independent of this build's real
@@ -14,7 +16,7 @@ vi.mock('../src/security/capabilities.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/security/capabilities.js')>();
   const isCapabilityAvailable = (capability: string) =>
     capability === 'live-agent-execution'
-      ? false
+      ? capabilityGate.liveAgentExecution
       : actual.isCapabilityAvailable(capability as never);
   return {
     ...actual,
@@ -62,6 +64,12 @@ function tempRoot(): string {
 function trustingNode(): TrustedExecutableRegistry {
   const registry = new TrustedExecutableRegistry();
   registry.pin(NODE);
+  return registry;
+}
+
+function trustingCodexAsNode(): TrustedExecutableRegistry {
+  const registry = trustingNode();
+  registry.trust('codex', NODE, 'pinned');
   return registry;
 }
 
@@ -364,15 +372,19 @@ describe('Codex guest mutation gateway boundary', () => {
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
   };
 
-  it('refuses Codex mutation through host containment even with Workshop authority', () => {
-    const { gateway, root } = makeGateway({
-      commandPolicy: { allowedExecutables: ['codex'] },
-      verifyProviderDecision: () => true,
-    });
-    expect(() =>
-      gateway.execute({
+  it('admits Codex mutation through host containment with Workshop authority and a source digest', async () => {
+    // The test registry maps the provider name to Node so this exercises the
+    // guest-mutation decision without starting a real provider CLI.
+    capabilityGate.liveAgentExecution = true;
+    try {
+      const { gateway, root } = makeGateway({
+        commandPolicy: { allowedExecutables: ['codex'] },
+        trustedExecutables: trustingCodexAsNode(),
+        verifyProviderDecision: () => true,
+      });
+      const handle = gateway.execute({
         executable: 'codex',
-        args: ['exec'],
+        args: ['-e', ''],
         cwd: root,
         executionAuthority: workshopAuthority,
         providerRequest: {
@@ -386,8 +398,11 @@ describe('Codex guest mutation gateway boundary', () => {
             () => true,
           ),
         },
-      }),
-    ).toThrow(/Lima execution backend/);
+      });
+      await expect(handle.outcome).resolves.toMatchObject({ status: 'succeeded' });
+    } finally {
+      capabilityGate.liveAgentExecution = false;
+    }
   });
 
   it('refuses Codex mutation on the Lima backend without a source digest', () => {

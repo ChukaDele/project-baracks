@@ -30,11 +30,13 @@ const roots: string[] = [];
 let priorPolicyPath: string | undefined;
 let priorLearningRoot: string | undefined;
 let priorMajorHome: string | undefined;
+let priorExecutionPath: string | undefined;
 
 beforeEach(() => {
   priorPolicyPath = process.env.MAJOR_POLICY_PATH;
   priorLearningRoot = process.env.MAJOR_LEARNING_ROOT;
   priorMajorHome = process.env.MAJOR_HOME;
+  priorExecutionPath = process.env.MAJOR_EXECUTION_PATH;
 });
 
 afterEach(() => {
@@ -44,6 +46,8 @@ afterEach(() => {
   else process.env.MAJOR_LEARNING_ROOT = priorLearningRoot;
   if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
   else process.env.MAJOR_HOME = priorMajorHome;
+  if (priorExecutionPath === undefined) delete process.env.MAJOR_EXECUTION_PATH;
+  else process.env.MAJOR_EXECUTION_PATH = priorExecutionPath;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -610,12 +614,11 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('RESOLVED MAJOR SKILLS');
     expect(prompt).toContain('mvp-speed-prioritisation');
     expect(prompt).toContain('Codex capacity:');
-    expect(prompt).toContain('ISOLATED WORKSPACE CONTRACT');
-    expect(prompt).toContain("Major's verified source mirror of the canonical target");
-    expect(prompt).toContain('synthetic Git repo here with no remote or history');
-    expect(prompt).toContain('it is not mounted inside this guest');
-    expect(prompt).toContain('expected isolation, not a project-identity blocker');
-    expect(prompt).toContain('applies it back to the canonical host worktree');
+    expect(prompt).toContain('HOST WORKSPACE CONTRACT');
+    expect(prompt).toContain('canonical Major-verified worktree for the target above');
+    expect(prompt).toContain('macOS Seatbelt boundary confines provider reads and writes');
+    expect(prompt).not.toContain('synthetic Git repo here with no remote or history');
+    expect(prompt).not.toContain('applies it back to the canonical host worktree');
     expect(prompt).toContain('binds every mutable dispatch to an internal source-tree digest');
     expect(prompt).toContain('The digest is not sent to the provider');
     expect(prompt).toContain('routing provenance only');
@@ -639,6 +642,7 @@ describe('Major coordinator contract', () => {
     roots.push(repo);
     process.env.MAJOR_HOME = join(repo, '.major');
     process.env.MAJOR_POLICY_PATH = join(repo, 'policies.json');
+    process.env.MAJOR_EXECUTION_PATH = 'lima';
     mkdirSync(join(repo, '.git'));
     writeFileSync(join(repo, 'README.md'), '# Mirror project\n');
     const hostCanonicalPath = '/Users/owner/canonical/jss-tool';

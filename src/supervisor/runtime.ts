@@ -72,6 +72,7 @@ import {
   RUN_INSIGHT_SCHEMA,
   recordPerformanceObservation,
 } from '../insights/performance-history.js';
+import { configuredExecutionPath, executionPathStatus } from '../execution/path.js';
 
 export { parseWorkerReport } from './worker-report.js';
 
@@ -220,7 +221,7 @@ export function selectCoordinator(
 
 /** Resolve and persist the one provider/model/account decision used by every
  * live execution backend. Retry-eligible capacity is consumed here so the
- * hidden DSH bridge and the legacy Lima cycle cannot diverge. */
+ * headless Major path and the explicit compatibility cycle cannot diverge. */
 export function routeGoalExecution(
   goal: SupervisorGoal,
   options: { eligibleHosts?: readonly WorkerHost[] } = {},
@@ -470,7 +471,7 @@ export function coordinatorPrompt(
     ? '(Major skill registry unavailable. Continue without skill context and report the degraded resolver in MAJOR_RESULT if it materially affects work.)'
     : resolvedSkills.length === 0
       ? '(No installed skill matched deterministically. Continue with the injected Major operating contract.)'
-      : `${skillProvenance}\nHost skill paths above are routing provenance only; they are intentionally unavailable inside this guest. Continue from the Major operating contract already injected below—do not stop or attempt host access to load them. Report unavailable skill content as degraded in MAJOR_RESULT when it materially affects work.`;
+      : `${skillProvenance}\nHost skill paths above are routing provenance only; they are intentionally outside the provider execution boundary. Continue from the Major operating contract already injected below—do not stop or attempt host access to load them. Report unavailable skill content as degraded in MAJOR_RESULT when it materially affects work.`;
   let assetContext: string;
   try {
     assetContext = formatReusableAssetDiscovery({ task: goal.goal, cwd: goal.repoPath });
@@ -479,10 +480,23 @@ export function coordinatorPrompt(
       'REUSABLE ASSET DISCOVERY (degraded): the metadata index is unavailable. Do not treat a repository search as the default reuse mechanism; report this degradation in MAJOR_RESULT if it materially affects work.';
   }
   const policy = getProjectPolicy(goal.project, goal.repoPath);
-  const workerLanguage =
-    policy.maxWorkers <= 1
-      ? 'The current DSH runtime has one worker slot. Do not bypass it. Keep independent work ready to fan out when capacity exists, and serialize only real write, interface, ordering, or scarce-resource conflicts.'
-      : `This project's parent coordinator may admit up to ${policy.maxWorkers} independent workers. This leased worker must request additional capacity in its final report rather than nesting workers itself.`;
+  const workerLanguage = `The project policy permits up to ${policy.maxWorkers} independent workers. Major's live resource ledger may lower that ceiling when CPU or memory is constrained. This leased worker must request additional capacity in its final report rather than nesting workers itself. Serialize only real write, interface, ordering, or scarce-resource conflicts.`;
+  const workspaceContract =
+    configuredExecutionPath() === 'host'
+      ? `HOST WORKSPACE CONTRACT:
+- Your current working directory is the canonical Major-verified worktree for the target above.
+- Major's macOS Seatbelt boundary confines provider reads and writes to the admitted project and runtime roots.
+- Confirm project identity from the embedded CANONICAL TARGET plus the source tree in your current cwd, then do all work there.
+- Major records the provider process through the single headless gateway. It does not copy a patch through a second harness.
+- Major binds every mutable dispatch to an internal source-tree digest and refuses execution if the canonical host tree changes. The digest is not sent to the provider.`
+      : `ISOLATED WORKSPACE CONTRACT:
+- Your current working directory is Major's verified source mirror of the canonical target above.
+- This mirror intentionally excludes host .git; Lima may initialize a synthetic Git repo here with no remote or history.
+- The canonical repository path names the host worktree; it is not mounted inside this guest.
+- Do not treat missing host path access, Git remote, or history as identity failure inside this isolated workspace.
+- Confirm project identity from the embedded CANONICAL TARGET plus the source tree in your current cwd, then do all work here.
+- The parent coordinator validates your patch and applies it back to the canonical host worktree.
+- Major binds every mutable dispatch to an internal source-tree digest and refuses execution or copy-back if the canonical host tree changes. The digest is not sent to the provider.`;
 
   return `You are the active Major coordinator for project ${goal.project}.
 
@@ -495,14 +509,7 @@ CANONICAL TARGET:
 - project: ${goal.project}
 - repository path: ${goal.repoPath}
 
-ISOLATED WORKSPACE CONTRACT:
-- Your current working directory is Major's verified source mirror of the canonical target above.
-- This mirror intentionally excludes host .git; Lima may initialize a synthetic Git repo here with no remote or history.
-- The canonical repository path names the host worktree; it is not mounted inside this guest.
-- Missing host path access, Git remote, or commit history is expected isolation, not a project-identity blocker.
-- Confirm project identity from the embedded CANONICAL TARGET plus the source tree in your current cwd, then do all work here.
-- The parent coordinator validates your patch and applies it back to the canonical host worktree.
-- Major binds every mutable dispatch to an internal source-tree digest and refuses execution or copy-back if the canonical host tree changes. The digest is not sent to the provider.
+${workspaceContract}
 
 RESOLVED TOOLSMITH CAPABILITIES:
 ${
@@ -524,7 +531,7 @@ Use this exact optional field for that evidence:
 
 ${formatCodexCapacityOverview(readCodexUsageReport())}
 
-Before any substantive mutation, confirm the embedded CANONICAL TARGET and the source tree in your current cwd describe the same project. Do not treat missing host path access, Git remote, or history as identity failure. If the task clearly belongs to another known project, do not patch this mirror. Use project-context-integrity and reroute when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong project is a failed task.
+Before any substantive mutation, confirm the embedded CANONICAL TARGET and the source tree in your current cwd describe the same project. Do not treat a provider-boundary restriction as identity failure. If the task clearly belongs to another known project, do not patch the current worktree. Use project-context-integrity and reroute when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong project is a failed task.
 
 ${trustContract(policy)}
 
@@ -640,10 +647,26 @@ export function supervisorRunInsight(input: {
   outcome: WorkerOutcome;
   report?: ReturnType<typeof parseWorkerReport>;
   totalDurationMs: number;
+  stages?: {
+    majorPreparationMs?: number;
+    majorFinalizationMs?: number;
+  };
 }) {
-  const workerDurationMs = Number.isFinite(input.outcome.durationMs)
-    ? Math.max(0, input.outcome.durationMs)
+  const workerDurationMs = Number.isFinite(
+    input.outcome.providerExecutionMs ?? input.outcome.durationMs,
+  )
+    ? Math.max(0, input.outcome.providerExecutionMs ?? input.outcome.durationMs)
     : null;
+  const preparationMs = input.stages?.majorPreparationMs;
+  const finalizationMs = input.stages?.majorFinalizationMs;
+  const majorOverheadMs =
+    preparationMs !== undefined || finalizationMs !== undefined
+      ? (preparationMs ?? 0) + (finalizationMs ?? 0)
+      : null;
+  const qualityAssessment =
+    input.outcome.status === 'failed' || input.outcome.status === 'timed_out'
+      ? 'failed'
+      : 'unknown';
   const acceptedAsset =
     input.report?.assetCandidate && input.outcome.workspaceMutated
       ? [input.report.assetCandidate.id]
@@ -687,11 +710,20 @@ export function supervisorRunInsight(input: {
         workerDurationMs === null || input.totalDurationMs === 0
           ? null
           : Math.min(1, workerDurationMs / input.totalDurationMs),
-      // The legacy supervisor worker reports one aggregate duration; it does
-      // not separately instrument orchestration, infrastructure, or review.
-      majorOverheadMs: null,
-      infrastructureOverheadMs: null,
-      stages: { workerExecutionMs: workerDurationMs, reviewMs: null },
+      // These values are populated from the host-path worker timers. Older
+      // DSH receipts remain valid and intentionally keep null where they did
+      // not record a stage.
+      majorOverheadMs,
+      infrastructureOverheadMs: input.outcome.infrastructureOverheadMs ?? null,
+      stages: {
+        majorPreparationMs: preparationMs ?? null,
+        resourceWaitMs: input.outcome.resourceWaitMs ?? null,
+        gatewaySetupMs: input.outcome.gatewaySetupMs ?? null,
+        workerExecutionMs: workerDurationMs,
+        providerExecutionMs: workerDurationMs,
+        majorFinalizationMs: finalizationMs ?? null,
+        reviewMs: null,
+      },
     },
     productiveWork: input.report?.summary ?? '',
     effects: [],
@@ -702,7 +734,7 @@ export function supervisorRunInsight(input: {
       evidence: recurrenceEvidence || null,
     },
     humanInterventions: input.settled?.ownerGate ? [input.settled.ownerGate] : [],
-    quality: { assessment: 'unknown' as const, evidence: [] },
+    quality: { assessment: qualityAssessment, evidence: [] },
     finalOutcome: input.settled?.lastSummary ?? input.report?.summary ?? diagnostic,
     reuseStrategy: {
       strategy: acceptedAsset.length ? 'explicit_worker_asset_candidate' : null,
@@ -903,6 +935,10 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     activePid: process.pid,
     lastCoordinator: host,
     lastAccountLabel: routedSelection.accountLabel,
+    // A new routed cycle is evidence that the prior owner gate has been
+    // superseded. Keep owner gates attached only to the blocked cycle that
+    // actually requires the human action.
+    ownerGate: undefined,
     pendingCompletion: undefined,
   });
 
@@ -914,6 +950,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(goal.lastSessionRef ? { lastSessionRef: goal.lastSessionRef } : {}),
     ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
   });
+  const workerStartedAtMs = Date.now();
   const outcome = await runWorker({
     host,
     prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
@@ -929,6 +966,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     accountLabel: routedSelection.accountLabel,
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
+  const workerFinishedAtMs = Date.now();
   let terminalReport: ReturnType<typeof parseWorkerReport> = undefined;
   const recordTerminalObservation = () => {
     const settled = getGoal(goal.id);
@@ -946,6 +984,10 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
             outcome,
             ...(terminalReport ? { report: terminalReport } : {}),
             totalDurationMs: Math.max(0, Date.now() - cycleStartedAtMs),
+            stages: {
+              majorPreparationMs: Math.max(0, workerStartedAtMs - cycleStartedAtMs),
+              majorFinalizationMs: Math.max(0, Date.now() - workerFinishedAtMs),
+            },
           }),
         });
       } finally {
@@ -1124,7 +1166,7 @@ export function codexMutationClaimRefusal(
   if (outcome.host !== 'codex' || outcome.workspaceMutated !== false || !report) return undefined;
   if (!/^BUILT(?:\b|:)/.test(report.summary)) return undefined;
   return (
-    'Rejected Codex mutation claim: the isolated backend compared the returned workspace ' +
+    'Rejected Codex mutation claim: the contained execution backend compared the returned workspace ' +
     'with its input and observed no project delta. The task remains active.'
   );
 }
@@ -1354,11 +1396,13 @@ export function majorStatusOverview(): string {
     readiness.length > 0
       ? readiness.map((r) => `${r.provider}=${r.state}`).join(' ')
       : 'none discovered';
+  const executionPath = executionPathStatus();
 
   return [
     `MAJOR: ${globalStopRequested() ? 'STOPPED (kill switch active)' : 'ACTIVE'}`,
     '',
     `Hosts:                ${hostsLine}`,
+    `Execution path:       ${executionPath.path} (${executionPath.source})`,
     `Execution providers:  ${providersLine}`,
     `Fallback capacity:    ${healthy.length} healthy provider${healthy.length === 1 ? '' : 's'}`,
     formatCodexCapacityOverview(readCodexUsageReport()),

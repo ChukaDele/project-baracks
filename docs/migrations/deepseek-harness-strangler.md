@@ -1,17 +1,19 @@
 # DeepSeek Harness cutover receipt
 
-Status: **cutover**. DeepSeek Harness owns the live session, agent loop, tools,
-subagents, persistence, trajectory and workstation UI. Major is the thin
-routing, policy, goal, account, skill, evaluation and GBrain layer.
+Status: **normal path migrated**. The headless Major core owns routing, policy,
+goals, accounts, skills, evaluation, run receipts and GBrain learning. Orca is
+the primary operational substrate. DeepSeek Harness remains historical and
+explicit compatibility/reference infrastructure. It is not the normal worker
+runtime.
 
 ## Outcome
 
-Run trusted repository mutation through native DSH Codex in the local
-environment and use native Claude for independent review. Keep the Codex worker
-choice independent from local or Lima environment choice. Preserve other hosts
-through the old compatibility path until each live DSH adapter passes the same
-gates. Preserve Lima and the old Major/Lima pipeline as explicit high-isolation
-and rollback choices.
+Run trusted repository mutation through official provider CLIs under Major's
+host containment boundary, with Orca-owned worktrees for operational isolation.
+Keep provider choice independent from the execution boundary. Preserve the
+Major intelligence path and all historical DSH/Lima receipts. Lima remains an
+explicit compatibility option while its active consumers are audited. No DSH
+runtime is selected by the normal path.
 
 ## KEEP
 
@@ -23,7 +25,7 @@ and rollback choices.
 
 ## ADOPT
 
-- DeepSeek Harness agent-loop, tool registry, session log, headless runner and loopback Web UI, pinned at exact npm versions in `distribution/deepseek-harness/pin.json`
+- DeepSeek Harness agent-loop, tool registry, session log, headless runner and loopback Web UI, pinned at exact npm versions in `distribution/deepseek-harness/pin.json`, as retained historical/reference evidence only
 
 ## WRAP
 
@@ -33,9 +35,9 @@ and rollback choices.
 
 ## SHIM
 
-- `MAJOR_DSH_EXECUTION_ENVIRONMENT=lima` selects optional DSH-native Lima.
-- `MAJOR_DSH_EXECUTION_ENVIRONMENT=legacy` selects the old Major/Lima pipeline.
-- Removal condition: active consumers reach zero after canonical cutover remains green.
+- `major execution select --path lima` selects the explicit Lima compatibility path.
+- The old `MAJOR_DSH_EXECUTION_ENVIRONMENT` switches are retained only for historical compatibility tooling.
+- Removal condition: active consumers reach zero after the host path, Orca operations and durable receipts remain green.
 
 ## DELETE later, not now
 
@@ -48,14 +50,15 @@ and rollback choices.
 1. `pin` — exact upstream versions recorded
 2. `shadow` — composition and deterministic conformance existed
 3. `strangle` — selected tasks may opt into pinned dsh inside Lima
-4. `cutover` — DSH is default; local is the default environment; Lima remains rollback (**current**)
-5. `cleanup` — delete obsolete active paths under `legacy-cleanup`
+4. `cutover` — DSH was default; local was the default environment; Lima remained rollback (**historical**)
+5. `headless-cutover` — Major host CLI path is default; Orca owns operations; DSH/Lima are explicit compatibility (**current**)
+6. `cleanup` — remove obsolete active paths under `legacy-cleanup` after live evidence and ownership checks
 
 The upstream release tag and npm package integrities are attested. The exact pin
 is installed outside `package.json`. Native local and Lima environment proofs
 passed before default cutover.
 
-## Unified Mac workstation
+## Historical unified Mac workstation
 
 One pin, two profiles:
 
@@ -90,7 +93,23 @@ policy stays in `workspace-lifecycle-management`.
 - `major harness workstation-app` records the reversible `Major.app` + Chrome app-mode launcher contract
 - `pnpm validate:dsh` runs the deterministic source gate (validate-major, harness tests, conformance, install dry-run)
 - Isolated-home tests stage/remove `Major.app` and prove single-instance start/stop with fakes; they are not a Mac field proof
-- The default execution backend is DSH and the default environment is local.
+- The former default execution backend was DSH and the former default environment was local.
 - The same Major-selected Codex adapter passed a separate Lima environment proof.
 - Both proofs included a real file mutation, tests, an independent native Claude review, trajectory persistence and restart/resume.
 - Canonical installation and exact-main release gates remain separate checks.
+
+## Current headless cutover evidence
+
+The current cutover is deliberately bounded. It must prove the following on the
+new path before cleanup removes any owned legacy process or artifact:
+
+- `major execution status` reports the host Seatbelt boundary and `host` is the selected path;
+- `major provider probe --provider codex` observes the supported host CLI without copying credentials;
+- a normal Major run records a compact `major.run-insight.v1` receipt with useful-work and infrastructure timing;
+- the receipt/report and project context are available after a Major restart;
+- Orca resolves the canonical repository and worktrees without becoming a second memory or policy store;
+- the thin Major UI reads the same durable state without starting a worker;
+- DSH/Lima cleanup inventory preserves receipts, project brains, skills, incidents, outcomes and validated learnings.
+
+The historical DSH receipts and validation leases are evidence of what the old
+path did. They are not permission to keep the old path active.

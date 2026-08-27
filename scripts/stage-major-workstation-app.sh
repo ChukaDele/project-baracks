@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Stage or remove the reversible Major.app launcher while keeping its runtime
-# state inside an isolated DSH home.
+# Stage or remove the legacy compatibility Major.app launcher while keeping
+# its historical runtime state inside an isolated DSH home.
 # Does not install npm packages, change the live Major backend, or mutate PATH.
 set -euo pipefail
 
@@ -21,7 +21,7 @@ fail() { echo "MAJOR WORKSTATION APP FAILED: $*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-stage-major-workstation-app.sh — installer-managed Major.app with isolated DSH state
+stage-major-workstation-app.sh — legacy installer-managed Major.app with isolated DSH state
 
   --dry-run    Print planned copies without mutating APP_DIR or DSH_HOME
   --remove     Delete Major.app, the staged launcher, lock, and chrome profile
@@ -29,7 +29,7 @@ stage-major-workstation-app.sh — installer-managed Major.app with isolated DSH
 
 Environment:
   MAJOR_HOME      Major state root (default: ~/.major)
-  MAJOR_DSH_HOME  Isolated harness home (default: $MAJOR_HOME/dsh-harness)
+  MAJOR_DSH_HOME  Isolated legacy harness home (default: $MAJOR_HOME/dsh-harness)
   MAJOR_APP_DIR   Major.app parent directory (default: /Applications)
 EOF
 }
@@ -75,7 +75,7 @@ if [[ "$REMOVE" -eq 1 ]]; then
   rm -rf "$DSH_HOME/bin/start-major-workstation.sh" \
     "$DSH_HOME/run/workstation.lock" "$DSH_HOME/chrome-profile"
   echo "removed installer-owned Major.app launcher from $APP_DEST"
-  echo "normal trusted repository execution defaults to DSH local"
+  echo "normal trusted repository execution defaults to headless Major host execution"
   exit 0
 fi
 
@@ -118,4 +118,4 @@ trap - EXIT INT TERM
 cp -f "$LAUNCHER_SOURCE" "$LAUNCHER_DEST"
 chmod +x "$LAUNCHER_DEST"
 echo "staged reversible Major.app launcher at $APP_DEST"
-echo "normal trusted repository execution defaults to DSH local"
+echo "normal trusted repository execution defaults to headless Major host execution"

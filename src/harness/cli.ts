@@ -25,7 +25,7 @@ import { buildHarnessInstallPlan, formatHarnessInstallPlan } from './install-pla
 import { DEEPSEEK_HARNESS_PIN } from './pin.js';
 import { buildWorkstationAppPlan, formatWorkstationAppPlan } from './workstation-app.js';
 
-const HARNESS_HELP = `major harness — DeepSeek Harness live workstation
+const HARNESS_HELP = `major harness — legacy DeepSeek Harness compatibility workstation
 
   harness status [--json]
   harness compose [--json]
@@ -227,8 +227,8 @@ function formatStatus(status: LiveDshStatus): string {
     `phase: ${CURRENT_HARNESS_MIGRATION_PHASE}`,
     `pin: ${DEEPSEEK_HARNESS_PIN.npm.version} (${DEEPSEEK_HARNESS_PIN.git.declaredTag})`,
     `attested commit: ${DEEPSEEK_HARNESS_PIN.git.attestedCommit ?? 'none'}`,
-    `live execution backend: ${DEFAULT_EXECUTION_BACKEND}`,
-    `default execution environment: ${DEFAULT_EXECUTION_ENVIRONMENT}`,
+    `historical DSH execution backend: ${DEFAULT_EXECUTION_BACKEND}`,
+    `historical execution environment: ${DEFAULT_EXECUTION_ENVIRONMENT}`,
     `live dsh installed: ${status.liveDshInstalled}`,
     `ready: ${status.ready}`,
   ].join('\n');

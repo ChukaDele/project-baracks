@@ -104,6 +104,16 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Rejected alternatives:** implement a generic Major MCP transport
 - **Evidence:** docs/reuse-first-architecture-audit.md MCP row.
 
+## 2026-08-27 — Cursor client context bridge
+
+- **Capability:** client-to-Major context transport
+- **Candidates:** existing Major CLI/UI, Orca supported interfaces, Cursor native MCP, official MCP SDK
+- **Decision:** BUILD one thin stdio MCP adapter over existing Major context services
+- **Reason:** the new required acceptance path is Cursor Agent → Major project context, GBrain, skills and run insights. The candidate had no Major MCP command and Orca exposed no supported MCP registration for this local core. The adapter is limited to the existing dashboard/context/history reads and bounded question answerer. It adds no memory store, provider runtime, credential bridge, execution bypass or global Ruflo dependency. The previous no-transport decision remains valid for provider execution; this entry supersedes it only for the explicitly required client-facing context surface.
+- **Major-specific layer retained:** existing GBrain/project learning, skill resolver, policy/readiness and run-insight history
+- **Rejected alternatives:** attach the failing global Ruflo entry, build a second memory service, route Cursor through DSH/Lima, or weaken the host execution boundary
+- **Evidence:** `src/ui/dashboard.ts`, `src/ui/server.ts`, Cursor `mcp` CLI output, and Orca `agent-context --json` showed the existing context services and the absence of a usable Major MCP endpoint.
+
 ## 2026-08-17 — targeted git-native code editing
 
 - **Capability:** targeted git-native code editing
@@ -239,3 +249,13 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Major-specific layer retained:** Major routing, policy, project-local learning, conservative evidence thresholds, append-only summary storage, retention exclusions, and the headless compatibility path
 - **Rejected alternatives:** storing raw trajectories in Major; making Langfuse a prerequisite for active work; automatic policy promotion from one observation; a second queue/telemetry runtime; a custom desktop application; making Orca the authority for routing or memory
 - **Evidence:** `src/insights/performance-history.ts`, `src/supervisor/runtime.ts`, `distribution/deepseek-harness/bundles/major-kernel/index.js`, `tests/performance-history.test.ts`, `tests/dsh-major-kernel.test.ts`, `tests/resources-hygiene.test.ts`, and the official [Orca repository](https://github.com/stablyai/orca).
+
+## 2026-08-27 — thin headless Major path over host CLIs and Orca
+
+- **Capability:** normal Major execution, client continuity and owner-facing operational control without a second agent harness
+- **Candidates:** the existing Major `ExecutionGateway` plus provider CLI adapters and macOS Seatbelt containment; Orca-managed worktrees and terminals; the pinned DSH workstation/bundles; the existing Lima backend; a new Major agent loop or desktop runtime
+- **Decision:** ADOPT the existing headless Major gateway, provider adapters, durable state, GBrain/skills and run-insight hooks. ADOPT Orca for workspace, worktree, terminal, fleet and client-operational surfaces. BUILD only a small host-execution selector and a standalone Major intelligence/control panel that calls the existing core. DEPRECATE DSH and Lima as normal execution paths after the host/Orca replacement passes bounded behavioural proofs. Do not build or fork another agent harness.
+- **Reason:** The current DSH receipt measured 379,388ms of infrastructure wait for 39,926ms of worker execution. Major already owns the required policy, provider routing, containment, context, learning and evidence boundaries. Orca already owns the operational workspace surfaces. A direct host path removes the obsolete lease/VM substrate from the normal critical path while preserving the same guarded provider process boundary and durable Major state.
+- **Major-specific layer retained:** GBrain and project brains, semantic resolver and skill lifecycle, authorization/policy, provider/account readiness, task continuity, append-only run insights, conservative learning and historical evidence.
+- **Rejected alternatives:** extend DSH, make Lima the permanent runtime, create a replacement harness, create a second memory store, make Langfuse a prerequisite, or rebuild an IDE/worktree/terminal/browser UI inside Major.
+- **Evidence:** existing `src/security/gateway.ts`, `src/security/major-gateway.ts`, `src/providers/*` adapters, `src/supervisor/runtime.ts`, Orca CLI/runtime 1.4.190 with the target repository registered, and the retained DSH performance receipt.

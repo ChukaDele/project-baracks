@@ -46,7 +46,7 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Build budget: one production build at a time. Build once per relevant commit. Reviewers inspect the same immutable remote preview.
 - Major admission checks the shared resource ledger and memory availability. Below the memory soft floor, new work queues instead of increasing pressure.
 - Use `major resource status` for lightweight telemetry: workers, browsers, builds, total active, queued and memory availability.
-- QA is currently scheduled through the single DSH worker slot: review, consolidate and repair, then run the next reviewer and final verifier. This is a temporary physical-capacity constraint, not a general rule against independent review.
+- QA uses the shared live resource ledger: review, consolidate and repair, then run the next reviewer and final verifier when capacity and token economics justify it. This is a current scheduling rule, not a fixed one-worker limit.
 
 ## Communication
 

@@ -69,7 +69,7 @@ describe('Major project trust policy', () => {
         projects: [{ ...legacy, trust: 'build', maxWorkers: 6, ownerApprovedBuild: true }],
       }),
     );
-    expect(getProjectPolicy('legacy', '/tmp/legacy').maxWorkers).toBe(1);
+    expect(getProjectPolicy('legacy', '/tmp/legacy').maxWorkers).toBe(4);
   });
 
   it('defaults unknown projects to observe-only with zero delegated workers', () => {
@@ -104,7 +104,7 @@ describe('Major project trust policy', () => {
     });
     expect(policy.trust).toBe('build');
     expect(policy.ownerApprovedBuild).toBe(true);
-    expect(policy.maxWorkers).toBe(1);
+    expect(policy.maxWorkers).toBe(4);
     expect(policy.maxRunMinutes).toBe(120);
     expect(policy.allowBackground).toBe(false);
     expect(policy.allowExternalWrites).toBe(true);
@@ -141,7 +141,7 @@ describe('Major project trust policy', () => {
       allowExternalWrites: true,
     });
     expect(policy.trust).toBe('build');
-    expect(policy.maxWorkers).toBe(1);
+    expect(policy.maxWorkers).toBe(4);
     expect(policy.allowExternalWrites).toBe(true);
     expect(policy.allowCrossProjectMemory).toBe(false);
     expect(policy.allowPaidSpend).toBe(false);
@@ -180,7 +180,7 @@ describe('Major project trust policy', () => {
       projectClass: 'workshop',
       trust: 'unattended',
     });
-    expect(unattended.maxWorkers).toBe(1);
+    expect(unattended.maxWorkers).toBe(4);
     expect(unattended.allowBackground).toBe(true);
   });
 
@@ -211,7 +211,7 @@ describe('Major project trust policy', () => {
       projectClass: 'workshop',
       trust: 'build',
     });
-    expect(built.maxWorkers).toBe(1);
+    expect(built.maxWorkers).toBe(4);
     expect(built.allowBackground).toBe(false);
   });
 
