@@ -3,9 +3,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assessDelivery,
+  assessPromotion,
   assessTaskDeliveryEvidence,
   decideSdlc,
   failureRegression,
+  planProgressiveValidation,
   reviewFindingBlocksPromotion,
   reviewFindingDisposition,
   validateSdlcIntent,
@@ -53,6 +55,33 @@ describe('MVP-first SDLC policy', () => {
         decision,
       ),
     ).toEqual({ ok: true, missing: [] });
+  });
+
+  it('defaults to the cheapest critical-path validation without broad ceremony', () => {
+    expect(planProgressiveValidation({})).toEqual({
+      requiredChecks: ['focused_tests', 'cheapest_compile_type_or_build', 'critical_path_behavior'],
+      broaderValidationRequired: false,
+      activeTriggers: [],
+    });
+  });
+
+  it('adds risk checks and broadens only for the five explicit triggers', () => {
+    expect(
+      planProgressiveValidation({
+        riskSpecificChecks: ['promotion boundary regression'],
+        triggers: { promotion_policy: true, shared_dependency: true },
+      }),
+    ).toEqual({
+      requiredChecks: [
+        'focused_tests',
+        'cheapest_compile_type_or_build',
+        'critical_path_behavior',
+        'risk_specific_checks',
+        'broader_validation',
+      ],
+      broaderValidationRequired: true,
+      activeTriggers: ['shared_dependency', 'promotion_policy'],
+    });
   });
 
   it('blocks only blockers while triaging important findings for a usable safe MVP', () => {
@@ -229,6 +258,49 @@ describe('MVP-first SDLC policy', () => {
       reviewProof: 'proven',
       installationProof: 'proven',
       behaviorProof: 'proven',
+    });
+  });
+
+  it('separates PROMOTABLE from installed READY proof', () => {
+    expect(
+      assessPromotion({
+        prePromotionEvidencePassed: true,
+        review: 'independent',
+        reviewPassed: true,
+        blockerFindings: 0,
+      }),
+    ).toEqual({ promotion: 'PROMOTABLE', blockers: [] });
+    expect(
+      assessDelivery(
+        {
+          implementationExists: true,
+          deterministicChecksPassed: true,
+          reviewPassed: true,
+        },
+        { review: 'independent', installationRequired: true },
+      ),
+    ).toMatchObject({
+      delivery: 'validated',
+      installationProof: 'unproven',
+      behaviorProof: 'unproven',
+    });
+  });
+
+  it('refuses promotion for missing evidence, required review, or BLOCKER findings', () => {
+    expect(
+      assessPromotion({
+        prePromotionEvidencePassed: false,
+        review: 'focused',
+        reviewPassed: false,
+        blockerFindings: 1,
+      }),
+    ).toEqual({
+      promotion: 'NOT_PROMOTABLE',
+      blockers: [
+        'required pre-promotion evidence is missing',
+        'required review has not passed',
+        'BLOCKER findings remain',
+      ],
     });
   });
 });

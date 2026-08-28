@@ -56,11 +56,21 @@ change, focused review for substantive ordinary work, and independent review for
 authority, security, irreversible or broad-blast-radius changes. Existing project
 policy continues to govern external effects and owner-only gates.
 
+Use `planProgressiveValidation` for the default evidence plan: focused tests, the cheapest
+relevant compile/type/build check, and critical-path behavior. Add task-specific risk checks when
+the task has a material risk. Broaden validation only for an explicit blast-radius,
+shared-dependency, insufficient-evidence, historical-regression, or promotion-policy trigger.
+
 Review findings use `BLOCKER`, `IMPORTANT`, or `NIT`. Nits and explicitly labelled
 speculation are non-blocking; speculation becomes a finding only when evidence establishes
 an actionable defect. BLOCKER findings block promotion. IMPORTANT findings must be triaged
 and recorded but do not automatically block a usable and safe MVP. See `REVIEW.md` for the
 concise promotion policy.
+
+Use `assessPromotion` after pre-promotion evidence and the selected review. A candidate with that
+evidence, a passed required review, and no BLOCKER findings is `PROMOTABLE`, which permits normal
+merge/install. Installation is not a prerequisite for PROMOTABLE; it remains separate proof after
+promotion, preventing a circular install gate.
 
 Record installation proof separately as `not_required`, `unproven`, or `proven`.
 Record representative behaviour as `unproven` or `proven`. Installation alone never

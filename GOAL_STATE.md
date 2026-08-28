@@ -21,9 +21,9 @@ Substantive. Risk: authority/process semantics. Review: independent.
 
 ## Plan
 
-- Add task-applicable delivery-state evidence without adding a store or universal gates.
-- Preserve the compact-state contract and review/readiness semantics with focused regressions.
-- Run deterministic focused and repository checks, then commit a new exact head.
+- Add a pure progressive-validation plan and explicit non-circular PROMOTABLE assessment.
+- Preserve compact state, review semantics, delivery evidence, and READY behavioral proof.
+- Run focused/risk-specific checks plus the cheapest relevant type check; do not run the full matrix.
 
 ## Evidence
 
@@ -59,9 +59,9 @@ Delivery evidence:
 
 ## Current status
 
-BUILT. Exact implementation head `7385b13` passed the final focused, ordinary, and resource test
-gates. Independent review has not run, so VALIDATED is not claimed. The candidate has not been
-merged or installed, and installed behavior remains unproven.
+BUILT. The progressive-validation and PROMOTABLE repair passes its proportional deterministic
+checks. Independent review has not run, so VALIDATED and PROMOTABLE are not claimed. The candidate
+has not been merged or installed, and installed behavior remains unproven.
 
 Installation proof: unproven.
 Representative installed behaviour proof: unproven.
@@ -83,6 +83,10 @@ installation and installed behavior proof follow normal merge.
 - Use only BLOCKER/IMPORTANT/NIT findings: BLOCKER blocks; IMPORTANT is triaged without
   automatically blocking a usable and safe MVP; nits and speculation never block.
 - Apply delivery evidence only to task-relevant states; irrelevant states are `not_required`.
+- Default to focused, cheapest compile/type/build, and critical-path checks; broaden only for the
+  five explicit triggers.
+- PROMOTABLE requires pre-promotion evidence, selected review, and no BLOCKER; install/behavior
+  remain later READY evidence.
 
 ## Completed evidence
 
@@ -92,6 +96,8 @@ installation and installed behavior proof follow normal merge.
   explicit, applicable states require evidence, and irrelevant states resolve to `not_required`.
 - Review-semantics repair: 5 focused files and 38/38 tests passed; BLOCKER blocks, IMPORTANT
   triages without automatically blocking, and NIT/speculation remain advisory.
+- Progressive-validation/PROMOTABLE repair: 17/17 focused SDLC tests, typecheck, targeted lint and
+  formatting, Major validation, and stability validation passed. The full matrix was not rerun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -110,6 +116,8 @@ installation and installed behavior proof follow normal merge.
   tests now require all eight delivery-evidence states while exempting task-irrelevant states.
 - Candidate regression: `4add22e` automatically blocked promotion for an unaccepted IMPORTANT
   finding. Focused tests now require IMPORTANT to return `triage` without blocking promotion.
+- Candidate regression: `6f05ab9` had no explicit progressive-validation plan or PROMOTABLE state.
+  Focused tests now protect proportional escalation and the non-circular merge/install boundary.
 - Repository exception: the final resource gate has one pre-existing skill-reachability failure
   covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
   skips. The durable record does not recast that exception as candidate success.

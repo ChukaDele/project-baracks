@@ -16,3 +16,7 @@ Small low-risk work may use deterministic acceptance evidence with no separate r
 Substantive ordinary work gets focused review. Authority, security, irreversible, or broad-impact
 changes require independent exact-head review. Any code change after review invalidates the
 verdict; review the new exact head again.
+
+A candidate is `PROMOTABLE` when its required pre-promotion evidence and selected review pass
+with no `BLOCKER` findings. `PROMOTABLE` permits the merge/install path; it does not claim
+installation or READY. IMPORTANT findings remain recorded triage and do not automatically block.

@@ -26,6 +26,27 @@ export const DELIVERY_EVIDENCE_KINDS = [
 export type DeliveryEvidenceKind = (typeof DELIVERY_EVIDENCE_KINDS)[number];
 export type DeliveryEvidenceMatrix = Record<DeliveryEvidenceKind, ProofState>;
 
+export const VALIDATION_CHECKS = [
+  'focused_tests',
+  'cheapest_compile_type_or_build',
+  'critical_path_behavior',
+  'risk_specific_checks',
+  'broader_validation',
+] as const;
+export type ValidationCheck = (typeof VALIDATION_CHECKS)[number];
+
+export const BROADER_VALIDATION_TRIGGERS = [
+  'blast_radius',
+  'shared_dependency',
+  'insufficient_evidence',
+  'historical_regression',
+  'promotion_policy',
+] as const;
+export type BroaderValidationTrigger = (typeof BROADER_VALIDATION_TRIGGERS)[number];
+
+export const PROMOTION_STATES = ['NOT_PROMOTABLE', 'PROMOTABLE'] as const;
+export type PromotionState = (typeof PROMOTION_STATES)[number];
+
 export interface SdlcIntent {
   intent: string;
   spec: string[];
@@ -128,6 +149,54 @@ export function validateSdlcIntent(
   };
   const missing = decision.requiredState.filter((field) => !present(field));
   return { ok: missing.length === 0, missing };
+}
+
+/** Select the cheapest credible proof first and broaden only for explicit triggers. */
+export function planProgressiveValidation(input: {
+  riskSpecificChecks?: string[];
+  triggers?: Partial<Record<BroaderValidationTrigger, boolean>>;
+}): {
+  requiredChecks: ValidationCheck[];
+  broaderValidationRequired: boolean;
+  activeTriggers: BroaderValidationTrigger[];
+} {
+  const activeTriggers = BROADER_VALIDATION_TRIGGERS.filter((trigger) => input.triggers?.[trigger]);
+  const requiredChecks: ValidationCheck[] = [
+    'focused_tests',
+    'cheapest_compile_type_or_build',
+    'critical_path_behavior',
+  ];
+  if (input.riskSpecificChecks?.some((check) => check.trim().length > 0)) {
+    requiredChecks.push('risk_specific_checks');
+  }
+  if (activeTriggers.length > 0) requiredChecks.push('broader_validation');
+  return {
+    requiredChecks,
+    broaderValidationRequired: activeTriggers.length > 0,
+    activeTriggers,
+  };
+}
+
+/**
+ * Decide whether a validated candidate may enter merge/install. Installation
+ * is deliberately absent: installed behavior is post-promotion READY proof.
+ */
+export function assessPromotion(input: {
+  prePromotionEvidencePassed: boolean;
+  review: ReviewLevel;
+  reviewPassed?: boolean;
+  blockerFindings: number;
+}): { promotion: PromotionState; blockers: string[] } {
+  if (!Number.isInteger(input.blockerFindings) || input.blockerFindings < 0) {
+    throw new Error('blockerFindings must be a non-negative integer');
+  }
+  const blockers: string[] = [];
+  if (!input.prePromotionEvidencePassed)
+    blockers.push('required pre-promotion evidence is missing');
+  if (input.review !== 'none' && !input.reviewPassed)
+    blockers.push('required review has not passed');
+  if (input.blockerFindings > 0) blockers.push('BLOCKER findings remain');
+  return { promotion: blockers.length === 0 ? 'PROMOTABLE' : 'NOT_PROMOTABLE', blockers };
 }
 
 /**
