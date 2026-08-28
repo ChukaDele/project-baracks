@@ -21,13 +21,25 @@ Substantive. Risk: authority/process semantics. Review: independent.
 
 ## Plan
 
-- Repair the committed vocabulary and severity-policy gaps without adding a store or lifecycle.
-- Add focused regressions for the exact compact-state contract and non-blocking review advice.
+- Add task-applicable delivery-state evidence without adding a store or universal gates.
+- Preserve the compact-state contract and review/readiness semantics with focused regressions.
 - Run deterministic focused and repository checks, then commit a new exact head.
 
 ## Evidence
 
 - Starting candidate `d5735a9` was clean and matched the canonical repository identity.
+- Final-repair starting head `3e94e66` was clean and matched the canonical repository identity.
+
+Delivery evidence:
+
+- IMPLEMENTED: proven — pure assessment code exists in `src/domain/sdlc.ts`.
+- TESTED: proven — 5 focused files and 38/38 tests pass with repository checks.
+- STAGED: proven — repaired candidate is committed in the isolated exact-head worktree.
+- RESOLVED: proven — all eight task-applicable evidence states have focused regression proof.
+- LOADED: not required — this slice adds no loadable runtime/configuration artifact.
+- FOLLOWED: proven — canonical template/prior-art paths are extended without a new store.
+- INSTALLED: unproven — supported exact-SHA installation has not run.
+- BEHAVIOURALLY PROVEN: unproven — representative installed behavior has not run.
 
 ## Critical-path dependencies
 
@@ -44,7 +56,7 @@ Substantive. Risk: authority/process semantics. Review: independent.
 
 ## Current status
 
-BUILT. The acceptance repair and focused regressions pass deterministic checks. Independent
+BUILT. The final acceptance repair and focused regressions pass deterministic checks. Independent
 exact-head review has not run, so VALIDATED is not claimed. Installation and installed behavior
 remain explicitly unproven.
 
@@ -66,11 +78,14 @@ installation and installed behavior proof follow normal merge.
   installation alone imply READY.
 - WRAP the existing state/readiness paths per `docs/prior-art-decisions.md`; add no new store.
 - Use only BLOCKER/IMPORTANT/NIT findings; nits and speculation never block promotion.
+- Apply delivery evidence only to task-relevant states; irrelevant states are `not_required`.
 
 ## Completed evidence
 
 - Repaired focused suite: 5 files and 36/36 tests passed, including exact intent/spec/plan/evidence,
   low-risk no-review, review severity, installation/behavior proof, prior-art, autonomy, and artifacts.
+- Final delivery-evidence repair: 5 focused files and 38/38 tests passed; all eight states are
+  explicit, applicable states require evidence, and irrelevant states resolve to `not_required`.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Ordinary repository tests made broad progress but sandbox-only host Git/Node/listener checks
@@ -83,6 +98,8 @@ installation and installed behavior proof follow normal merge.
 - Candidate regression: `d5735a9` used outcome/acceptance and P0-P3 vocabulary. Focused tests now
   require exact intent/spec/plan/evidence headings and BLOCKER/IMPORTANT/NIT semantics, including
   non-blocking nits and speculation.
+- Candidate regression: `3e94e66` exposed only generic review/installation/behavior proof. Focused
+  tests now require all eight delivery-evidence states while exempting task-irrelevant states.
 - Environment regression: repository suites that deliberately inspect host Git, Node, nested
   Seatbelt, Lima, or listeners cannot all pass inside the provider Seatbelt boundary. Focused
   project-local checks run with an isolated `MAJOR_HOME` and remain authoritative for this slice.

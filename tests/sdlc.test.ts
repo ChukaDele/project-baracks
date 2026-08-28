@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assessDelivery,
+  assessTaskDeliveryEvidence,
   decideSdlc,
   failureRegression,
   reviewFindingBlocksPromotion,
@@ -68,6 +69,18 @@ describe('MVP-first SDLC policy', () => {
     expect(template).toMatch(/^## Spec$/m);
     expect(template).toMatch(/^## Plan$/m);
     expect(template).toMatch(/^## Evidence$/m);
+    for (const state of [
+      'IMPLEMENTED',
+      'TESTED',
+      'STAGED',
+      'RESOLVED',
+      'LOADED',
+      'FOLLOWED',
+      'INSTALLED',
+      'BEHAVIOURALLY PROVEN',
+    ]) {
+      expect(template).toContain(`${state}:`);
+    }
 
     const reviewPolicy = readFileSync(join(process.cwd(), 'REVIEW.md'), 'utf8');
     expect(reviewPolicy).toContain('**BLOCKER:**');
@@ -75,6 +88,49 @@ describe('MVP-first SDLC policy', () => {
     expect(reviewPolicy).toContain('**NIT:**');
     expect(reviewPolicy).toContain('Speculation and questions are not findings and never block.');
     expect(reviewPolicy).not.toMatch(/\*\*P[0-3]/);
+  });
+
+  it('requires evidence only for delivery states applicable to the task', () => {
+    expect(
+      assessTaskDeliveryEvidence({
+        applicable: ['IMPLEMENTED', 'TESTED', 'INSTALLED', 'BEHAVIOURALLY PROVEN'],
+        evidence: {
+          IMPLEMENTED: ['src/domain/sdlc.ts'],
+          TESTED: ['focused regression passed'],
+          INSTALLED: ['   '],
+        },
+      }),
+    ).toEqual({
+      IMPLEMENTED: 'proven',
+      TESTED: 'proven',
+      STAGED: 'not_required',
+      RESOLVED: 'not_required',
+      LOADED: 'not_required',
+      FOLLOWED: 'not_required',
+      INSTALLED: 'unproven',
+      'BEHAVIOURALLY PROVEN': 'unproven',
+    });
+  });
+
+  it('can prove workflow states without inventing installation requirements', () => {
+    expect(
+      assessTaskDeliveryEvidence({
+        applicable: ['RESOLVED', 'LOADED', 'FOLLOWED'],
+        evidence: {
+          RESOLVED: ['dependency resolution recorded'],
+          LOADED: ['configuration observed in runtime'],
+          FOLLOWED: ['procedure evidence recorded'],
+        },
+      }),
+    ).toMatchObject({
+      IMPLEMENTED: 'not_required',
+      TESTED: 'not_required',
+      RESOLVED: 'proven',
+      LOADED: 'proven',
+      FOLLOWED: 'proven',
+      INSTALLED: 'not_required',
+      'BEHAVIOURALLY PROVEN': 'not_required',
+    });
   });
 
   it('raises review based on consequence, not change size', () => {

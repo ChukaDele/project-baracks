@@ -67,6 +67,13 @@ installation proof, and a representative behaviour outcome under the intended tr
 profile. For low-risk work whose review level is `none`, deterministic checks can
 support VALIDATED without inventing an independent-review requirement.
 
+Use `assessTaskDeliveryEvidence` to record evidence for the states relevant to the task:
+`IMPLEMENTED`, `TESTED`, `STAGED`, `RESOLVED`, `LOADED`, `FOLLOWED`, `INSTALLED`, and
+`BEHAVIOURALLY_PROVEN`. An applicable state is proven only by a non-empty evidence record.
+States outside the task's delivery path are `not_required`; never demand or claim them merely
+because the vocabulary exists. This matrix supplements rather than replaces the canonical
+BUILT/VALIDATED/READY assessment and its independent-review and representative-outcome gates.
+
 For a failure, keep its reproduction and executable regression verification in the
 project. Submit only a separate sanitized, generalisable principle to the existing
 GBrain learning lifecycle. A regression artifact is not itself global learning.

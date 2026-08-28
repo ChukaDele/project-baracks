@@ -23,6 +23,17 @@ Review: [none / focused / independent]
 
 - [Observed proof; omit until evidence exists]
 
+Delivery evidence (record only task-applicable rows; omitted rows are not required):
+
+- IMPLEMENTED: [unproven / proven — implementation evidence]
+- TESTED: [unproven / proven — deterministic check evidence]
+- STAGED: [unproven / proven — staged-candidate evidence]
+- RESOLVED: [unproven / proven — issue/dependency resolution evidence]
+- LOADED: [unproven / proven — runtime/configuration load evidence]
+- FOLLOWED: [unproven / proven — procedure/policy adherence evidence]
+- INSTALLED: [unproven / proven — exact-artifact installation evidence]
+- BEHAVIOURALLY PROVEN: [unproven / proven — representative outcome evidence]
+
 ## Critical-path dependencies
 
 - [Ordered dependency, owner and the smallest current constraint]

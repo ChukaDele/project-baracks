@@ -13,6 +13,19 @@ export type ReviewSeverity = (typeof REVIEW_SEVERITIES)[number];
 export const PROOF_STATES = ['not_required', 'unproven', 'proven'] as const;
 export type ProofState = (typeof PROOF_STATES)[number];
 
+export const DELIVERY_EVIDENCE_KINDS = [
+  'IMPLEMENTED',
+  'TESTED',
+  'STAGED',
+  'RESOLVED',
+  'LOADED',
+  'FOLLOWED',
+  'INSTALLED',
+  'BEHAVIOURALLY PROVEN',
+] as const;
+export type DeliveryEvidenceKind = (typeof DELIVERY_EVIDENCE_KINDS)[number];
+export type DeliveryEvidenceMatrix = Record<DeliveryEvidenceKind, ProofState>;
+
 export interface SdlcIntent {
   intent: string;
   spec: string[];
@@ -106,6 +119,25 @@ export function validateSdlcIntent(
   };
   const missing = decision.requiredState.filter((field) => !present(field));
   return { ok: missing.length === 0, missing };
+}
+
+/**
+ * Resolve task-appropriate delivery evidence without turning every possible
+ * proof into a universal gate. Applicable states need at least one non-empty
+ * evidence record; every other state is explicitly not required.
+ */
+export function assessTaskDeliveryEvidence(input: {
+  applicable: DeliveryEvidenceKind[];
+  evidence?: Partial<Record<DeliveryEvidenceKind, string[]>>;
+}): DeliveryEvidenceMatrix {
+  const applicable = new Set(input.applicable);
+  return Object.fromEntries(
+    DELIVERY_EVIDENCE_KINDS.map((kind) => {
+      if (!applicable.has(kind)) return [kind, 'not_required'];
+      const proven = input.evidence?.[kind]?.some((item) => item.trim().length > 0) ?? false;
+      return [kind, proven ? 'proven' : 'unproven'];
+    }),
+  ) as DeliveryEvidenceMatrix;
 }
 
 export interface DeliveryEvidence {
