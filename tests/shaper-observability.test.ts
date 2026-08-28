@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   existsSync,
   mkdtempSync,
@@ -128,10 +128,12 @@ describe('read-only Shaper observability adapter', () => {
     const missing = join(root, 'missing.db');
     const outdated = join(root, 'outdated.db');
     const priorDbPath = process.env.MAJOR_DB_PATH;
+    const stdoutWrite = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     try {
       process.env.MAJOR_DB_PATH = missing;
       await expect(runShaperCli(['telemetry', 'shaper'])).rejects.toThrow();
       expect(existsSync(missing)).toBe(false);
+      expect(stdoutWrite).not.toHaveBeenCalled();
 
       const created = new Database(outdated);
       created.exec(
@@ -147,7 +149,9 @@ describe('read-only Shaper observability adapter', () => {
       expect(readFileSync(outdated)).toEqual(beforeBytes);
       expect(statSync(outdated).mtimeMs).toBe(beforeMtime);
       expect(readdirSync(root).sort()).toEqual(beforeEntries);
+      expect(stdoutWrite).not.toHaveBeenCalled();
     } finally {
+      stdoutWrite.mockRestore();
       if (priorDbPath === undefined) delete process.env.MAJOR_DB_PATH;
       else process.env.MAJOR_DB_PATH = priorDbPath;
       rmSync(root, { recursive: true, force: true });
