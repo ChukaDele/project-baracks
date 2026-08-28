@@ -33,7 +33,8 @@ Substantive. Risk: authority/process semantics. Review: independent.
 Delivery evidence:
 
 - IMPLEMENTED: proven — pure assessment code exists in `src/domain/sdlc.ts`.
-- TESTED: proven — 5 focused files and 38/38 tests pass with repository checks.
+- TESTED: proven — exact implementation head `4add22e` passed 106/106 ordinary test files and
+  910/910 ordinary tests; the resource run passed 139 tests with 5 expected skips.
 - STAGED: proven — repaired candidate is committed in the isolated exact-head worktree.
 - RESOLVED: proven — all eight task-applicable evidence states have focused regression proof.
 - LOADED: not required — this slice adds no loadable runtime/configuration artifact.
@@ -56,7 +57,7 @@ Delivery evidence:
 
 ## Current status
 
-BUILT. The final acceptance repair and focused regressions pass deterministic checks. Independent
+BUILT. Exact implementation head `4add22e` passed the final deterministic gates. Independent
 exact-head review has not run, so VALIDATED is not claimed. Installation and installed behavior
 remain explicitly unproven.
 
@@ -88,10 +89,11 @@ installation and installed behavior proof follow normal merge.
   explicit, applicable states require evidence, and irrelevant states resolve to `not_required`.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
-- Ordinary repository tests made broad progress but sandbox-only host Git/Node/listener checks
-  failed or hung; the run was stopped after evidence collection. No SDLC test failed.
-- Resource suite: 132 passed, 5 expected skips, 8 sandbox/path failures. No candidate-touched
-  test failed.
+- Final ordinary exact-head gate: 106/106 files and 910/910 tests passed.
+- Final resource exact-head gate: 139 tests passed with 5 expected skips.
+- The resource gate also reported one pre-existing skill-reachability failure covering 14 orphan
+  writing/brand IDs. It is recorded as an unresolved repository exception, not an SDLC candidate
+  failure and not a readiness claim.
 
 ## Failure regression
 
@@ -100,9 +102,9 @@ installation and installed behavior proof follow normal merge.
   non-blocking nits and speculation.
 - Candidate regression: `3e94e66` exposed only generic review/installation/behavior proof. Focused
   tests now require all eight delivery-evidence states while exempting task-irrelevant states.
-- Environment regression: repository suites that deliberately inspect host Git, Node, nested
-  Seatbelt, Lima, or listeners cannot all pass inside the provider Seatbelt boundary. Focused
-  project-local checks run with an isolated `MAJOR_HOME` and remain authoritative for this slice.
+- Repository exception: the final resource gate has one pre-existing skill-reachability failure
+  covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
+  skips. The durable record does not recast that exception as candidate success.
 - Generalisable learning is already captured in active Major learning; no duplicate candidate.
 
 ## Next executable action
