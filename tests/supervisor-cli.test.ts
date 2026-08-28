@@ -324,6 +324,23 @@ describe('major status: host/provider breakdown, separate from goal detail', () 
     }
   });
 
+  it('treats --json as an output flag and agrees with goal show', async () => {
+    const lines: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => lines.push(String(value)));
+
+    expect(await runSupervisorCli(['status', '--json'])).toBe(true);
+    const status = JSON.parse(lines.at(-1)!) as {
+      activeGoalCount: number;
+      goals: SupervisorGoal[];
+    };
+    expect(status.activeGoalCount).toBe(1);
+    expect(status.goals).toHaveLength(1);
+    expect(status.goals[0]?.project).toBe('major');
+
+    lines.length = 0;
+    expect(await runSupervisorCli(['goal', 'show', '--id', status.goals[0]!.id])).toBe(true);
+    expect(status.goals[0]).toEqual(JSON.parse(lines.at(-1)!) as SupervisorGoal);
+  });
   it('reports a stale live-worker claim as reclaimable and the kill switch as stopped', async () => {
     const scratchHome = mkdtempSync(join(tmpdir(), 'major-status-home-'));
     const priorHome = process.env.HOME;
