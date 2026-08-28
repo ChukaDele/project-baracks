@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { openDb } from '../src/db/client.js';
 import { transitionTask } from '../src/domain/task-service.js';
-import { openShaperTelemetryDb } from '../src/observability/shaper-cli.js';
+import { openShaperTelemetryDb, runShaperCli } from '../src/observability/shaper-cli.js';
 import {
   readShaperCommandCentre,
   readShaperTelemetry,
@@ -116,6 +123,37 @@ describe('read-only Shaper observability adapter', () => {
     }
   });
 
+  it('fails closed through runShaperCli without creating or migrating a database', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-shaper-cli-readonly-'));
+    const missing = join(root, 'missing.db');
+    const outdated = join(root, 'outdated.db');
+    const priorDbPath = process.env.MAJOR_DB_PATH;
+    try {
+      process.env.MAJOR_DB_PATH = missing;
+      await expect(runShaperCli(['telemetry', 'shaper'])).rejects.toThrow();
+      expect(existsSync(missing)).toBe(false);
+
+      const created = new Database(outdated);
+      created.exec(
+        "PRAGMA user_version = 1; CREATE TABLE marker (value text); INSERT INTO marker VALUES ('unchanged')",
+      );
+      created.close();
+      const beforeBytes = readFileSync(outdated);
+      const beforeMtime = statSync(outdated).mtimeMs;
+      const beforeEntries = readdirSync(root).sort();
+
+      process.env.MAJOR_DB_PATH = outdated;
+      await expect(runShaperCli(['telemetry', 'shaper'])).rejects.toThrow(/no such table/);
+      expect(readFileSync(outdated)).toEqual(beforeBytes);
+      expect(statSync(outdated).mtimeMs).toBe(beforeMtime);
+      expect(readdirSync(root).sort()).toEqual(beforeEntries);
+    } finally {
+      if (priorDbPath === undefined) delete process.env.MAJOR_DB_PATH;
+      else process.env.MAJOR_DB_PATH = priorDbPath;
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('projects known run telemetry and keeps unsupported or sensitive data unavailable', () => {
     const opened = seedTelemetry();
     try {
@@ -197,6 +235,10 @@ describe('read-only Shaper observability adapter', () => {
           (id,task_id,provider_id,model_id,model_ref,purpose,billing_mode,routing_reason,status,
            started_at,ended_at,created_at,updated_at)
         VALUES
+          ('run-before','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
+           '2026-08-27T11:59:59Z','2026-08-27T11:59:59Z','2026-08-27T11:59:59Z','2026-08-27T11:59:59Z'),
+          ('run-window-boundary','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
+           '2026-08-27T12:00:00Z','2026-08-27T12:00:00Z','2026-08-27T12:00:00Z','2026-08-27T12:00:00Z'),
           ('run-early','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
            '2026-08-28T11:00:00Z','2026-08-28T11:00:01Z','2026-08-28T11:00:00Z','2026-08-28T11:00:01Z'),
           ('run-late','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
@@ -212,7 +254,16 @@ describe('read-only Shaper observability adapter', () => {
           ('t-boundary','p','boundary','boundary','draft','routine',0,'2026-08-28T12:00:00Z','2026-08-28T12:00:00Z'),
           ('t-future','p','future','future','draft','routine',0,'2026-08-28T12:00:01Z','2026-08-28T12:00:01Z');
       `);
-      const options = { asOf: '2026-08-28T12:00:00Z', limit: 2 };
+      const window = { asOf: '2026-08-28T12:00:00Z', days: 1 };
+      expect(readShaperTelemetry(opened.sqlite, window).map((row) => row.runId)).toEqual([
+        'run-boundary-a',
+        'run-boundary-b',
+        'run-late',
+        'run-early',
+        'run',
+        'run-window-boundary',
+      ]);
+      const options = { ...window, limit: 2 };
       expect(readShaperTelemetry(opened.sqlite, options).map((row) => row.runId)).toEqual([
         'run-boundary-a',
         'run-boundary-b',
@@ -220,7 +271,7 @@ describe('read-only Shaper observability adapter', () => {
       expect(readShaperCommandCentre(opened.sqlite, options)).toContainEqual({
         metric: 'run_status',
         status: 'succeeded',
-        count: 5,
+        count: 6,
         latestAt: '2026-08-28T12:00:00Z',
       });
       expect(readShaperCommandCentre(opened.sqlite, options)).toContainEqual({
@@ -237,14 +288,18 @@ describe('read-only Shaper observability adapter', () => {
   it('neutralizes CSV formulas after whitespace/control prefixes and preserves ordinary strings', () => {
     const csv = shaperCommandCentreCsv([
       { metric: 'run_status', status: '=cmd()', count: 1, latestAt: '+SUM(A1)' },
-      { metric: 'run_status', status: ' \t-2+3', count: 2, latestAt: '\u0000@payload' },
-      { metric: 'run_status', status: '\u200b=hidden()', count: 4, latestAt: null },
-      { metric: 'run_status', status: 'ordinary value', count: 3, latestAt: '2026-08-28' },
+      { metric: 'run_status', status: '\t=tab()', count: 2, latestAt: '\r@carriage' },
+      { metric: 'run_status', status: '\u0001+control', count: 3, latestAt: '   -whitespace' },
+      { metric: 'run_status', status: 'ordinary whitespace', count: 4, latestAt: '  unchanged' },
+      { metric: 'run_status', status: 'comma,value', count: 5, latestAt: 'say "hello"' },
+      { metric: 'run_status', status: 'first line\nsecond line', count: 6, latestAt: null },
     ]);
     expect(csv).toContain("run_status,'=cmd(),1,'+SUM(A1)");
-    expect(csv).toContain("run_status,' \t-2+3,2,'\u0000@payload");
-    expect(csv).toContain("run_status,'\u200b=hidden(),4,");
-    expect(csv).toContain('run_status,ordinary value,3,2026-08-28');
+    expect(csv).toContain("run_status,'\t=tab(),2,\"'\r@carriage\"");
+    expect(csv).toContain("run_status,'\u0001+control,3,'   -whitespace");
+    expect(csv).toContain('run_status,ordinary whitespace,4,  unchanged');
+    expect(csv).toContain('run_status,"comma,value",5,"say ""hello"""');
+    expect(csv).toContain('run_status,"first line\nsecond line",6,');
   });
 
   it('returns an empty result for an empty database without network or writes', () => {

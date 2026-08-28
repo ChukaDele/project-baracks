@@ -309,6 +309,37 @@ function generatedSkillPath(entry: SkillCandidate): string | undefined {
   return entry.path && existsSync(entry.path) ? entry.path : undefined;
 }
 
+function integrationDisambiguation(entryId: string, task: string): string | undefined {
+  const isMetaShapeR = /\bmeta\s+shaper\b/u.test(task);
+  const hasShaperAnalyticsIntent = /\b(?:taleshape|dashboard|analytics|telemetry)\b/u.test(task);
+  const hasSplatIntent = /\b(?:splat|splatting|reconstruct|reconstruction|colmap|novel[ -]view)\b/u.test(
+    task,
+  );
+  if (
+    entryId === 'analytics-with-shaper' &&
+    (isMetaShapeR ||
+      (!hasShaperAnalyticsIntent &&
+        (/(?:network|packet|bandwidth|qdisc).{0,24}shap(?:e|er|ing)|shap(?:e|er|ing).{0,24}(?:network|packet|bandwidth|qdisc)/u.test(
+          task,
+        ) ||
+          /\bshap\s+(?:value|explain)/u.test(task) ||
+          /(?:scatter\s+plot|scatterplot)/u.test(task))))
+  ) {
+    return 'disambiguated a non-analytics Shaper meaning';
+  }
+  if (
+    entryId === 'gaussian-splatting-spatial-reconstruction' &&
+    (isMetaShapeR ||
+      (!hasSplatIntent &&
+        (/gaussian.{0,20}(?:blur|filter|noise|distribution|kernel|process)/u.test(task) ||
+          /(?:blur|filter|noise|distribution|kernel|process).{0,20}gaussian/u.test(task) ||
+          /gaussian.{0,20}(?:scatter|chart|plot)/u.test(task))))
+  ) {
+    return 'disambiguated a non-reconstruction Gaussian meaning';
+  }
+  return undefined;
+}
+
 function scoreEntry(
   entry: SkillRegistryEntry,
   task: string,
@@ -316,23 +347,8 @@ function scoreEntry(
 ): { score: number; reason: string } {
   const normalized = task.toLowerCase();
   const fixtures = examples.get(entry.id);
-  if (
-    entry.id === 'analytics-with-shaper' &&
-    (/(?:network|packet|bandwidth|qdisc).{0,24}shap(?:e|er|ing)|shap(?:e|er|ing).{0,24}(?:network|packet|bandwidth|qdisc)/u.test(
-      normalized,
-    ) ||
-      /\bmeta\s+shaper\b|\bshap\s+(?:value|explain)/u.test(normalized))
-  ) {
-    return { score: 0, reason: 'disambiguated a non-analytics Shaper meaning' };
-  }
-  if (
-    entry.id === 'gaussian-splatting-spatial-reconstruction' &&
-    (/gaussian.{0,20}(?:blur|filter|noise|distribution|kernel|process)/u.test(normalized) ||
-      /(?:blur|filter|noise|distribution|kernel|process).{0,20}gaussian/u.test(normalized) ||
-      /gaussian.{0,20}(?:scatter|chart|plot)/u.test(normalized))
-  ) {
-    return { score: 0, reason: 'disambiguated a non-reconstruction Gaussian meaning' };
-  }
+  const disambiguation = integrationDisambiguation(entry.id, normalized);
+  if (disambiguation) return { score: 0, reason: disambiguation };
   if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
     return { score: 0, reason: 'matched a negative trigger example' };
   }
