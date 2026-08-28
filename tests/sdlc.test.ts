@@ -125,6 +125,28 @@ describe('MVP-first SDLC policy', () => {
     expect(reviewPolicy).not.toMatch(/\*\*P[0-3]/);
   });
 
+  it('keeps progressive validation operational in the worker policy', () => {
+    const workerPolicy = readFileSync(
+      join(process.cwd(), 'guidance/global-worker-rules.md'),
+      'utf8',
+    );
+    expect(workerPolicy).toContain('focused changed-behavior tests');
+    expect(workerPolicy).toContain('the cheapest relevant compile/type/build check');
+    expect(workerPolicy).toContain('critical-path behavior');
+    expect(workerPolicy).toContain('checks for each material risk');
+    for (const trigger of [
+      'blast-radius',
+      'shared-dependency',
+      'insufficient-evidence',
+      'historical-regression',
+      'promotion-policy',
+    ]) {
+      expect(workerPolicy).toContain(trigger);
+    }
+    expect(workerPolicy).toContain('or repository policy requires them');
+    expect(workerPolicy).toContain('cost versus expected information gain');
+  });
+
   it('requires evidence only for delivery states applicable to the task', () => {
     expect(
       assessTaskDeliveryEvidence({

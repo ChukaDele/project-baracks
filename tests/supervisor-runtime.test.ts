@@ -587,6 +587,21 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain(
       'FAST checks while iterating, acceptance evidence for the critical path',
     );
+    expect(prompt).toContain('focused changed-behavior tests');
+    expect(prompt).toContain('the cheapest relevant compile/type/build check');
+    expect(prompt).toContain('critical-path behavior');
+    expect(prompt).toContain('checks for each material risk');
+    for (const trigger of [
+      'blast-radius',
+      'shared-dependency',
+      'insufficient-evidence',
+      'historical-regression',
+      'promotion-policy',
+    ]) {
+      expect(prompt).toContain(trigger);
+    }
+    expect(prompt).toContain('or repository policy requires them');
+    expect(prompt).toContain('cost versus expected information gain');
     expect(prompt).toContain('class: workshop');
     expect(prompt).toContain('trust: assist');
     expect(prompt).toContain('maximum concurrent workers: 1');
@@ -597,6 +612,13 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('mcp-integration-ops');
     expect(prompt).toContain('website-design-qa');
     expect(prompt).toContain('BUILT = implementation exists');
+    expect(prompt).toContain(
+      'PROMOTABLE = required pre-promotion evidence and review passed with no BLOCKER',
+    );
+    expect(prompt).toContain('merge/install may proceed before installation proof exists');
+    expect(prompt).toContain(
+      'READY = a representative real-world outcome has succeeded under the intended trust profile',
+    );
     expect(prompt).toContain("You cannot access or mutate Major's global control state");
     expect(prompt).toContain('the parent owns resource admission and learning capture');
     expect(prompt).not.toContain('capture it with major learn capture');

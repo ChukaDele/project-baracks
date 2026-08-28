@@ -21,7 +21,8 @@ Substantive. Risk: authority/process semantics. Review: independent.
 
 ## Plan
 
-- Add a pure progressive-validation plan and explicit non-circular PROMOTABLE assessment.
+- Make the pure progressive-validation plan operational in the live coordinator prompt and keep
+  the explicit non-circular PROMOTABLE assessment.
 - Preserve compact state, review semantics, delivery evidence, and READY behavioral proof.
 - Run focused/risk-specific checks plus the cheapest relevant type check; do not run the full matrix.
 
@@ -83,8 +84,9 @@ installation and installed behavior proof follow normal merge.
 - Use only BLOCKER/IMPORTANT/NIT findings: BLOCKER blocks; IMPORTANT is triaged without
   automatically blocking a usable and safe MVP; nits and speculation never block.
 - Apply delivery evidence only to task-relevant states; irrelevant states are `not_required`.
-- Default to focused, cheapest compile/type/build, and critical-path checks; broaden only for the
-  five explicit triggers.
+- Default to focused changed-behavior, cheapest compile/type/build, critical-path, and material-risk
+  checks. Prohibit broad suites unless the five explicit triggers or repository policy apply, and
+  require cost versus expected information-gain reasoning.
 - PROMOTABLE requires pre-promotion evidence, selected review, and no BLOCKER; install/behavior
   remain later READY evidence.
 
@@ -98,6 +100,13 @@ installation and installed behavior proof follow normal merge.
   triages without automatically blocking, and NIT/speculation remain advisory.
 - Progressive-validation/PROMOTABLE repair: 17/17 focused SDLC tests, typecheck, targeted lint and
   formatting, Major validation, and stability validation passed. The full matrix was not rerun.
+- Live-prompt repair: the coordinator prompt and worker policy now carry the progressive-validation
+  requirements, broad-suite triggers, and cost/information-gain gate. The proportional gate passed
+  58/58 focused prompt/policy tests, typecheck, targeted source/policy lint, formatting, Major
+  validation, and stability validation. The full matrix was not rerun.
+- Targeted lint of the entire supervisor-runtime test file also surfaced two pre-existing
+  `no-unsafe-assignment` errors at unchanged lines 133 and 186; they are outside this candidate's
+  focused assertions and are not recast as passing evidence.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -118,6 +127,9 @@ installation and installed behavior proof follow normal merge.
   finding. Focused tests now require IMPORTANT to return `triage` without blocking promotion.
 - Candidate regression: `6f05ab9` had no explicit progressive-validation plan or PROMOTABLE state.
   Focused tests now protect proportional escalation and the non-circular merge/install boundary.
+- Candidate regression: `4d5f931` implemented the pure policy but did not carry its progressive
+  validation contract in the live coordinator prompt. Focused prompt/policy tests now protect that
+  operational path.
 - Repository exception: the final resource gate has one pre-existing skill-reachability failure
   covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
   skips. The durable record does not recast that exception as candidate success.

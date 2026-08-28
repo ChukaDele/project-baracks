@@ -56,10 +56,12 @@ change, focused review for substantive ordinary work, and independent review for
 authority, security, irreversible or broad-blast-radius changes. Existing project
 policy continues to govern external effects and owner-only gates.
 
-Use `planProgressiveValidation` for the default evidence plan: focused tests, the cheapest
-relevant compile/type/build check, and critical-path behavior. Add task-specific risk checks when
-the task has a material risk. Broaden validation only for an explicit blast-radius,
-shared-dependency, insufficient-evidence, historical-regression, or promotion-policy trigger.
+Use `planProgressiveValidation` for the default evidence plan: focused changed-behavior tests, the
+cheapest relevant compile/type/build check, critical-path behavior, and checks for each material
+risk. Do not run broad suites unless an explicit blast-radius, shared-dependency,
+insufficient-evidence, historical-regression, or promotion-policy trigger applies, or repository
+policy requires them. Record broad validation's cost versus expected information gain and run it
+only when that tradeoff supports the promotion decision.
 
 Review findings use `BLOCKER`, `IMPORTANT`, or `NIT`. Nits and explicitly labelled
 speculation are non-blocking; speculation becomes a finding only when evidence establishes

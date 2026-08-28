@@ -34,7 +34,7 @@ For owner-approved build projects, do not re-introduce shadow runs, repeated per
 - Maximise useful concurrency. Parallelise independent work when the current capacity, trust policy and write ownership allow it. Serialize only actual conflicts: shared mutable state, incompatible interfaces, required ordering or a scarce physical resource.
 - Treat numeric worker and browser caps as current physical/runtime capacity, not a claim that one-worker delivery is the permanent governance model. Do not bypass them. Improve scheduling only when the runtime can safely support it.
 - Work from the critical path. Remove the smallest present constraint first. Prefer deletion, reuse and a simpler design over new machinery.
-- Match validation and independent review to risk. Use FAST checks while iterating, acceptance evidence for the critical path, and one frozen-candidate release gate. Do not add review loops that do not change the decision.
+- Match validation and independent review to risk. By default require focused changed-behavior tests, the cheapest relevant compile/type/build check, critical-path behavior, and checks for each material risk. Do not run broad suites unless explicit blast-radius, shared-dependency, insufficient-evidence, historical-regression, or promotion-policy triggers apply, or repository policy requires them. Record broad validation's cost versus expected information gain and run it only when that tradeoff supports the promotion decision. Do not add review loops that do not change the decision.
 
 ## Global resource guard
 

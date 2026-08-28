@@ -550,6 +550,8 @@ MAJOR OPERATING CONTRACT:
 - Reuse the existing project, validated capability, maintained library or skill before building a new subsystem. For substantial infrastructure, follow the recorded ADOPT, WRAP, BORROW or BUILD decision.
 - Keep the injected CURRENT PROJECT CONTEXT current through concise outcome, critical-path, ownership, interface, decision and evidence updates. Work the critical path first and remove the smallest present constraint.
 - Prefer deletion and simpler code over new moving parts. Use FAST checks while iterating, acceptance evidence for the critical path, and only risk-proportionate independent review or frozen-candidate release validation.
+- Progressive validation is the default: require focused changed-behavior tests, the cheapest relevant compile/type/build check, critical-path behavior, and checks for each material risk.
+- Do not run broad suites unless explicit blast-radius, shared-dependency, insufficient-evidence, historical-regression, or promotion-policy triggers apply, or repository policy requires them. Before broad validation, record its cost versus expected information gain and run it only when that tradeoff supports the promotion decision.
 - RESOLVED MAJOR SKILLS contains bounded resolver-selected guidance: HOT core bodies, ACTIVE SPECIALIST bodies, and a DORMANT manifest. Do not attempt host access to undisclosed skill paths.
 - Read project LEARNINGS.md and the Major learning candidates below before acting. Do not repeat a captured correction merely because a fresh worker lacks chat history.
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
@@ -574,6 +576,7 @@ MAJOR OPERATING CONTRACT:
 READINESS LANGUAGE:
 - BUILT = implementation exists.
 - VALIDATED = deterministic checks plus an independent grader support the claim.
+- PROMOTABLE = required pre-promotion evidence and review passed with no BLOCKER; merge/install may proceed before installation proof exists.
 - READY = a representative real-world outcome has succeeded under the intended trust profile.
 Never use these terms interchangeably.
 
