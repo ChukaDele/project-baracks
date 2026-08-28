@@ -1,12 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-} from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -299,7 +292,7 @@ describe('read-only Shaper observability adapter', () => {
       { metric: 'run_status', status: 'first line\nsecond line', count: 6, latestAt: null },
     ]);
     expect(csv).toContain("run_status,'=cmd(),1,'+SUM(A1)");
-    expect(csv).toContain("run_status,'\t=tab(),2,\"'\r@carriage\"");
+    expect(csv).toContain('run_status,\'\t=tab(),2,"\'\r@carriage"');
     expect(csv).toContain("run_status,'\u0001+control,3,'   -whitespace");
     expect(csv).toContain('run_status,ordinary whitespace,4,  unchanged');
     expect(csv).toContain('run_status,"comma,value",5,"say ""hello"""');
