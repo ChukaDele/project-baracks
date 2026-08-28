@@ -12,6 +12,7 @@ import { retrieveReusableAssets } from './assets.js';
 import { resolveProject } from '../supervisor/state.js';
 import { readFileSync } from 'node:fs';
 import type { SkillOptimizationEvidence } from './optimizer-validation.js';
+import { fetchVendorSection } from './vendor.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -26,6 +27,7 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
     if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
     else {
       console.log(`Major hot skills activated: ${result.internalSkillCount} internal skills`);
+      console.log(`vendor-live skills: ${result.vendorSkillCount}`);
       console.log(`bundle: ${result.bundleId}`);
       console.log(`registry version: ${result.registryVersion}`);
       console.log(`source: ${result.sourceRoot}`);
@@ -59,8 +61,57 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
     else if (result.skills.length === 0) console.log('No installed Major skill matched this task.');
     else {
       for (const skill of result.skills) {
-        console.log(`${skill.id}\t${skill.path}\t${skill.reason}`);
+        console.log(`${skill.id}\t${skill.path ?? skill.reference}\t${skill.reason}`);
       }
+    }
+    return true;
+  }
+  if (args[1] === 'vendor') {
+    const task = flag(args, '--task');
+    if (!task) throw new Error('missing required --task');
+    const resolved = resolveSkills({ task, cwd: flag(args, '--cwd') ?? process.cwd() });
+    const vendorSkills = resolved.skills.filter((skill) => skill.vendor !== undefined);
+    const refreshed = [];
+    if (args.includes('--refresh')) {
+      for (const skill of vendorSkills) {
+        if (!skill.vendor) continue;
+        try {
+          const fetched = await fetchVendorSection({ selection: skill.vendor });
+          refreshed.push({
+            id: skill.id,
+            fetchedAt: fetched.fetchedAt,
+            fromCache: fetched.fromCache,
+            content: fetched.content,
+          });
+        } catch (error) {
+          refreshed.push({
+            id: skill.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+    const result = {
+      task,
+      skills: vendorSkills.map((skill) => ({
+        id: skill.id,
+        score: skill.score,
+        reason: skill.reason,
+        reference: skill.reference,
+        vendor: skill.vendor,
+      })),
+      refreshed,
+    };
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
+    else if (vendorSkills.length === 0) console.log('No live vendor skill matched this task.');
+    else {
+      for (const skill of vendorSkills) {
+        const vendor = skill.vendor!;
+        console.log(
+          `${skill.id}\t${vendor.state}\t${vendor.sectionId}\t${vendor.referenceUrl}`,
+        );
+      }
+      if (refreshed.length > 0) console.log(`refreshed: ${refreshed.length}`);
     }
     return true;
   }
@@ -70,6 +121,11 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
     else {
       for (const skill of result.internal) {
         console.log(`${skill.reachable ? 'reachable' : 'missing'}\t${skill.id}\t${skill.path ?? '-'}`);
+      }
+      for (const skill of result.vendor) {
+        console.log(
+          `${skill.available ? 'available' : 'unavailable'}\t${skill.id}\t${skill.state}\t${skill.reference ?? '-'}`,
+        );
       }
       if (result.duplicateIds.length) console.log(`duplicate ids: ${result.duplicateIds.join(', ')}`);
       if (result.orphanInternalSkills.length)

@@ -18,10 +18,18 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parseDocument } from 'yaml';
 import { majorHome } from '../supervisor/state.js';
 import { cloneGitBranch } from '../resources/tools.js';
+import {
+  findVendorSkill,
+  loadVendorCatalog,
+  SKILL_SOURCE_KINDS,
+  type SkillSourceKind,
+} from './vendor.js';
 
 interface RegistryEntry {
   id: string;
   source: string;
+  sourceKind?: SkillSourceKind;
+  vendorSkill?: string;
   availability: string;
   load: string;
   aliases?: string[];
@@ -45,6 +53,7 @@ export interface SkillSyncResult {
   registryVersion: number;
   activeBundle: string;
   internalSkillCount: number;
+  vendorSkillCount: number;
 }
 
 export interface SkillRollbackResult {
@@ -82,9 +91,23 @@ function assertRegistry(value: unknown): Registry {
     ) {
       throw new Error(`skill registry entry ${index} has invalid aliases`);
     }
+    if (
+      row.sourceKind !== undefined &&
+      (typeof row.sourceKind !== 'string' ||
+        !SKILL_SOURCE_KINDS.includes(row.sourceKind as SkillSourceKind))
+    ) {
+      throw new Error(`skill registry entry ${index} has invalid source kind`);
+    }
+    if (row.vendorSkill !== undefined && typeof row.vendorSkill !== 'string') {
+      throw new Error(`skill registry entry ${index} has invalid vendor skill id`);
+    }
     return {
       id: row.id as string,
       source: row.source as string,
+      ...(typeof row.sourceKind === 'string'
+        ? { sourceKind: row.sourceKind as SkillSourceKind }
+        : {}),
+      ...(typeof row.vendorSkill === 'string' ? { vendorSkill: row.vendorSkill } : {}),
       availability: row.availability as string,
       load: row.load as string,
       ...(Array.isArray(row.aliases) && row.aliases.every((alias) => typeof alias === 'string')
@@ -138,6 +161,7 @@ function validateSource(sourceRoot: string): {
   reconciliationLedgerPath: string;
   sourceLedgerPath: string;
   capabilityMatrixPath: string;
+  vendorSourcePath: string;
   internalRoot: string;
   evalRoot: string;
   internalIds: string[];
@@ -147,6 +171,7 @@ function validateSource(sourceRoot: string): {
   const reconciliationLedgerPath = join(sourceRoot, 'guidance', 'skills-reconciliation-ledger.json');
   const sourceLedgerPath = join(sourceRoot, 'package', 'source-ledger.json');
   const capabilityMatrixPath = join(sourceRoot, 'guidance', 'worker-capability-matrix.json');
+  const vendorSourcePath = join(sourceRoot, 'guidance', 'vendor-sources.json');
   const internalRoot = join(sourceRoot, 'skills', 'internal');
   const evalRoot = join(sourceRoot, 'evals', 'skill-resolver');
   const assetRegistryPath = join(sourceRoot, 'guidance', 'reusable-assets.registry.json');
@@ -155,6 +180,7 @@ function validateSource(sourceRoot: string): {
     reconciliationLedgerPath,
     sourceLedgerPath,
     capabilityMatrixPath,
+    vendorSourcePath,
     assetRegistryPath,
     internalRoot,
     evalRoot,
@@ -176,6 +202,14 @@ function validateSource(sourceRoot: string): {
   }
 
   const registry = assertRegistry(JSON.parse(readFileSync(registryPath, 'utf8')));
+  const vendorCatalog = loadVendorCatalog(vendorSourcePath);
+  for (const entry of registry.entries.filter((candidate) => candidate.sourceKind === 'VENDOR_LIVE')) {
+    const source = vendorCatalog.sources.find((candidate) => candidate.id === entry.source);
+    const skill = source ? findVendorSkill(source, entry.vendorSkill ?? entry.id) : undefined;
+    if (!source || !skill) {
+      throw new Error(`vendor registry entry is not present in the vendor catalog: ${entry.id}`);
+    }
+  }
   const reconciliationLedger = JSON.parse(readFileSync(reconciliationLedgerPath, 'utf8')) as {
     entries?: unknown;
   };
@@ -281,6 +315,7 @@ function validateSource(sourceRoot: string): {
     reconciliationLedgerPath,
     sourceLedgerPath,
     capabilityMatrixPath,
+    vendorSourcePath,
     internalRoot,
     evalRoot,
     internalIds: installed,
@@ -370,6 +405,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
     join(staged, 'guidance', 'skills-reconciliation-ledger.json'),
   );
   cpSync(validated.capabilityMatrixPath, join(staged, 'guidance', 'worker-capability-matrix.json'));
+  cpSync(validated.vendorSourcePath, join(staged, 'guidance', 'vendor-sources.json'));
   cpSync(validated.sourceLedgerPath, join(staged, 'package', 'source-ledger.json'));
   cpSync(
     join(sourceRoot, 'guidance', 'reusable-assets.registry.json'),
@@ -420,6 +456,9 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
     registryVersion: validated.registry.version,
     activeBundle: destination,
     internalSkillCount: validated.internalIds.length,
+    vendorSkillCount: validated.registry.entries.filter(
+      (entry) => entry.sourceKind === 'VENDOR_LIVE',
+    ).length,
   };
 }
 

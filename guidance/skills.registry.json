@@ -1,5 +1,5 @@
 {
-  "version": 17,
+  "version": 18,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -361,6 +361,96 @@
       "source": "github:openai/skills",
       "availability": "vercel-projects",
       "load": "preview-or-production-vercel-deployment"
+    },
+    {
+      "id": "vercel-optimize",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "vercel-optimize",
+      "availability": "vercel-projects",
+      "load": "vercel-performance-cost-reliability-caching-functions-billing",
+      "aliases": ["Vercel Optimize", "Vercel performance", "Vercel cost", "Vercel caching"],
+      "disclosure": "specialist"
+    },
+    {
+      "id": "vercel-react-best-practices",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "vercel-react-best-practices",
+      "availability": "vercel-projects",
+      "load": "current React Next.js performance rendering bundle server guidance",
+      "aliases": ["React best practices", "Next.js performance", "React performance"],
+      "disclosure": "specialist"
+    },
+    {
+      "id": "web-design-guidelines",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "web-design-guidelines",
+      "availability": "vercel-projects",
+      "load": "current web design accessibility UX performance guidance",
+      "aliases": ["web design guidelines", "Vercel web design", "web accessibility guidance"],
+      "disclosure": "specialist"
+    },
+    {
+      "id": "writing-guidelines",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "writing-guidelines",
+      "availability": "vercel-projects",
+      "load": "current Vercel writing copy content clarity voice structure guidance",
+      "aliases": ["Vercel writing guidelines", "Vercel copy guidance"],
+      "disclosure": "specialist"
+    },
+    {
+      "id": "vercel-react-native-skills",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "vercel-react-native-skills",
+      "availability": "vercel-projects",
+      "load": "current React Native mobile list navigation animation guidance",
+      "aliases": ["React Native guidelines", "React Native performance"],
+      "disclosure": "specialist"
+    },
+    {
+      "id": "vercel-react-view-transitions",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "vercel-react-view-transitions",
+      "availability": "vercel-projects",
+      "load": "current React view transitions animation navigation guidance",
+      "aliases": ["React view transitions", "view transition guidance"],
+      "disclosure": "specialist"
+    },
+    {
+      "id": "vercel-composition-patterns",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "vercel-composition-patterns",
+      "availability": "vercel-projects",
+      "load": "current React component composition compound components state props guidance",
+      "aliases": ["React composition patterns", "component composition"],
+      "disclosure": "specialist"
+    },
+    {
+      "id": "deploy-to-vercel",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "deploy-to-vercel",
+      "availability": "vercel-projects",
+      "load": "current Vercel deploy deployment preview claim framework detection guidance",
+      "aliases": ["Vercel deploy claimable", "Vercel preview deployment"],
+      "disclosure": "specialist"
+    },
+    {
+      "id": "vercel-cli-with-tokens",
+      "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "vendorSkill": "vercel-cli-with-tokens",
+      "availability": "vercel-projects",
+      "load": "current Vercel CLI token authentication project environment deployment configuration guidance",
+      "aliases": ["Vercel CLI with tokens", "Vercel token CLI", "Vercel environment variables"],
+      "disclosure": "specialist"
     },
     {
       "id": "figma-use",

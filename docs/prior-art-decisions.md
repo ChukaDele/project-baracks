@@ -302,3 +302,29 @@ These are independently authored Major workflow contracts, not copied donor impl
 - **Major-specific layer retained:** the locked file store, canonical resource ownership and queue, worker heartbeat/lifecycle integration, process-liveness checks, gateway containment, and atomic reclaim under the existing lock
 - **Rejected alternatives:** BullMQ/Redis; a Redis-backed lease service; a second queue; an external scheduler; an unfenced time-only reclaim; a new platform, framework or runtime
 - **Evidence:** `src/supervisor/resources.ts`, `tests/resources.test.ts`, `tests/worker-resource-lifecycle.test.ts`, `src/supervisor/worker.ts`, `src/security/major-gateway.ts`, and the retained DSH performance evidence showing high infrastructure wait.
+
+## 2026-08-28 — Vercel live-vendor skill source and section disclosure
+
+- **Capability:** resolve current Vercel and framework guidance without copying the vendor skill pack into Major prompts or creating a second skill/runtime authority.
+- **Candidates:** the existing Major registry/resolver and immutable hot bundle; the official Vercel Agent Skills documentation and `vercel-labs/agent-skills` repository; the official Vercel `skills` CLI; a copied Vercel skill bundle; a second MCP/registry/retriever; Major's existing `performance-caching`, `source-adapter-engineering`, `deployment`, `verification`, `capability-freshness`, and `skill-harvest` skills.
+- **Decision:** WRAP the existing Major registry/resolver/hot-bundle path with one metadata-only `VENDOR_LIVE` source catalog and bounded section references. USE LIVE for Vercel-owned, rapidly changing guidance. MERGE DURABLE PATTERN only where Major already has a generic canonical skill. REUSE the official Vercel CLI/MCP/action path for provider operations. Do not copy the vendor skill bodies or build another MCP, registry, retriever, installer, or orchestration runtime.
+- **Reason:** Major already owns semantic resolution, policy, client context, evidence, and atomic skill-bundle activation. The Vercel ecosystem owns current framework/platform knowledge and its supported client distribution. A compact catalog plus selected section/reference disclosure preserves both authorities and keeps prompt cost independent from total vendor skill count.
+- **Major-specific layer retained:** source-kind classification, resolver precedence, HOT/ACTIVE/DORMANT disclosure, section selection, bounded reference/cache metrics, freshness/degraded truth states, source provenance, harvest decisions, and action-policy boundaries.
+- **Rejected alternatives:** copy the complete Vercel pack; create one internal skill per documentation topic; network-check every request; install a second MCP or vendor runtime; replace Major's resolver; use vendor deployment guidance as production permission; merge current Vercel facts into durable GBrain meaning without evidence review.
+
+| Candidate | Disposition | Boundary |
+| --- | --- | --- |
+| `vercel-optimize` | **USE LIVE** | Current Vercel cost, performance, caching, functions, billing, and reliability guidance remains an official external reference. |
+| `vercel-react-best-practices` | **USE LIVE** | Current React/Next.js performance rules remain a Vercel-maintained knowledge index; only generic Major performance mechanics remain internal. |
+| `web-design-guidelines` | **USE LIVE** | Accessibility, UX, and web-performance guidance remains external and section-addressable. |
+| `writing-guidelines` | **USE LIVE** | Current Vercel writing guidance remains external; Major's writing and evidence boundaries remain authoritative. |
+| `vercel-react-native-skills` | **USE LIVE** | Current React Native guidance remains external and on demand. |
+| `vercel-react-view-transitions` | **USE LIVE** | Current view-transition guidance remains external and on demand. |
+| `vercel-composition-patterns` | **USE LIVE** | Current React composition patterns remain external; no duplicate internal topic skill is created. |
+| `deploy-to-vercel` | **CONFIGURE** | Expose the official reference and supported action path only. Major policy still controls deployment, claim, and production authority. |
+| `vercel-cli-with-tokens` | **CONFIGURE** | Expose the official CLI/token reference and supported action path only. Major policy still controls credentials, deployment, and production authority. |
+| deployment verification methodology | **MERGE DURABLE PATTERN** | Reuse existing Major `deployment` and `verification` authority/evidence contracts. No Vercel copy is added. |
+| environment/config safety | **MERGE DURABLE PATTERN** | Reuse existing Major project, security, and source-adapter boundaries. No vendor-specific authority is internalized. |
+| framework migration discipline | **MERGE DURABLE PATTERN** | Reuse existing Major `migration`, `legacy-cleanup`, and `capability-freshness` controls. |
+
+- **Evidence:** official Vercel Agent Skills documentation at `https://vercel.com/docs/agent-resources/skills`; official skill source at `https://github.com/vercel-labs/agent-skills`; official distribution CLI at `https://github.com/vercel-labs/skills`; Vercel's published retrieval evaluation at `https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals`; existing Major source and test audit on branch `codex/major-vercel-skill-expansion-20260828`.

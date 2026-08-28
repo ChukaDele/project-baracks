@@ -8,10 +8,26 @@ import {
   skillPerformanceScore,
   type SkillCandidate,
 } from './lifecycle.js';
+import {
+  findVendorSkill,
+  formatVendorReference,
+  getCachedVendorSection,
+  inferSkillSourceKind,
+  loadVendorCatalog,
+  selectVendorSkill,
+  SKILL_SOURCE_KINDS,
+  vendorSourceState,
+  type SkillSourceKind,
+  type VendorCatalog,
+  type VendorSkillSelection,
+  type VendorSourceState,
+} from './vendor.js';
 
 const registryEntrySchema = z.object({
   id: z.string(),
   source: z.string(),
+  sourceKind: z.enum(SKILL_SOURCE_KINDS).optional(),
+  vendorSkill: z.string().optional(),
   availability: z.string(),
   load: z.string(),
   aliases: z.array(z.string().min(1)).default([]),
@@ -33,7 +49,10 @@ export type SkillRegistryEntry = z.infer<typeof registryEntrySchema>;
 export interface ResolvedSkill {
   id: string;
   source: string;
-  path: string;
+  sourceKind: SkillSourceKind;
+  path?: string;
+  reference: string;
+  vendor?: VendorSkillSelection;
   score: number;
   reason: string;
 }
@@ -50,19 +69,36 @@ export interface SkillDisclosure {
   manifest: Array<{
     id: string;
     source: string;
+    sourceKind: SkillSourceKind;
     state: SkillDisclosureState;
     load: string;
+    vendor?: {
+      state: VendorSourceState;
+      freshness: VendorSkillSelection['freshness'];
+      sectionId: string;
+    };
   }>;
   bodies: Array<{
     id: string;
     source: string;
+    sourceKind: SkillSourceKind;
     state: Exclude<SkillDisclosureState, 'DORMANT'>;
     content: string;
     truncated: boolean;
+    sectionId?: string;
+    reference?: string;
+    contentSource?: 'reference' | 'cache';
   }>;
+  vendorReferences: Array<VendorSkillSelection & { contentSource: 'reference' | 'cache' }>;
   metrics: {
     manifest: { beforeBytes: number; disclosedBytes: number };
     bodies: { beforeBytes: number; disclosedBytes: number };
+    vendor: {
+      beforeBytes: number;
+      disclosedBytes: number;
+      selectedSkills: number;
+      cachedSections: number;
+    };
     total: { beforeBytes: number; disclosedBytes: number; estimatedTokensBefore: number; estimatedTokensDisclosed: number };
     budgets: { manifestBytes: number; bodyBytes: number; perBodyBytes: number };
   };
@@ -151,6 +187,16 @@ function resolverEvalPath(): string {
   return hotPath && existsSync(hotPath) ? hotPath : join(runtimeRoot(), 'evals', 'skill-resolver');
 }
 
+function vendorCatalogPath(): string {
+  if (process.env.MAJOR_VENDOR_SOURCES) return resolve(process.env.MAJOR_VENDOR_SOURCES);
+  return join(dirname(registryPath()), 'vendor-sources.json');
+}
+
+function readVendorCatalog(): VendorCatalog | undefined {
+  const path = vendorCatalogPath();
+  return existsSync(path) ? loadVendorCatalog(path) : undefined;
+}
+
 interface ResolverExamples {
   positive: string[];
   negative: string[];
@@ -181,6 +227,22 @@ export function loadSkillRegistry(): SkillRegistryEntry[] {
   return readRegistry(registryPath()).entries;
 }
 
+function vendorSelectionForEntry(
+  entry: SkillRegistryEntry,
+  task: string,
+  catalog: VendorCatalog | undefined,
+  now: Date,
+): VendorSkillSelection | undefined {
+  if (inferSkillSourceKind(entry.source, entry.sourceKind) !== 'VENDOR_LIVE' || !catalog) {
+    return undefined;
+  }
+  const source = catalog.sources.find((candidate) => candidate.id === entry.source);
+  const skill = source ? findVendorSkill(source, entry.vendorSkill ?? entry.id) : undefined;
+  if (!source || !skill) return undefined;
+  const selection = selectVendorSkill({ source, skill, task, now });
+  return selection.state === 'unavailable' ? undefined : selection;
+}
+
 function words(value: string): string[] {
   return value
     .toLowerCase()
@@ -192,6 +254,32 @@ function words(value: string): string[] {
 
 function normalizedText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
+const VENDOR_CONTEXT_TERMS = new Set(['vercel', 'next', 'nextjs', 'react', 'expo']);
+
+function includesPhrase(text: string, phrase: string): boolean {
+  const normalizedPhrase = normalizedText(phrase);
+  return ` ${text} `.includes(` ${normalizedPhrase} `);
+}
+
+function vendorMatchAllowed(entry: SkillRegistryEntry, task: string): boolean {
+  const normalized = normalizedText(task);
+  if ([entry.id, ...entry.aliases].some((term) => includesPhrase(normalized, term))) {
+    return true;
+  }
+  const taskWords = new Set(words(task));
+  if (![...VENDOR_CONTEXT_TERMS].some((term) => taskWords.has(term))) return false;
+  const matchedSignals = new Set(
+    [
+      ...words(entry.id),
+      ...entry.aliases.flatMap((alias) => words(alias)),
+      ...words(entry.load),
+    ].filter((term) => taskWords.has(term)),
+  );
+  return [...matchedSignals].some(
+    (term) => term !== 'current' && !VENDOR_CONTEXT_TERMS.has(term),
+  );
 }
 
 function skillPath(id: string, cwd: string, source: string): string | undefined {
@@ -269,10 +357,13 @@ export function resolveSkills(input: {
   task: string;
   cwd?: string;
   limit?: number;
+  now?: Date;
 }): SkillResolution {
   const task = input.task.trim();
   if (!task) throw new Error('skill resolution task must not be empty');
   const cwd = resolve(input.cwd ?? process.cwd());
+  const now = input.now ?? new Date();
+  const vendorCatalog = readVendorCatalog();
   const examples = resolverExamples();
   const generated = loadActiveGeneratedSkills(cwd);
   const matches = [
@@ -291,28 +382,63 @@ export function resolveSkills(input: {
   ]
     .map(({ entry, generated }) => {
       const scored = scoreEntry(entry, task, examples);
+      const sourceKind = generated
+        ? 'PROJECT_LOCAL'
+        : inferSkillSourceKind(entry.source, entry.sourceKind);
+      const vendor = generated
+        ? undefined
+        : vendorSelectionForEntry(entry, task, vendorCatalog, now);
       return {
         entry,
         generated,
+        sourceKind,
+        vendor,
         ...scored,
         score: scored.score + (generated ? skillPerformanceScore(generated) : 0),
       };
     })
-    .filter(({ score }) => score >= 5)
+    .filter(
+      ({ entry, score, sourceKind, vendor }) =>
+        score >= 5 &&
+        (sourceKind !== 'VENDOR_LIVE' ||
+          (vendor !== undefined && vendorMatchAllowed(entry, task))),
+    )
     .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id));
+
+  const explicitVendorIds = new Set(
+    matches
+      .filter(({ sourceKind, score }) => sourceKind === 'VENDOR_LIVE' && score >= 100)
+      .map(({ entry }) => entry.id),
+  );
 
   const skills: ResolvedSkill[] = [];
   for (const match of matches) {
+    if (
+      match.sourceKind === 'VENDOR_LIVE' &&
+      explicitVendorIds.size > 0 &&
+      !explicitVendorIds.has(match.entry.id)
+    ) {
+      continue;
+    }
     const path = match.generated
       ? generatedSkillPath(match.generated)
-      : skillPath(match.entry.id, cwd, match.entry.source);
-    if (!path) continue;
+      : match.sourceKind === 'VENDOR_LIVE'
+        ? undefined
+        : skillPath(match.entry.id, cwd, match.entry.source);
+    if (!path && !match.vendor) continue;
+    const reference = match.vendor?.referenceUrl ?? path;
+    if (!reference) continue;
     skills.push({
       id: match.entry.id,
       source: match.entry.source,
-      path,
+      sourceKind: match.sourceKind,
+      ...(path ? { path } : {}),
+      reference,
+      ...(match.vendor ? { vendor: match.vendor } : {}),
       score: match.score,
-      reason: match.reason,
+      reason: match.vendor
+        ? `${match.reason}; live vendor source ${match.vendor.sourceId} (${match.vendor.state})`
+        : match.reason,
     });
     if (skills.length >= (input.limit ?? 6)) break;
   }
@@ -331,10 +457,17 @@ export function discloseSkills(input: {
   manifestBytes?: number;
   bodyBytes?: number;
   perBodyBytes?: number;
+  now?: Date;
 }): SkillDisclosure {
   const cwd = resolve(input.cwd ?? process.cwd());
+  const now = input.now ?? new Date();
   const registry = loadSkillRegistry();
-  const resolution = resolveSkills({ task: input.task, cwd, ...(input.limit ? { limit: input.limit } : {}) });
+  const resolution = resolveSkills({
+    task: input.task,
+    cwd,
+    ...(input.limit ? { limit: input.limit } : {}),
+    now,
+  });
   const active = new Map(resolution.skills.map((skill) => [skill.id, skill]));
   const hot = registry.filter((entry) => entry.disclosure === 'hot');
   const ordered = [
@@ -359,7 +492,24 @@ export function discloseSkills(input: {
   const manifestBudget = input.manifestBytes ?? DISCLOSURE_BUDGETS.manifestBytes;
   const manifest: SkillDisclosure['manifest'] = [];
   for (const { entry, state } of [...ordered, ...dormant]) {
-    const candidate = { id: entry.id, source: entry.source, state, load: entry.load };
+    const selected = active.get(entry.id);
+    const vendor = selected?.vendor;
+    const candidate = {
+      id: entry.id,
+      source: entry.source,
+      sourceKind: inferSkillSourceKind(entry.source, entry.sourceKind),
+      state,
+      load: entry.load,
+      ...(vendor
+        ? {
+            vendor: {
+              state: vendor.state,
+              freshness: vendor.freshness,
+              sectionId: vendor.sectionId,
+            },
+          }
+        : {}),
+    };
     if (jsonBytes([...manifest, candidate]) > manifestBudget) break;
     manifest.push(candidate);
   }
@@ -367,9 +517,36 @@ export function discloseSkills(input: {
   const bodyBudget = input.bodyBytes ?? DISCLOSURE_BUDGETS.bodyBytes;
   const perBodyBudget = input.perBodyBytes ?? DISCLOSURE_BUDGETS.perBodyBytes;
   const bodies: SkillDisclosure['bodies'] = [];
+  const vendorReferences: SkillDisclosure['vendorReferences'] = [];
   let disclosedBodyBytes = 0;
+  let disclosedVendorBytes = 0;
   for (const { entry, state } of ordered) {
     const selected = active.get(entry.id);
+    const vendor = selected?.vendor;
+    if (vendor) {
+      const cached = getCachedVendorSection(vendor, now);
+      const original = formatVendorReference(vendor, cached);
+      if (disclosedBodyBytes >= bodyBudget) continue;
+      const allowance = Math.min(perBodyBudget, bodyBudget - disclosedBodyBytes);
+      const content = utf8Prefix(original, allowance);
+      const contentBytes = Buffer.byteLength(content, 'utf8');
+      const contentSource = cached === undefined ? 'reference' : 'cache';
+      bodies.push({
+        id: entry.id,
+        source: entry.source,
+        sourceKind: 'VENDOR_LIVE',
+        state,
+        content,
+        truncated: contentBytes < Buffer.byteLength(original, 'utf8'),
+        sectionId: vendor.sectionId,
+        reference: vendor.referenceUrl,
+        contentSource,
+      });
+      vendorReferences.push({ ...vendor, contentSource });
+      disclosedBodyBytes += contentBytes;
+      disclosedVendorBytes += contentBytes;
+      continue;
+    }
     const path = selected?.path ?? skillPath(entry.id, cwd, entry.source);
     if (!path || disclosedBodyBytes >= bodyBudget) continue;
     const original = readFileSync(path, 'utf8');
@@ -379,6 +556,7 @@ export function discloseSkills(input: {
     bodies.push({
       id: entry.id,
       source: entry.source,
+      sourceKind: inferSkillSourceKind(entry.source, entry.sourceKind),
       state,
       content,
       truncated: contentBytes < Buffer.byteLength(original, 'utf8'),
@@ -389,18 +567,29 @@ export function discloseSkills(input: {
   const manifestBeforeBytes = jsonBytes(registry);
   const manifestDisclosedBytes = jsonBytes(manifest);
   const bodyBeforeBytes = registry.reduce((total, entry) => {
+    if (inferSkillSourceKind(entry.source, entry.sourceKind) === 'VENDOR_LIVE') return total;
     const path = skillPath(entry.id, cwd, entry.source);
     return total + (path ? statSync(path).size : 0);
   }, 0);
-  const beforeBytes = manifestBeforeBytes + bodyBeforeBytes;
+  const vendorCatalogFile = vendorCatalogPath();
+  const vendorBeforeBytes = existsSync(vendorCatalogFile) ? statSync(vendorCatalogFile).size : 0;
+  const beforeBytes = manifestBeforeBytes + bodyBeforeBytes + vendorBeforeBytes;
   const disclosedBytes = manifestDisclosedBytes + disclosedBodyBytes;
   return {
     task: resolution.task,
     manifest,
     bodies,
+    vendorReferences,
     metrics: {
       manifest: { beforeBytes: manifestBeforeBytes, disclosedBytes: manifestDisclosedBytes },
       bodies: { beforeBytes: bodyBeforeBytes, disclosedBytes: disclosedBodyBytes },
+      vendor: {
+        beforeBytes: vendorBeforeBytes,
+        disclosedBytes: disclosedVendorBytes,
+        selectedSkills: vendorReferences.length,
+        cachedSections: vendorReferences.filter((reference) => reference.contentSource === 'cache')
+          .length,
+      },
       total: {
         beforeBytes,
         disclosedBytes,
@@ -414,6 +603,14 @@ export function discloseSkills(input: {
 
 export interface SkillAudit {
   internal: { id: string; reachable: boolean; path?: string }[];
+  vendor: {
+    id: string;
+    source: string;
+    sourceKind: 'VENDOR_LIVE';
+    available: boolean;
+    state: VendorSourceState | 'missing';
+    reference?: string;
+  }[];
   duplicateIds: string[];
   orphanInternalSkills: string[];
 }
@@ -438,8 +635,34 @@ export function auditSkillReachability(cwd = process.cwd()): SkillAudit {
         .filter((entry) => entry.isDirectory() && existsSync(join(internalRoot, entry.name, 'SKILL.md')))
         .map((entry) => entry.name)
     : [];
+  const vendorCatalog = readVendorCatalog();
+  const vendor = entries
+    .filter((entry) => inferSkillSourceKind(entry.source, entry.sourceKind) === 'VENDOR_LIVE')
+    .map((entry) => {
+      const source = vendorCatalog?.sources.find((candidate) => candidate.id === entry.source);
+      const skill = source ? findVendorSkill(source, entry.vendorSkill ?? entry.id) : undefined;
+      if (!source || !skill) {
+        return {
+          id: entry.id,
+          source: entry.source,
+          sourceKind: 'VENDOR_LIVE' as const,
+          available: false,
+          state: 'missing' as const,
+        };
+      }
+      const state = vendorSourceState(source);
+      return {
+        id: entry.id,
+        source: entry.source,
+        sourceKind: 'VENDOR_LIVE' as const,
+        available: state !== 'unavailable',
+        state,
+        reference: skill.sections[0]!.referenceUrl,
+      };
+    });
   return {
     internal,
+    vendor,
     duplicateIds: [...counts].filter(([, count]) => count > 1).map(([id]) => id),
     orphanInternalSkills: installed.filter((id) => !registered.has(id)).sort(),
   };

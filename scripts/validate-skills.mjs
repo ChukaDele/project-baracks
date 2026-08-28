@@ -6,6 +6,7 @@ const root = resolve(process.cwd());
 const registryPath = join(root, 'guidance', 'skills.registry.json');
 const reconciliationLedgerPath = join(root, 'guidance', 'skills-reconciliation-ledger.json');
 const sourceLedgerPath = join(root, 'package', 'source-ledger.json');
+const vendorSourcesPath = join(root, 'guidance', 'vendor-sources.json');
 const capabilityMatrixPath = join(root, 'guidance', 'worker-capability-matrix.json');
 const assetRegistryPath = join(root, 'guidance', 'reusable-assets.registry.json');
 const gbrainIndexPath = join(root, 'guidance', 'gbrain-reusable-assets.index.json');
@@ -85,9 +86,24 @@ function validateAsset(asset, label, requireLocator = true) {
 const registry = object(JSON.parse(readFileSync(registryPath, 'utf8')), 'skills registry');
 if (!Number.isInteger(registry.version) || !Array.isArray(registry.entries))
   fail('skills registry schema is invalid');
-const registered = registry.entries
-  .filter((entry) => object(entry, 'skill registry entry').source === 'major-internal')
+const registryEntries = registry.entries.map((entry) => object(entry, 'skill registry entry'));
+const allRegistered = registryEntries.map((entry) => nonEmpty(entry.id, 'skill registry entry id'));
+const registered = registryEntries
+  .filter((entry) => entry.source === 'major-internal')
   .map((entry) => nonEmpty(entry.id, 'skill registry entry id'));
+const sourceKinds = new Set([
+  'INTERNAL_DURABLE',
+  'VENDOR_LIVE',
+  'PROJECT_LOCAL',
+  'DORMANT_REFERENCE',
+]);
+for (const entry of registryEntries) {
+  if (entry.sourceKind !== undefined && !sourceKinds.has(entry.sourceKind))
+    fail(`skill registry entry ${entry.id}.sourceKind is invalid`);
+  if (entry.sourceKind === 'VENDOR_LIVE')
+    nonEmpty(entry.vendorSkill, `skill registry entry ${entry.id}.vendorSkill`);
+}
+if (new Set(allRegistered).size !== allRegistered.length) fail('skills registry has duplicate ids');
 if (new Set(registered).size !== registered.length)
   fail('skills registry has duplicate internal ids');
 const installed = readdirSync(internalRoot, { withFileTypes: true })
@@ -97,6 +113,118 @@ const installed = readdirSync(internalRoot, { withFileTypes: true })
 if (registered.slice().sort().join('\n') !== installed.join('\n'))
   fail('skills registry and internal skill tree differ');
 for (const id of installed) validateSkill(id);
+
+const vendorCatalog = object(
+  JSON.parse(readFileSync(vendorSourcesPath, 'utf8')),
+  'vendor skill source catalog',
+);
+if (
+  vendorCatalog.schemaVersion !== 1 ||
+  vendorCatalog.kind !== 'major.vendor-skill-sources' ||
+  !Array.isArray(vendorCatalog.sources) ||
+  vendorCatalog.sources.length === 0
+) {
+  fail('vendor skill source catalog schema is invalid');
+}
+const vendorSourceIds = new Set();
+for (const source of vendorCatalog.sources) {
+  const row = object(source, 'vendor skill source');
+  const sourceId = nonEmpty(row.id, 'vendor skill source.id');
+  if (vendorSourceIds.has(sourceId)) fail(`duplicate vendor source id ${sourceId}`);
+  vendorSourceIds.add(sourceId);
+  if (row.kind !== 'VENDOR_LIVE') fail(`vendor source ${sourceId}.kind must be VENDOR_LIVE`);
+  for (const key of [
+    'vendor',
+    'sourceUrl',
+    'repositoryUrl',
+    'revision',
+    'license',
+    'licenseStatus',
+    'provenance',
+  ]) {
+    nonEmpty(row[key], `vendor source ${sourceId}.${key}`);
+  }
+  for (const key of ['sourceUrl', 'repositoryUrl']) {
+    try {
+      new URL(row[key]);
+    } catch {
+      fail(`vendor source ${sourceId}.${key} must be an absolute URL`);
+    }
+  }
+  nonEmpty(row.lastChecked, `vendor source ${sourceId}.lastChecked`);
+  if (!Number.isInteger(row.freshnessTtlMs) || row.freshnessTtlMs <= 0)
+    fail(`vendor source ${sourceId}.freshnessTtlMs is invalid`);
+  if (!['available', 'degraded', 'unavailable'].includes(row.availability))
+    fail(`vendor source ${sourceId}.availability is invalid`);
+  if (!Array.isArray(row.supportedClients) || row.supportedClients.length === 0)
+    fail(`vendor source ${sourceId}.supportedClients is invalid`);
+  if (!Array.isArray(row.resolverDomains) || row.resolverDomains.length === 0)
+    fail(`vendor source ${sourceId}.resolverDomains is invalid`);
+  if (!Array.isArray(row.skills) || row.skills.length === 0)
+    fail(`vendor source ${sourceId}.skills is invalid`);
+  const skillIds = new Set();
+  for (const skill of row.skills) {
+    const skillRow = object(skill, `vendor source ${sourceId} skill`);
+    const skillId = nonEmpty(skillRow.id, `vendor source ${sourceId} skill.id`);
+    if (skillIds.has(skillId)) fail(`vendor source ${sourceId} has duplicate skill ${skillId}`);
+    skillIds.add(skillId);
+    if (!['knowledge-index', 'actionable-skill'].includes(skillRow.classification))
+      fail(`vendor skill ${skillId}.classification is invalid`);
+    if (skillRow.version !== undefined)
+      nonEmpty(skillRow.version, `vendor skill ${skillId}.version`);
+    if (
+      !['USE_LIVE', 'CONFIGURE', 'MERGE_DURABLE_PATTERN', 'INTERNALIZE', 'REJECT'].includes(
+        skillRow.harvestDecision,
+      )
+    ) {
+      fail(`vendor skill ${skillId}.harvestDecision is invalid`);
+    }
+    for (const key of ['title', 'skillUrl', 'retrievalUrl'])
+      nonEmpty(skillRow[key], `vendor skill ${skillId}.${key}`);
+    for (const key of ['skillUrl', 'retrievalUrl']) {
+      try {
+        new URL(skillRow[key]);
+      } catch {
+        fail(`vendor skill ${skillId}.${key} must be an absolute URL`);
+      }
+    }
+    if (!Array.isArray(skillRow.keywords) || skillRow.keywords.length === 0)
+      fail(`vendor skill ${skillId}.keywords is invalid`);
+    if (!Array.isArray(skillRow.sections) || skillRow.sections.length === 0)
+      fail(`vendor skill ${skillId}.sections is invalid`);
+    const sectionIds = new Set();
+    for (const section of skillRow.sections) {
+      const sectionRow = object(section, `vendor skill ${skillId} section`);
+      const sectionId = nonEmpty(sectionRow.id, `vendor skill ${skillId} section.id`);
+      if (sectionIds.has(sectionId))
+        fail(`vendor skill ${skillId} has duplicate section ${sectionId}`);
+      sectionIds.add(sectionId);
+      for (const key of ['title', 'referenceUrl'])
+        nonEmpty(sectionRow[key], `vendor skill ${skillId} section.${key}`);
+      try {
+        new URL(sectionRow.referenceUrl);
+      } catch {
+        fail(`vendor skill ${skillId} section.${sectionId}.referenceUrl must be an absolute URL`);
+      }
+      if (sectionRow.retrievalUrl !== undefined) {
+        try {
+          new URL(sectionRow.retrievalUrl);
+        } catch {
+          fail(`vendor skill ${skillId} section.${sectionId}.retrievalUrl must be an absolute URL`);
+        }
+      }
+      if (!Array.isArray(sectionRow.keywords) || sectionRow.keywords.length === 0)
+        fail(`vendor skill ${skillId} section.${sectionId}.keywords is invalid`);
+    }
+  }
+}
+for (const entry of registryEntries.filter((row) => row.sourceKind === 'VENDOR_LIVE')) {
+  const source = vendorCatalog.sources.find((row) => row.id === entry.source);
+  const skill = source?.skills?.find((row) => row.id === entry.vendorSkill);
+  if (!source || !skill)
+    fail(`vendor registry entry ${entry.id} is missing from the vendor source catalog`);
+}
+const vendorEntryCount = registryEntries.filter((row) => row.sourceKind === 'VENDOR_LIVE').length;
 
 const sourceLedger = object(
   JSON.parse(readFileSync(sourceLedgerPath, 'utf8')),
@@ -201,16 +329,19 @@ for (const [index, row] of candidates.assets.entries())
   validateAsset(row, `asset candidate ${index}`);
 
 const fixtureIds = new Set();
+const allFixtureIds = new Set();
 for (const fixture of readdirSync(evalRoot).filter((name) => name.endsWith('.json'))) {
   const value = object(
     JSON.parse(readFileSync(join(evalRoot, fixture), 'utf8')),
     `resolver fixture ${fixture}`,
   );
   const skill = nonEmpty(value.skill, `resolver fixture ${fixture}.skill`);
-  if (!registered.includes(skill))
-    fail(`resolver fixture ${fixture} references an unknown internal skill`);
+  if (!allRegistered.includes(skill))
+    fail(`resolver fixture ${fixture} references an unknown skill`);
+  if (allFixtureIds.has(skill)) fail(`multiple resolver fixtures for ${skill}`);
+  allFixtureIds.add(skill);
   if (fixtureIds.has(skill)) fail(`multiple resolver fixtures for ${skill}`);
-  fixtureIds.add(skill);
+  if (registered.includes(skill)) fixtureIds.add(skill);
   const positive = list(value.should_trigger, `resolver fixture ${fixture}.should_trigger`);
   const negative = list(value.should_not_trigger, `resolver fixture ${fixture}.should_not_trigger`);
   if (positive.length === 0 || negative.length === 0)
@@ -274,5 +405,5 @@ for (const role of capabilityMatrix.roles) {
 if (roleIds.size !== 18) fail(`expected 18 worker capability roles, found ${roleIds.size}`);
 
 console.log(
-  `Major skill validation passed: ${installed.length} internal skills, ${assetRows.length} reusable assets.`,
+  `Major skill validation passed: ${installed.length} internal skills, ${vendorEntryCount} live vendor skills, ${assetRows.length} reusable assets.`,
 );
