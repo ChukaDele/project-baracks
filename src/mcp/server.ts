@@ -2,6 +2,12 @@ import { createInterface } from 'node:readline';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { answerMajorMessage, buildMajorDashboard, type MajorDashboard } from '../ui/dashboard.js';
+import {
+  buildContextPack,
+  CONTEXT_PACK_SECTIONS,
+  type ContextPackDetail,
+  type ContextPackSection,
+} from '../context/context-pack.js';
 
 const MCP_PROTOCOL_VERSION = '2024-11-05';
 const SERVER_VERSION = '0.5.3';
@@ -28,8 +34,20 @@ const TOOLS = [
   {
     name: 'major_context',
     description:
-      'Read the current Major project, GBrain context, selected skills, execution state, providers and durable run-insight history.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      'Read a bounded, evidence-labelled Major context pack. Start with summary or selected sections; request more detail only when needed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        detail: { type: 'string', enum: ['summary', 'standard', 'full'], default: 'standard' },
+        sections: {
+          type: 'array',
+          items: { type: 'string', enum: CONTEXT_PACK_SECTIONS },
+          uniqueItems: true,
+        },
+        maxBytes: { type: 'integer', minimum: 2_000, maximum: 64_000, default: 16_000 },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: 'major_ask',
@@ -73,7 +91,8 @@ function compactHistory(dashboard: MajorDashboard) {
   };
 }
 
-function contextResult(dashboard: MajorDashboard) {
+/** Serialize the stable zero-argument context contract without reading global Major state. */
+export function serializeLegacyContext(dashboard: MajorDashboard) {
   return {
     schemaVersion: 1,
     kind: 'major.context.v1',
@@ -87,6 +106,13 @@ function contextResult(dashboard: MajorDashboard) {
     workers: dashboard.workers,
     history: compactHistory(dashboard),
   };
+}
+
+function isContextPackDetail(value: unknown): value is ContextPackDetail {
+  return (
+    typeof value === 'string' &&
+    (['summary', 'standard', 'full'] as readonly string[]).includes(value)
+  );
 }
 
 function textToolResult(value: unknown, isError = false) {
@@ -131,7 +157,40 @@ async function callTool(
   cwd: string,
 ): Promise<ReturnType<typeof textToolResult>> {
   if (name === 'major_context') {
-    return textToolResult(contextResult(await buildMajorDashboard(cwd)));
+    const dashboard = await buildMajorDashboard(cwd);
+    // Preserve the original Cursor/client contract. Progressive disclosure is
+    // opt-in through any of the new arguments, so existing callers do not need
+    // a synchronized migration. Context packs intentionally remain
+    // manifest/selection-only: skill bodies are execution instructions and
+    // are disclosed by the canonical resolver only after a goal is routed.
+    if (Object.keys(args).length === 0) return textToolResult(serializeLegacyContext(dashboard));
+    const detail = args.detail ?? 'standard';
+    const sections = args.sections ?? CONTEXT_PACK_SECTIONS;
+    const maxBytes = args.maxBytes ?? 16_000;
+    if (!isContextPackDetail(detail)) {
+      return textToolResult({ error: 'detail must be summary, standard, or full' }, true);
+    }
+    if (
+      !Array.isArray(sections) ||
+      sections.some((section) => !CONTEXT_PACK_SECTIONS.includes(section as ContextPackSection))
+    ) {
+      return textToolResult({ error: 'sections contains an unknown context-pack section' }, true);
+    }
+    if (
+      typeof maxBytes !== 'number' ||
+      !Number.isInteger(maxBytes) ||
+      maxBytes < 2_000 ||
+      maxBytes > 64_000
+    ) {
+      return textToolResult({ error: 'maxBytes must be an integer from 2,000 to 64,000' }, true);
+    }
+    return textToolResult(
+      buildContextPack(dashboard, {
+        detail,
+        sections: sections as readonly ContextPackSection[],
+        maxBytes,
+      }),
+    );
   }
   if (name === 'major_ask') {
     const question = args.question;

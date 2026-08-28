@@ -161,6 +161,7 @@ export async function runHarnessCli(args: string[]): Promise<boolean> {
         goalId,
         guestArgv,
         resourceLeaseId: requiredFlag(args, '--resource-lease-id'),
+        resourceLeaseFencingToken: requiredFlag(args, '--resource-lease-fencing-token'),
         resourceLeasePid,
         executionAuthority,
         signal: abort.signal,

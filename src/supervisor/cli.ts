@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { allocateDevPort, listDevPorts } from '../dev/ports.js';
@@ -37,7 +37,7 @@ import {
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
-import { resolveSkills } from '../skills/resolver.js';
+import { discloseSkills } from '../skills/resolver.js';
 import {
   majorStatusOverview,
   runDaemon,
@@ -53,6 +53,7 @@ import {
   cancelResourceRequest,
   formatResourceTelemetry,
   heartbeatResource,
+  reclaimStaleResources,
   releaseResource,
   requestResource,
   resourceSnapshot,
@@ -233,15 +234,25 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   }
 
   if (command === 'resource' && args[1] === 'heartbeat') {
-    const lease = heartbeatResource(requireFlag(args, '--lease'));
+    const lease = heartbeatResource(requireFlag(args, '--lease'), requireFlag(args, '--fence'));
     console.log(JSON.stringify(lease, null, 2));
     return true;
   }
 
   if (command === 'resource' && args[1] === 'release') {
-    const telemetry = releaseResource(requireFlag(args, '--lease'));
+    const telemetry = releaseResource(requireFlag(args, '--lease'), requireFlag(args, '--fence'));
     if (hasFlag(args, '--json')) console.log(JSON.stringify(telemetry, null, 2));
     else console.log(formatResourceTelemetry(telemetry));
+    return true;
+  }
+
+  if (command === 'resource' && args[1] === 'reclaim') {
+    const result = reclaimStaleResources();
+    if (hasFlag(args, '--json')) console.log(JSON.stringify(result, null, 2));
+    else {
+      console.log(`reclaimed stale leases: ${result.reclaimedLeaseIds.length}`);
+      console.log(formatResourceTelemetry(result.telemetry));
+    }
     return true;
   }
 
@@ -658,16 +669,17 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const policy = getProjectPolicy(goal.project, goal.repoPath);
     const selection = routeGoalExecution(goal, { eligibleHosts: ['codex'] });
     let resolvedSkills: Array<{ id: string; source: string; content: string }> = [];
+    let skillDisclosure: ReturnType<typeof discloseSkills>['metrics'] | undefined;
     let skillResolutionDegraded = false;
     if (selection.kind === 'route') {
       try {
-        resolvedSkills = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills.map(
-          (skill) => ({
-            id: skill.id,
-            source: skill.source,
-            content: readFileSync(skill.path, 'utf8').slice(0, 32_000),
-          }),
-        );
+        const disclosure = discloseSkills({ task: goal.goal, cwd: goal.repoPath });
+        resolvedSkills = disclosure.bodies.map((skill) => ({
+          id: skill.id,
+          source: skill.source,
+          content: skill.content,
+        }));
+        skillDisclosure = disclosure.metrics;
       } catch {
         skillResolutionDegraded = true;
       }
@@ -678,6 +690,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
           ...selection,
           maxRunMinutes: policy.maxRunMinutes,
           resolvedSkills,
+          skillDisclosure,
           skillResolutionDegraded,
         },
         null,

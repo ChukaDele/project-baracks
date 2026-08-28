@@ -1,0 +1,5 @@
+{
+  "skill": "pdf-reporting-qa",
+  "should_trigger": ["Use pdf-reporting-qa for this task."],
+  "should_not_trigger": ["This unrelated request must not activate pdf reporting qa workflow."]
+}

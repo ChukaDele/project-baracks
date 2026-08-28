@@ -1,0 +1,5 @@
+{
+  "skill": "open-source-leverage",
+  "should_trigger": ["Use open-source-leverage for this task."],
+  "should_not_trigger": ["This unrelated request must not activate open source leverage workflow."]
+}

@@ -1,0 +1,5 @@
+{
+  "skill": "legacy-cleanup",
+  "should_trigger": ["Use legacy-cleanup for this task."],
+  "should_not_trigger": ["This unrelated request must not activate legacy cleanup workflow."]
+}

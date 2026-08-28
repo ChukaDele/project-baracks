@@ -186,7 +186,9 @@ function executeStagedFieldCase({
       resourceLeaseId: resource.lease.id,
       stagedValidationAuthority: authority,
     });
-    const outcome = handle.outcome.finally(() => releaseResource(resource.lease.id));
+    const outcome = handle.outcome.finally(() =>
+      releaseResource(resource.lease.id, resource.lease.fencingToken),
+    );
     const capturedEvents = [];
     const events = (async function* () {
       for await (const event of handle.events) {
@@ -223,7 +225,7 @@ function executeStagedFieldCase({
         // Admission may already have terminalized it. Never reopen the lease.
       }
     }
-    releaseResource(resource.lease.id);
+    releaseResource(resource.lease.id, resource.lease.fencingToken);
     throw error;
   } finally {
     opened.sqlite.close();

@@ -91,6 +91,7 @@ export interface MajorGatewayRequest {
   extractSessionRef?: (event: ProviderEvent) => string | undefined;
   extractUsage?: (event: ProviderEvent) => unknown;
   resourceLeaseId?: string;
+  resourceLeaseFencingToken?: string;
   /** Product-owned one-use release validation authority. Never set by normal workers. */
   stagedValidationAuthority?: StagedValidationExecutionAuthority;
   providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority' | 'workshopMode'> & {
@@ -256,11 +257,14 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
   if (workshop) {
     assertSupervisedWorkshopAuthority(workshop, request.cwd);
     if (request.providerRequest) {
-      if (!request.resourceLeaseId) {
-        throw new Error('supervised Workshop provider execution requires a worker resource lease');
+      if (!request.resourceLeaseId || !request.resourceLeaseFencingToken) {
+        throw new Error(
+          'supervised Workshop provider execution requires a fenced worker resource lease',
+        );
       }
       assertActiveResourceLeaseForProcess({
         leaseId: request.resourceLeaseId,
+        fencingToken: request.resourceLeaseFencingToken,
         kind: 'worker',
         pid: process.pid,
       });
@@ -270,11 +274,12 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
     // Workshop and staged-validation paths: this is now the ordinary,
     // default authority for real provider work, not a rare pre-activation
     // exception, so it must be visible to Major's global resource ledger too.
-    if (!request.resourceLeaseId) {
-      throw new Error('supervised provider execution requires a worker resource lease');
+    if (!request.resourceLeaseId || !request.resourceLeaseFencingToken) {
+      throw new Error('supervised provider execution requires a fenced worker resource lease');
     }
     assertActiveResourceLeaseForProcess({
       leaseId: request.resourceLeaseId,
+      fencingToken: request.resourceLeaseFencingToken,
       kind: 'worker',
       pid: process.pid,
     });
@@ -304,8 +309,12 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
         .update(project?.project ?? `local:${resolve(request.cwd)}`)
         .digest('hex');
       const projectRootHash = createHash('sha256').update(realpathSync(request.cwd)).digest('hex');
-      if (!request.resourceLeaseId || !lease.resourceLeaseId) {
-        throw new Error('staged validation requires its exact worker resource lease');
+      if (
+        !request.resourceLeaseId ||
+        !request.resourceLeaseFencingToken ||
+        !lease.resourceLeaseId
+      ) {
+        throw new Error('staged validation requires its exact fenced worker resource lease');
       }
       assertStagedValidationScope(lease, {
         provider: request.providerRequest.host,
@@ -418,6 +427,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       }
       assertActiveResourceLease({
         leaseId: lease.resourceLeaseId,
+        fencingToken: request.resourceLeaseFencingToken,
         kind: 'worker',
         owner: lease.workerId,
         pid: process.pid,
@@ -526,6 +536,9 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       ...(request.extractSessionRef ? { extractSessionRef: request.extractSessionRef } : {}),
       ...(request.extractUsage ? { extractUsage: request.extractUsage } : {}),
       ...(request.resourceLeaseId ? { resourceLeaseId: request.resourceLeaseId } : {}),
+      ...(request.resourceLeaseFencingToken
+        ? { resourceLeaseFencingToken: request.resourceLeaseFencingToken }
+        : {}),
       ...(request.providerRequest ? { providerRequest: request.providerRequest } : {}),
       ...(staged
         ? { executionAuthority: staged }

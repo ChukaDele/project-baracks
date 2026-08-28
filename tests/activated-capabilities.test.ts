@@ -154,7 +154,7 @@ describe('the v0.5.2 capability gate', () => {
             approvalAuthority: { decisions: [] },
           },
         }),
-      ).toThrow(/supervised Workshop provider execution requires a worker resource lease/);
+      ).toThrow(/supervised Workshop provider execution requires a fenced worker resource lease/);
     } finally {
       for (const [name, value] of Object.entries(prior)) {
         const key =

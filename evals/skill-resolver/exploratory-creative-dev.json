@@ -1,0 +1,7 @@
+{
+  "skill": "exploratory-creative-dev",
+  "should_trigger": ["Use exploratory-creative-dev for this task."],
+  "should_not_trigger": [
+    "This unrelated request must not activate exploratory creative dev workflow."
+  ]
+}

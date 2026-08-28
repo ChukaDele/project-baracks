@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -45,6 +45,102 @@ describe('major doctor', () => {
     networkIsolation: true,
     liveExecutionReady: true,
     detail: 'test containment enforced',
+  });
+
+  it('includes typed knowledge maintenance findings when records are supplied', async () => {
+    const report = await runDoctor({
+      providers: [],
+      configuredProjects: [],
+      resolve: fullToolchain,
+      knowledgeRecords: [
+        {
+          id: 'fact',
+          entityId: 'major',
+          predicate: 'status',
+          value: 'active',
+          observedAt: '2026-01-01',
+        },
+      ],
+      inspectKnowledge: (records) => [
+        {
+          kind: 'missing-provenance',
+          ids: [records[0]!.id],
+          repair: 'semantic-candidate',
+          detail: 'evidence required',
+        },
+      ],
+    });
+    expect(report.knowledgeMaintenance).toEqual([
+      expect.objectContaining({ repair: 'semantic-candidate', kind: 'missing-provenance' }),
+    ]);
+  });
+
+  it('loads a bounded configured knowledge snapshot and leaves semantic findings non-mutating', async () => {
+    const snapshot = join(storageHome, 'knowledge.json');
+    const records = [
+      {
+        id: 'fact',
+        entityId: 'major',
+        predicate: 'status',
+        value: 'active',
+        observedAt: '2026-01-01',
+      },
+    ];
+    writeFileSync(snapshot, JSON.stringify(records));
+    const inspected: unknown[] = [];
+    const report = await runDoctor({
+      providers: [],
+      configuredProjects: [],
+      resolve: fullToolchain,
+      env: { MAJOR_KNOWLEDGE_SNAPSHOT: snapshot },
+      inspectKnowledge: (rows) => {
+        inspected.push(...rows);
+        return [
+          {
+            kind: 'missing-provenance',
+            ids: ['fact'],
+            repair: 'semantic-candidate',
+            detail: 'evidence required',
+          },
+        ];
+      },
+    });
+    expect(inspected).toEqual(records);
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({ name: 'knowledge-source', status: 'ok' }),
+    );
+    expect(report.knowledgeMaintenance[0]).toMatchObject({ repair: 'semantic-candidate' });
+    expect(JSON.parse(readFileSync(snapshot, 'utf8'))).toEqual(records);
+  });
+
+  it('reports malformed snapshots and throwing inspections without blocking doctor', async () => {
+    const snapshot = join(storageHome, 'malformed-knowledge.json');
+    writeFileSync(snapshot, JSON.stringify([{ id: 'only-an-id' }]));
+    const malformed = await runDoctor({
+      providers: [],
+      configuredProjects: [],
+      resolve: fullToolchain,
+      env: { MAJOR_KNOWLEDGE_SNAPSHOT: snapshot },
+    });
+    expect(malformed.checks).toContainEqual(
+      expect.objectContaining({ name: 'knowledge-source', status: 'warn' }),
+    );
+
+    const throwing = await runDoctor({
+      providers: [],
+      configuredProjects: [],
+      resolve: fullToolchain,
+      knowledgeRecords: [],
+      inspectKnowledge: () => {
+        throw new Error('bad inspector');
+      },
+    });
+    expect(throwing.checks).toContainEqual(
+      expect.objectContaining({ name: 'knowledge-inspection', status: 'warn' }),
+    );
+    expect(throwing.knowledgeMaintenance).toEqual([
+      expect.objectContaining({ repair: 'semantic-candidate' }),
+    ]);
   });
 
   it('keeps overnight execution unavailable without unattended policy and an explicit daemon', async () => {

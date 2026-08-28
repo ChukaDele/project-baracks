@@ -1,0 +1,7 @@
+{
+  "skill": "behavior-reward-system",
+  "should_trigger": ["Use behavior-reward-system for this task."],
+  "should_not_trigger": [
+    "This unrelated request must not activate behavior reward system workflow."
+  ]
+}

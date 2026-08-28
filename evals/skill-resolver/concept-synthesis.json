@@ -1,0 +1,16 @@
+{
+  "skill": "concept-synthesis",
+  "should_trigger": [
+    "Run concept-synthesis across these notes while retaining minority and abandoned branches.",
+    "Distinguish duplicate, related and contradictory knowledge and reduce retrieval noise.",
+    "Create a provenance-backed canonical synthesis without embedding-only merges."
+  ],
+  "should_not_trigger": [
+    "Deduplicate these identical CSV rows by key.",
+    "Trace when this single idea first appeared.",
+    "Summarize this article."
+  ],
+  "conflicts": [
+    "idea-lineage owns temporal evolution; concept-synthesis owns relationships among existing knowledge records."
+  ]
+}

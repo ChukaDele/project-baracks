@@ -13,6 +13,7 @@ import { dirname, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
 import { getProjectPolicy } from '../supervisor/policy.js';
 import { majorHome, resolveProjectForCwd } from '../supervisor/state.js';
+import { validateSkillOptimization, type SkillOptimizationEvidence } from './optimizer-validation.js';
 
 export const SKILL_LIFECYCLE_STATUSES = ['candidate', 'active', 'review', 'deprecated'] as const;
 export type SkillLifecycleStatus = (typeof SKILL_LIFECYCLE_STATUSES)[number];
@@ -419,7 +420,7 @@ export function validateGeneratedSkill(input: { skillId: string; markdown: strin
   return errors;
 }
 
-function promoteSkillCandidateUnlocked(input: { id: string; project: string; repoPath: string }): SkillCandidate {
+function promoteSkillCandidateUnlocked(input: { id: string; project: string; repoPath: string; optimizationEvidence?: SkillOptimizationEvidence }): SkillCandidate {
   const path = candidatePath(input.project);
   const store = readJson<CandidateStore>(path, { version: 1, candidates: [] });
   const candidate = store.candidates.find((item) => item.id === input.id);
@@ -435,6 +436,12 @@ function promoteSkillCandidateUnlocked(input: { id: string; project: string; rep
   }
   if (candidate.occurrences < 2 || candidate.taskFingerprints.length < 2 || candidate.confidence < 0.8) {
     throw new Error(`skill candidate lacks consistent recurring evidence: confidence ${candidate.confidence}`);
+  }
+  const optimization = input.optimizationEvidence
+    ? validateSkillOptimization(input.optimizationEvidence)
+    : { status: 'rejected' as const, reasons: ['optimizer-evidence-required'] };
+  if (optimization.status !== 'promotable') {
+    throw new Error(`skill optimization evidence is not promotable: ${optimization.reasons.join(', ')}`);
   }
   if (candidate.scope === 'global') throw new Error('automatic global skill promotion is forbidden');
   const markdown = skillMarkdown(candidate);
@@ -462,7 +469,7 @@ function promoteSkillCandidateUnlocked(input: { id: string; project: string; rep
   return candidate;
 }
 
-export function promoteSkillCandidate(input: { id: string; project: string; repoPath: string }): SkillCandidate {
+export function promoteSkillCandidate(input: { id: string; project: string; repoPath: string; optimizationEvidence?: SkillOptimizationEvidence }): SkillCandidate {
   return withStoreLock(candidatePath(input.project), () => promoteSkillCandidateUnlocked(input));
 }
 
@@ -516,6 +523,7 @@ export function applyIndependentSkillValidation(input: {
   goalId: string;
   provider: string;
   evidence: string;
+  optimizationEvidence?: SkillOptimizationEvidence;
 }): { validated: SkillCandidate[]; promoted: SkillCandidate[] } {
   const validated = validateSkillCandidatesForGoal(input);
   const promoted: SkillCandidate[] = [];
@@ -533,6 +541,9 @@ export function applyIndependentSkillValidation(input: {
           id: candidate.id,
           project: input.project,
           repoPath: input.repoPath,
+          ...(input.optimizationEvidence
+            ? { optimizationEvidence: input.optimizationEvidence }
+            : {}),
         }),
       );
     } catch {

@@ -1,0 +1,7 @@
+{
+  "skill": "source-adapter-engineering",
+  "should_trigger": ["Use source-adapter-engineering for this task."],
+  "should_not_trigger": [
+    "This unrelated request must not activate source adapter engineering workflow."
+  ]
+}

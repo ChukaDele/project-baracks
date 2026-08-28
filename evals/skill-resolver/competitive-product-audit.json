@@ -1,0 +1,7 @@
+{
+  "skill": "competitive-product-audit",
+  "should_trigger": ["Use competitive-product-audit for this task."],
+  "should_not_trigger": [
+    "This unrelated request must not activate competitive product audit workflow."
+  ]
+}

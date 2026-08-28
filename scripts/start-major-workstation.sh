@@ -275,8 +275,8 @@ CHROME_IDENTITY="$(process_identity "$CHROME_PID" 2>/dev/null || true)"
 if [[ -n "$CHROME_IDENTITY" ]]; then
   printf '%s\n' "$CHROME_IDENTITY" > "$LOCK_DIR/chrome.identity"
 fi
-date -u +%Y-%m-%dT%H:%M:%SZ > "$LOCK_DIR/ready"
 printf '%s\n' '@major/dsh-kernel' > "$LOCK_DIR/boot-graph"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$LOCK_DIR/ready"
 
 echo "Major workstation listening on ${LISTEN_HOST}:${PORT}"
 echo "served boot graph includes @major/dsh-kernel"

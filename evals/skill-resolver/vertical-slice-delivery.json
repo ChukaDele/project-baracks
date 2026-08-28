@@ -1,0 +1,7 @@
+{
+  "skill": "vertical-slice-delivery",
+  "should_trigger": ["Use vertical-slice-delivery for this task."],
+  "should_not_trigger": [
+    "This unrelated request must not activate vertical slice delivery workflow."
+  ]
+}

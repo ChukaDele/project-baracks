@@ -1,0 +1,5 @@
+{
+  "skill": "project-start",
+  "should_trigger": ["Use project-start for this task."],
+  "should_not_trigger": ["This unrelated request must not activate project start workflow."]
+}

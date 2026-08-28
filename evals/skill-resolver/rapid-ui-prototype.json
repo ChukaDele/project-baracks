@@ -1,0 +1,5 @@
+{
+  "skill": "rapid-ui-prototype",
+  "should_trigger": ["Use rapid-ui-prototype for this task."],
+  "should_not_trigger": ["This unrelated request must not activate rapid ui prototype workflow."]
+}

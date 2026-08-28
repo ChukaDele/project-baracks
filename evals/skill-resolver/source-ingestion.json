@@ -1,0 +1,5 @@
+{
+  "skill": "source-ingestion",
+  "should_trigger": ["Use source-ingestion for this task."],
+  "should_not_trigger": ["This unrelated request must not activate source ingestion workflow."]
+}

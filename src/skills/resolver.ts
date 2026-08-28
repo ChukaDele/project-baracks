@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ const registryEntrySchema = z.object({
   availability: z.string(),
   load: z.string(),
   aliases: z.array(z.string().min(1)).default([]),
+  disclosure: z.enum(['hot', 'specialist']).default('specialist'),
 });
 
 const registrySchema = z.object({
@@ -40,6 +41,47 @@ export interface ResolvedSkill {
 export interface SkillResolution {
   task: string;
   skills: ResolvedSkill[];
+}
+
+export type SkillDisclosureState = 'HOT' | 'ACTIVE' | 'DORMANT';
+
+export interface SkillDisclosure {
+  task: string;
+  manifest: Array<{
+    id: string;
+    source: string;
+    state: SkillDisclosureState;
+    load: string;
+  }>;
+  bodies: Array<{
+    id: string;
+    source: string;
+    state: Exclude<SkillDisclosureState, 'DORMANT'>;
+    content: string;
+    truncated: boolean;
+  }>;
+  metrics: {
+    manifest: { beforeBytes: number; disclosedBytes: number };
+    bodies: { beforeBytes: number; disclosedBytes: number };
+    total: { beforeBytes: number; disclosedBytes: number; estimatedTokensBefore: number; estimatedTokensDisclosed: number };
+    budgets: { manifestBytes: number; bodyBytes: number; perBodyBytes: number };
+  };
+}
+
+const DISCLOSURE_BUDGETS = {
+  manifestBytes: 8_000,
+  bodyBytes: 32_000,
+  perBodyBytes: 12_000,
+} as const;
+
+function jsonBytes(value: unknown): number {
+  return Buffer.byteLength(JSON.stringify(value), 'utf8');
+}
+
+function utf8Prefix(value: string, maxBytes: number): string {
+  const bytes = Buffer.from(value, 'utf8');
+  if (bytes.length <= maxBytes) return value;
+  return bytes.subarray(0, maxBytes).toString('utf8').replace(/\uFFFD$/u, '');
 }
 
 const STOP_WORDS = new Set([
@@ -242,6 +284,7 @@ export function resolveSkills(input: {
         availability: 'project',
         load: generated.trigger,
         aliases: [],
+        disclosure: 'specialist' as const,
       },
       generated,
     })),
@@ -274,6 +317,99 @@ export function resolveSkills(input: {
     if (skills.length >= (input.limit ?? 6)) break;
   }
   return { task, skills };
+}
+
+/**
+ * Produce the one bounded disclosure contract used by provider prompts and
+ * routed clients. Registry metadata is cheap and canonical; bodies are read
+ * only for explicitly HOT guidance or deterministic ACTIVE matches.
+ */
+export function discloseSkills(input: {
+  task: string;
+  cwd?: string;
+  limit?: number;
+  manifestBytes?: number;
+  bodyBytes?: number;
+  perBodyBytes?: number;
+}): SkillDisclosure {
+  const cwd = resolve(input.cwd ?? process.cwd());
+  const registry = loadSkillRegistry();
+  const resolution = resolveSkills({ task: input.task, cwd, ...(input.limit ? { limit: input.limit } : {}) });
+  const active = new Map(resolution.skills.map((skill) => [skill.id, skill]));
+  const hot = registry.filter((entry) => entry.disclosure === 'hot');
+  const ordered = [
+    ...hot.map((entry) => ({ entry, state: 'HOT' as const })),
+    ...resolution.skills
+      .filter((skill) => !hot.some((entry) => entry.id === skill.id))
+      .map((skill) => ({
+        entry: registry.find((entry) => entry.id === skill.id) ?? {
+          id: skill.id,
+          source: skill.source,
+          availability: 'project',
+          load: 'generated active skill',
+          aliases: [],
+          disclosure: 'specialist' as const,
+        },
+        state: 'ACTIVE' as const,
+      })),
+  ];
+  const dormant = registry
+    .filter((entry) => !hot.some((candidate) => candidate.id === entry.id) && !active.has(entry.id))
+    .map((entry) => ({ entry, state: 'DORMANT' as const }));
+  const manifestBudget = input.manifestBytes ?? DISCLOSURE_BUDGETS.manifestBytes;
+  const manifest: SkillDisclosure['manifest'] = [];
+  for (const { entry, state } of [...ordered, ...dormant]) {
+    const candidate = { id: entry.id, source: entry.source, state, load: entry.load };
+    if (jsonBytes([...manifest, candidate]) > manifestBudget) break;
+    manifest.push(candidate);
+  }
+
+  const bodyBudget = input.bodyBytes ?? DISCLOSURE_BUDGETS.bodyBytes;
+  const perBodyBudget = input.perBodyBytes ?? DISCLOSURE_BUDGETS.perBodyBytes;
+  const bodies: SkillDisclosure['bodies'] = [];
+  let disclosedBodyBytes = 0;
+  for (const { entry, state } of ordered) {
+    const selected = active.get(entry.id);
+    const path = selected?.path ?? skillPath(entry.id, cwd, entry.source);
+    if (!path || disclosedBodyBytes >= bodyBudget) continue;
+    const original = readFileSync(path, 'utf8');
+    const allowance = Math.min(perBodyBudget, bodyBudget - disclosedBodyBytes);
+    const content = utf8Prefix(original, allowance);
+    const contentBytes = Buffer.byteLength(content, 'utf8');
+    bodies.push({
+      id: entry.id,
+      source: entry.source,
+      state,
+      content,
+      truncated: contentBytes < Buffer.byteLength(original, 'utf8'),
+    });
+    disclosedBodyBytes += contentBytes;
+  }
+
+  const manifestBeforeBytes = jsonBytes(registry);
+  const manifestDisclosedBytes = jsonBytes(manifest);
+  const bodyBeforeBytes = registry.reduce((total, entry) => {
+    const path = skillPath(entry.id, cwd, entry.source);
+    return total + (path ? statSync(path).size : 0);
+  }, 0);
+  const beforeBytes = manifestBeforeBytes + bodyBeforeBytes;
+  const disclosedBytes = manifestDisclosedBytes + disclosedBodyBytes;
+  return {
+    task: resolution.task,
+    manifest,
+    bodies,
+    metrics: {
+      manifest: { beforeBytes: manifestBeforeBytes, disclosedBytes: manifestDisclosedBytes },
+      bodies: { beforeBytes: bodyBeforeBytes, disclosedBytes: disclosedBodyBytes },
+      total: {
+        beforeBytes,
+        disclosedBytes,
+        estimatedTokensBefore: Math.ceil(beforeBytes / 4),
+        estimatedTokensDisclosed: Math.ceil(disclosedBytes / 4),
+      },
+      budgets: { manifestBytes: manifestBudget, bodyBytes: bodyBudget, perBodyBytes: perBodyBudget },
+    },
+  };
 }
 
 export interface SkillAudit {

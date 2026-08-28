@@ -1,0 +1,5 @@
+{
+  "skill": "performance-caching",
+  "should_trigger": ["Use performance-caching for this task."],
+  "should_not_trigger": ["This unrelated request must not activate performance caching workflow."]
+}

@@ -197,6 +197,7 @@ export interface LimaNativeEnvironmentRequest {
   goalId: string;
   guestArgv: readonly string[];
   resourceLeaseId: string;
+  resourceLeaseFencingToken: string;
   resourceLeasePid: number;
   executionAuthority: SupervisedWorkshopExecutionAuthority;
   signal: AbortSignal;
@@ -1280,6 +1281,7 @@ export class LimaBackend implements ExecutionBackend {
     assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd);
     assertActiveResourceLeaseForProcess({
       leaseId: request.resourceLeaseId,
+      fencingToken: request.resourceLeaseFencingToken,
       kind: 'worker',
       pid: request.resourceLeasePid,
     });
@@ -1615,6 +1617,7 @@ export class LimaBackend implements ExecutionBackend {
       if (workspaceMutated) {
         assertActiveResourceLeaseForProcess({
           leaseId: request.resourceLeaseId,
+          fencingToken: request.resourceLeaseFencingToken,
           kind: 'worker',
           pid: request.resourceLeasePid,
         });
@@ -1709,11 +1712,12 @@ export class LimaBackend implements ExecutionBackend {
     } else if (request.executionAuthority.kind === 'supervised_workshop') {
       if (globalStopRequested()) throw new Error('Major global kill switch is active');
       assertSupervisedWorkshopAuthority(request.executionAuthority, request.cwd);
-      if (!request.resourceLeaseId) {
-        throw new Error('supervised Workshop backend requires a worker resource lease');
+      if (!request.resourceLeaseId || !request.resourceLeaseFencingToken) {
+        throw new Error('supervised Workshop backend requires a fenced worker resource lease');
       }
       assertActiveResourceLeaseForProcess({
         leaseId: request.resourceLeaseId,
+        fencingToken: request.resourceLeaseFencingToken,
         kind: 'worker',
         pid: process.pid,
       });
@@ -1828,11 +1832,12 @@ export class LimaBackend implements ExecutionBackend {
             providerRequest: request.providerRequest,
           }),
         );
-        if (!lease.resourceLeaseId) {
-          throw new Error('staged validation backend is missing its worker resource lease');
+        if (!lease.resourceLeaseId || !request.resourceLeaseFencingToken) {
+          throw new Error('staged validation backend is missing its fenced worker resource lease');
         }
         assertActiveResourceLease({
           leaseId: lease.resourceLeaseId,
+          fencingToken: request.resourceLeaseFencingToken,
           kind: 'worker',
           owner: lease.workerId,
           pid: process.pid,
@@ -1971,6 +1976,9 @@ export class LimaBackend implements ExecutionBackend {
       cleanup: 'pending',
       startedAt: new Date().toISOString(),
       ...(request.resourceLeaseId ? { resourceLeaseId: request.resourceLeaseId } : {}),
+      ...(request.resourceLeaseFencingToken
+        ? { resourceLeaseFencingToken: request.resourceLeaseFencingToken }
+        : {}),
     };
     let manifestWritten = false;
     let guestPrepared = false;

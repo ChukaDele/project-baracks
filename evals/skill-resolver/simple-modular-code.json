@@ -1,0 +1,5 @@
+{
+  "skill": "simple-modular-code",
+  "should_trigger": ["Use simple-modular-code for this task."],
+  "should_not_trigger": ["This unrelated request must not activate simple modular code workflow."]
+}

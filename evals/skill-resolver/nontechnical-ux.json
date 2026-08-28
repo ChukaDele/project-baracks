@@ -1,0 +1,5 @@
+{
+  "skill": "nontechnical-ux",
+  "should_trigger": ["Use nontechnical-ux for this task."],
+  "should_not_trigger": ["This unrelated request must not activate nontechnical ux workflow."]
+}

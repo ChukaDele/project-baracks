@@ -198,6 +198,7 @@ export async function runGatewayCommand(input: {
   timeoutMs?: number;
   extraAllowedRoots?: readonly string[];
   resourceLeaseId?: string;
+  resourceLeaseFencingToken?: string;
   resourceLeaseTtlMs?: number;
   providerRequest?: {
     host: WorkerHost;
@@ -224,6 +225,9 @@ export async function runGatewayCommand(input: {
       allowedRoots: gatewayAllowedRoots(input.cwd, input.extraAllowedRoots),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.resourceLeaseId ? { resourceLeaseId: input.resourceLeaseId } : {}),
+      ...(input.resourceLeaseFencingToken
+        ? { resourceLeaseFencingToken: input.resourceLeaseFencingToken }
+        : {}),
       ...(input.providerRequest ? { providerRequest: input.providerRequest } : {}),
       parseLine: parseProviderEventLine,
       detectRateLimit: (value) => RATE_LIMIT_PATTERN.test(value),
@@ -248,7 +252,11 @@ export async function runGatewayCommand(input: {
         ? setInterval(
             () => {
               try {
-                heartbeatResource(input.resourceLeaseId!, input.resourceLeaseTtlMs);
+                heartbeatResource(
+                  input.resourceLeaseId!,
+                  input.resourceLeaseFencingToken!,
+                  input.resourceLeaseTtlMs,
+                );
               } catch {
                 handle.cancel();
               }
@@ -339,6 +347,8 @@ export async function runWorker(input: {
   host: WorkerHost;
   prompt: string;
   cwd: string;
+  taskId?: string;
+  resourceId?: string;
   timeoutMs?: number;
   modelRef?: string;
   accountLabel?: string;
@@ -350,6 +360,8 @@ export async function runWorker(input: {
   const request = requestResource({
     kind: 'worker',
     owner: `major:${input.host}:${process.pid}:${randomUUID()}`,
+    ...(input.taskId ? { taskId: input.taskId } : {}),
+    ...(input.resourceId ? { resourceId: input.resourceId } : {}),
     project: basename(resolve(input.cwd)),
     pid: process.pid,
     ttlMs: leaseTtlMs,
@@ -394,6 +406,7 @@ export async function runWorker(input: {
         args: spec.args,
         cwd: input.cwd,
         resourceLeaseId: lease!.id,
+        resourceLeaseFencingToken: lease!.fencingToken,
         resourceLeaseTtlMs: leaseTtlMs,
         providerRequest: {
           ...providerRequest,
@@ -452,7 +465,7 @@ export async function runWorker(input: {
       exhausted: false,
     };
   } finally {
-    if (lease) releaseResource(lease.id);
+    if (lease) releaseResource(lease.id, lease.fencingToken);
   }
 }
 

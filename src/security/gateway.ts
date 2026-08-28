@@ -80,6 +80,7 @@ export interface GatewayExecuteRequest {
   extractSessionRef?: StreamingSpawnSpec['extractSessionRef'];
   extractUsage?: StreamingSpawnSpec['extractUsage'];
   resourceLeaseId?: string;
+  resourceLeaseFencingToken?: string;
   executionAuthority?: BackendExecutionAuthority;
   providerRequest?: Omit<BackendProviderRequest, 'approvalAuthority' | 'workshopMode'> & {
     approvalAuthority: ProviderApprovalAuthority;
@@ -444,6 +445,9 @@ export class ExecutionGateway {
         ...(request.extractSessionRef ? { extractSessionRef: request.extractSessionRef } : {}),
         ...(request.extractUsage ? { extractUsage: request.extractUsage } : {}),
         ...(request.resourceLeaseId ? { resourceLeaseId: request.resourceLeaseId } : {}),
+        ...(request.resourceLeaseFencingToken
+          ? { resourceLeaseFencingToken: request.resourceLeaseFencingToken }
+          : {}),
         providerRequest: verifiedProviderRequest,
       });
     }
