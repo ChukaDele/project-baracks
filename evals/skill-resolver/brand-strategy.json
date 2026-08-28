@@ -1,0 +1,31 @@
+{
+  "skill": "brand-strategy",
+  "should_trigger": [
+    "Clarify our brand positioning, category choice and buyer alternatives.",
+    "Map the brand architecture before we name the new service.",
+    "Should we create a new market category?"
+  ],
+  "should_not_trigger": [
+    "Create three visual identity stylescapes.",
+    "Stress-test this existing brand name.",
+    "Write our tone of voice guide.",
+    "Here is our approved positioning. Create three visual directions.",
+    "Is 39 Foundry a strong name?",
+    "Give me 100 names for this company.",
+    "Our homepage copy sounds generic.",
+    "What colour should our brand be?",
+    "We need a logo for our new company.",
+    "Attack this finished identity before launch.",
+    "Build my founder personal brand and LinkedIn authority plan.",
+    "Help me become known on LinkedIn as an expert in recruitment AI.",
+    "Build our complete brand from scratch.",
+    "Redesign this website without changing the company brand.",
+    "Audit our technical SEO.",
+    "Build our brand.",
+    "Our brand looks generic.",
+    "Help us rethink positioning, messaging and identity."
+  ],
+  "conflicts": [
+    "brand-strategy owns positioning and architecture; brand-os only sequences a complete programme and naming, verbal and visual specialists own downstream outputs."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "skill": "brand-red-team",
+  "should_trigger": [
+    "Red-team this completed brand before launch and list fatal issues.",
+    "Stress-test our positioning, name, messaging and visual identity.",
+    "Attack this finished identity before launch",
+    "Attack this finished identity before launch."
+  ],
+  "should_not_trigger": [
+    "Create a new logo for us.",
+    "Generate company name candidates.",
+    "Run browser QA on this web app.",
+    "Here is our approved positioning. Create three visual directions.",
+    "Is 39 Foundry a strong name?",
+    "Give me 100 names for this company.",
+    "Our homepage copy sounds generic.",
+    "What colour should our brand be?",
+    "We need a logo for our new company.",
+    "Build my founder personal brand and LinkedIn authority plan.",
+    "Help me become known on LinkedIn as an expert in recruitment AI.",
+    "Build our complete brand from scratch.",
+    "Should we create a new market category?",
+    "Redesign this website without changing the company brand.",
+    "Audit our technical SEO.",
+    "Build our brand.",
+    "Our brand looks generic.",
+    "Help us rethink positioning, messaging and identity."
+  ],
+  "conflicts": [
+    "brand-red-team attacks completed brand work without redesigning it; creation stays with the relevant Brand OS specialist."
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "skill": "brand-identity-design",
+  "should_trigger": [
+    "Turn the approved positioning into stylescapes, a logo and a brand colour system.",
+    "Create the visual brand identity, wordmark and distinctive asset palette.",
+    "Here is our approved positioning. Create three visual directions."
+  ],
+  "should_not_trigger": [
+    "Redesign this landing page without changing the company brand.",
+    "Our brand looks generic",
+    "Redesign this website without changing the company brand",
+    "Define our brand positioning.",
+    "Review an existing identity without redesigning it.",
+    "Is 39 Foundry a strong name?",
+    "Give me 100 names for this company.",
+    "Our homepage copy sounds generic.",
+    "What colour should our brand be?",
+    "We need a logo for our new company.",
+    "Attack this finished identity before launch.",
+    "Build my founder personal brand and LinkedIn authority plan.",
+    "Help me become known on LinkedIn as an expert in recruitment AI.",
+    "Build our complete brand from scratch.",
+    "Should we create a new market category?",
+    "Audit our technical SEO.",
+    "Redesign this website without changing the company brand.",
+    "Build our brand.",
+    "Our brand looks generic.",
+    "Help us rethink positioning, messaging and identity."
+  ],
+  "conflicts": [
+    "brand-identity-design owns company brand identity systems; design-direction-and-taste owns website and product art direction."
+  ]
+}

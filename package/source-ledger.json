@@ -1,7 +1,7 @@
 {
   "policy": "No external skill payload was copied. Unlicensed inputs are quarantined.",
   "schemaVersion": 2,
-  "sourceLockDate": "2026-08-24",
+  "sourceLockDate": "2026-08-28",
   "sources": [
     {
       "contentCopied": false,
@@ -143,6 +143,26 @@
       "branch": "master",
       "package": { "name": "gbrain", "version": "0.45.12.0" },
       "status": "EXAMINED"
+    },
+    {
+      "contentCopied": true,
+      "decision": "INSTALL_OWNER_SUPPLIED_PACKAGES_UNCHANGED",
+      "licence": "OWNER_SUPPLIED; NO UPSTREAM LICENCE DECLARED IN ARCHIVES",
+      "licenceStatus": "OWNER_AUTHORIZED_PROJECT_INSTALL",
+      "localisation": "The seven supplied .skill archives are retained byte-for-byte in package/brand-os-input and extracted unchanged into skills/internal. Major owns only registry routing, validation, activation and rollback metadata.",
+      "name": "owner-supplied-brand-os-skill-packages",
+      "paths": [
+        "package/brand-os-input/brand-identity-design.skill",
+        "package/brand-os-input/brand-naming.skill",
+        "package/brand-os-input/brand-os.skill",
+        "package/brand-os-input/brand-red-team.skill",
+        "package/brand-os-input/brand-strategy.skill",
+        "package/brand-os-input/brand-verbal-identity.skill",
+        "package/brand-os-input/personal-brand-authority.skill"
+      ],
+      "repository": "owner-supplied-local-package",
+      "revision": "sha256-set:58a6af2b5e403bd7bd64c30fdb0d1e8ca77eb3881078e918a233359f28ad1496,15d1a1a92c644a4fc880d7a8f766d7b27c9e4d685842b21d6dff10fb9f471e64,6779dce51f2c18ba5a51dff54f5a657704f2d43b8fd965644a538f48ee20ae9a,cfed4b3dada52056ce5e948c37ab56fda9f7994a52c7f0fbc9d910146e4593b8,d402033ce90a34a1536537278d35e24d50d4f5d8bfbcae525cbbdaabc838f564,736c422ccccde46e5a953b8ca827585083839797a6b8e986ca5f25969fe75454,48f3666fb3f42feab0dbc45c882db4afd1596cfa64b0c85b82c78ef89cca4fbb",
+      "status": "INSTALLED"
     }
   ]
 }

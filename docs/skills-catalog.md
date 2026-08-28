@@ -195,6 +195,18 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 - PDFs → `pdf` + `pdf-reporting-qa` as appropriate.
 - Deep orchestration → `graph-engineering` only when lean graph engineering is insufficient.
 
+### Brand OS specialists
+
+- Complete, staged brand programme or Brand Book → `brand-os` as router and quality gate.
+- Positioning, category choice, buyer alternatives or brand architecture → `brand-strategy`.
+- Company, product or service naming and name screening → `brand-naming`.
+- Messaging house, tagline or tone of voice → `brand-verbal-identity`.
+- Stylescapes, logo/wordmark, brand typography, colour or distinctive assets → `brand-identity-design`; `design-direction-and-taste` remains the art-direction authority for website/product redesigns.
+- Pre-launch attack on an existing brand output → `brand-red-team`.
+- Founder authority, thought leadership or LinkedIn authority → `personal-brand-authority`.
+
+The seven Brand OS packages are owner-supplied, retained byte-for-byte under `package/brand-os-input`, and installed unchanged. Their archive SHA-256 provenance is recorded in `package/source-ledger.json`. Registry trigger phrases are deliberately specialist-specific so `brand-os` does not shadow its specialists or Major's existing design authority.
+
 ## Explicit recurring exclusions
 
 These may be installed per project when needed, but they are **not** Major recurring defaults:

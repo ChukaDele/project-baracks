@@ -1,0 +1,33 @@
+{
+  "skill": "brand-naming",
+  "should_trigger": [
+    "Help me name this company and screen the shortlist.",
+    "Should we keep or replace this product name?",
+    "Use the approved positioning and architecture to name the new service.",
+    "Approved positioning: stress-test these names",
+    "Is 39 Foundry a strong name?",
+    "Give me 100 names for this company."
+  ],
+  "should_not_trigger": [
+    "Choose our market category and positioning.",
+    "Design a wordmark for the approved name.",
+    "Create a founder LinkedIn publishing plan.",
+    "Here is our approved positioning. Create three visual directions.",
+    "Our homepage copy sounds generic.",
+    "What colour should our brand be?",
+    "We need a logo for our new company.",
+    "Attack this finished identity before launch.",
+    "Build my founder personal brand and LinkedIn authority plan.",
+    "Help me become known on LinkedIn as an expert in recruitment AI.",
+    "Build our complete brand from scratch.",
+    "Should we create a new market category?",
+    "Redesign this website without changing the company brand.",
+    "Audit our technical SEO.",
+    "Build our brand.",
+    "Our brand looks generic.",
+    "Help us rethink positioning, messaging and identity."
+  ],
+  "conflicts": [
+    "brand-naming owns name creation and screening after brand-strategy establishes positioning and architecture."
+  ]
+}

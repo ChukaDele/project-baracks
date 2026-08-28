@@ -1,0 +1,30 @@
+{
+  "skill": "personal-brand-authority",
+  "should_trigger": [
+    "Build my founder personal brand and LinkedIn authority plan.",
+    "Help me become known on LinkedIn as an expert in recruitment AI.",
+    "Create a thought-leadership publishing plan around my breakthrough idea."
+  ],
+  "should_not_trigger": [
+    "Build the company brand identity.",
+    "Write a generic social media calendar for the product.",
+    "Design a company logo.",
+    "Here is our approved positioning. Create three visual directions.",
+    "Is 39 Foundry a strong name?",
+    "Give me 100 names for this company.",
+    "Our homepage copy sounds generic.",
+    "What colour should our brand be?",
+    "We need a logo for our new company.",
+    "Attack this finished identity before launch.",
+    "Build our complete brand from scratch.",
+    "Should we create a new market category?",
+    "Redesign this website without changing the company brand.",
+    "Audit our technical SEO.",
+    "Build our brand.",
+    "Our brand looks generic.",
+    "Help us rethink positioning, messaging and identity."
+  ],
+  "conflicts": [
+    "personal-brand-authority owns founder authority; company positioning and identity stay with brand-strategy and brand-identity-design."
+  ]
+}

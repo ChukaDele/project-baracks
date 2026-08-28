@@ -4,7 +4,8 @@
     "Do a full responsive and visual QA of this marketing website before launch.",
     "Review the live site against the intended design across desktop, tablet and mobile.",
     "The page looks wrong at 100% zoom and on a short laptop; diagnose and fix the real layout cause.",
-    "Check production parity, SEO, accessibility, performance and critical journeys before we call the site ready."
+    "Check production parity, SEO, accessibility, performance and critical journeys before we call the site ready.",
+    "Redesign this website without changing the company brand."
   ],
   "should_not_trigger": [
     "Fix this backend SQL query.",

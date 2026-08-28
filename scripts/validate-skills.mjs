@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, resolve, sep } from 'node:path';
 import { parseDocument } from 'yaml';
 
@@ -123,6 +124,53 @@ for (const [index, source] of sourceLedger.sources.entries()) {
     nonEmpty(row[key], `skills source ledger source ${index}.${key}`);
   }
   list(row.paths, `skills source ledger source ${index}.paths`);
+}
+
+const brandPackageHashes = new Map([
+  [
+    'package/brand-os-input/brand-identity-design.skill',
+    '58a6af2b5e403bd7bd64c30fdb0d1e8ca77eb3881078e918a233359f28ad1496',
+  ],
+  [
+    'package/brand-os-input/brand-naming.skill',
+    '15d1a1a92c644a4fc880d7a8f766d7b27c9e4d685842b21d6dff10fb9f471e64',
+  ],
+  [
+    'package/brand-os-input/brand-os.skill',
+    '6779dce51f2c18ba5a51dff54f5a657704f2d43b8fd965644a538f48ee20ae9a',
+  ],
+  [
+    'package/brand-os-input/brand-red-team.skill',
+    'cfed4b3dada52056ce5e948c37ab56fda9f7994a52c7f0fbc9d910146e4593b8',
+  ],
+  [
+    'package/brand-os-input/brand-strategy.skill',
+    'd402033ce90a34a1536537278d35e24d50d4f5d8bfbcae525cbbdaabc838f564',
+  ],
+  [
+    'package/brand-os-input/brand-verbal-identity.skill',
+    '736c422ccccde46e5a953b8ca827585083839797a6b8e986ca5f25969fe75454',
+  ],
+  [
+    'package/brand-os-input/personal-brand-authority.skill',
+    '48f3666fb3f42feab0dbc45c882db4afd1596cfa64b0c85b82c78ef89cca4fbb',
+  ],
+]);
+const brandPackageSource = sourceLedger.sources.find(
+  (source) => source.name === 'owner-supplied-brand-os-skill-packages',
+);
+if (!brandPackageSource) fail('owner-supplied Brand OS package provenance is missing');
+const brandPackagePaths = list(brandPackageSource.paths, 'Brand OS package provenance paths');
+if (
+  brandPackagePaths.slice().sort().join('\n') !== [...brandPackageHashes.keys()].sort().join('\n')
+) {
+  fail('Brand OS provenance must name exactly the seven supplied packages');
+}
+for (const [locator, expected] of brandPackageHashes) {
+  const path = resolve(root, locator);
+  if (!inside(path) || !existsSync(path)) fail(`Brand OS package is unavailable: ${locator}`);
+  const actual = createHash('sha256').update(readFileSync(path)).digest('hex');
+  if (actual !== expected) fail(`Brand OS package hash mismatch: ${locator}`);
 }
 
 const stagedIds = new Set(

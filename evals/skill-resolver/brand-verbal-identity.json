@@ -1,0 +1,33 @@
+{
+  "skill": "brand-verbal-identity",
+  "should_trigger": [
+    "Build our messaging house and tone of voice guide.",
+    "Develop tagline territories from the approved positioning.",
+    "Turn the approved positioning into the messaging house and brand voice.",
+    "Approved positioning: write our verbal identity",
+    "Our homepage copy sounds generic."
+  ],
+  "should_not_trigger": [
+    "Choose a name for the new product.",
+    "Create the logo and colour system.",
+    "Audit our technical SEO.",
+    "Here is our approved positioning. Create three visual directions.",
+    "Is 39 Foundry a strong name?",
+    "Give me 100 names for this company.",
+    "What colour should our brand be?",
+    "We need a logo for our new company.",
+    "Attack this finished identity before launch.",
+    "Build my founder personal brand and LinkedIn authority plan.",
+    "Help me become known on LinkedIn as an expert in recruitment AI.",
+    "Build our complete brand from scratch.",
+    "Should we create a new market category?",
+    "Redesign this website without changing the company brand.",
+    "Audit our technical SEO.",
+    "Build our brand.",
+    "Our brand looks generic.",
+    "Help us rethink positioning, messaging and identity."
+  ],
+  "conflicts": [
+    "brand-verbal-identity owns brand messaging and voice; presentation-storylining owns decks and seo-os owns search-specific copy decisions."
+  ]
+}

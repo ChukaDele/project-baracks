@@ -292,6 +292,16 @@ The user brief names `skill-harvest` and `knowledge-ingest`; their provenance in
 
 These are independently authored Major workflow contracts, not copied donor implementations. GBrain remains the durable organizational meaning/provenance authority; Major remains control plane and routing authority. No page writer, archive store, provider lock-in, queue, scheduler, resolver, orchestration runtime or storage substrate is imported. The merges do not infer causality from correlation or permit one observation to become durable policy.
 
+## 2026-08-28 — owner-supplied Brand OS package integration
+
+- **Capability:** complete brand-programme routing with bounded specialists for strategy, naming, verbal identity, identity design, adversarial review and founder authority
+- **Candidates:** the seven owner-supplied `.skill` archives; existing `design-direction-and-taste`, `knowledge-work`, `presentation-storylining` and `seo-os`; a second Brand OS registry or installer
+- **Decision:** **INTEGRATE** exactly the seven supplied packages unchanged through Major's existing canonical registry, resolver fixtures, installer, immutable hot bundle and rollback pointer. Retain the archives byte-for-byte and lock their SHA-256 digests in `package/source-ledger.json`. Use specialist-specific registry triggers; do not add a second router, installer or generic design authority.
+- **Reason:** the packages form one intentional router/specialist set and add brand-specific methods not owned by adjacent Major skills. Narrow triggers preserve the existing website/product art-direction, SEO, presentation and general research boundaries.
+- **Major-specific layer retained:** authority, registry reachability, trigger deduplication, installation, provenance, immutable activation, rollback and validation
+- **Rejected alternatives:** flattening all seven into `design-direction-and-taste`; loading `brand-os` for every specialist request; modifying supplied bodies; creating a package manager or second hot-sync path
+- **Evidence:** the seven archives under `package/brand-os-input`, their hashes in `package/source-ledger.json`, seven resolver fixtures, registry version 18, and the existing skill-sync/rollback implementation
+
 ## 2026-08-28 — safe stale resource lease reclaim
 
 - **Capability:** safely reclaim stale resource leases without introducing a second resource authority or execution substrate

@@ -1,0 +1,43 @@
+{
+  "skill": "brand-os",
+  "should_trigger": [
+    "Run a complete end-to-end brand project and deliver the Brand Book.",
+    "Use the brand operating system to sequence our full rebrand programme.",
+    "Help us build our brand from scratch.",
+    "We need a rebrand but do not know where to start.",
+    "Build our brand",
+    "Build our brand.",
+    "We need a rebrand",
+    "Our brand looks generic",
+    "Our brand looks generic.",
+    "Help us rethink positioning, messaging and identity",
+    "Help us rethink positioning, messaging and identity.",
+    "We need a logo",
+    "We need a logo for our new company.",
+    "Build our complete brand from scratch.",
+    "What colour should our brand be?"
+  ],
+  "should_not_trigger": [
+    "Help me screen this company name.",
+    "Define our tone of voice.",
+    "Turn the approved positioning into a visual identity system.",
+    "Build my founder authority and LinkedIn publishing plan.",
+    "Redesign this product landing page with stronger art direction.",
+    "Redesign this website without changing the company brand",
+    "Audit our technical SEO and improve organic search visibility.",
+    "Audit our technical SEO",
+    "Here is our approved positioning. Create three visual directions.",
+    "Is 39 Foundry a strong name?",
+    "Give me 100 names for this company.",
+    "Our homepage copy sounds generic.",
+    "Attack this finished identity before launch.",
+    "Build my founder personal brand and LinkedIn authority plan.",
+    "Help me become known on LinkedIn as an expert in recruitment AI.",
+    "Should we create a new market category?",
+    "Redesign this website without changing the company brand.",
+    "Audit our technical SEO."
+  ],
+  "conflicts": [
+    "brand-os routes complete programmes; each Brand OS specialist owns its bounded decision, while design-direction-and-taste owns product and website art direction."
+  ]
+}

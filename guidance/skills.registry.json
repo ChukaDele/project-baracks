@@ -1,5 +1,5 @@
 {
-  "version": 17,
+  "version": 18,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -98,13 +98,15 @@
       "id": "website-design-qa",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"
+      "load": "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa",
+      "aliases": ["Redesign this website without changing the company brand."]
     },
     {
       "id": "seo-os",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking"
+      "load": "seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking",
+      "aliases": ["Audit our technical SEO."]
     },
     {
       "id": "responsive-motion-systems",
@@ -1326,6 +1328,97 @@
       "availability": "all-projects",
       "load": "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support",
       "aliases": ["paper verification", "literature verification"]
+    },
+    {
+      "id": "brand-os",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "complete-brand-program end-to-end-brand-project brand-book staged-brand-work",
+      "aliases": [
+        "brand operating system",
+        "build our brand",
+        "Build our brand.",
+        "we need a rebrand",
+        "our brand looks generic",
+        "Our brand looks generic.",
+        "rethink positioning messaging and identity",
+        "Help us rethink positioning, messaging and identity.",
+        "we need a logo",
+        "We need a logo for our new company.",
+        "Build our complete brand from scratch.",
+        "help with our brand",
+        "rebrand our company",
+        "What colour should our brand be?"
+      ],
+      "exclusiveGroup": "brand-os"
+    },
+    {
+      "id": "brand-strategy",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "brand-positioning category-choice brand-architecture onlyness buyer-alternatives",
+      "aliases": ["brand positioning", "Should we create a new market category?"],
+      "exclusiveGroup": "brand-os"
+    },
+    {
+      "id": "brand-naming",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "company-naming product-naming service-naming rename name-shortlist",
+      "aliases": [
+        "naming a brand",
+        "stress test these names",
+        "Is 39 Foundry a strong name?",
+        "Give me 100 names for this company."
+      ],
+      "exclusiveGroup": "brand-os"
+    },
+    {
+      "id": "brand-verbal-identity",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "brand-messaging tagline tone-of-voice verbal-identity messaging-house",
+      "aliases": [
+        "brand voice",
+        "write our verbal identity",
+        "Our homepage copy sounds generic."
+      ],
+      "exclusiveGroup": "brand-os"
+    },
+    {
+      "id": "brand-identity-design",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "logo wordmark stylescape brand-colours brand-typography distinctive-assets",
+      "aliases": [
+        "visual brand identity",
+        "Here is our approved positioning. Create three visual directions."
+      ],
+      "exclusiveGroup": "brand-os"
+    },
+    {
+      "id": "brand-red-team",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "brand-review brand-critique prelaunch-brand-audit brand-stress-test",
+      "aliases": [
+        "red team a brand",
+        "attack this finished identity before launch",
+        "Attack this finished identity before launch."
+      ],
+      "exclusiveGroup": "brand-os"
+    },
+    {
+      "id": "personal-brand-authority",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "founder-personal-brand thought-leadership linkedin-authority founder-content",
+      "aliases": [
+        "personal brand",
+        "Build my founder personal brand and LinkedIn authority plan.",
+        "Help me become known on LinkedIn as an expert in recruitment AI."
+      ],
+      "exclusiveGroup": "brand-os"
     }
   ],
   "reconciliation": {

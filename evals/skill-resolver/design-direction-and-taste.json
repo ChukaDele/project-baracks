@@ -3,12 +3,13 @@
   "should_trigger": [
     "Redesign this landing page; it still looks like generic AI SaaS.",
     "Make this website Awwwards-level without losing conversion clarity.",
-    "The design is too safe and category-generic; give it a stronger visual identity.",
+    "The website design is too safe and category-generic; give it stronger art direction.",
     "Use these references to define the design language before rebuilding the page.",
     "I want a real redesign, not another mild polish pass."
   ],
   "should_not_trigger": [
     "Fix the missing React import.",
+    "Our brand looks generic",
     "Run browser QA on this already-approved layout.",
     "Debug this ScrollTrigger overlap without changing the art direction.",
     "Fix this database migration."

@@ -16,6 +16,7 @@ const registryEntrySchema = z.object({
   load: z.string(),
   aliases: z.array(z.string().min(1)).default([]),
   disclosure: z.enum(['hot', 'specialist']).default('specialist'),
+  exclusiveGroup: z.string().min(1).optional(),
 });
 
 const registrySchema = z.object({
@@ -87,6 +88,7 @@ function utf8Prefix(value: string, maxBytes: number): string {
 const STOP_WORDS = new Set([
   'all',
   'and',
+  'brand',
   'for',
   'from',
   'into',
@@ -101,6 +103,7 @@ const STOP_WORDS = new Set([
   'the',
   'this',
   'use',
+  'with',
   'work',
 ]);
 
@@ -194,6 +197,10 @@ function normalizedText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
 
+function includesNormalizedPhrase(value: string, phrase: string): boolean {
+  return ` ${normalizedText(value)} `.includes(` ${normalizedText(phrase)} `);
+}
+
 function skillPath(id: string, cwd: string, source: string): string | undefined {
   const immutable = join(runtimeRoot(), 'skills', 'internal');
   const legacyMutableGlobal = join(majorHome(), 'skills', 'internal');
@@ -231,7 +238,9 @@ function scoreEntry(
   if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
     return { score: 0, reason: 'matched a negative trigger example' };
   }
-  const explicitTerm = [entry.id, ...entry.aliases].find((term) => normalized.includes(term.toLowerCase()));
+  const explicitTerm = [entry.id, ...entry.aliases].find((term, index) =>
+    index === 0 ? normalized.includes(term.toLowerCase()) : includesNormalizedPhrase(task, term),
+  );
   if (explicitTerm) {
     // A short id can be a substring of a more specific explicit id, such as
     // `integration` in `mcp-integration-ops`. Prefer the longer named skill.
@@ -242,10 +251,9 @@ function scoreEntry(
   }
   const taskWords = new Set(words(task));
   const idMatches = words(entry.id).filter((word) => taskWords.has(word));
-  const aliasMatches = entry.aliases.flatMap((alias) => words(alias)).filter((word) => taskWords.has(word));
   const triggerMatches = [...new Set(words(entry.load).filter((word) => taskWords.has(word)))];
   const rareMatches = triggerMatches.filter((word) => word.length >= 8);
-  let score = (idMatches.length + aliasMatches.length) * 5 + triggerMatches.length * 2 + rareMatches.length;
+  let score = idMatches.length * 5 + triggerMatches.length * 2 + rareMatches.length;
   let exampleReason = '';
   for (const example of fixtures?.positive ?? []) {
     const exampleWords = new Set(words(example));
@@ -261,7 +269,7 @@ function scoreEntry(
   return {
     score,
     reason:
-      exampleReason || `matched: ${[...new Set([...idMatches, ...aliasMatches, ...triggerMatches])].join(', ')}`,
+      exampleReason || `matched: ${[...new Set([...idMatches, ...triggerMatches])].join(', ')}`,
   };
 }
 
@@ -285,6 +293,7 @@ export function resolveSkills(input: {
         load: generated.trigger,
         aliases: [],
         disclosure: 'specialist' as const,
+        exclusiveGroup: undefined,
       },
       generated,
     })),
@@ -302,7 +311,14 @@ export function resolveSkills(input: {
     .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id));
 
   const skills: ResolvedSkill[] = [];
+  const selectedExclusiveGroups = new Set<string>();
   for (const match of matches) {
+    if (
+      match.entry.exclusiveGroup &&
+      selectedExclusiveGroups.has(match.entry.exclusiveGroup)
+    ) {
+      continue;
+    }
     const path = match.generated
       ? generatedSkillPath(match.generated)
       : skillPath(match.entry.id, cwd, match.entry.source);
@@ -314,6 +330,7 @@ export function resolveSkills(input: {
       score: match.score,
       reason: match.reason,
     });
+    if (match.entry.exclusiveGroup) selectedExclusiveGroups.add(match.entry.exclusiveGroup);
     if (skills.length >= (input.limit ?? 6)) break;
   }
   return { task, skills };

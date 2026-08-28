@@ -69,6 +69,158 @@ describe('runtime skill resolver', () => {
     }
   });
 
+  it('keeps Brand OS specialist trigger surfaces distinct', () => {
+    const cases = new Map([
+      ['Build our brand', 'brand-os'],
+      ['We need a rebrand', 'brand-os'],
+      ['Our brand looks generic', 'brand-os'],
+      ['Help us rethink positioning, messaging and identity', 'brand-os'],
+      ['We need a logo', 'brand-os'],
+      ['Help us build our brand from scratch.', 'brand-os'],
+      ['We need a rebrand but do not know where to start.', 'brand-os'],
+      ['Run a complete end-to-end brand project and deliver the Brand Book.', 'brand-os'],
+      ['Clarify our brand positioning, category choice and buyer alternatives.', 'brand-strategy'],
+      ['Use the approved positioning and architecture to name the new service.', 'brand-naming'],
+      [
+        'Turn the approved positioning into the messaging house and brand voice.',
+        'brand-verbal-identity',
+      ],
+      [
+        'Turn the approved positioning into stylescapes, a logo and a brand colour system.',
+        'brand-identity-design',
+      ],
+      ['Red-team this completed brand before launch and list fatal issues.', 'brand-red-team'],
+      ['Approved positioning: stress-test these names', 'brand-naming'],
+      ['Approved positioning: write our verbal identity', 'brand-verbal-identity'],
+      ['Attack this finished identity before launch', 'brand-red-team'],
+      ['Build my founder personal brand and LinkedIn authority plan.', 'personal-brand-authority'],
+    ]);
+    const brandSkills = new Set(cases.values());
+
+    for (const [prompt, expected] of cases) {
+      const resolved = resolveSkills({ task: prompt })
+        .skills.map((skill) => skill.id)
+        .filter((id) => brandSkills.has(id));
+      expect(resolved, prompt).toEqual([expected]);
+    }
+  });
+
+  it('routes the ten Brand OS acceptance prompts to one owner with no competing specialist', () => {
+    const brandSkills = new Set([
+      'brand-os',
+      'brand-strategy',
+      'brand-naming',
+      'brand-verbal-identity',
+      'brand-identity-design',
+      'brand-red-team',
+      'personal-brand-authority',
+    ]);
+    const cases = new Map([
+      ['We need a logo for our new company.', 'brand-os'],
+      ['Attack this finished identity before launch.', 'brand-red-team'],
+      [
+        'Help me become known on LinkedIn as an expert in recruitment AI.',
+        'personal-brand-authority',
+      ],
+      ['Build our complete brand from scratch.', 'brand-os'],
+      ['Should we create a new market category?', 'brand-strategy'],
+      ['Redesign this website without changing the company brand.', 'website-design-qa'],
+      ['Audit our technical SEO.', 'seo-os'],
+      ['Build our brand.', 'brand-os'],
+      ['Our brand looks generic.', 'brand-os'],
+      ['Help us rethink positioning, messaging and identity.', 'brand-os'],
+    ]);
+
+    for (const [prompt, expected] of cases) {
+      const resolved = resolveSkills({ task: prompt }).skills.map((skill) => skill.id);
+      expect(resolved, prompt).toContain(expected);
+      expect(
+        resolved.filter((id) => brandSkills.has(id) && id !== expected),
+        prompt,
+      ).toEqual([]);
+    }
+  });
+
+  it('keeps exact repaired routes compatible with the installed pre-exclusivity resolver', () => {
+    const registry = JSON.parse(
+      readFileSync(join(process.cwd(), 'guidance', 'skills.registry.json'), 'utf8'),
+    ) as { entries: Array<{ id: string; aliases?: string[] }> };
+    const cases = new Map([
+      ['We need a logo for our new company.', 'brand-os'],
+      ['Attack this finished identity before launch.', 'brand-red-team'],
+      [
+        'Help me become known on LinkedIn as an expert in recruitment AI.',
+        'personal-brand-authority',
+      ],
+      ['Build our complete brand from scratch.', 'brand-os'],
+      ['Should we create a new market category?', 'brand-strategy'],
+      ['Redesign this website without changing the company brand.', 'website-design-qa'],
+      ['Audit our technical SEO.', 'seo-os'],
+      ['Build our brand.', 'brand-os'],
+      ['Our brand looks generic.', 'brand-os'],
+      ['Help us rethink positioning, messaging and identity.', 'brand-os'],
+    ]);
+    const brandSkills = [
+      'brand-os',
+      'brand-strategy',
+      'brand-naming',
+      'brand-verbal-identity',
+      'brand-identity-design',
+      'brand-red-team',
+      'personal-brand-authority',
+    ];
+
+    for (const [prompt, expected] of cases) {
+      expect(
+        registry.entries.find((entry) => entry.id === expected)?.aliases,
+        `${prompt} must be an exact owner alias for the installed resolver`,
+      ).toContain(prompt);
+      for (const competitor of brandSkills.filter((id) => id !== expected)) {
+        const fixture = JSON.parse(
+          readFileSync(
+            join(process.cwd(), 'evals', 'skill-resolver', `${competitor}.json`),
+            'utf8',
+          ),
+        ) as { should_not_trigger: string[] };
+        expect(fixture.should_not_trigger, `${prompt} must suppress ${competitor}`).toContain(
+          prompt,
+        );
+      }
+    }
+  });
+
+  it('scores aliases as phrases rather than as individual generic words', () => {
+    const ids = resolveSkills({
+      task: 'Our company needs help with an unrelated task.',
+    }).skills.map((skill) => skill.id);
+    expect(ids).not.toContain('brand-os');
+  });
+
+  it('keeps website/product art direction and SEO with existing Major owners', () => {
+    const brandSkills = new Set([
+      'brand-os',
+      'brand-strategy',
+      'brand-naming',
+      'brand-verbal-identity',
+      'brand-identity-design',
+      'brand-red-team',
+      'personal-brand-authority',
+    ]);
+    const cases = new Map([
+      ['Redesign this website without changing the company brand', 'design-direction-and-taste'],
+      ['Audit our technical SEO', 'seo-os'],
+    ]);
+
+    for (const [prompt, expected] of cases) {
+      const resolved = resolveSkills({ task: prompt }).skills.map((skill) => skill.id);
+      expect(resolved, prompt).toContain(expected);
+      expect(
+        resolved.filter((id) => brandSkills.has(id)),
+        prompt,
+      ).toEqual([]);
+    }
+  });
+
   it('resolves a canonical skill by a retained non-ID alias', () => {
     expect(
       resolveSkills({

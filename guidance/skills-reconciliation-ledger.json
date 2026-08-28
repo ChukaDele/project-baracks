@@ -754,6 +754,62 @@
       "status": "active",
       "provenance": "docs/prior-art-decisions.md",
       "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "brand-os",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "sourceHashDisposition": "owner-supplied-archive-sha256-preserved"
+    },
+    {
+      "id": "brand-strategy",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "sourceHashDisposition": "owner-supplied-archive-sha256-preserved"
+    },
+    {
+      "id": "brand-naming",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "sourceHashDisposition": "owner-supplied-archive-sha256-preserved"
+    },
+    {
+      "id": "brand-verbal-identity",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "sourceHashDisposition": "owner-supplied-archive-sha256-preserved"
+    },
+    {
+      "id": "brand-identity-design",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "sourceHashDisposition": "owner-supplied-archive-sha256-preserved"
+    },
+    {
+      "id": "brand-red-team",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "sourceHashDisposition": "owner-supplied-archive-sha256-preserved"
+    },
+    {
+      "id": "personal-brand-authority",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "package/source-ledger.json",
+      "sourceHashDisposition": "owner-supplied-archive-sha256-preserved"
     }
   ]
 }

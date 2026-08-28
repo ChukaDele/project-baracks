@@ -6,7 +6,9 @@
     "Improve internal linking and site architecture so our money pages rank better.",
     "Build an SEO content plan based on what we already rank for and what competitors own.",
     "Check our visibility in AI answers and improve GEO/AEO as part of SEO.",
-    "Use OpenSEO with our existing Major skills rather than rebuilding SEO tooling."
+    "Use OpenSEO with our existing Major skills rather than rebuilding SEO tooling.",
+    "Audit our technical SEO",
+    "Audit our technical SEO."
   ],
   "should_not_trigger": [
     "Fix the spacing on this dashboard card.",
