@@ -4,6 +4,16 @@ Future Major agents must consult this log before rebuilding a capability or addi
 
 Record format: Capability, Date, Candidates, Decision, Reason, Major-specific layer retained, Rejected alternatives, Evidence.
 
+## 2026-08-28 — lightweight intent-to-evidence SDLC state
+
+- **Capability:** proportional intent-to-spec-to-plan-to-evidence state, review, regression learning, and delivery proof for Major work.
+- **Candidates:** the canonical project `GOAL_STATE.md` template and shared reusable-asset record; existing task, evidence, review-finding, learning, worktree, policy, and readiness paths; a new workflow engine, database schema, or external SDLC framework.
+- **Decision:** WRAP the existing goal-state template and readiness guidance. BUILD only a pure deterministic assessment module and focused tests for the missing policy delta. KEEP all existing orchestration and persistence paths.
+- **Reason:** the repository already owns durable state, execution, evidence, review, learning, and promotion. Another store or workflow runtime would duplicate authority and slow small work. The missing behavior is a compact, testable classification and truthful proof vocabulary.
+- **Major-specific layer retained:** supervisor orchestration, isolated worktrees, project policy, immutable evidence, review findings, independent completion grading, project learning capture, GBrain promotion, and supported installation/release gates.
+- **Rejected alternatives:** a second task lifecycle; schema migration; mandatory independent review for every change; embedding project regressions in GBrain; treating installation as readiness; adopting an external workflow platform.
+- **Evidence:** `guidance/gbrain-reusable-assets.index.json` identifies the canonical goal-state template; `templates/project/GOAL_STATE.md`, `src/domain/completion.ts`, `src/supervisor/autonomy.ts`, `src/learning/candidates.ts`, and `guidance/readiness-and-independent-validation.md` already implement the retained paths. The missing delta is covered by `src/domain/sdlc.ts` and `tests/sdlc.test.ts`.
+
 ## 2026-08-24 — Skills Library and reusable implementation discovery
 
 - **Capability:** promote the reconciled Major Skills Library and retrieve a proven reusable implementation before starting a new build.

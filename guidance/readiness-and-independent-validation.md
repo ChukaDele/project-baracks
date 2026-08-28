@@ -44,6 +44,29 @@ Trust/autonomy is earned from real evidence:
 
 Do not increase trust merely because configuration exists or self-authored tests are green.
 
+## Lightweight SDLC profile
+
+Use `decideSdlc` from `src/domain/sdlc.ts` as the deterministic policy primitive.
+A low-risk change touching at most two files with one acceptance path needs only a
+clear outcome, acceptance check and focused proof. Substantive or risk-bearing work
+keeps compact outcome, acceptance, plan and evidence state in `GOAL_STATE.md`.
+
+Review follows consequence: no mandatory independent review for a small low-risk
+change, focused review for substantive ordinary work, and independent review for
+authority, security, irreversible or broad-blast-radius changes. Existing project
+policy continues to govern external effects and owner-only gates.
+
+Record installation proof separately as `not_required`, `unproven`, or `proven`.
+Record representative behaviour as `unproven` or `proven`. Installation alone never
+makes work READY; READY requires the applicable validation/review, any required
+installation proof, and a representative behaviour outcome under the intended trust
+profile. For low-risk work whose review level is `none`, deterministic checks can
+support VALIDATED without inventing an independent-review requirement.
+
+For a failure, keep its reproduction and executable regression verification in the
+project. Submit only a separate sanitized, generalisable principle to the existing
+GBrain learning lifecycle. A regression artifact is not itself global learning.
+
 ## Client boundary
 
 Client/candidate/PII projects default to `client/observe` until explicitly classified otherwise. Being globally attached to Major does not grant Major or Ruflo permission to execute, read cross-project memory, or promote sensitive project information into global memory.
