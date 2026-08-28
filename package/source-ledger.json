@@ -1,7 +1,7 @@
 {
   "policy": "No external skill payload was copied. Unlicensed inputs are quarantined.",
   "schemaVersion": 2,
-  "sourceLockDate": "2026-08-24",
+  "sourceLockDate": "2026-08-28",
   "sources": [
     {
       "contentCopied": false,
@@ -143,6 +143,28 @@
       "branch": "master",
       "package": { "name": "gbrain", "version": "0.45.12.0" },
       "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "USE_LIVE_NO_COPY",
+      "licence": "MIT (upstream README declaration; no top-level LICENSE file)",
+      "licenceStatus": "DECLARED_REFERENCE_ONLY",
+      "localisation": "Metadata-only live source catalog and section references. Do not redistribute or copy Vercel skill bodies into Major.",
+      "name": "vercel-labs/agent-skills",
+      "paths": [
+        "skills/vercel-optimize/SKILL.md",
+        "skills/react-best-practices/SKILL.md",
+        "skills/web-design-guidelines/SKILL.md",
+        "skills/writing-guidelines/SKILL.md",
+        "skills/react-native-skills/SKILL.md",
+        "skills/react-view-transitions/SKILL.md",
+        "skills/composition-patterns/SKILL.md",
+        "skills/deploy-to-vercel/SKILL.md",
+        "skills/vercel-cli-with-tokens/SKILL.md"
+      ],
+      "repository": "https://github.com/vercel-labs/agent-skills",
+      "revision": "main",
+      "status": "LIVE_REFERENCE"
     }
   ]
 }

@@ -1,0 +1,9 @@
+{
+  "skill": "vercel-optimize",
+  "should_trigger": [
+    "Use vercel-optimize to investigate the current Vercel performance, latency, and cost of this deployed route."
+  ],
+  "should_not_trigger": [
+    "Write a generic unit test for a local parser without deployment, performance, or cost work."
+  ]
+}

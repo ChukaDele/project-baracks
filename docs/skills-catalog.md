@@ -136,6 +136,16 @@ If Emil adds/removes skills later, the installer records the upstream commit and
 | `security-threat-model` | material security task | Deep security analysis only when risk justifies it. |
 | `pdf` | PDF task | General PDF capability. |
 
+## Live vendor skill sources
+
+Major keeps nine current Vercel capabilities as a metadata-only live source. The catalog records official URLs, revision, per-skill version where available, freshness, license/provenance status, client support, resolver domains and bounded section references. It does not copy vendor skill bodies into the Major bundle.
+
+| Source | Coverage | Operational path |
+|---|---|---|
+| `vercel-labs/agent-skills` | Vercel optimization, React/Next.js performance, web and writing guidelines, React Native, view transitions, composition patterns, deployment and CLI/token guidance | Resolver selects a relevant section reference. `major skill vendor --task "..." --refresh` explicitly retrieves only that section and caches it within the freshness window. |
+
+Live vendor guidance is subordinate to Major policy. A vendor reference does not grant deployment, claim, merge or production authority. When a live source is stale, degraded or unavailable, Major exposes that state and keeps the official reference visible rather than silently treating a frozen copy as current.
+
 ## Deep graph skill
 
 - `graph-engineering` from `codejunkie99/graph-engineering` — load only when Major's lean graph skill is insufficient and the workflow genuinely needs deeper graph modeling/orchestration.

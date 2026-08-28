@@ -76,7 +76,7 @@ function resolvedGoalSkills(project: string, repoPath: string): string {
   try {
     for (const goal of goals) {
       for (const skill of resolveSkills({ task: goal.goal, cwd: repoPath }).skills) {
-        unique.set(skill.id, skill.path);
+        unique.set(skill.id, skill.path ?? skill.reference);
       }
     }
   } catch {

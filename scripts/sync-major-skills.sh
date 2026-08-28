@@ -41,12 +41,13 @@ GBRAIN_ASSETS="$SOURCE_ROOT/guidance/gbrain-reusable-assets.index.json"
 ASSET_CANDIDATES="$SOURCE_ROOT/guidance/reusable-assets.candidates.json"
 CAPABILITY_MATRIX="$SOURCE_ROOT/guidance/worker-capability-matrix.json"
 SOURCE_LEDGER="$SOURCE_ROOT/package/source-ledger.json"
-for required in "$REGISTRY" "$RECONCILIATION_LEDGER" "$ASSETS" "$GBRAIN_ASSETS" "$ASSET_CANDIDATES" "$CAPABILITY_MATRIX" "$SOURCE_LEDGER" "$INTERNAL" "$EVALS"; do
+VENDOR_SOURCES="$SOURCE_ROOT/guidance/vendor-sources.json"
+for required in "$REGISTRY" "$RECONCILIATION_LEDGER" "$ASSETS" "$GBRAIN_ASSETS" "$ASSET_CANDIDATES" "$CAPABILITY_MATRIX" "$SOURCE_LEDGER" "$VENDOR_SOURCES" "$INTERNAL" "$EVALS"; do
   [ -e "$required" ] || { echo "ERROR: required skill-bundle source missing: $required" >&2; exit 1; }
 done
 
 # Validate the complete knowledge bundle before mutating active Major state.
-REGISTRY_VERSION="$(python3 - "$REGISTRY" "$INTERNAL" "$EVALS" "$ASSETS" <<'PY'
+REGISTRY_VERSION="$(python3 - "$REGISTRY" "$INTERNAL" "$EVALS" "$ASSETS" "$VENDOR_SOURCES" <<'PY'
 import json
 import re
 import sys
@@ -56,6 +57,7 @@ registry_path = Path(sys.argv[1])
 internal_root = Path(sys.argv[2])
 evals_root = Path(sys.argv[3])
 assets_path = Path(sys.argv[4])
+vendor_sources_path = Path(sys.argv[5])
 registry = json.loads(registry_path.read_text())
 version = registry.get('version')
 entries = registry.get('entries')
@@ -76,6 +78,18 @@ for entry in entries:
         internal_ids.append(skill_id)
 if len(ids) != len(set(ids)):
     raise SystemExit('ERROR: duplicate Major skill ids in registry')
+
+vendor_catalog = json.loads(vendor_sources_path.read_text())
+if vendor_catalog.get('schemaVersion') != 1 or vendor_catalog.get('kind') != 'major.vendor-skill-sources' or not isinstance(vendor_catalog.get('sources'), list):
+    raise SystemExit('ERROR: invalid vendor skill source catalog')
+vendor_sources = {source.get('id'): source for source in vendor_catalog['sources'] if isinstance(source, dict)}
+for entry in entries:
+    if entry.get('sourceKind') != 'VENDOR_LIVE':
+        continue
+    source = vendor_sources.get(entry.get('source'))
+    skills = source.get('skills', []) if isinstance(source, dict) else []
+    if not any(isinstance(skill, dict) and skill.get('id') == entry.get('vendorSkill') for skill in skills):
+        raise SystemExit(f"ERROR: vendor registry entry is missing from vendor catalog: {entry.get('id')}")
 
 installed = sorted(
     path.name for path in internal_root.iterdir()
@@ -158,6 +172,7 @@ mkdir -p "$STAGED/guidance" "$STAGED/package" "$STAGED/skills" "$STAGED/evals"
 cp "$REGISTRY" "$STAGED/guidance/skills.registry.json"
 cp "$RECONCILIATION_LEDGER" "$STAGED/guidance/skills-reconciliation-ledger.json"
 cp "$CAPABILITY_MATRIX" "$STAGED/guidance/worker-capability-matrix.json"
+cp "$VENDOR_SOURCES" "$STAGED/guidance/vendor-sources.json"
 cp "$SOURCE_LEDGER" "$STAGED/package/source-ledger.json"
 cp "$ASSETS" "$STAGED/guidance/reusable-assets.registry.json"
 cp "$GBRAIN_ASSETS" "$STAGED/guidance/gbrain-reusable-assets.index.json"

@@ -59,6 +59,7 @@ describe('Major hot skill sync', () => {
     const current = join(home, 'skill-bundles', 'current');
     expect(existsSync(join(current, 'bundle.json'))).toBe(true);
     expect(existsSync(join(current, 'guidance', 'skills.registry.json'))).toBe(true);
+    expect(existsSync(join(current, 'guidance', 'vendor-sources.json'))).toBe(true);
     expect(existsSync(join(current, 'guidance', 'skills-reconciliation-ledger.json'))).toBe(true);
     expect(existsSync(join(current, 'guidance', 'reusable-assets.registry.json'))).toBe(true);
     expect(existsSync(join(current, 'templates', 'project', 'GOAL_STATE.md'))).toBe(true);

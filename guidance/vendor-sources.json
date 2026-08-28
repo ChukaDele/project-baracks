@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "kind": "major.vendor-skill-sources",
+  "sources": [
+    {
+      "id": "vercel-agent-skills",
+      "kind": "VENDOR_LIVE",
+      "vendor": "Vercel",
+      "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+      "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+      "revision": "main",
+      "version": null,
+      "lastChecked": "2026-08-28T05:36:32.974Z",
+      "freshnessTtlMs": 86400000,
+      "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+      "licenseStatus": "DECLARED_REFERENCE_ONLY",
+      "provenance": "Official Vercel Agent Skills documentation and vercel-labs/agent-skills repository. Major stores metadata and references only; it does not copy vendor skill bodies.",
+      "supportedClients": ["codex", "claude-code", "cursor", "orca-hosted"],
+      "resolverDomains": [
+        "vercel",
+        "nextjs",
+        "react",
+        "react-native",
+        "web-performance",
+        "web-design",
+        "deployment"
+      ],
+      "availability": "available",
+      "degradedReason": null,
+      "skills": [
+        {
+          "id": "vercel-optimize",
+          "version": "1.2.0",
+          "harvestDecision": "USE_LIVE",
+          "classification": "actionable-skill",
+          "title": "Vercel Optimize",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-optimize/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/vercel-optimize/SKILL.md",
+          "keywords": [
+            "vercel",
+            "optimization",
+            "performance",
+            "cost",
+            "reliability",
+            "caching",
+            "functions",
+            "billing"
+          ],
+          "sections": [
+            {
+              "id": "metrics-first",
+              "title": "Pipeline",
+              "keywords": ["metrics", "measure", "performance", "cost", "latency"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-optimize/SKILL.md#pipeline"
+            },
+            {
+              "id": "investigate",
+              "title": "Stop on blockers",
+              "keywords": ["route", "files", "investigate", "bottleneck", "caching"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-optimize/SKILL.md#11-stop-on-blockers"
+            }
+          ]
+        },
+        {
+          "id": "vercel-react-best-practices",
+          "version": "1.0.0",
+          "harvestDecision": "USE_LIVE",
+          "classification": "knowledge-index",
+          "title": "Vercel React Best Practices",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-best-practices/SKILL.md",
+          "keywords": ["react", "nextjs", "next", "performance", "rendering", "bundle", "server"],
+          "sections": [
+            {
+              "id": "when-to-apply",
+              "title": "When to Apply",
+              "keywords": ["react", "nextjs", "components", "pages", "data fetching"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/SKILL.md#when-to-apply"
+            },
+            {
+              "id": "rule-categories",
+              "title": "Rule Categories by Priority",
+              "keywords": ["rules", "categories", "performance", "react", "nextjs"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/SKILL.md#rule-categories-by-priority"
+            }
+          ]
+        },
+        {
+          "id": "web-design-guidelines",
+          "version": "1.0.0",
+          "harvestDecision": "USE_LIVE",
+          "classification": "knowledge-index",
+          "title": "Web Design Guidelines",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/web-design-guidelines/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md",
+          "keywords": ["web", "design", "accessibility", "ux", "performance", "interface"],
+          "sections": [
+            {
+              "id": "interactions",
+              "title": "Interactions",
+              "keywords": ["accessibility", "keyboard", "screen", "contrast", "aria"],
+              "referenceUrl": "https://github.com/vercel-labs/web-interface-guidelines/blob/main/command.md#interactions"
+            },
+            {
+              "id": "animations",
+              "title": "Animations",
+              "keywords": ["performance", "ux", "loading", "animation", "motion", "responsive"],
+              "referenceUrl": "https://github.com/vercel-labs/web-interface-guidelines/blob/main/command.md#animations"
+            }
+          ]
+        },
+        {
+          "id": "writing-guidelines",
+          "version": "1.0.0",
+          "harvestDecision": "USE_LIVE",
+          "classification": "knowledge-index",
+          "title": "Writing Guidelines",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/writing-guidelines/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/writing-guidelines/main/command.md",
+          "keywords": ["writing", "copy", "content", "clarity", "voice", "structure"],
+          "sections": [
+            {
+              "id": "voice-and-tone",
+              "title": "Voice & tone",
+              "keywords": ["clarity", "concise", "plain", "specific", "writing", "tone"],
+              "referenceUrl": "https://github.com/vercel-labs/writing-guidelines/blob/main/command.md#voice-and-tone"
+            },
+            {
+              "id": "headings-and-structure",
+              "title": "Headings & structure",
+              "keywords": ["structure", "headings", "scannable", "content", "copy"],
+              "referenceUrl": "https://github.com/vercel-labs/writing-guidelines/blob/main/command.md#headings--structure"
+            }
+          ]
+        },
+        {
+          "id": "vercel-react-native-skills",
+          "version": "1.0.0",
+          "harvestDecision": "USE_LIVE",
+          "classification": "knowledge-index",
+          "title": "Vercel React Native Skills",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-native-skills/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-native-skills/SKILL.md",
+          "keywords": ["react-native", "mobile", "native", "list", "navigation", "animation"],
+          "sections": [
+            {
+              "id": "when-to-apply",
+              "title": "When to Apply",
+              "keywords": ["react-native", "expo", "mobile", "performance", "native"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-native-skills/SKILL.md#when-to-apply"
+            },
+            {
+              "id": "rule-categories",
+              "title": "Rule Categories by Priority",
+              "keywords": ["list", "flashlist", "animation", "navigation", "rendering", "mobile"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-native-skills/SKILL.md#rule-categories-by-priority"
+            }
+          ]
+        },
+        {
+          "id": "vercel-react-view-transitions",
+          "version": "1.0.0",
+          "harvestDecision": "USE_LIVE",
+          "classification": "actionable-skill",
+          "title": "React View Transitions",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-view-transitions/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-view-transitions/SKILL.md",
+          "keywords": ["react", "view", "transition", "animation", "navigation"],
+          "sections": [
+            {
+              "id": "opt-in",
+              "title": "When to Animate",
+              "keywords": ["opt", "enable", "transition", "react", "view"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-view-transitions/SKILL.md#when-to-animate"
+            },
+            {
+              "id": "implementation-workflow",
+              "title": "Implementation Workflow",
+              "keywords": ["transition", "boundary", "navigation", "animation", "state"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-view-transitions/references/implementation.md#implementation-workflow",
+              "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-view-transitions/references/implementation.md"
+            }
+          ]
+        },
+        {
+          "id": "vercel-composition-patterns",
+          "version": "1.0.0",
+          "harvestDecision": "USE_LIVE",
+          "classification": "actionable-skill",
+          "title": "Composition Patterns",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/composition-patterns/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/composition-patterns/SKILL.md",
+          "keywords": ["composition", "react", "component", "compound", "state", "props"],
+          "sections": [
+            {
+              "id": "when-to-apply",
+              "title": "When to Apply",
+              "keywords": ["component", "composition", "compound", "react", "props"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/composition-patterns/SKILL.md#when-to-apply"
+            },
+            {
+              "id": "rule-categories",
+              "title": "Rule Categories by Priority",
+              "keywords": ["state", "ownership", "component", "context", "props", "architecture"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/composition-patterns/SKILL.md#rule-categories-by-priority"
+            }
+          ]
+        },
+        {
+          "id": "deploy-to-vercel",
+          "version": "3.0.0",
+          "harvestDecision": "CONFIGURE",
+          "classification": "actionable-skill",
+          "title": "Deploy to Vercel",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/deploy-to-vercel/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/deploy-to-vercel/SKILL.md",
+          "keywords": ["vercel", "deploy", "deployment", "preview", "claim", "framework"],
+          "sections": [
+            {
+              "id": "project-state",
+              "title": "Step 1: Gather Project State",
+              "keywords": ["framework", "detect", "nextjs", "deployment", "project", "remote", "linked"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/deploy-to-vercel/SKILL.md#step-1-gather-project-state"
+            },
+            {
+              "id": "output",
+              "title": "Output",
+              "keywords": ["preview", "claim", "deploy", "deployment", "vercel"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/deploy-to-vercel/SKILL.md#output"
+            }
+          ]
+        },
+        {
+          "id": "vercel-cli-with-tokens",
+          "version": "1.0.0",
+          "harvestDecision": "CONFIGURE",
+          "classification": "actionable-skill",
+          "title": "Vercel CLI with Tokens",
+          "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-cli-with-tokens/SKILL.md",
+          "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/vercel-cli-with-tokens/SKILL.md",
+          "keywords": ["vercel", "cli", "token", "environment", "deployment", "project", "team"],
+          "sections": [
+            {
+              "id": "locate-token",
+              "title": "Step 1: Locate the Vercel Token",
+              "keywords": ["token", "authentication", "vercel", "environment"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-cli-with-tokens/SKILL.md#step-1-locate-the-vercel-token"
+            },
+            {
+              "id": "locate-project",
+              "title": "Step 2: Locate the Project and Team",
+              "keywords": ["project", "team", "scope", "org", "link", "deployment"],
+              "referenceUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-cli-with-tokens/SKILL.md#step-2-locate-the-project-and-team"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

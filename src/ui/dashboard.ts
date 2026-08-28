@@ -184,6 +184,7 @@ export async function buildMajorDashboard(cwd = process.cwd()): Promise<MajorDas
   let selected: MajorDashboard['skills']['selected'] = [];
   let skillAudit = {
     internal: [],
+    vendor: [],
     duplicateIds: [],
     orphanInternalSkills: [],
   } as ReturnType<typeof auditSkillReachability>;
