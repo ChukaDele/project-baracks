@@ -29,12 +29,14 @@ Substantive. Risk: authority/process semantics. Review: independent.
 
 - Starting candidate `d5735a9` was clean and matched the canonical repository identity.
 - Final-repair starting head `3e94e66` was clean and matched the canonical repository identity.
+- Final implementation head `7385b13` was clean and received the final deterministic gates.
 
 Delivery evidence:
 
 - IMPLEMENTED: proven — pure assessment code exists in `src/domain/sdlc.ts`.
-- TESTED: proven — exact implementation head `4add22e` passed 106/106 ordinary test files and
-  910/910 ordinary tests; the resource run passed 139 tests with 5 expected skips.
+- TESTED: proven — exact implementation head `7385b13` passed 38/38 focused tests, 106/106
+  ordinary test files and 910/910 ordinary tests; the resource run passed 139 tests with 5
+  expected skips and reported the pre-existing 14-ID skill-reachability exception.
 - STAGED: proven — repaired candidate is committed in the isolated exact-head worktree.
 - RESOLVED: proven — all eight task-applicable evidence states have focused regression proof.
 - LOADED: not required — this slice adds no loadable runtime/configuration artifact.
@@ -57,9 +59,9 @@ Delivery evidence:
 
 ## Current status
 
-BUILT. The final review-semantics repair passes focused and relevant deterministic checks. The
-106-file full gate remains evidence for prior implementation head `4add22e`; independent review
-has not run, so VALIDATED is not claimed. Installation and installed behavior remain unproven.
+BUILT. Exact implementation head `7385b13` passed the final focused, ordinary, and resource test
+gates. Independent review has not run, so VALIDATED is not claimed. The candidate has not been
+merged or installed, and installed behavior remains unproven.
 
 Installation proof: unproven.
 Representative installed behaviour proof: unproven.
@@ -92,8 +94,9 @@ installation and installed behavior proof follow normal merge.
   triages without automatically blocking, and NIT/speculation remain advisory.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
-- Final ordinary exact-head gate: 106/106 files and 910/910 tests passed.
-- Final resource exact-head gate: 139 tests passed with 5 expected skips.
+- Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
+- Final ordinary gate for `7385b13`: 106/106 files and 910/910 tests passed.
+- Final resource gate for `7385b13`: 139 tests passed with 5 expected skips.
 - The resource gate also reported one pre-existing skill-reachability failure covering 14 orphan
   writing/brand IDs. It is recorded as an unresolved repository exception, not an SDLC candidate
   failure and not a readiness claim.
