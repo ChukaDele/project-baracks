@@ -311,19 +311,35 @@ function generatedSkillPath(entry: SkillCandidate): string | undefined {
 }
 
 function integrationDisambiguation(entryId: string, task: string): string | undefined {
-  const isShapeRReconstruction =
-    /\bshaper\b/u.test(task) &&
-    /\b(?:reconstruct(?:ion|ing)?|sculpture|object)\b/u.test(task);
   const hasShaperAnalyticsIntent = /\b(?:taleshape|dashboard|analytics|telemetry)\b/u.test(task);
   const hasNetworkShapingIntent =
     /\b(?:network|packet|bandwidth|qdisc|traffic)\b.{0,24}\bshap(?:e|er|ing)\b/u.test(task) ||
     /\bshap(?:e|er|ing)\b.{0,24}\b(?:network|packet|bandwidth|qdisc|traffic)\b/u.test(task);
-  const hasSplatIntent = /\b(?:splat|splatting|reconstruct|reconstruction|colmap|novel[ -]view)\b/u.test(
+  const hasSpatialIntent = /\b(?:splat(?:ting)?|reconstruct(?:ion|ing)?|colmap|novel[ -]views?)\b/u.test(
     task,
   );
+  const hasNegatedSpatialIntent =
+    /\b(?:without|no|not|never|don't|do not|does not|isn't|is not)\b(?:\s+\w+){0,6}\s+\b(?:splat(?:ting)?|reconstruct(?:ion|ing)?|colmap|novel[ -]views?)\b/u.test(
+      task,
+    ) ||
+    /\b(?:splat(?:ting)?|reconstruct(?:ion)?|colmap|novel[ -]views?)\b(?:\s+\w+){0,6}\s+\b(?:unnecessary|unneeded|not needed|not necessary|not required|isn't needed|is not needed|isn't necessary|is not necessary|isn't required|is not required)\b/u.test(
+      task,
+    ) ||
+    /\bnon[- ](?:reconstruct(?:ion)?|splat(?:ting)?)\b/u.test(task);
+  const hasPositiveSpatialIntent = hasSpatialIntent && !hasNegatedSpatialIntent;
+  const hasExplicitGaussianSpatialIntent =
+    /\b(?:gaussian[ -]+splat(?:ting)?|splat(?:ting)?|colmap|novel[ -]views?)\b/u.test(task) &&
+    !hasNegatedSpatialIntent;
+  const isShapeRCapabilityRequest =
+    /\bshaper\b/u.test(task) &&
+    !hasShaperAnalyticsIntent &&
+    !hasNetworkShapingIntent &&
+    /\b(?:reconstruct(?:ion|ing)?|sculpture|object|generate|generation|create|make|build|model|asset|3d|text[ -]prompt)\b/u.test(
+      task,
+    );
   if (
     entryId === 'analytics-with-shaper' &&
-    (isShapeRReconstruction ||
+    (isShapeRCapabilityRequest && !hasExplicitGaussianSpatialIntent ||
       hasNetworkShapingIntent ||
       (!hasShaperAnalyticsIntent &&
         (/\bshap\s+(?:value|explain)/u.test(task) ||
@@ -333,8 +349,9 @@ function integrationDisambiguation(entryId: string, task: string): string | unde
   }
   if (
     entryId === 'gaussian-splatting-spatial-reconstruction' &&
-    (isShapeRReconstruction ||
-      (!hasSplatIntent &&
+    (hasNegatedSpatialIntent ||
+      (isShapeRCapabilityRequest && !hasExplicitGaussianSpatialIntent) ||
+      (!hasPositiveSpatialIntent &&
         (/gaussian.{0,20}(?:blur|filter|noise|distribution|kernel|process)/u.test(task) ||
           /(?:blur|filter|noise|distribution|kernel|process).{0,20}gaussian/u.test(task) ||
           /gaussian.{0,20}(?:scatter|chart|plot)/u.test(task))))

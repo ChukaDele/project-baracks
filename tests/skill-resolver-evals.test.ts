@@ -99,4 +99,27 @@ describe('skill resolver fixtures', () => {
     }).skills.map((skill) => skill.id);
     expect(scatterPlot).not.toContain('analytics-with-shaper');
   });
+
+  it('guards negative spatial intent and generic ShapeR generation semantically', () => {
+    const cases = [
+      [
+        'Create a point cloud of a sculpture without reconstruction or rendering.',
+        ['concept-synthesis', 'worktree'],
+      ],
+      ['No reconstruction is needed; inspect a sculpture point cloud.', []],
+      ['Do not reconstruct the sculpture; export its point cloud.', ['presentation-storylining']],
+      ['Reconstruction is unnecessary; inspect the point cloud.', []],
+      ['Do not use splatting or novel-view rendering; export the point cloud.', ['idea-lineage']],
+      [
+        'Do not use COLMAP; inspect the existing point cloud.',
+        ['project-context-integrity', 'seo-os', 'skill-harvest', 'skill-resolver'],
+      ],
+      ['Use ShapeR to make a 3D model.', []],
+      ['Generate a 3D asset with ShapeR from a text prompt.', ['reusable-asset-discovery']],
+    ] as const;
+
+    for (const [task, expected] of cases) {
+      expect(skillIds(task), task).toEqual(expected);
+    }
+  });
 });
