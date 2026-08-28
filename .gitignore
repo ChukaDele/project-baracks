@@ -9,3 +9,5 @@ dist/
 *.log
 .DS_Store
 .major-ingest/
+shaper-dashboards/major-command-centre.csv
+shaper-dashboards/major-run-telemetry.csv

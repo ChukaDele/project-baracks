@@ -7,6 +7,9 @@
   ],
   "should_not_trigger": [
     "Configure the Linux network shaper to cap packet bandwidth.",
+    "Use ShapeR to reconstruct a sculpture.",
+    "Use 3D ShapeR to reconstruct a sculpture.",
+    "Use a network shaper to cap telemetry packet bandwidth.",
     "Explain the classifier's output with SHAP values.",
     "Generate a 3D object with Meta ShapeR from a text prompt."
   ],

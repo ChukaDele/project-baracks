@@ -18,6 +18,10 @@ const fixtures = readdirSync(root)
   .sort()
   .map((name) => JSON.parse(readFileSync(join(root, name), 'utf8')) as Fixture);
 
+function skillIds(task: string): string[] {
+  return resolveSkills({ task, limit: 12 }).skills.map((skill) => skill.id);
+}
+
 beforeEach(() => {
   process.env.MAJOR_SKILLS_REGISTRY = registry;
   process.env.MAJOR_SKILLS_EVALS = root;
@@ -35,15 +39,31 @@ describe('skill resolver fixtures', () => {
     'retrieves $skill for every positive and excludes every negative',
     (fixture) => {
       for (const task of fixture.should_trigger) {
-        const ids = resolveSkills({ task, limit: 12 }).skills.map((skill) => skill.id);
+        const ids = skillIds(task);
         expect(ids, task).toContain(fixture.skill);
       }
       for (const task of fixture.should_not_trigger) {
-        const ids = resolveSkills({ task, limit: 12 }).skills.map((skill) => skill.id);
+        const ids = skillIds(task);
         expect(ids, task).not.toContain(fixture.skill);
       }
     },
   );
+
+  it('excludes both specialist skills for ShapeR reconstruction and analytics for network shaping', () => {
+    const shapeRTasks = [
+      'Use ShapeR to reconstruct a sculpture.',
+      'Use 3D ShapeR to reconstruct a sculpture.',
+    ];
+    for (const task of shapeRTasks) {
+      const ids = skillIds(task);
+      expect(ids, task).not.toContain('analytics-with-shaper');
+      expect(ids, task).not.toContain('gaussian-splatting-spatial-reconstruction');
+    }
+
+    const networkShaperTask = 'Use a network shaper to cap telemetry packet bandwidth.';
+    const ids = skillIds(networkShaperTask);
+    expect(ids, networkShaperTask).not.toContain('analytics-with-shaper');
+  });
 
   it('disambiguates the required held-out Shaper and Gaussian phrases', () => {
     const gaussianPositive = resolveSkills({

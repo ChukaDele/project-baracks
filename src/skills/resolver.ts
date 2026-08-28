@@ -311,26 +311,29 @@ function generatedSkillPath(entry: SkillCandidate): string | undefined {
 }
 
 function integrationDisambiguation(entryId: string, task: string): string | undefined {
-  const isMetaShapeR = /\bmeta\s+shaper\b/u.test(task);
+  const isShapeRReconstruction =
+    /\bshaper\b/u.test(task) &&
+    /\b(?:reconstruct(?:ion|ing)?|sculpture|object)\b/u.test(task);
   const hasShaperAnalyticsIntent = /\b(?:taleshape|dashboard|analytics|telemetry)\b/u.test(task);
+  const hasNetworkShapingIntent =
+    /\b(?:network|packet|bandwidth|qdisc|traffic)\b.{0,24}\bshap(?:e|er|ing)\b/u.test(task) ||
+    /\bshap(?:e|er|ing)\b.{0,24}\b(?:network|packet|bandwidth|qdisc|traffic)\b/u.test(task);
   const hasSplatIntent = /\b(?:splat|splatting|reconstruct|reconstruction|colmap|novel[ -]view)\b/u.test(
     task,
   );
   if (
     entryId === 'analytics-with-shaper' &&
-    (isMetaShapeR ||
+    (isShapeRReconstruction ||
+      hasNetworkShapingIntent ||
       (!hasShaperAnalyticsIntent &&
-        (/(?:network|packet|bandwidth|qdisc).{0,24}shap(?:e|er|ing)|shap(?:e|er|ing).{0,24}(?:network|packet|bandwidth|qdisc)/u.test(
-          task,
-        ) ||
-          /\bshap\s+(?:value|explain)/u.test(task) ||
+        (/\bshap\s+(?:value|explain)/u.test(task) ||
           /(?:scatter\s+plot|scatterplot)/u.test(task))))
   ) {
     return 'disambiguated a non-analytics Shaper meaning';
   }
   if (
     entryId === 'gaussian-splatting-spatial-reconstruction' &&
-    (isMetaShapeR ||
+    (isShapeRReconstruction ||
       (!hasSplatIntent &&
         (/gaussian.{0,20}(?:blur|filter|noise|distribution|kernel|process)/u.test(task) ||
           /(?:blur|filter|noise|distribution|kernel|process).{0,20}gaussian/u.test(task) ||
