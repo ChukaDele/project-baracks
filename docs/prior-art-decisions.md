@@ -259,3 +259,46 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Major-specific layer retained:** GBrain and project brains, semantic resolver and skill lifecycle, authorization/policy, provider/account readiness, task continuity, append-only run insights, conservative learning and historical evidence.
 - **Rejected alternatives:** extend DSH, make Lima the permanent runtime, create a replacement harness, create a second memory store, make Langfuse a prerequisite, or rebuild an IDE/worktree/terminal/browser UI inside Major.
 - **Evidence:** existing `src/security/gateway.ts`, `src/security/major-gateway.ts`, `src/providers/*` adapters, `src/supervisor/runtime.ts`, Orca CLI/runtime 1.4.190 with the target repository registered, and the retained DSH performance receipt.
+
+## 2026-08-28 — progressive client context disclosure
+
+- **Capability:** bounded, evidence-qualified context retrieval for existing Major clients
+- **Candidates:** return the complete `MajorDashboard`; create a vector store or second memory service; wrap the existing dashboard with deterministic section/detail budgets
+- **Decision:** WRAP the existing dashboard with a pure context-pack projection. BORROW progressive disclosure, evidence labels, and deterministic whole-section shedding. Do not add a retriever, memory store, agent loop, or runtime dependency.
+- **Reason:** the dashboard already joins project state, GBrain, selected skills, execution, resource telemetry, and compact run history. The missing boundary was caller-controlled disclosure and a hard serialized-byte ceiling, not another source of truth.
+- **Major-specific layer retained:** GBrain authority, project-local memory hygiene, deterministic skill resolver, persisted evidence-qualified run observations, MCP tool name, containment, and the thin DSH/host runtime split.
+- **Rejected alternatives:** embedding/vector retrieval for a six-section local projection; copying dashboard state into a new cache; model-ranked context selection; changing resource reclamation or provider execution.
+- **Evidence:** `src/context/context-pack.ts`, the optional `major_context` input schema in `src/mcp/server.ts`, and the deterministic acceptance case in `tests/mcp-server.test.ts`.
+
+## 2026-08-28 — GBrain workflow donor disposition
+
+Donor identity evidence: the requested read-only checkout path is `/Users/chukwuka/gbrain`, revision `d941e9f918236c33e10e42d8a4223f36789b02c9` on `master`, package `gbrain` version `0.45.12.0`. Its `LICENSE` is MIT (copyright 2026 Garry Tan). The exact inspected skill paths are recorded in `package/source-ledger.json`. No source payload was copied; the contracts below are independent Major localizations. GBrain remains the organizational brain for knowledge and provenance, while Major remains the control plane for authority, execution, skills and evidence-qualified learning.
+
+The user brief names `skill-harvest` and `knowledge-ingest`; their provenance in the reviewed donor checkout is `skillpack-harvest` and `ingest`, respectively. The aliases below identify the requested capabilities without implying that either donor workflow was added to Major.
+
+| Donor | Disposition | Overlap and boundary | Evidence |
+| --- | --- | --- | --- |
+| `skill-optimizer` 0.1.0 | **MERGE** | Merge only its evidence gates into Major's existing `skillify`: baseline before change, median of three comparable runs, 5% inconclusive band, held-out tasks for bundled mutations, cost preflight and proposal-only output without mutation authority. Do not copy its skill or runtime. | Supplied donor observation; `skills/internal/skillify/SKILL.md` and `scripts/validate-skills.mjs`. |
+| `skill-harvest` (donor checkout: `skillpack-harvest`) | **ADD** | Add a Major-native prior-art-to-skill workflow over the existing resolver, lifecycle and `skillify`; retain licence/provenance review and duplicate prevention. No donor content or GBrain page writer is copied. | `skills/internal/skill-harvest/SKILL.md`; `skills/internal/skillify/SKILL.md`. |
+| `strategic-reading` | **ADD** | Add a problem-applied reading contract that extracts mechanisms, limits, contradictions, actions and indicators; durable meaning is handed to existing GBrain interfaces. | `skills/internal/strategic-reading/SKILL.md`; `skills/internal/source-ingestion/SKILL.md`. |
+| `idea-lineage` | **ADD** | Add an on-demand view over provenance and temporal facts. It never rewrites raw sources or invents missing history and introduces no store. | `skills/internal/idea-lineage/SKILL.md`; `src/knowledge/semantics.ts`. |
+| `concept-synthesis` | **ADD** | Add evidence-qualified, reversible synthesis over existing GBrain knowledge, preserving minority and abandoned branches; no embedding-only merge or new concept store. | `skills/internal/concept-synthesis/SKILL.md`; `src/knowledge/semantics.ts`. |
+| `knowledge-ingest` (donor checkout: `ingest`) | **ADD** | Add one Major dispatcher that classifies and dedupes inputs, separates source claims from conclusions and routes notable durable meaning through existing GBrain interfaces. It owns no page store. | `skills/internal/knowledge-ingest/SKILL.md`; `src/knowledge/semantics.ts`. |
+| `research-compendium` | **ADD** | Add a reusable structured research-asset contract containing citations and derived knowledge, never copyrighted full text; GBrain remains storage authority. | `skills/internal/research-compendium/SKILL.md`. |
+| `academic-verify` | **ADD** | Add provider-neutral, warranted verification from claim through methodology, results, limitations and replication/contradiction, with distinct evidence-strength judgments. | `skills/internal/academic-verify/SKILL.md`. |
+| `cross-modal-review` | **MERGE** | Strengthen the existing skill: deterministic checks first, independent provider diversity when expected value warrants it, preserve disagreements, and prohibit implementer self-certification. | `skills/internal/cross-modal-review/SKILL.md`. |
+| `functional-area-resolver` | **MERGE** | Merge aliases, positive/negative/near-neighbour evidence into Major's single canonical resolver while preserving HOT/ACTIVE/DORMANT disclosure. No second resolver is introduced. | `src/skills/resolver.ts`; `evals/skill-resolver/*.json`. |
+| `minion-orchestrator` | **MERGE** | Merge only deterministic-versus-reasoning execution classification into existing Major routing; mechanical checks use tools without unnecessary model calls. Reject its queue, scheduler and runtime. | `skills/internal/skill-harvest/SKILL.md`; existing Major supervisor and resolver. |
+
+These are independently authored Major workflow contracts, not copied donor implementations. GBrain remains the durable organizational meaning/provenance authority; Major remains control plane and routing authority. No page writer, archive store, provider lock-in, queue, scheduler, resolver, orchestration runtime or storage substrate is imported. The merges do not infer causality from correlation or permit one observation to become durable policy.
+
+## 2026-08-28 — safe stale resource lease reclaim
+
+- **Capability:** safely reclaim stale resource leases without introducing a second resource authority or execution substrate
+- **Date:** 2026-08-28
+- **Candidates:** Major's existing locked file-backed resource store and worker lifecycle; BullMQ/Redis lease patterns; external schedulers; a second queue or dedicated lease service
+- **Decision:** WRAP Major's existing locked file store. BORROW TTL, heartbeat, grace-period, live-PID, fencing and atomic-reclaim principles. Do not adopt BullMQ/Redis, a second queue, a new scheduler, or a new platform/framework/runtime.
+- **Reason:** Major already has the sufficient resource store, queue and guarded worker lifecycle. BullMQ/Redis demonstrates mature expiring-lock and stalled-worker recovery patterns, while external schedulers demonstrate lease renewal and fenced ownership, but adopting either substrate would duplicate existing authority. The current DSH evidence showed high infrastructure wait, so adding infrastructure to the critical path would worsen the observed problem rather than close the stale-lease gap. The task also explicitly forbids a new platform, framework or runtime.
+- **Major-specific layer retained:** the locked file store, canonical resource ownership and queue, worker heartbeat/lifecycle integration, process-liveness checks, gateway containment, and atomic reclaim under the existing lock
+- **Rejected alternatives:** BullMQ/Redis; a Redis-backed lease service; a second queue; an external scheduler; an unfenced time-only reclaim; a new platform, framework or runtime
+- **Evidence:** `src/supervisor/resources.ts`, `tests/resources.test.ts`, `tests/worker-resource-lifecycle.test.ts`, `src/supervisor/worker.ts`, `src/security/major-gateway.ts`, and the retained DSH performance evidence showing high infrastructure wait.

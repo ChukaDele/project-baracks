@@ -1,0 +1,16 @@
+{
+  "skill": "research-compendium",
+  "should_trigger": [
+    "Build a research-compendium with a source index, claim map, contradictions, uncertainty and freshness.",
+    "Turn this research into a reusable cited dossier linked to the project and entities.",
+    "Update the compendium findings without storing copyrighted full text."
+  ],
+  "should_not_trigger": [
+    "Find one source for this fact.",
+    "Write a literature-free project status note.",
+    "Download and archive the full books."
+  ],
+  "conflicts": [
+    "knowledge-ingest routes durable inputs; research-compendium structures a bounded reusable research asset."
+  ]
+}

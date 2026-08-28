@@ -1,0 +1,5 @@
+{
+  "skill": "data-learning-loop",
+  "should_trigger": ["Use data-learning-loop for this task."],
+  "should_not_trigger": ["This unrelated request must not activate data learning loop workflow."]
+}

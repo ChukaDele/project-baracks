@@ -1,0 +1,16 @@
+{
+  "skill": "skill-harvest",
+  "should_trigger": [
+    "Use skill-harvest to assess this donor capability before building anything.",
+    "Discover mature prior art and decide whether to integrate it or harvest only the generic pattern.",
+    "Compare our existing skill with this upstream capability, including licence and provenance, then propose activation evidence."
+  ],
+  "should_not_trigger": [
+    "Turn the already proven local workflow into a skill.",
+    "Search this repository for a misspelled function.",
+    "Summarize the pasted article."
+  ],
+  "conflicts": [
+    "prior-art-discovery locates candidates; skill-harvest owns capability disposition through evidence-gated skill activation; skillify owns packaging a procedure already proven locally."
+  ]
+}

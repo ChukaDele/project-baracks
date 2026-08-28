@@ -40,6 +40,9 @@ export const GLOBAL_RESOURCE_LIMITS: ResourceLimits = {
 
 export interface ResourceLease {
   id: string;
+  taskId: string;
+  resourceId: string;
+  fencingToken: string;
   kind: ResourceKind;
   owner: string;
   project?: string | undefined;
@@ -48,11 +51,17 @@ export interface ResourceLease {
   pid?: number | undefined;
   createdAt: string;
   heartbeatAt: string;
+  ttlMs: number;
   expiresAt: string;
+  graceMs: number;
+  reclaimAfter: string;
 }
 
 export interface QueuedResourceRequest {
   id: string;
+  taskId: string;
+  resourceId: string;
+  fencingToken: string;
   kind: ResourceKind;
   owner: string;
   project?: string | undefined;
@@ -68,6 +77,15 @@ interface ResourceStore {
   version: 1;
   leases: ResourceLease[];
   queue: QueuedResourceRequest[];
+  reclaimTelemetry?: ResourceReclaimTelemetry;
+}
+
+export interface ResourceReclaimTelemetry {
+  total: number;
+  expired: number;
+  deadProcess: number;
+  lastReclaimedAt?: string | undefined;
+  lastReclaimedLeaseIds: string[];
 }
 
 export interface ResourceTelemetry {
@@ -78,6 +96,7 @@ export interface ResourceTelemetry {
   queued: number;
   memoryAvailablePercent: number;
   memorySoftFloorPercent: number;
+  reclaims: ResourceReclaimTelemetry;
 }
 
 export type ResourceRequestResult =
@@ -90,6 +109,7 @@ const DEFAULT_TTL_MS: Record<ResourceKind, number> = {
   browser: 15 * 60 * 1000,
   build: 20 * 60 * 1000,
 };
+export const RESOURCE_RECLAIM_GRACE_MS = 60_000;
 const LOCK_TIMEOUT_MS = 5_000;
 const STALE_LOCK_MS = 30_000;
 const sleepArray = new Int32Array(new SharedArrayBuffer(4));
@@ -101,7 +121,61 @@ function storePath(): string {
 }
 
 function emptyStore(): ResourceStore {
-  return { version: 1, leases: [], queue: [] };
+  return { version: 1, leases: [], queue: [], reclaimTelemetry: emptyReclaimTelemetry() };
+}
+
+function emptyReclaimTelemetry(): ResourceReclaimTelemetry {
+  return { total: 0, expired: 0, deadProcess: 0, lastReclaimedLeaseIds: [] };
+}
+
+/** Stable compatibility identities for callers and v1 records created before
+ * task/resource/fencing identity became explicit. They derive only from
+ * existing persisted identity and do not introduce another authority. */
+function fallbackTaskId(owner: string): string {
+  return `legacy:task:${owner}`;
+}
+
+function fallbackResourceId(kind: ResourceKind, project?: string): string {
+  return `legacy:resource:${kind}:${project ?? 'global'}`;
+}
+
+function fallbackFencingToken(id: string): string {
+  return `legacy:fence:${id}`;
+}
+
+/** The only compatibility path for pre-fencing persisted v1 records. It
+ * assigns deterministic migration tokens while loading the legacy store; all
+ * public authorization boundaries still require the resulting token. */
+function migrateLegacyResourceStore(parsed: ResourceStore): ResourceStore {
+  parsed.leases = parsed.leases.map((lease) => {
+    const derivedTtlCandidate = Date.parse(lease.expiresAt) - Date.parse(lease.heartbeatAt);
+    const derivedTtlMs = Number.isFinite(derivedTtlCandidate)
+      ? Math.max(1, derivedTtlCandidate)
+      : DEFAULT_TTL_MS[lease.kind];
+    const ttlMs = Number.isFinite(lease.ttlMs) && lease.ttlMs > 0 ? lease.ttlMs : derivedTtlMs;
+    const graceMs =
+      Number.isFinite(lease.graceMs) && lease.graceMs >= 0
+        ? lease.graceMs
+        : RESOURCE_RECLAIM_GRACE_MS;
+    return {
+      ...lease,
+      taskId: lease.taskId ?? fallbackTaskId(lease.owner),
+      resourceId: lease.resourceId ?? fallbackResourceId(lease.kind, lease.project),
+      fencingToken: lease.fencingToken ?? fallbackFencingToken(lease.id),
+      ttlMs,
+      graceMs,
+      reclaimAfter: Number.isFinite(Date.parse(lease.reclaimAfter))
+        ? lease.reclaimAfter
+        : new Date(Date.parse(lease.expiresAt) + graceMs).toISOString(),
+    };
+  });
+  parsed.queue = parsed.queue.map((request) => ({
+    ...request,
+    taskId: request.taskId ?? fallbackTaskId(request.owner),
+    resourceId: request.resourceId ?? fallbackResourceId(request.kind, request.project),
+    fencingToken: request.fencingToken ?? fallbackFencingToken(request.id),
+  }));
+  return parsed;
 }
 
 function readStore(): ResourceStore {
@@ -111,7 +185,9 @@ function readStore(): ResourceStore {
   if (parsed.version !== 1 || !Array.isArray(parsed.leases) || !Array.isArray(parsed.queue)) {
     throw new Error(`invalid Major resource store: ${path}`);
   }
-  return parsed;
+  // In-place schema extension: old v1 stores remain readable and acquire the
+  // explicit freshness contract on their next supported store operation.
+  return migrateLegacyResourceStore(parsed);
 }
 
 function writeStore(store: ResourceStore): void {
@@ -162,8 +238,8 @@ function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 
@@ -193,11 +269,39 @@ export function currentResourceLimits(): ResourceLimits {
   return { ...GLOBAL_RESOURCE_LIMITS, workers };
 }
 
-function prune(store: ResourceStore, now = Date.now()): void {
+function leaseReclaimAfter(lease: ResourceLease): number {
+  const explicit = Date.parse(lease.reclaimAfter);
+  return Number.isFinite(explicit)
+    ? explicit
+    : Date.parse(lease.expiresAt) + RESOURCE_RECLAIM_GRACE_MS;
+}
+
+function leaseIsActive(lease: ResourceLease, now = Date.now()): boolean {
+  return now < leaseReclaimAfter(lease) || (lease.pid !== undefined && pidAlive(lease.pid));
+}
+
+/** Reclaim is decided and committed while holding the resource-store lock.
+ * A live process always wins over wall-clock staleness, and the grace window
+ * gives an active owner time to renew after a delayed heartbeat. */
+function prune(store: ResourceStore, now = Date.now()): ResourceReclaimTelemetry {
+  const reclaimed: { id: string; reason: 'expired' | 'deadProcess' }[] = [];
   store.leases = store.leases.filter((lease) => {
-    if (Date.parse(lease.expiresAt) <= now) return false;
-    return lease.pid === undefined || pidAlive(lease.pid);
+    if (leaseIsActive(lease, now)) return true;
+    reclaimed.push({ id: lease.id, reason: lease.pid === undefined ? 'expired' : 'deadProcess' });
+    return false;
   });
+  if (reclaimed.length > 0) {
+    const prior = store.reclaimTelemetry ?? emptyReclaimTelemetry();
+    store.reclaimTelemetry = {
+      total: prior.total + reclaimed.length,
+      expired: prior.expired + reclaimed.filter((item) => item.reason === 'expired').length,
+      deadProcess:
+        prior.deadProcess + reclaimed.filter((item) => item.reason === 'deadProcess').length,
+      lastReclaimedAt: new Date(now).toISOString(),
+      lastReclaimedLeaseIds: reclaimed.map((item) => item.id),
+    };
+  }
+  return store.reclaimTelemetry ?? emptyReclaimTelemetry();
 }
 
 function countKind(store: ResourceStore, kind: ResourceKind): number {
@@ -217,6 +321,7 @@ function telemetry(
     queued: store.queue.length,
     memoryAvailablePercent: memoryAvailable,
     memorySoftFloorPercent: limits.softMemoryAvailablePercent,
+    reclaims: { ...(store.reclaimTelemetry ?? emptyReclaimTelemetry()) },
   };
 }
 
@@ -240,12 +345,18 @@ function capacityReason(
 function leaseFrom(request: QueuedResourceRequest, now = Date.now()): ResourceLease {
   return {
     id: `lease_${randomUUID()}`,
+    taskId: request.taskId,
+    resourceId: request.resourceId,
+    fencingToken: request.fencingToken,
     kind: request.kind,
     owner: request.owner,
     depth: request.depth,
     createdAt: new Date(now).toISOString(),
     heartbeatAt: new Date(now).toISOString(),
+    ttlMs: request.ttlMs,
     expiresAt: new Date(now + request.ttlMs).toISOString(),
+    graceMs: RESOURCE_RECLAIM_GRACE_MS,
+    reclaimAfter: new Date(now + request.ttlMs + RESOURCE_RECLAIM_GRACE_MS).toISOString(),
     ...(request.project ? { project: request.project } : {}),
     ...(request.parentLeaseId ? { parentLeaseId: request.parentLeaseId } : {}),
     ...(request.pid !== undefined ? { pid: request.pid } : {}),
@@ -298,11 +409,16 @@ function requestDepth(
 export function requestResource(input: {
   kind: ResourceKind;
   owner: string;
+  taskId?: string;
+  resourceId?: string;
   project?: string;
   parentLeaseId?: string;
   pid?: number;
   ttlMs?: number;
 }): ResourceRequestResult {
+  if (input.ttlMs !== undefined && (!Number.isFinite(input.ttlMs) || input.ttlMs <= 0)) {
+    throw new Error('resource lease TTL must be greater than zero');
+  }
   return withStoreLock((store) => {
     const memoryAvailable = availableMemoryPercent();
     const limits = currentResourceLimits();
@@ -338,6 +454,9 @@ export function requestResource(input: {
     }
     const request: QueuedResourceRequest = {
       id: `request_${randomUUID()}`,
+      taskId: input.taskId ?? fallbackTaskId(input.owner),
+      resourceId: input.resourceId ?? fallbackResourceId(input.kind, input.project),
+      fencingToken: `fence_${randomUUID()}`,
       kind: input.kind,
       owner: input.owner,
       depth: depth.depth,
@@ -382,9 +501,30 @@ export function resourceSnapshot(): {
   });
 }
 
+/** Explicit supported repair path. Reclamation and queue promotion are one
+ * locked transaction, so a concurrent heartbeat cannot lose its lease between
+ * classification and removal. */
+export function reclaimStaleResources(): {
+  reclaimedLeaseIds: string[];
+  telemetry: ResourceTelemetry;
+} {
+  return withStoreLock((store) => {
+    const before = store.reclaimTelemetry?.total ?? 0;
+    const memoryAvailable = availableMemoryPercent();
+    const limits = currentResourceLimits();
+    const reclaims = prune(store);
+    promoteQueued(store, memoryAvailable, limits);
+    return {
+      reclaimedLeaseIds: reclaims.total > before ? [...reclaims.lastReclaimedLeaseIds] : [],
+      telemetry: telemetry(store, memoryAvailable, limits),
+    };
+  });
+}
+
 /** Exact active capacity fence used by staged validation admission. */
 export function assertActiveResourceLease(input: {
   leaseId: string;
+  fencingToken: string;
   kind: ResourceKind;
   owner: string;
   pid: number;
@@ -394,6 +534,8 @@ export function assertActiveResourceLease(input: {
     const lease = store.leases.find((candidate) => candidate.id === input.leaseId);
     if (
       !lease ||
+      !leaseIsActive(lease) ||
+      lease.fencingToken !== input.fencingToken ||
       lease.kind !== input.kind ||
       lease.owner !== input.owner ||
       lease.pid !== input.pid
@@ -407,13 +549,20 @@ export function assertActiveResourceLease(input: {
 /** Active process fence for a supervised Workshop run whose random owner is not authority. */
 export function assertActiveResourceLeaseForProcess(input: {
   leaseId: string;
+  fencingToken: string;
   kind: ResourceKind;
   pid: number;
 }): ResourceLease {
   return withStoreLock((store) => {
     prune(store);
     const lease = store.leases.find((candidate) => candidate.id === input.leaseId);
-    if (!lease || lease.kind !== input.kind || lease.pid !== input.pid) {
+    if (
+      !lease ||
+      !leaseIsActive(lease) ||
+      lease.fencingToken !== input.fencingToken ||
+      lease.kind !== input.kind ||
+      lease.pid !== input.pid
+    ) {
       throw new Error(
         `resource lease is not the active ${input.kind} process fence: ${input.leaseId}`,
       );
@@ -422,21 +571,35 @@ export function assertActiveResourceLeaseForProcess(input: {
   });
 }
 
-export function heartbeatResource(leaseId: string, ttlMs?: number): ResourceLease {
+export function heartbeatResource(
+  leaseId: string,
+  fencingToken: string,
+  ttlMs?: number,
+): ResourceLease {
   return withStoreLock((store) => {
     prune(store);
     const lease = store.leases.find((candidate) => candidate.id === leaseId);
-    if (!lease) throw new Error(`resource lease is not active: ${leaseId}`);
+    if (!lease || lease.fencingToken !== fencingToken) {
+      throw new Error(`resource lease is not active: ${leaseId}`);
+    }
     const now = Date.now();
+    const nextTtlMs = ttlMs ?? lease.ttlMs ?? DEFAULT_TTL_MS[lease.kind];
     lease.heartbeatAt = new Date(now).toISOString();
-    lease.expiresAt = new Date(now + (ttlMs ?? DEFAULT_TTL_MS[lease.kind])).toISOString();
+    lease.ttlMs = nextTtlMs;
+    lease.expiresAt = new Date(now + nextTtlMs).toISOString();
+    lease.graceMs = lease.graceMs ?? RESOURCE_RECLAIM_GRACE_MS;
+    lease.reclaimAfter = new Date(now + nextTtlMs + lease.graceMs).toISOString();
     return { ...lease };
   });
 }
 
-export function releaseResource(leaseId: string): ResourceTelemetry {
+export function releaseResource(leaseId: string, fencingToken: string): ResourceTelemetry {
   return withStoreLock((store) => {
     prune(store);
+    const lease = store.leases.find((candidate) => candidate.id === leaseId);
+    if (!lease || lease.fencingToken !== fencingToken) {
+      throw new Error(`resource lease is not the current fence: ${leaseId}`);
+    }
     if (store.leases.some((lease) => lease.parentLeaseId === leaseId)) {
       throw new Error(`resource lease ${leaseId} still owns an active child worker`);
     }
@@ -467,7 +630,10 @@ export async function waitForResource(
   for (;;) {
     const snapshot = resourceSnapshot();
     const lease = snapshot.leases.find(
-      (candidate) => candidate.owner === request.owner && candidate.kind === request.kind,
+      (candidate) =>
+        candidate.fencingToken === request.fencingToken &&
+        candidate.owner === request.owner &&
+        candidate.kind === request.kind,
     );
     if (lease) return lease;
     if (!snapshot.queue.some((candidate) => candidate.id === request.id)) {
@@ -489,5 +655,6 @@ export function formatResourceTelemetry(value: ResourceTelemetry): string {
     `total: ${value.total.active}/${value.total.limit}`,
     `queued: ${value.queued}`,
     `memory available: ${value.memoryAvailablePercent}% (soft floor ${value.memorySoftFloorPercent}%)`,
+    `reclaimed: ${value.reclaims.total} (expired ${value.reclaims.expired}, dead process ${value.reclaims.deadProcess})`,
   ].join('\n');
 }

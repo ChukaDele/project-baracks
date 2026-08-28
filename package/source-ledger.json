@@ -120,6 +120,29 @@
       "repository": "https://www.reddit.com",
       "revision": "web-observed-2026-08-24",
       "status": "EXAMINED"
+    },
+    {
+      "contentCopied": false,
+      "decision": "LOCALISE_WORKFLOW_CONTRACTS",
+      "licence": "MIT (copyright 2026 Garry Tan)",
+      "licenceStatus": "VERIFIED_COMPATIBLE",
+      "localisation": "Exact donor skill paths were inspected read-only. No source payload was copied; Major contracts and mechanics were independently localized onto existing learning, knowledge and skill lifecycle boundaries.",
+      "name": "local-gbrain-donor",
+      "paths": [
+        "skills/skillpack-harvest/SKILL.md",
+        "skills/strategic-reading/SKILL.md",
+        "skills/idea-lineage/SKILL.md",
+        "skills/concept-synthesis/SKILL.md",
+        "skills/ingest/SKILL.md",
+        "skills/research-compendium/SKILL.md",
+        "skills/academic-verify/SKILL.md",
+        "skills/skill-optimizer/SKILL.md"
+      ],
+      "repository": "local-path:/Users/chukwuka/gbrain",
+      "revision": "d941e9f918236c33e10e42d8a4223f36789b02c9",
+      "branch": "master",
+      "package": { "name": "gbrain", "version": "0.45.12.0" },
+      "status": "EXAMINED"
     }
   ]
 }

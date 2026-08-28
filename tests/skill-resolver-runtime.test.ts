@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { auditSkillReachability, resolveSkills } from '../src/skills/resolver.js';
+import { auditSkillReachability, discloseSkills, resolveSkills } from '../src/skills/resolver.js';
 import { runSkillCli } from '../src/skills/cli.js';
 
 const roots: string[] = [];
@@ -76,6 +76,50 @@ describe('runtime skill resolver', () => {
         limit: 3,
       }).skills.map((skill) => skill.id),
     ).toContain('root-cause-qa');
+  });
+
+  it('classifies hot, active specialist, and dormant skills deterministically', () => {
+    const disclosure = discloseSkills({
+      task: 'Perform a root cause analysis for this regression.',
+      bodyBytes: 8_000,
+      perBodyBytes: 2_000,
+    });
+
+    expect(disclosure.manifest).toContainEqual(
+      expect.objectContaining({ id: 'project-context-integrity', state: 'HOT' }),
+    );
+    expect(disclosure.manifest).toContainEqual(
+      expect.objectContaining({ id: 'root-cause-qa', state: 'ACTIVE' }),
+    );
+    expect(disclosure.manifest).toContainEqual(
+      expect.objectContaining({ id: 'project-start', state: 'DORMANT' }),
+    );
+    expect(disclosure.bodies.map((skill) => skill.id)).toContain('root-cause-qa');
+    expect(disclosure.bodies.every((skill) => ['HOT', 'ACTIVE'].includes(skill.state))).toBe(true);
+  });
+
+  it('keeps manifest and selected bodies within explicit disclosure budgets', () => {
+    const disclosure = discloseSkills({
+      task: 'Use root-cause-qa to debug and verify this deployment incident.',
+      manifestBytes: 2_000,
+      bodyBytes: 1_000,
+      perBodyBytes: 300,
+    });
+
+    expect(disclosure.metrics.manifest.disclosedBytes).toBeLessThanOrEqual(2_000);
+    expect(disclosure.metrics.bodies.disclosedBytes).toBeLessThanOrEqual(1_000);
+    expect(disclosure.bodies.every((skill) => Buffer.byteLength(skill.content) <= 300)).toBe(true);
+    expect(disclosure.metrics.total.disclosedBytes).toBeLessThan(
+      disclosure.metrics.total.beforeBytes,
+    );
+  });
+
+  it('does not disclose a specialist body for its exact negative example', () => {
+    const disclosure = discloseSkills({ task: 'Run the single test command I just gave you.' });
+    expect(disclosure.bodies.map((skill) => skill.id)).not.toContain('skill-resolver');
+    expect(disclosure.manifest).toContainEqual(
+      expect.objectContaining({ id: 'skill-resolver', state: 'DORMANT' }),
+    );
   });
 
   it('prefers the immutable runtime skill over an untrusted legacy mutable global copy', () => {

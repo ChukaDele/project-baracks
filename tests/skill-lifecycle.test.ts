@@ -66,7 +66,32 @@ function validateGoal(goalId: string) {
     goalId,
     provider: 'claude',
     evidence,
+    optimizationEvidence: optimizationEvidence(),
   });
+}
+
+function optimizationEvidence() {
+  return {
+    version: '1.0.0',
+    runIds: ['run-1', 'run-2', 'run-3'],
+    taskIds: ['task-1', 'task-2', 'task-3'],
+    baselineQuality: [10, 10, 10],
+    candidateQuality: [12, 12, 12],
+    baselineLatencyMs: [100, 105, 110],
+    candidateLatencyMs: [90, 95, 100],
+    baselineCost: [1, 1, 1],
+    candidateCost: [1, 1, 1],
+    heldOut: {
+      runIds: ['held-out-run'],
+      taskIds: ['held-out-task'],
+      baselineQuality: [10],
+      candidateQuality: [12],
+    },
+    mutationExists: true,
+    materialThreshold: 10,
+    rollbackTarget: 'candidate-v1',
+    postActivationFieldOutcome: 'held-out workflow succeeded',
+  };
 }
 
 beforeEach(() => {
@@ -89,6 +114,46 @@ afterEach(() => {
 });
 
 describe('GBrain skill lifecycle', () => {
+  it('gates promotion on conclusive optimizer evidence', () => {
+    const taskA = 'Partition Quartz fixture shards across concurrent test lanes.';
+    const taskB = 'Assign deterministic Quartz shard identifiers to parallel fixture lanes.';
+    const candidate = observeSuccessfulWorkflow(observation(taskA));
+    observeSuccessfulWorkflow(observation(taskB));
+    const evidence = `Independent fixture evidence for ${taskB}`;
+    recordIndependentGrade({
+      project,
+      repoPath: repository,
+      goalId: taskB,
+      provider: 'claude',
+      result: 'pass',
+      evidence,
+    });
+    const invalid = applyIndependentSkillValidation({
+      project,
+      repoPath: repository,
+      goalId: taskB,
+      provider: 'claude',
+      evidence,
+      optimizationEvidence: {
+        ...optimizationEvidence(),
+        candidateQuality: [10, 10, 10],
+        mutationExists: false,
+        materialThreshold: 5,
+        postActivationFieldOutcome: 'unchanged',
+      },
+    });
+    expect(invalid.promoted).toEqual([]);
+    expect(listSkillCandidates(project)[0]?.status).not.toBe('active');
+    expect(
+      promoteSkillCandidate({
+        id: candidate.id,
+        project,
+        repoPath: repository,
+        optimizationEvidence: optimizationEvidence(),
+      }).status,
+    ).toBe('active');
+  });
+
   it('keeps a one-off successful procedure as an inactive candidate', () => {
     const candidate = observeSuccessfulWorkflow(
       observation('Partition one Quartz fixture shard for a concurrent test lane.'),
@@ -123,8 +188,11 @@ describe('GBrain skill lifecycle', () => {
     const modulePath = join(process.cwd(), 'src', 'skills', 'lifecycle.ts');
     const run = (task: string) =>
       execFileAsync(
-        join(process.cwd(), 'node_modules', '.bin', 'tsx'),
+        process.execPath,
         [
+          '--import',
+          'tsx',
+          '--input-type=module',
           '-e',
           `(async()=>{process.env.MAJOR_SKILL_LIFECYCLE_ROOT=${JSON.stringify(join(root, 'skills'))};process.env.MAJOR_POLICY_PATH=${JSON.stringify(join(root, 'policies.json'))};const {observeSuccessfulWorkflow}=await import(${JSON.stringify(modulePath)});observeSuccessfulWorkflow(${JSON.stringify(
             {

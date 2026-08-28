@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 17,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -27,6 +27,7 @@
     },
     {
       "id": "project-context-integrity",
+      "disclosure": "hot",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "named-project-repository-path-cross-project-edit-handoff-migration-wrong-project"
@@ -39,6 +40,7 @@
     },
     {
       "id": "mvp-speed-prioritisation",
+      "disclosure": "hot",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "always-on-project-and-large-feature-planning"
@@ -51,6 +53,7 @@
     },
     {
       "id": "major-self-maintenance",
+      "disclosure": "hot",
       "source": "major-internal",
       "availability": "major-repo",
       "load": "major-self-change-skill-routing-learning-policy-runtime-installer"
@@ -1274,6 +1277,55 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       }
+    },
+    {
+      "id": "skill-harvest",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation",
+      "aliases": ["skillpack-harvest", "capability-harvest"]
+    },
+    {
+      "id": "knowledge-ingest",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability",
+      "aliases": ["knowledge dispatcher"]
+    },
+    {
+      "id": "strategic-reading",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators",
+      "aliases": ["applied reading"]
+    },
+    {
+      "id": "idea-lineage",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view",
+      "aliases": ["view lineage"]
+    },
+    {
+      "id": "concept-synthesis",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise",
+      "aliases": ["knowledge synthesis"]
+    },
+    {
+      "id": "research-compendium",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness",
+      "aliases": ["research dossier"]
+    },
+    {
+      "id": "academic-verify",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support",
+      "aliases": ["paper verification", "literature verification"]
     }
   ],
   "reconciliation": {

@@ -1,0 +1,7 @@
+{
+  "skill": "lean-graph-engineering",
+  "should_trigger": ["Use lean-graph-engineering for this task."],
+  "should_not_trigger": [
+    "This unrelated request must not activate lean graph engineering workflow."
+  ]
+}

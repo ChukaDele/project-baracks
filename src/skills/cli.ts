@@ -10,6 +10,8 @@ import {
 import { rollbackMajorSkills, syncMajorSkills } from './sync.js';
 import { retrieveReusableAssets } from './assets.js';
 import { resolveProject } from '../supervisor/state.js';
+import { readFileSync } from 'node:fs';
+import type { SkillOptimizationEvidence } from './optimizer-validation.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -101,9 +103,19 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
     const resolved = resolveProject(flag(args, '--project') ?? 'current');
     const id = flag(args, '--id');
     if (!id) throw new Error('missing required --id');
+    const evidencePath = flag(args, '--optimization-evidence');
+    if (!evidencePath) throw new Error('missing required --optimization-evidence');
+    const optimizationEvidence = JSON.parse(
+      readFileSync(evidencePath, 'utf8'),
+    ) as unknown as SkillOptimizationEvidence;
     console.log(
       JSON.stringify(
-        promoteSkillCandidate({ id, project: resolved.project, repoPath: resolved.repoPath }),
+        promoteSkillCandidate({
+          id,
+          project: resolved.project,
+          repoPath: resolved.repoPath,
+          optimizationEvidence,
+        }),
         null,
         2,
       ),

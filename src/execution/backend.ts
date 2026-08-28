@@ -36,6 +36,7 @@ export interface BackendExecuteRequest {
   extractSessionRef?: (event: ProviderEvent) => string | undefined;
   extractUsage?: (event: ProviderEvent) => unknown;
   resourceLeaseId?: string;
+  resourceLeaseFencingToken?: string;
   /** Structured provider intent. Required by protocol-aware isolated backends. */
   providerRequest?: BackendProviderRequest;
 }

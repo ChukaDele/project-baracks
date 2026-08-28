@@ -1,0 +1,5 @@
+{
+  "skill": "knowledge-work",
+  "should_trigger": ["Use knowledge-work for this task."],
+  "should_not_trigger": ["This unrelated request must not activate knowledge work workflow."]
+}

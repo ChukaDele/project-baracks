@@ -1,0 +1,16 @@
+{
+  "skill": "academic-verify",
+  "should_trigger": [
+    "Use academic-verify on this consequential claim and distinguish citation existence from actual support.",
+    "Check the paper methodology, statistical strength, limitations and replications before we rely on this result.",
+    "Verify whether current literature supports or contradicts this scientific claim."
+  ],
+  "should_not_trigger": [
+    "Check whether this package builds.",
+    "Summarize this academic abstract for a casual note.",
+    "Find the DOI formatting error only."
+  ],
+  "conflicts": [
+    "verification handles general acceptance evidence; academic-verify is reserved for warranted scholarly claim evaluation."
+  ]
+}

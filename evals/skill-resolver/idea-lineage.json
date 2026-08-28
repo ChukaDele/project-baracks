@@ -1,0 +1,16 @@
+{
+  "skill": "idea-lineage",
+  "should_trigger": [
+    "Trace the idea-lineage from first evidenced appearance to the current canonical view.",
+    "When did our view change, what evidence caused it and which branch was abandoned?",
+    "Show superseded versions and time-qualified conflicts for this product thesis."
+  ],
+  "should_not_trigger": [
+    "Show the latest git commit for this file.",
+    "Summarize our current product thesis only.",
+    "Merge these duplicate contact records."
+  ],
+  "conflicts": [
+    "concept-synthesis compares a bounded concept set; idea-lineage reconstructs change through time without inventing history."
+  ]
+}

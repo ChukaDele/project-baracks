@@ -211,11 +211,13 @@ for (const fixture of readdirSync(evalRoot).filter((name) => name.endsWith('.jso
     fail(`resolver fixture ${fixture} references an unknown internal skill`);
   if (fixtureIds.has(skill)) fail(`multiple resolver fixtures for ${skill}`);
   fixtureIds.add(skill);
-  list(value.should_trigger, `resolver fixture ${fixture}.should_trigger`);
-  list(value.should_not_trigger, `resolver fixture ${fixture}.should_not_trigger`);
+  const positive = list(value.should_trigger, `resolver fixture ${fixture}.should_trigger`);
+  const negative = list(value.should_not_trigger, `resolver fixture ${fixture}.should_not_trigger`);
+  if (positive.length === 0 || negative.length === 0)
+    fail(`resolver fixture ${fixture} requires positive and negative cases`);
 }
-for (const id of stagedIds) {
-  if (!fixtureIds.has(id)) fail(`staged skill ${id} has no resolver fixture`);
+for (const id of registered) {
+  if (!fixtureIds.has(id)) fail(`internal skill ${id} has no resolver fixture`);
 }
 
 const reconciliation = object(
@@ -230,6 +232,13 @@ for (const entry of reconciliation.entries) {
   if (reconciled.has(id)) fail(`skills reconciliation ledger duplicate entry ${id}`);
   reconciled.add(id);
   nonEmpty(row.disposition, `skills reconciliation ledger entry ${id}.disposition`);
+  if (row.disposition === 'ADD') {
+    if (!registered.includes(id)) fail(`added reconciliation row ${id} is not registered`);
+    if (!installed.includes(id)) fail(`added reconciliation row ${id} has no skill directory`);
+    if (!fixtureIds.has(id)) fail(`added reconciliation row ${id} has no resolver fixture`);
+    for (const field of ['source', 'status', 'provenance', 'sourceHashDisposition'])
+      nonEmpty(row[field], `added reconciliation row ${id}.${field}`);
+  }
 }
 for (const id of stagedIds) {
   if (!reconciled.has(id)) fail(`staged skill ${id} has no reconciliation disposition`);

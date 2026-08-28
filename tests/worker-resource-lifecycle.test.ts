@@ -4,6 +4,16 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let finish: ((value: unknown) => void) | undefined;
+let gatewayStarted: Promise<void>;
+let signalGatewayStarted: (() => void) | undefined;
+
+function resetGatewaySynchronization(): void {
+  gatewayStarted = new Promise((resolve) => {
+    signalGatewayStarted = resolve;
+  });
+}
+
+resetGatewaySynchronization();
 
 vi.mock('../src/security/major-gateway.js', () => ({
   readSystemMemoryAvailablePercent: () => undefined,
@@ -11,6 +21,7 @@ vi.mock('../src/security/major-gateway.js', () => ({
     events: (async function* () {})(),
     outcome: new Promise((resolve) => {
       finish = resolve;
+      signalGatewayStarted?.();
     }),
     cancel: vi.fn(),
   }),
@@ -22,13 +33,20 @@ import { isMissingCodexResumeFailure, runWorker } from '../src/supervisor/worker
 let root = '';
 let priorResourcePath: string | undefined;
 let priorMemory: string | undefined;
+let priorParentLeaseId: string | undefined;
+let priorMajorHome: string | undefined;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  resetGatewaySynchronization();
   root = mkdtempSync(join(tmpdir(), 'major-worker-resource-'));
   priorResourcePath = process.env.MAJOR_RESOURCE_PATH;
   priorMemory = process.env.MAJOR_MEMORY_AVAILABLE_PERCENT;
+  priorParentLeaseId = process.env.MAJOR_RESOURCE_LEASE_ID;
+  priorMajorHome = process.env.MAJOR_HOME;
+  delete process.env.MAJOR_RESOURCE_LEASE_ID;
   process.env.MAJOR_RESOURCE_PATH = join(root, 'resources.json');
+  process.env.MAJOR_HOME = join(root, 'major-home');
   process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
 });
 
@@ -38,6 +56,10 @@ afterEach(() => {
   else process.env.MAJOR_RESOURCE_PATH = priorResourcePath;
   if (priorMemory === undefined) delete process.env.MAJOR_MEMORY_AVAILABLE_PERCENT;
   else process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = priorMemory;
+  if (priorParentLeaseId === undefined) delete process.env.MAJOR_RESOURCE_LEASE_ID;
+  else process.env.MAJOR_RESOURCE_LEASE_ID = priorParentLeaseId;
+  if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+  else process.env.MAJOR_HOME = priorMajorHome;
   rmSync(root, { recursive: true, force: true });
   finish = undefined;
 });
@@ -61,8 +83,9 @@ describe('worker resource lifecycle', () => {
   });
 
   it('propagates returned-tree evidence from the gateway outcome to the worker outcome', async () => {
+    vi.useRealTimers();
     const running = runWorker({ host: 'codex', cwd: root, prompt: 'read only' });
-    await Promise.resolve();
+    await gatewayStarted;
     if (!finish) throw new Error('gateway propagation mock was not initialized');
     finish({
       status: 'succeeded',
@@ -80,8 +103,9 @@ describe('worker resource lifecycle', () => {
   });
 
   it('keeps omitted returned-tree evidence omitted', async () => {
+    vi.useRealTimers();
     const running = runWorker({ host: 'codex', cwd: root, prompt: 'read only' });
-    await Promise.resolve();
+    await gatewayStarted;
     if (!finish) throw new Error('gateway propagation mock was not initialized');
     finish({
       status: 'succeeded',
@@ -99,10 +123,16 @@ describe('worker resource lifecycle', () => {
       host: 'claude',
       cwd: root,
       prompt: 'read only',
+      taskId: 'goal_worker_lifecycle',
+      resourceId: 'worker:test-project',
       timeoutMs: 120 * 60 * 1000,
     });
     await Promise.resolve();
     const initial = resourceSnapshot().leases[0]!;
+    expect(initial).toMatchObject({
+      taskId: 'goal_worker_lifecycle',
+      resourceId: 'worker:test-project',
+    });
     expect(Date.parse(initial.expiresAt) - Date.now()).toBeGreaterThan(120 * 60 * 1000);
 
     await vi.advanceTimersByTimeAsync(6 * 60 * 1000);

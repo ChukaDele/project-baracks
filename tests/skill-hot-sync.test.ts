@@ -72,6 +72,12 @@ describe('Major hot skill sync', () => {
     };
     expect(marker.version).toBe(1);
     expect(marker.sha).toMatch(/^[0-9a-f]{64}$/);
+    const syncedRegistry = JSON.parse(
+      readFileSync(join(current, 'guidance', 'skills.registry.json'), 'utf8'),
+    ) as { entries: Array<{ id: string; disclosure?: string }> };
+    expect(syncedRegistry.entries).toContainEqual(
+      expect.objectContaining({ id: 'project-context-integrity', disclosure: 'hot' }),
+    );
 
     const resolved = resolveSkills({
       task: 'Prepare an approved customer invoice, review receivables and payables, and draft a controlled follow-up.',

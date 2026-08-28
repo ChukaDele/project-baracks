@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { platform, release } from 'node:os';
 import type { ProviderAdapter, ProviderInfo } from '../providers/types.js';
 import {
@@ -20,6 +20,8 @@ import {
   type ProviderReadiness,
 } from './readiness.js';
 import { buildStorageReport, type StorageReport } from '../resources/storage-report.js';
+import type { BrainFinding, KnowledgeFact } from '../knowledge/semantics.js';
+import { inspectBrain } from '../knowledge/semantics.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'missing';
 
@@ -64,6 +66,8 @@ export interface DoctorReport {
   multiProvider: MultiProviderReadiness;
   /** Resource hygiene: disk pressure, worker classes and reclaimable upper bound. */
   storage: StorageReport;
+  /** Read-only maintenance candidates; semantic findings never auto-repair. */
+  knowledgeMaintenance: BrainFinding[];
 }
 
 /**
@@ -85,6 +89,8 @@ export interface DoctorInputs {
   detectContainment?: () => ContainmentStatus;
   inspectExecutionBackend?: () => Promise<BackendStatus>;
   collectStorage?: () => StorageReport;
+  knowledgeRecords?: KnowledgeFact[];
+  inspectKnowledge?: (records: KnowledgeFact[]) => BrainFinding[];
 }
 
 export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
@@ -95,6 +101,52 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
   const env = inputs.env ?? process.env;
   const fileExists = inputs.fileExists ?? existsSync;
   const checks: DoctorCheck[] = [];
+  let knowledgeRecords = inputs.knowledgeRecords;
+  if (knowledgeRecords === undefined) {
+    const snapshotPath = env.MAJOR_KNOWLEDGE_SNAPSHOT;
+    if (!snapshotPath) {
+      checks.push({
+        name: 'knowledge-source',
+        required: false,
+        status: 'warn',
+        detail: 'MAJOR_KNOWLEDGE_SNAPSHOT not configured; knowledge maintenance unavailable',
+      });
+      knowledgeRecords = [];
+    } else {
+      try {
+        const parsed = JSON.parse(readFileSync(snapshotPath, 'utf8')) as unknown;
+        if (!Array.isArray(parsed)) throw new Error('snapshot must be an array');
+        knowledgeRecords = (parsed as KnowledgeFact[]).slice(0, 100);
+        if (
+          knowledgeRecords.some(
+            (record) =>
+              !record ||
+              typeof record !== 'object' ||
+              !['id', 'entityId', 'predicate', 'value', 'observedAt'].every(
+                (field) =>
+                  typeof (record as unknown as Record<string, unknown>)[field] === 'string',
+              ),
+          )
+        ) {
+          throw new Error('snapshot contains malformed knowledge records');
+        }
+        checks.push({
+          name: 'knowledge-source',
+          required: false,
+          status: 'ok',
+          detail: `bounded project-local snapshot available (${knowledgeRecords.length} records)`,
+        });
+      } catch (error) {
+        knowledgeRecords = [];
+        checks.push({
+          name: 'knowledge-source',
+          required: false,
+          status: 'warn',
+          detail: `knowledge snapshot unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    }
+  }
 
   const add = (name: string, required: boolean, value: string | undefined, missingDetail: string) =>
     checks.push({
@@ -309,6 +361,31 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     };
   }
 
+  let knowledgeMaintenance: BrainFinding[];
+  try {
+    knowledgeMaintenance = (inputs.inspectKnowledge ?? ((records) => inspectBrain(records)))(
+      knowledgeRecords,
+    ).slice(0, 100);
+  } catch (error) {
+    const detail = `Knowledge inspection unavailable: ${
+      error instanceof Error ? error.message : String(error)
+    }`.slice(0, 500);
+    checks.push({
+      name: 'knowledge-inspection',
+      required: false,
+      status: 'warn',
+      detail,
+    });
+    knowledgeMaintenance = [
+      {
+        kind: 'missing-provenance',
+        ids: [],
+        repair: 'semantic-candidate',
+        detail,
+      },
+    ];
+  }
+
   return {
     os: `${platform()} ${release()}`,
     checks: checks.map((c) => ({ ...c, detail: redactText(c.detail) })),
@@ -328,5 +405,6 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
     multiProviderReady: multiProvider.ready,
     multiProvider,
     storage,
+    knowledgeMaintenance,
   };
 }

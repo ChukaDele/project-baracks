@@ -17,6 +17,7 @@ import {
 } from '../src/providers/discovery-store.js';
 import { writeCodexUsageReport } from '../src/providers/codex-usage.js';
 import { model } from './helpers.js';
+import { requestResource } from '../src/supervisor/resources.js';
 
 let root: string;
 let priorStatePath: string | undefined;
@@ -65,6 +66,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  delete process.env.MAJOR_MEMORY_AVAILABLE_PERCENT;
   if (priorStatePath === undefined) delete process.env.MAJOR_STATE_PATH;
   else process.env.MAJOR_STATE_PATH = priorStatePath;
   if (priorDbPath === undefined) delete process.env.MAJOR_DB_PATH;
@@ -79,6 +81,54 @@ afterEach(() => {
 });
 
 describe('supervisor CLI authority', () => {
+  it('passes supplied fencing tokens through heartbeat and release', async () => {
+    process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
+    delete process.env.MAJOR_RESOURCE_LEASE_ID;
+    const active = requestResource({ kind: 'worker', owner: 'cli-fence' });
+    expect(active.status).toBe('active');
+    if (active.status !== 'active') return;
+    await expect(
+      runSupervisorCli(['resource', 'heartbeat', '--lease', active.lease.id]),
+    ).rejects.toThrow(/--fence/);
+    await expect(
+      runSupervisorCli(['resource', 'release', '--lease', active.lease.id]),
+    ).rejects.toThrow(/--fence/);
+    await expect(
+      runSupervisorCli(['resource', 'heartbeat', '--lease', active.lease.id, '--fence', 'stale']),
+    ).rejects.toThrow(/not active/);
+    await runSupervisorCli([
+      'resource',
+      'heartbeat',
+      '--lease',
+      active.lease.id,
+      '--fence',
+      active.lease.fencingToken,
+    ]);
+    await expect(
+      runSupervisorCli(['resource', 'release', '--lease', active.lease.id, '--fence', 'stale']),
+    ).rejects.toThrow(/current fence/);
+    await expect(
+      runSupervisorCli([
+        'resource',
+        'release',
+        '--lease',
+        active.lease.id,
+        '--fence',
+        active.lease.fencingToken,
+      ]),
+    ).resolves.toBe(true);
+  });
+
+  it('exposes stale-resource repair through the locked resource path', async () => {
+    const output: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => output.push(String(value)));
+    await expect(runSupervisorCli(['resource', 'reclaim', '--json'])).resolves.toBe(true);
+    expect(JSON.parse(output.at(-1)!)).toMatchObject({
+      reclaimedLeaseIds: [],
+      telemetry: { reclaims: { total: 0, expired: 0, deadProcess: 0 } },
+    });
+  });
+
   it('clears a stale legacy cycle pid when a compositional runtime reports', async () => {
     writeSupervisorState({
       version: 1,

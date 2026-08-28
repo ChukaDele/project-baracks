@@ -1,0 +1,16 @@
+{
+  "skill": "strategic-reading",
+  "should_trigger": [
+    "Apply strategic-reading to this book for our retention problem.",
+    "Read this substantive report for mechanisms, counterexamples, risks and indicators relevant to our decision.",
+    "Analyze this essay against the real operating problem instead of merely summarizing it."
+  ],
+  "should_not_trigger": [
+    "Give me a five-sentence summary of this memo.",
+    "Verify whether this paper citation exists.",
+    "Ingest these meeting notes into GBrain."
+  ],
+  "conflicts": [
+    "source-ingestion acquires the source; strategic-reading applies substantive material to a stated problem; academic-verify tests consequential scholarly claims."
+  ]
+}

@@ -621,9 +621,10 @@ describe('Major coordinator contract', () => {
     expect(prompt).not.toContain('applies it back to the canonical host worktree');
     expect(prompt).toContain('binds every mutable dispatch to an internal source-tree digest');
     expect(prompt).toContain('The digest is not sent to the provider');
-    expect(prompt).toContain('routing provenance only');
-    expect(prompt).toContain('do not stop or attempt host access');
-    expect(prompt).toContain('Report unavailable skill content as degraded in MAJOR_RESULT');
+    expect(prompt).toContain('HOT core bodies, ACTIVE SPECIALIST bodies, and a DORMANT manifest');
+    expect(prompt).toContain('Disclosure bytes');
+    expect(prompt).toContain('===== HOT MAJOR SKILL mvp-speed-prioritisation');
+    expect(prompt).toContain('Do not attempt host access to undisclosed skill paths');
     expect(prompt).toContain('REUSABLE ASSET DISCOVERY (required before implementation)');
     expect(prompt).toContain(
       'project-local -> GBrain organisation index -> canonical shared assets',

@@ -134,7 +134,7 @@ describe.runIf(platform() === 'darwin')('M1 release recovery gate', () => {
             approvalAuthority: { decisions: [] },
           },
         }),
-      ).toThrow(/supervised Workshop provider execution requires a worker resource lease/);
+      ).toThrow(/supervised Workshop provider execution requires a fenced worker resource lease/);
     } finally {
       for (const [name, value] of Object.entries(prior)) {
         const key =

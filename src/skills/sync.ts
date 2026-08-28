@@ -24,6 +24,8 @@ interface RegistryEntry {
   source: string;
   availability: string;
   load: string;
+  aliases?: string[];
+  disclosure?: 'hot' | 'specialist';
 }
 
 interface Registry {
@@ -67,11 +69,30 @@ function assertRegistry(value: unknown): Registry {
         throw new Error(`skill registry entry ${index} missing ${field}`);
       }
     }
+    if (
+      row.disclosure !== undefined &&
+      row.disclosure !== 'hot' &&
+      row.disclosure !== 'specialist'
+    ) {
+      throw new Error(`skill registry entry ${index} has invalid disclosure tier`);
+    }
+    if (
+      row.aliases !== undefined &&
+      (!Array.isArray(row.aliases) || !row.aliases.every((alias) => typeof alias === 'string'))
+    ) {
+      throw new Error(`skill registry entry ${index} has invalid aliases`);
+    }
     return {
       id: row.id as string,
       source: row.source as string,
       availability: row.availability as string,
       load: row.load as string,
+      ...(Array.isArray(row.aliases) && row.aliases.every((alias) => typeof alias === 'string')
+        ? { aliases: row.aliases }
+        : {}),
+      ...(row.disclosure === 'hot' || row.disclosure === 'specialist'
+        ? { disclosure: row.disclosure }
+        : {}),
     };
   });
   const ids = entries.map((entry) => entry.id);

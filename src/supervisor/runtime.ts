@@ -43,7 +43,7 @@ import {
   lastCapacityKey,
   subscriptionAccountPool,
 } from '../routing/subscription-accounts.js';
-import { resolveSkills } from '../skills/resolver.js';
+import { discloseSkills, resolveSkills } from '../skills/resolver.js';
 import { observeSuccessfulWorkflow, recordSkillOutcome } from '../skills/lifecycle.js';
 import { formatReusableAssetDiscovery, observeReusableAssetCandidate } from '../skills/assets.js';
 import {
@@ -456,22 +456,29 @@ export function coordinatorPrompt(
 ): string {
   const context = readProjectContext(goal.repoPath);
   const learningContext = readLearningContext(goal.project, goal.repoPath);
-  let resolvedSkills: ReturnType<typeof resolveSkills>['skills'] = [];
+  let skillDisclosure: ReturnType<typeof discloseSkills> | undefined;
   let skillResolutionFailed = false;
   try {
-    resolvedSkills = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills;
+    skillDisclosure = discloseSkills({ task: goal.goal, cwd: goal.repoPath });
   } catch {
     skillResolutionFailed = true;
   }
-  const skillProvenance =
-    resolvedSkills.length > 0
-      ? resolvedSkills.map((skill) => `- ${skill.id}: ${skill.path}`).join('\n')
-      : '';
+  const disclosedBodies = skillDisclosure?.bodies ?? [];
+  const skillManifest = (skillDisclosure?.manifest ?? [])
+    .map((skill) => `- ${skill.state} ${skill.id} (${skill.source}): ${skill.load}`)
+    .join('\n');
+  const skillBodies = disclosedBodies
+    .map(
+      (skill) =>
+        `\n===== ${skill.state} MAJOR SKILL ${skill.id} (${skill.source})${skill.truncated ? ' [TRUNCATED]' : ''} =====\n${skill.content}`,
+    )
+    .join('\n');
+  const skillMetrics = skillDisclosure
+    ? `Disclosure bytes ${skillDisclosure.metrics.total.disclosedBytes}/${skillDisclosure.metrics.total.beforeBytes} (estimated tokens ${skillDisclosure.metrics.total.estimatedTokensDisclosed}/${skillDisclosure.metrics.total.estimatedTokensBefore}); body budget ${skillDisclosure.metrics.budgets.bodyBytes}, manifest budget ${skillDisclosure.metrics.budgets.manifestBytes}.`
+    : '';
   const skillContext = skillResolutionFailed
     ? '(Major skill registry unavailable. Continue without skill context and report the degraded resolver in MAJOR_RESULT if it materially affects work.)'
-    : resolvedSkills.length === 0
-      ? '(No installed skill matched deterministically. Continue with the injected Major operating contract.)'
-      : `${skillProvenance}\nHost skill paths above are routing provenance only; they are intentionally outside the provider execution boundary. Continue from the Major operating contract already injected below—do not stop or attempt host access to load them. Report unavailable skill content as degraded in MAJOR_RESULT when it materially affects work.`;
+    : `${skillMetrics}\n${skillManifest}${skillBodies}`;
   let assetContext: string;
   try {
     assetContext = formatReusableAssetDiscovery({ task: goal.goal, cwd: goal.repoPath });
@@ -543,7 +550,7 @@ MAJOR OPERATING CONTRACT:
 - Reuse the existing project, validated capability, maintained library or skill before building a new subsystem. For substantial infrastructure, follow the recorded ADOPT, WRAP, BORROW or BUILD decision.
 - Keep the injected CURRENT PROJECT CONTEXT current through concise outcome, critical-path, ownership, interface, decision and evidence updates. Work the critical path first and remove the smallest present constraint.
 - Prefer deletion and simpler code over new moving parts. Use FAST checks while iterating, acceptance evidence for the critical path, and only risk-proportionate independent review or frozen-candidate release validation.
-- RESOLVED MAJOR SKILLS lists routing provenance only; host skill files are not mounted here. Follow the injected Major operating contract and matched skill ids—do not stop or attempt host access to open skill paths.
+- RESOLVED MAJOR SKILLS contains bounded resolver-selected guidance: HOT core bodies, ACTIVE SPECIALIST bodies, and a DORMANT manifest. Do not attempt host access to undisclosed skill paths.
 - Read project LEARNINGS.md and the Major learning candidates below before acting. Do not repeat a captured correction merely because a fresh worker lacks chat history.
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
 - For substantial UI/website creation, redesign, art-direction changes, or "generic/AI-looking/too safe/too loud" feedback, use design-direction-and-taste first. It is the single Major art-direction/taste authority; do not stack competing generic taste systems.
@@ -953,6 +960,8 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
   const workerStartedAtMs = Date.now();
   const outcome = await runWorker({
     host,
+    taskId: goal.id,
+    resourceId: `worker:${goal.project}`,
     prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
       accountLabel: routedSelection.accountLabel,
       continuityBlock: continuity.promptBlock,

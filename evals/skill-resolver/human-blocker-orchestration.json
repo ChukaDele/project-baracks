@@ -1,0 +1,7 @@
+{
+  "skill": "human-blocker-orchestration",
+  "should_trigger": ["Use human-blocker-orchestration for this task."],
+  "should_not_trigger": [
+    "This unrelated request must not activate human blocker orchestration workflow."
+  ]
+}

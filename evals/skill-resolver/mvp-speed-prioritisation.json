@@ -1,0 +1,7 @@
+{
+  "skill": "mvp-speed-prioritisation",
+  "should_trigger": ["Use mvp-speed-prioritisation for this task."],
+  "should_not_trigger": [
+    "This unrelated request must not activate mvp speed prioritisation workflow."
+  ]
+}

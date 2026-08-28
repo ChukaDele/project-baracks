@@ -698,6 +698,62 @@
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
       "sourceHashDisposition": "localized-independent-content"
+    },
+    {
+      "id": "skill-harvest",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/prior-art-decisions.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "knowledge-ingest",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/prior-art-decisions.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "strategic-reading",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/prior-art-decisions.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "idea-lineage",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/prior-art-decisions.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "concept-synthesis",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/prior-art-decisions.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "research-compendium",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/prior-art-decisions.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "academic-verify",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/prior-art-decisions.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
     }
   ]
 }

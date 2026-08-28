@@ -67,13 +67,17 @@ Do not encode an entire agent workflow in TypeScript/Python merely because it ca
 
 Before promotion to the recurring Major skill library:
 
+- establish the unchanged baseline before an optimization;
+- apply one bounded candidate mutation and compare it on at least three representative repeated runs, reporting the median cost and latency; treat differences within 5% as inconclusive and require a predeclared material-improvement threshold;
+- use held-out tasks when the candidate bundles a mutation, and check expected evaluation cost before running it;
+- version every accepted change, retain a tested rollback target, and monitor field outcomes for regression after activation;
 - run deterministic tests;
 - run resolver positive/negative cases;
 - run one integration/E2E example;
 - use an independent reviewer for consequential skills;
 - verify the skill does not duplicate an existing capability.
 
-A successful real procedure can remain a **candidate skill** until these checks pass.
+A successful real procedure remains a **candidate skill** until these checks pass. Correlation is not causal evidence, and one observation cannot create durable policy. Without mutation authority, return the proposed skill change and evidence plan without applying or promoting it.
 
 ## Immediate availability after promotion
 
@@ -102,7 +106,7 @@ If hot sync is unavailable because the installed Major predates that capability,
 7. Route active project skills through the canonical resolver.
 8. For a global/internal promotion merged to `main`, hot-sync the validated bundle and prove resolver reachability before declaring the promotion usable.
 9. Record success, failure, duration and cost when available.
-10. Repeated poor outcomes deprecate the skill from default routing without deleting provenance.
+10. Monitor field cost, latency and outcomes against the baseline. Repeated poor outcomes roll back or deprecate the skill from default routing without deleting provenance.
 
 Automatic promotion is project-local. Global promotion still uses Major's existing sanitized learning review and cross-project policy.
 

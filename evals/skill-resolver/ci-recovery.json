@@ -1,0 +1,5 @@
+{
+  "skill": "ci-recovery",
+  "should_trigger": ["Use ci-recovery for this task."],
+  "should_not_trigger": ["This unrelated request must not activate ci recovery workflow."]
+}
