@@ -754,6 +754,22 @@
       "status": "active",
       "provenance": "docs/prior-art-decisions.md",
       "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "analytics-with-shaper",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/shaper-and-gaussian-splatting.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
+    },
+    {
+      "id": "gaussian-splatting-spatial-reconstruction",
+      "disposition": "ADD",
+      "source": "major-internal",
+      "status": "active",
+      "provenance": "docs/shaper-and-gaussian-splatting.md",
+      "sourceHashDisposition": "independently-authored-no-donor-copy"
     }
   ]
 }

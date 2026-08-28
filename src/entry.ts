@@ -6,6 +6,7 @@ import { runLearningLifecycleCli } from './learning/lifecycle-cli.js';
 import { runKnowledgeCli } from './knowledge/cli.js';
 import { runSkillCli } from './skills/cli.js';
 import { runProviderLifecycleCli } from './providers/lifecycle-cli.js';
+import { runShaperCli } from './observability/shaper-cli.js';
 import { runSupervisorCli } from './supervisor/cli.js';
 import { resolveMajorMcpCwd, runMajorMcpServer } from './mcp/server.js';
 
@@ -26,12 +27,15 @@ try {
           if (!learningLifecycleHandled) {
             const skillHandled = await runSkillCli(args);
             if (!skillHandled) {
-              const harnessHandled = await runHarnessCli(args);
-              if (!harnessHandled) {
-                const providerHandled = await runProviderLifecycleCli(args);
-                if (!providerHandled) {
-                  const handled = await runSupervisorCli(args);
-                  if (!handled) await import('./cli/index.js');
+              const shaperHandled = await runShaperCli(args);
+              if (!shaperHandled) {
+                const harnessHandled = await runHarnessCli(args);
+                if (!harnessHandled) {
+                  const providerHandled = await runProviderLifecycleCli(args);
+                  if (!providerHandled) {
+                    const handled = await runSupervisorCli(args);
+                    if (!handled) await import('./cli/index.js');
+                  }
                 }
               }
             }
