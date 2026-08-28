@@ -121,5 +121,16 @@ describe('skill resolver fixtures', () => {
     for (const [task, expected] of cases) {
       expect(skillIds(task), task).toEqual(expected);
     }
+
+    const shapeRWithGaussianTasks = [
+      'Use ShapeR to reconstruct a sculpture with 3D Gaussian Splatting.',
+      'Generate a 3D asset with ShapeR and Gaussian Splatting.',
+      'Use ShapeR to build a 3D model, then apply Gaussian Splatting for novel views.',
+    ];
+    for (const task of shapeRWithGaussianTasks) {
+      const ids = skillIds(task);
+      expect(ids, task).toContain('gaussian-splatting-spatial-reconstruction');
+      expect(ids, task).not.toContain('analytics-with-shaper');
+    }
   });
 });

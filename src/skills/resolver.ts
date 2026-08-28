@@ -339,7 +339,7 @@ function integrationDisambiguation(entryId: string, task: string): string | unde
     );
   if (
     entryId === 'analytics-with-shaper' &&
-    (isShapeRCapabilityRequest && !hasExplicitGaussianSpatialIntent ||
+    (isShapeRCapabilityRequest ||
       hasNetworkShapingIntent ||
       (!hasShaperAnalyticsIntent &&
         (/\bshap\s+(?:value|explain)/u.test(task) ||
