@@ -46,6 +46,20 @@ describe('skill resolver fixtures', () => {
   );
 
   it('disambiguates the required held-out Shaper and Gaussian phrases', () => {
+    const gaussianPositive = resolveSkills({
+      task: 'Reconstruct a consented room capture with 3D Gaussian Splatting and render novel views.',
+      limit: 12,
+    }).skills.map((skill) => skill.id);
+    expect(gaussianPositive).toContain('gaussian-splatting-spatial-reconstruction');
+    expect(gaussianPositive).not.toContain('analytics-with-shaper');
+
+    const shaperPositive = resolveSkills({
+      task: 'Build a Taleshape Shaper dashboard over Major telemetry without adding a runtime dependency.',
+      limit: 12,
+    }).skills.map((skill) => skill.id);
+    expect(shaperPositive).toContain('analytics-with-shaper');
+    expect(shaperPositive).not.toContain('gaussian-splatting-spatial-reconstruction');
+
     const metaShapeR = resolveSkills({
       task: 'Reconstruct a sculpture with Meta ShapeR.',
       limit: 12,

@@ -27,6 +27,8 @@ These are canonical Major-owned skills.
 | `human-blocker-orchestration` | Surface auth/OAuth/2FA/CAPTCHA/payment/irreversible human-only actions and keep independent work moving. |
 | `dev-server-management` | Coordinate an explicitly approved local exception only. |
 | `mcp-integration-ops` | Diagnose and prove MCP/connector/plugin integrations across installed→configured→exposed→authenticated→permissioned→operational→integrated states. |
+| `analytics-with-shaper` | SQL-first Taleshape Shaper dashboards, operational analytics, reporting, alerts and privacy-safe Major telemetry exports. |
+| `gaussian-splatting-spatial-reconstruction` | Consent-gated 3D Gaussian Splatting reconstruction, spatial visualisation and novel-view rendering. |
 | `source-ingestion` | Retrieve named primary sources with the right connector/CLI/browser/local tool before analysis. |
 | `knowledge-work` | Research/strategy/synthesis with minimum credible evidence, independent angles and skeptic review where justified. |
 | `competitive-product-audit` | Learn direct/adjacent product patterns before reinventing workflows. |

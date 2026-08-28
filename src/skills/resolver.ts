@@ -137,6 +137,7 @@ const STOP_WORDS = new Set([
   'the',
   'this',
   'use',
+  'with',
   'work',
 ]);
 
