@@ -1,0 +1,16 @@
+{
+  "skill": "analytics-with-shaper",
+  "should_trigger": [
+    "Build a Taleshape Shaper dashboard over Major telemetry without adding a runtime dependency.",
+    "Export Major run observability as privacy-safe CSV for Shaper analytics.",
+    "Use analytics-with-shaper to inspect provider run counts and durations."
+  ],
+  "should_not_trigger": [
+    "Tune the network traffic shaper queue.",
+    "Use SHAP values to explain this classification model.",
+    "Reconstruct this room with Meta ShapeR."
+  ],
+  "conflicts": [
+    "analytics-with-shaper owns the optional Taleshape analytics consumer; observability owns telemetry semantics and privacy; gaussian-splatting-spatial-reconstruction owns 3D reconstruction."
+  ]
+}

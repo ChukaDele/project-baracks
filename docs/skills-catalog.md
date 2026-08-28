@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 38
+## Major internal skills — 40
 
 These are canonical Major-owned skills.
 
@@ -194,6 +194,8 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 - GSAP/ScrollTrigger/sticky/pinned/Three.js/viewport motion → add `responsive-motion-systems`.
 - Explicit owner-approved local exception → `dev-server-management`.
 - MCP/connector/plugin setup/reconnect/tool exposure/auth/permission failure → `mcp-integration-ops`.
+- Taleshape Shaper dashboards or privacy-safe SQL analytics over Major telemetry → `analytics-with-shaper`.
+- 3D Gaussian Splatting, COLMAP-to-splat reconstruction or novel-view rendering → `gaussian-splatting-spatial-reconstruction`.
 - Reusable successful procedure / recurring solved failure → `skillify` after the real task succeeds.
 - Repeated deterministic tool/retrieval mechanics → `tools-as-code`.
 - Named URL/video/file/source → `source-ingestion`.
