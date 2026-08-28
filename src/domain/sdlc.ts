@@ -96,15 +96,24 @@ export function decideSdlc(input: {
   };
 }
 
-/** Nits and unverified speculation are advisory; only evidenced actionable findings block. */
+export type ReviewFindingDisposition = 'block' | 'triage' | 'advisory';
+
+/** Classify review action without turning every evidenced issue into an MVP blocker. */
+export function reviewFindingDisposition(input: {
+  severity?: ReviewSeverity;
+  speculative?: boolean;
+}): ReviewFindingDisposition {
+  if (input.speculative || input.severity === undefined || input.severity === 'NIT') {
+    return 'advisory';
+  }
+  return input.severity === 'BLOCKER' ? 'block' : 'triage';
+}
+
 export function reviewFindingBlocksPromotion(input: {
   severity?: ReviewSeverity;
   speculative?: boolean;
-  riskAccepted?: boolean;
 }): boolean {
-  if (input.speculative || input.severity === undefined) return false;
-  if (input.severity === 'BLOCKER') return true;
-  return input.severity === 'IMPORTANT' && !input.riskAccepted;
+  return reviewFindingDisposition(input) === 'block';
 }
 
 export function validateSdlcIntent(

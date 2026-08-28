@@ -57,9 +57,9 @@ Delivery evidence:
 
 ## Current status
 
-BUILT. Exact implementation head `4add22e` passed the final deterministic gates. Independent
-exact-head review has not run, so VALIDATED is not claimed. Installation and installed behavior
-remain explicitly unproven.
+BUILT. The final review-semantics repair passes focused and relevant deterministic checks. The
+106-file full gate remains evidence for prior implementation head `4add22e`; independent review
+has not run, so VALIDATED is not claimed. Installation and installed behavior remain unproven.
 
 Installation proof: unproven.
 Representative installed behaviour proof: unproven.
@@ -78,7 +78,8 @@ installation and installed behavior proof follow normal merge.
 - Keep installation and representative behavior proof separate; neither source checks nor
   installation alone imply READY.
 - WRAP the existing state/readiness paths per `docs/prior-art-decisions.md`; add no new store.
-- Use only BLOCKER/IMPORTANT/NIT findings; nits and speculation never block promotion.
+- Use only BLOCKER/IMPORTANT/NIT findings: BLOCKER blocks; IMPORTANT is triaged without
+  automatically blocking a usable and safe MVP; nits and speculation never block.
 - Apply delivery evidence only to task-relevant states; irrelevant states are `not_required`.
 
 ## Completed evidence
@@ -87,6 +88,8 @@ installation and installed behavior proof follow normal merge.
   low-risk no-review, review severity, installation/behavior proof, prior-art, autonomy, and artifacts.
 - Final delivery-evidence repair: 5 focused files and 38/38 tests passed; all eight states are
   explicit, applicable states require evidence, and irrelevant states resolve to `not_required`.
+- Review-semantics repair: 5 focused files and 38/38 tests passed; BLOCKER blocks, IMPORTANT
+  triages without automatically blocking, and NIT/speculation remain advisory.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final ordinary exact-head gate: 106/106 files and 910/910 tests passed.
@@ -102,6 +105,8 @@ installation and installed behavior proof follow normal merge.
   non-blocking nits and speculation.
 - Candidate regression: `3e94e66` exposed only generic review/installation/behavior proof. Focused
   tests now require all eight delivery-evidence states while exempting task-irrelevant states.
+- Candidate regression: `4add22e` automatically blocked promotion for an unaccepted IMPORTANT
+  finding. Focused tests now require IMPORTANT to return `triage` without blocking promotion.
 - Repository exception: the final resource gate has one pre-existing skill-reachability failure
   covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
   skips. The durable record does not recast that exception as candidate success.

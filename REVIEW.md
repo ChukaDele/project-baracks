@@ -5,8 +5,8 @@ severity reflects impact, not effort:
 
 - **BLOCKER:** unsafe authority/security boundary, destructive data risk, broken core path,
   material regression, or false acceptance/readiness claim. Blocks validation and promotion.
-- **IMPORTANT:** evidenced defect or maintainability risk that should be resolved before
-  promotion unless an explicit owner accepts and records the bounded risk.
+- **IMPORTANT:** evidenced defect or maintainability risk that must be triaged and recorded.
+  It does not automatically block a usable and safe MVP; record the disposition and follow-up.
 - **NIT:** polish, clarity, or optional improvement. Never blocks validation or promotion.
 
 Speculation and questions are not findings and never block. Label them explicitly and promote

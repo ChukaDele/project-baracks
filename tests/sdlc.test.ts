@@ -7,6 +7,7 @@ import {
   decideSdlc,
   failureRegression,
   reviewFindingBlocksPromotion,
+  reviewFindingDisposition,
   validateSdlcIntent,
 } from '../src/domain/sdlc.js';
 
@@ -54,13 +55,17 @@ describe('MVP-first SDLC policy', () => {
     ).toEqual({ ok: true, missing: [] });
   });
 
-  it('keeps nits and speculation non-blocking while actionable findings block promotion', () => {
+  it('blocks only blockers while triaging important findings for a usable safe MVP', () => {
     expect(reviewFindingBlocksPromotion({ severity: 'BLOCKER' })).toBe(true);
-    expect(reviewFindingBlocksPromotion({ severity: 'IMPORTANT' })).toBe(true);
-    expect(reviewFindingBlocksPromotion({ severity: 'IMPORTANT', riskAccepted: true })).toBe(false);
+    expect(reviewFindingBlocksPromotion({ severity: 'IMPORTANT' })).toBe(false);
     expect(reviewFindingBlocksPromotion({ severity: 'NIT' })).toBe(false);
     expect(reviewFindingBlocksPromotion({ severity: 'BLOCKER', speculative: true })).toBe(false);
     expect(reviewFindingBlocksPromotion({})).toBe(false);
+
+    expect(reviewFindingDisposition({ severity: 'BLOCKER' })).toBe('block');
+    expect(reviewFindingDisposition({ severity: 'IMPORTANT' })).toBe('triage');
+    expect(reviewFindingDisposition({ severity: 'NIT' })).toBe('advisory');
+    expect(reviewFindingDisposition({ severity: 'IMPORTANT', speculative: true })).toBe('advisory');
   });
 
   it('keeps the canonical template and review policy aligned with the public contract', () => {
@@ -86,6 +91,7 @@ describe('MVP-first SDLC policy', () => {
     expect(reviewPolicy).toContain('**BLOCKER:**');
     expect(reviewPolicy).toContain('**IMPORTANT:**');
     expect(reviewPolicy).toContain('**NIT:**');
+    expect(reviewPolicy).toContain('does not automatically block');
     expect(reviewPolicy).toContain('Speculation and questions are not findings and never block.');
     expect(reviewPolicy).not.toMatch(/\*\*P[0-3]/);
   });

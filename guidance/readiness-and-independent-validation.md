@@ -58,7 +58,9 @@ policy continues to govern external effects and owner-only gates.
 
 Review findings use `BLOCKER`, `IMPORTANT`, or `NIT`. Nits and explicitly labelled
 speculation are non-blocking; speculation becomes a finding only when evidence establishes
-an actionable defect. See `REVIEW.md` for the concise promotion policy.
+an actionable defect. BLOCKER findings block promotion. IMPORTANT findings must be triaged
+and recorded but do not automatically block a usable and safe MVP. See `REVIEW.md` for the
+concise promotion policy.
 
 Record installation proof separately as `not_required`, `unproven`, or `proven`.
 Record representative behaviour as `unproven` or `proven`. Installation alone never
