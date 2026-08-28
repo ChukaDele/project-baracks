@@ -316,6 +316,23 @@ function scoreEntry(
 ): { score: number; reason: string } {
   const normalized = task.toLowerCase();
   const fixtures = examples.get(entry.id);
+  if (
+    entry.id === 'analytics-with-shaper' &&
+    (/(?:network|packet|bandwidth|qdisc).{0,24}shap(?:e|er|ing)|shap(?:e|er|ing).{0,24}(?:network|packet|bandwidth|qdisc)/u.test(
+      normalized,
+    ) ||
+      /\bmeta\s+shaper\b|\bshap\s+(?:value|explain)/u.test(normalized))
+  ) {
+    return { score: 0, reason: 'disambiguated a non-analytics Shaper meaning' };
+  }
+  if (
+    entry.id === 'gaussian-splatting-spatial-reconstruction' &&
+    (/gaussian.{0,20}(?:blur|filter|noise|distribution|kernel|process)/u.test(normalized) ||
+      /(?:blur|filter|noise|distribution|kernel|process).{0,20}gaussian/u.test(normalized) ||
+      /gaussian.{0,20}(?:scatter|chart|plot)/u.test(normalized))
+  ) {
+    return { score: 0, reason: 'disambiguated a non-reconstruction Gaussian meaning' };
+  }
   if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
     return { score: 0, reason: 'matched a negative trigger example' };
   }

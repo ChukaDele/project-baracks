@@ -44,4 +44,26 @@ describe('skill resolver fixtures', () => {
       }
     },
   );
+
+  it.each([
+    [
+      'Shape outbound network traffic with qdisc so packet bursts stay below the bandwidth cap.',
+      'analytics-with-shaper',
+    ],
+    [
+      'Use SHAP explanations to show which features drove the fraud prediction.',
+      'analytics-with-shaper',
+    ],
+    [
+      'Run a Gaussian noise filter over the scanned image before OCR.',
+      'gaussian-splatting-spatial-reconstruction',
+    ],
+    [
+      'Plot a fitted Gaussian distribution for the response-time sample.',
+      'gaussian-splatting-spatial-reconstruction',
+    ],
+  ])('rejects held-out near-neighbour paraphrase: %s', (task, excludedSkill) => {
+    const ids = resolveSkills({ task, limit: 12 }).skills.map((skill) => skill.id);
+    expect(ids, task).not.toContain(excludedSkill);
+  });
 });

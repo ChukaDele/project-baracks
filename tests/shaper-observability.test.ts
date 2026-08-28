@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { openDb } from '../src/db/client.js';
 import { transitionTask } from '../src/domain/task-service.js';
+import { openShaperTelemetryDb } from '../src/observability/shaper-cli.js';
 import {
   readShaperCommandCentre,
   readShaperTelemetry,
@@ -86,6 +91,31 @@ function seedTelemetry() {
 }
 
 describe('read-only Shaper observability adapter', () => {
+  it('opens only an existing database in query-only mode without migrations or writes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-shaper-readonly-'));
+    const missing = join(root, 'missing', 'major.db');
+    const existing = join(root, 'major.db');
+    try {
+      expect(() => openShaperTelemetryDb(missing)).toThrow();
+      const created = new Database(existing);
+      created.exec('CREATE TABLE marker (value text)');
+      created.close();
+
+      const sqlite = openShaperTelemetryDb(existing);
+      try {
+        expect(sqlite.pragma('query_only', { simple: true })).toBe(1);
+        expect(
+          sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").pluck().all(),
+        ).toEqual(['marker']);
+        expect(() => sqlite.exec("INSERT INTO marker VALUES ('write')")).toThrow();
+      } finally {
+        sqlite.close();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('projects known run telemetry and keeps unsupported or sensitive data unavailable', () => {
     const opened = seedTelemetry();
     try {
@@ -157,6 +187,64 @@ describe('read-only Shaper observability adapter', () => {
     } finally {
       opened.sqlite.close();
     }
+  });
+
+  it('uses an inclusive as-of cutoff and limits by full run timestamp then run id', () => {
+    const opened = seedTelemetry();
+    try {
+      opened.sqlite.exec(`
+        INSERT INTO agent_runs
+          (id,task_id,provider_id,model_id,model_ref,purpose,billing_mode,routing_reason,status,
+           started_at,ended_at,created_at,updated_at)
+        VALUES
+          ('run-early','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
+           '2026-08-28T11:00:00Z','2026-08-28T11:00:01Z','2026-08-28T11:00:00Z','2026-08-28T11:00:01Z'),
+          ('run-late','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
+           '2026-08-28T11:59:59Z','2026-08-28T12:00:00Z','2026-08-28T11:59:59Z','2026-08-28T12:00:00Z'),
+          ('run-boundary-a','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
+           '2026-08-28T12:00:00Z','2026-08-28T12:00:00Z','2026-08-28T12:00:00Z','2026-08-28T12:00:00Z'),
+          ('run-boundary-b','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
+           '2026-08-28T12:00:00Z','2026-08-28T12:00:00Z','2026-08-28T12:00:00Z','2026-08-28T12:00:00Z'),
+          ('run-future','t','ap','model','gpt-test','implementation','subscription_included','test','succeeded',
+           '2026-08-28T12:00:01Z','2026-08-28T12:00:01Z','2026-08-28T12:00:01Z','2026-08-28T12:00:01Z');
+        INSERT INTO tasks (id,project_id,title,description,status,complexity,version,created_at,updated_at)
+        VALUES
+          ('t-boundary','p','boundary','boundary','draft','routine',0,'2026-08-28T12:00:00Z','2026-08-28T12:00:00Z'),
+          ('t-future','p','future','future','draft','routine',0,'2026-08-28T12:00:01Z','2026-08-28T12:00:01Z');
+      `);
+      const options = { asOf: '2026-08-28T12:00:00Z', limit: 2 };
+      expect(readShaperTelemetry(opened.sqlite, options).map((row) => row.runId)).toEqual([
+        'run-boundary-a',
+        'run-boundary-b',
+      ]);
+      expect(readShaperCommandCentre(opened.sqlite, options)).toContainEqual({
+        metric: 'run_status',
+        status: 'succeeded',
+        count: 5,
+        latestAt: '2026-08-28T12:00:00Z',
+      });
+      expect(readShaperCommandCentre(opened.sqlite, options)).toContainEqual({
+        metric: 'task_status',
+        status: 'draft',
+        count: 1,
+        latestAt: '2026-08-28T12:00:00Z',
+      });
+    } finally {
+      opened.sqlite.close();
+    }
+  });
+
+  it('neutralizes CSV formulas after whitespace/control prefixes and preserves ordinary strings', () => {
+    const csv = shaperCommandCentreCsv([
+      { metric: 'run_status', status: '=cmd()', count: 1, latestAt: '+SUM(A1)' },
+      { metric: 'run_status', status: ' \t-2+3', count: 2, latestAt: '\u0000@payload' },
+      { metric: 'run_status', status: '\u200b=hidden()', count: 4, latestAt: null },
+      { metric: 'run_status', status: 'ordinary value', count: 3, latestAt: '2026-08-28' },
+    ]);
+    expect(csv).toContain("run_status,'=cmd(),1,'+SUM(A1)");
+    expect(csv).toContain("run_status,' \t-2+3,2,'\u0000@payload");
+    expect(csv).toContain("run_status,'\u200b=hidden(),4,");
+    expect(csv).toContain('run_status,ordinary value,3,2026-08-28');
   });
 
   it('returns an empty result for an empty database without network or writes', () => {

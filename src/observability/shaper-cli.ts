@@ -1,4 +1,5 @@
-import { openDb } from '../db/client.js';
+import Database from 'better-sqlite3';
+import { defaultDbPath } from '../db/client.js';
 import {
   readShaperCommandCentre,
   readShaperTelemetry,
@@ -41,20 +42,17 @@ export async function runShaperCli(args: string[]): Promise<boolean> {
   if (provider !== undefined) options.provider = provider;
   if (runPurpose !== undefined) options.runPurpose = runPurpose;
   if (limit !== undefined) options.limit = limit;
-  const opened = openDb();
+  const sqlite = openShaperTelemetryDb();
   try {
-    // The normal Major process may migrate an old database while opening it.
-    // After that boundary, this adapter is query-only and cannot mutate state.
-    opened.sqlite.pragma('query_only = ON');
     if (view === 'command-centre') {
-      const rows = readShaperCommandCentre(opened.sqlite, options);
+      const rows = readShaperCommandCentre(sqlite, options);
       process.stdout.write(
         format === 'csv'
           ? shaperCommandCentreCsv(rows)
           : JSON.stringify({ schemaVersion: 2, kind: 'shaper-command-centre', data: rows }) + '\n',
       );
     } else {
-      const rows = readShaperTelemetry(opened.sqlite, options);
+      const rows = readShaperTelemetry(sqlite, options);
       process.stdout.write(
         format === 'csv'
           ? shaperTelemetryCsv(rows)
@@ -62,7 +60,19 @@ export async function runShaperCli(args: string[]): Promise<boolean> {
       );
     }
   } finally {
-    opened.sqlite.close();
+    sqlite.close();
   }
   return true;
+}
+
+/** Open an existing Major database without creating directories, files, or running migrations. */
+export function openShaperTelemetryDb(path: string = defaultDbPath()): Database.Database {
+  const sqlite = new Database(path, { readonly: true, fileMustExist: true });
+  try {
+    sqlite.pragma('query_only = ON');
+    return sqlite;
+  } catch (error) {
+    sqlite.close();
+    throw error;
+  }
 }

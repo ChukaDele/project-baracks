@@ -6,9 +6,9 @@
     "Prepare a COLMAP scene for gaussian-splatting-spatial-reconstruction."
   ],
   "should_not_trigger": [
-    "Add Gaussian blur to this image.",
-    "Make a scatter plot of provider latency.",
-    "Export run analytics to Taleshape Shaper."
+    "Apply a Gaussian blur kernel to soften this photograph.",
+    "Fit a Gaussian distribution to the latency samples and chart it.",
+    "Build a Taleshape Shaper dashboard from provider telemetry."
   ],
   "conflicts": [
     "This skill owns 3D reconstruction workflow and spatial-data gates; analytics-with-shaper owns SQL analytics; dependency owns package mechanics after adoption is authorised."

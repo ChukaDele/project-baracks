@@ -6,9 +6,9 @@
     "Use analytics-with-shaper to inspect provider run counts and durations."
   ],
   "should_not_trigger": [
-    "Tune the network traffic shaper queue.",
-    "Use SHAP values to explain this classification model.",
-    "Reconstruct this room with Meta ShapeR."
+    "Configure the Linux network shaper to cap packet bandwidth.",
+    "Explain the classifier's output with SHAP values.",
+    "Generate a 3D object with Meta ShapeR from a text prompt."
   ],
   "conflicts": [
     "analytics-with-shaper owns the optional Taleshape analytics consumer; observability owns telemetry semantics and privacy; gaussian-splatting-spatial-reconstruction owns 3D reconstruction."

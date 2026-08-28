@@ -154,12 +154,13 @@ JOIN projects p ON p.id = t.project_id
 JOIN agent_providers ap ON ap.id = r.provider_id
 LEFT JOIN task_claims c ON c.id = r.claim_id
 LEFT JOIN decision_requests d ON d.id = r.paid_usage_decision_id
-WHERE datetime(coalesce(r.started_at, r.created_at)) >=
-  datetime(@asOf, '-' || @days || ' days')
+WHERE julianday(coalesce(r.started_at, r.created_at)) >=
+  julianday(@asOf, '-' || @days || ' days')
+  AND julianday(coalesce(r.started_at, r.created_at)) <= julianday(@asOf)
   AND (@project IS NULL OR p.name = @project)
   AND (@provider IS NULL OR ap.name = @provider)
   AND (@runPurpose IS NULL OR r.purpose = @runPurpose)
-ORDER BY day DESC, project, runId
+ORDER BY julianday(coalesce(r.started_at, r.created_at)) DESC, r.id
 LIMIT @limit`;
 
 const COMMAND_CENTRE_QUERY = `
@@ -167,6 +168,7 @@ SELECT 'task_status' AS metric, t.status AS status, count(*) AS count, max(t.upd
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
 WHERE (@project IS NULL OR p.name = @project)
+  AND julianday(t.updated_at) <= julianday(@asOf)
 GROUP BY t.status
 UNION ALL
 SELECT 'run_status' AS metric, r.status AS status,
@@ -176,8 +178,9 @@ FROM agent_runs r
 JOIN tasks t ON t.id = r.task_id
 JOIN projects p ON p.id = t.project_id
 JOIN agent_providers ap ON ap.id = r.provider_id
-WHERE datetime(coalesce(r.started_at, r.created_at)) >=
-  datetime(@asOf, '-' || @days || ' days')
+WHERE julianday(coalesce(r.started_at, r.created_at)) >=
+  julianday(@asOf, '-' || @days || ' days')
+  AND julianday(coalesce(r.started_at, r.created_at)) <= julianday(@asOf)
   AND (@project IS NULL OR p.name = @project)
   AND (@provider IS NULL OR ap.name = @provider)
   AND (@runPurpose IS NULL OR r.purpose = @runPurpose)
@@ -384,8 +387,14 @@ const TELEMETRY_CSV_COLUMNS: readonly (readonly [keyof ShaperTelemetryRow, strin
 
 function csvCell(value: CsvValue): string {
   if (value === null) return '';
-  const text = String(value);
+  const text = typeof value === 'string' ? safeCsvString(value) : String(value);
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+/** Neutralize spreadsheet formulas, including leading whitespace/control bypasses. */
+function safeCsvString(value: string): string {
+  const firstVisible = value.replace(/^[\p{White_Space}\p{Cc}\p{Cf}]*/u, '').charAt(0);
+  return ['=', '+', '-', '@'].includes(firstVisible) ? `'${value}` : value;
 }
 
 export function shaperTelemetryCsv(rows: readonly ShaperTelemetryRow[]): string {
