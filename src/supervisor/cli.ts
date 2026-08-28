@@ -500,9 +500,30 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   }
 
   if (command === 'status') {
+    const project =
+      flag(args, '--project') ?? args.slice(1).find((value) => !value.startsWith('-'));
+    if (hasFlag(args, '--json')) {
+      const goals = readSupervisorState().goals.filter(
+        (goal) => project === undefined || goal.project === project,
+      );
+      console.log(
+        JSON.stringify(
+          {
+            activeGoalCount: goals.filter(
+              (goal) => goal.status === 'active' || goal.status === 'running',
+            ).length,
+            goals,
+            resourceTelemetry: resourceSnapshot().telemetry,
+          },
+          null,
+          2,
+        ),
+      );
+      return true;
+    }
     console.log(majorStatusOverview());
     console.log('');
-    console.log(supervisorSnapshot(args[1]));
+    console.log(supervisorSnapshot(project));
     console.log(formatResourceTelemetry(resourceSnapshot().telemetry));
     return true;
   }
