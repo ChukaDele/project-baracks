@@ -7,12 +7,15 @@ export type WorkClass = (typeof WORK_CLASSES)[number];
 export const REVIEW_LEVELS = ['none', 'focused', 'independent'] as const;
 export type ReviewLevel = (typeof REVIEW_LEVELS)[number];
 
+export const REVIEW_SEVERITIES = ['BLOCKER', 'IMPORTANT', 'NIT'] as const;
+export type ReviewSeverity = (typeof REVIEW_SEVERITIES)[number];
+
 export const PROOF_STATES = ['not_required', 'unproven', 'proven'] as const;
 export type ProofState = (typeof PROOF_STATES)[number];
 
 export interface SdlcIntent {
-  outcome: string;
-  acceptance: string[];
+  intent: string;
+  spec: string[];
   plan?: string[];
   evidence?: string[];
 }
@@ -68,9 +71,7 @@ export function decideSdlc(input: {
     workClass: substantive ? 'substantive' : 'small',
     review: consequential ? 'independent' : substantive ? 'focused' : 'none',
     requiresCompactState: substantive,
-    requiredState: substantive
-      ? ['outcome', 'acceptance', 'plan', 'evidence']
-      : ['outcome', 'acceptance'],
+    requiredState: substantive ? ['intent', 'spec', 'plan', 'evidence'] : ['intent', 'spec'],
     reasons: [
       substantive ? 'scope or risk requires a resumable compact state' : 'bounded low-risk change',
       consequential
@@ -80,6 +81,17 @@ export function decideSdlc(input: {
           : 'deterministic acceptance proof is sufficient',
     ],
   };
+}
+
+/** Nits and unverified speculation are advisory; only evidenced actionable findings block. */
+export function reviewFindingBlocksPromotion(input: {
+  severity?: ReviewSeverity;
+  speculative?: boolean;
+  riskAccepted?: boolean;
+}): boolean {
+  if (input.speculative || input.severity === undefined) return false;
+  if (input.severity === 'BLOCKER') return true;
+  return input.severity === 'IMPORTANT' && !input.riskAccepted;
 }
 
 export function validateSdlcIntent(

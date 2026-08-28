@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assessDelivery,
   decideSdlc,
   failureRegression,
+  reviewFindingBlocksPromotion,
   validateSdlcIntent,
 } from '../src/domain/sdlc.js';
 
@@ -13,11 +16,11 @@ describe('MVP-first SDLC policy', () => {
       workClass: 'small',
       review: 'none',
       requiresCompactState: false,
-      requiredState: ['outcome', 'acceptance'],
+      requiredState: ['intent', 'spec'],
     });
     expect(
       validateSdlcIntent(
-        { outcome: 'Correct the label.', acceptance: ['Focused test passes.'] },
+        { intent: 'Correct the label.', spec: ['Focused test passes.'] },
         decision,
       ),
     ).toEqual({ ok: true, missing: [] });
@@ -28,10 +31,50 @@ describe('MVP-first SDLC policy', () => {
     expect(decision).toMatchObject({ workClass: 'substantive', review: 'focused' });
     expect(
       validateSdlcIntent(
-        { outcome: 'Ship the flow.', acceptance: ['E2E passes.'], plan: [], evidence: [] },
+        { intent: 'Ship the flow.', spec: ['E2E passes.'], plan: [], evidence: [] },
         decision,
       ),
     ).toEqual({ ok: false, missing: ['plan', 'evidence'] });
+  });
+
+  it('uses the exact compact intent/spec/plan/evidence contract', () => {
+    const decision = decideSdlc({ estimatedFiles: 3, acceptancePaths: 2 });
+    expect(decision.requiredState).toEqual(['intent', 'spec', 'plan', 'evidence']);
+    expect(
+      validateSdlcIntent(
+        {
+          intent: 'Deliver one useful end-to-end slice.',
+          spec: ['The representative acceptance path succeeds.'],
+          plan: ['Implement the minimum delta.'],
+          evidence: ['Focused regression passes.'],
+        },
+        decision,
+      ),
+    ).toEqual({ ok: true, missing: [] });
+  });
+
+  it('keeps nits and speculation non-blocking while actionable findings block promotion', () => {
+    expect(reviewFindingBlocksPromotion({ severity: 'BLOCKER' })).toBe(true);
+    expect(reviewFindingBlocksPromotion({ severity: 'IMPORTANT' })).toBe(true);
+    expect(reviewFindingBlocksPromotion({ severity: 'IMPORTANT', riskAccepted: true })).toBe(false);
+    expect(reviewFindingBlocksPromotion({ severity: 'NIT' })).toBe(false);
+    expect(reviewFindingBlocksPromotion({ severity: 'BLOCKER', speculative: true })).toBe(false);
+    expect(reviewFindingBlocksPromotion({})).toBe(false);
+  });
+
+  it('keeps the canonical template and review policy aligned with the public contract', () => {
+    const template = readFileSync(join(process.cwd(), 'templates/project/GOAL_STATE.md'), 'utf8');
+    expect(template).toMatch(/^## Intent$/m);
+    expect(template).toMatch(/^## Spec$/m);
+    expect(template).toMatch(/^## Plan$/m);
+    expect(template).toMatch(/^## Evidence$/m);
+
+    const reviewPolicy = readFileSync(join(process.cwd(), 'REVIEW.md'), 'utf8');
+    expect(reviewPolicy).toContain('**BLOCKER:**');
+    expect(reviewPolicy).toContain('**IMPORTANT:**');
+    expect(reviewPolicy).toContain('**NIT:**');
+    expect(reviewPolicy).toContain('Speculation and questions are not findings and never block.');
+    expect(reviewPolicy).not.toMatch(/\*\*P[0-3]/);
   });
 
   it('raises review based on consequence, not change size', () => {

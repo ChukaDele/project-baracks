@@ -1,8 +1,8 @@
 # Goal state
 
-## Active outcome
+## Intent
 
-[One concrete outcome]
+[One concrete outcome and why it matters]
 
 ## Work profile
 
@@ -11,9 +11,17 @@
 Risk: [low / persistence / authority / security / external / irreversible / broad]
 Review: [none / focused / independent]
 
-## Acceptance evidence
+## Spec
 
-- [Observable proof required to call this outcome done]
+- [Observable acceptance requirement]
+
+## Plan
+
+- [Smallest ordered implementation slice; omit for small low-risk work]
+
+## Evidence
+
+- [Observed proof; omit until evidence exists]
 
 ## Critical-path dependencies
 

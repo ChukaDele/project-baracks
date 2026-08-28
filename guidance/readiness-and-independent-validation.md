@@ -48,13 +48,17 @@ Do not increase trust merely because configuration exists or self-authored tests
 
 Use `decideSdlc` from `src/domain/sdlc.ts` as the deterministic policy primitive.
 A low-risk change touching at most two files with one acceptance path needs only a
-clear outcome, acceptance check and focused proof. Substantive or risk-bearing work
-keeps compact outcome, acceptance, plan and evidence state in `GOAL_STATE.md`.
+clear intent, spec and focused proof. Substantive or risk-bearing work keeps compact
+intent, spec, plan and evidence state in `GOAL_STATE.md`.
 
 Review follows consequence: no mandatory independent review for a small low-risk
 change, focused review for substantive ordinary work, and independent review for
 authority, security, irreversible or broad-blast-radius changes. Existing project
 policy continues to govern external effects and owner-only gates.
+
+Review findings use `BLOCKER`, `IMPORTANT`, or `NIT`. Nits and explicitly labelled
+speculation are non-blocking; speculation becomes a finding only when evidence establishes
+an actionable defect. See `REVIEW.md` for the concise promotion policy.
 
 Record installation proof separately as `not_required`, `unproven`, or `proven`.
 Record representative behaviour as `unproven` or `proven`. Installation alone never

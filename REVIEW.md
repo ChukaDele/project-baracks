@@ -1,15 +1,16 @@
 # Review policy
 
-Review the exact candidate and report findings before summaries. Severity reflects impact,
-not effort:
+Review the exact candidate and report findings before summaries. Use only these severities;
+severity reflects impact, not effort:
 
-- **P0 — critical:** unsafe authority/security boundary, destructive data risk, or core path
-  cannot work. Blocks validation and delivery.
-- **P1 — major:** acceptance path is wrong, material regression, or evidence/readiness claim is
-  false. Blocks validation and delivery.
-- **P2 — moderate:** bounded defect or maintainability risk with a safe workaround. Fix before
-  promotion when practical; otherwise record an owner and follow-up.
-- **P3 — minor:** polish, clarity, or non-blocking improvement. Does not block promotion.
+- **BLOCKER:** unsafe authority/security boundary, destructive data risk, broken core path,
+  material regression, or false acceptance/readiness claim. Blocks validation and promotion.
+- **IMPORTANT:** evidenced defect or maintainability risk that should be resolved before
+  promotion unless an explicit owner accepts and records the bounded risk.
+- **NIT:** polish, clarity, or optional improvement. Never blocks validation or promotion.
+
+Speculation and questions are not findings and never block. Label them explicitly and promote
+them to `BLOCKER` or `IMPORTANT` only after evidence establishes an actionable defect.
 
 Small low-risk work may use deterministic acceptance evidence with no separate reviewer.
 Substantive ordinary work gets focused review. Authority, security, irreversible, or broad-impact
