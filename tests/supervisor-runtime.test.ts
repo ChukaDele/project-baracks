@@ -602,6 +602,9 @@ describe('Major coordinator contract', () => {
     }
     expect(prompt).toContain('or repository policy requires them');
     expect(prompt).toContain('cost versus expected information gain');
+    expect(prompt).toContain('existing qualifying verification/evidence path');
+    expect(prompt).toContain('BLOCKER → critical, IMPORTANT → minor, NIT → info');
+    expect(prompt).toContain('stored legacy major remains a BLOCKER');
     expect(prompt).toContain('class: workshop');
     expect(prompt).toContain('trust: assist');
     expect(prompt).toContain('maximum concurrent workers: 1');

@@ -5,7 +5,7 @@ import { createDecisionRequest, resolveDecision } from '../src/domain/decision-s
 import { newId } from '../src/domain/ids.js';
 import { createRun, recordVerificationRun, setRunStatus } from '../src/domain/run-service.js';
 import { addEvidence, addTask, transitionTask } from '../src/domain/task-service.js';
-import { ensureObservedModel, seedProject } from './helpers.js';
+import { ensureObservedModel, recordQualifyingVerification, seedProject } from './helpers.js';
 
 /**
  * P1-3 reproducer: task-specific completion criteria must be enforced at the
@@ -139,6 +139,45 @@ describe('P1-3 database-enforced completion criteria', () => {
   it('direct SQL cannot complete a task short of its minimum verifications', () => {
     const { forceComplete } = harness();
     expect(() => forceComplete()).toThrow();
+  });
+
+  it('direct SQL cannot bypass opt-in progressive validation subjects', () => {
+    const { db, sqlite } = openDb(':memory:');
+    const project = seedProject(db);
+    const task = addTask(db, {
+      projectId: project.id,
+      title: 'progressive direct-write gate',
+      completionCriteriaJson: JSON.stringify({
+        progressiveValidation: { review: 'none' },
+      }),
+    });
+    for (const status of [
+      'ready',
+      'queued',
+      'running',
+      'verifying',
+      'reviewing',
+      'ready_to_merge',
+    ] as const) {
+      transitionTask(db, task.id, status);
+    }
+    recordQualifyingVerification(db, task.id, { validationSubject: 'focused_tests' });
+    const forceComplete = () =>
+      sqlite
+        .prepare(`UPDATE tasks SET status = 'completed', version = version + 1 WHERE id = ?`)
+        .run(task.id);
+    expect(() => forceComplete()).toThrow(/progressive validation/);
+
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'cheapest_compile_type_or_build',
+    });
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'critical_path_behavior',
+    });
+    forceComplete();
+    expect(sqlite.prepare(`SELECT status FROM tasks WHERE id = ?`).get(task.id)).toMatchObject({
+      status: 'completed',
+    });
   });
 
   it('completes via direct SQL only once every task-specific criterion is met', () => {

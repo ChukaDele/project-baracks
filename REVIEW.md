@@ -12,6 +12,10 @@ severity reflects impact, not effort:
 Speculation and questions are not findings and never block. Label them explicitly and promote
 them to `BLOCKER` or `IMPORTANT` only after evidence establishes an actionable defect.
 
+The existing review-finding store remains canonical. New findings map `BLOCKER` to `critical`,
+`IMPORTANT` to `minor`, and `NIT` to `info`. Stored `major` rows are a legacy `BLOCKER` alias, so
+existing data remains safe. Only open `critical` or legacy `major` rows block the durable gate.
+
 Small low-risk work may use deterministic acceptance evidence with no separate reviewer.
 Substantive ordinary work gets focused review. Authority, security, irreversible, or broad-impact
 changes require independent exact-head review. Any code change after review invalidates the

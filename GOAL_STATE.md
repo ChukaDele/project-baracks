@@ -21,8 +21,8 @@ Substantive. Risk: authority/process semantics. Review: independent.
 
 ## Plan
 
-- Make the pure progressive-validation plan operational in the live coordinator prompt and keep
-  the explicit non-circular PROMOTABLE assessment.
+- Connect the progressive-validation plan and non-circular PROMOTABLE assessment to the existing
+  coordinator, frozen completion-criteria, verification/evidence, and SQLite trigger paths.
 - Preserve compact state, review semantics, delivery evidence, and READY behavioral proof.
 - Run focused/risk-specific checks plus the cheapest relevant type check; do not run the full matrix.
 
@@ -43,7 +43,7 @@ Delivery evidence:
 - LOADED: not required — this slice adds no loadable runtime/configuration artifact.
 - FOLLOWED: proven — canonical template/prior-art paths are extended without a new store.
 - INSTALLED: unproven — supported exact-SHA installation has not run.
-- BEHAVIOURALLY PROVEN: unproven — representative installed behavior has not run.
+- BEHAVIORALLY PROVEN: unproven — representative installed behavior has not run.
 
 ## Critical-path dependencies
 
@@ -89,6 +89,10 @@ installation and installed behavior proof follow normal merge.
   require cost versus expected information-gain reasoning.
 - PROMOTABLE requires pre-promotion evidence, selected review, and no BLOCKER; install/behavior
   remain later READY evidence.
+- Canonical review severities reuse the existing store: BLOCKER writes `critical`, IMPORTANT writes
+  `minor`, NIT writes `info`, and legacy `major` remains a safe BLOCKER alias.
+- Canonical delivery evidence uses `BEHAVIORALLY PROVEN`; the prior British spelling remains an
+  accepted read alias so existing records are not discarded.
 
 ## Completed evidence
 
@@ -107,6 +111,11 @@ installation and installed behavior proof follow normal merge.
 - Targeted lint of the entire supervisor-runtime test file also surfaced two pre-existing
   `no-unsafe-assignment` errors at unchanged lines 133 and 186; they are outside this candidate's
   focused assertions and are not recast as passing evidence.
+- Completion-boundary repair: opt-in progressive criteria now resolve required validation subjects
+  through qualifying verification/evidence rows, require the selected succeeded review, call the
+  PROMOTABLE assessment, and enforce the same rules in SQLite. The proportional gate passed 89/89
+  focused tests across policy, coordinator prompt, service completion, and direct-SQL enforcement;
+  the full matrix was not rerun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -130,6 +139,9 @@ installation and installed behavior proof follow normal merge.
 - Candidate regression: `4d5f931` implemented the pure policy but did not carry its progressive
   validation contract in the live coordinator prompt. Focused prompt/policy tests now protect that
   operational path.
+- Independent review regression: `b6433f8` left the new helpers disconnected from durable
+  completion and lacked an explicit canonical-to-storage severity mapping. Focused service and
+  direct-SQL regressions now prove IMPORTANT remains non-blocking and BLOCKER blocks.
 - Repository exception: the final resource gate has one pre-existing skill-reachability failure
   covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
   skips. The durable record does not recast that exception as candidate success.

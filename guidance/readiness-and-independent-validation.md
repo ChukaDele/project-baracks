@@ -63,6 +63,11 @@ insufficient-evidence, historical-regression, or promotion-policy trigger applie
 policy requires them. Record broad validation's cost versus expected information gain and run it
 only when that tradeoff supports the promotion decision.
 
+When a task opts into `progressiveValidation` in its existing frozen completion criteria, record
+each planned check as a qualifying verification run with the matching canonical
+`validationSubject`. The durable completion proof reuses those records, a succeeded selected
+review, and the existing review-finding store to call `assessPromotion`; no parallel state exists.
+
 Review findings use `BLOCKER`, `IMPORTANT`, or `NIT`. Nits and explicitly labelled
 speculation are non-blocking; speculation becomes a finding only when evidence establishes
 an actionable defect. BLOCKER findings block promotion. IMPORTANT findings must be triaged
@@ -83,7 +88,7 @@ support VALIDATED without inventing an independent-review requirement.
 
 Use `assessTaskDeliveryEvidence` to record evidence for the states relevant to the task:
 `IMPLEMENTED`, `TESTED`, `STAGED`, `RESOLVED`, `LOADED`, `FOLLOWED`, `INSTALLED`, and
-`BEHAVIOURALLY_PROVEN`. An applicable state is proven only by a non-empty evidence record.
+`BEHAVIORALLY_PROVEN`. An applicable state is proven only by a non-empty evidence record.
 States outside the task's delivery path are `not_required`; never demand or claim them merely
 because the vocabulary exists. This matrix supplements rather than replaces the canonical
 BUILT/VALIDATED/READY assessment and its independent-review and representative-outcome gates.

@@ -1,4 +1,4 @@
-import { and, count, countDistinct, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbConn } from '../db/client.js';
 import {
@@ -9,17 +9,24 @@ import {
   verificationRuns,
 } from '../db/schema.js';
 import type { CompletionProof } from './lifecycle.js';
+import {
+  assessPromotion,
+  BROADER_VALIDATION_TRIGGERS,
+  planProgressiveValidation,
+  REVIEW_LEVELS,
+  type ReviewSeverity,
+} from './sdlc.js';
 
 /**
  * The completion proof set: what must be true, in the database, before a task
  * may reach 'completed'. Free-text evidence alone is never sufficient — the
  * proof requires QUALIFYING VerificationRun records (passed with exit code 0,
  * completed timestamps, produced under a succeeded agent run of this same
- * task, and cited by an immutable evidence row), resolved P0/P1 review
+ * task, and cited by an immutable evidence row), resolved BLOCKER review
  * findings, verified evidence relationships, and any task-specific criteria.
  * It is evaluated inside the same transaction as the final state transition,
  * and the same invariants are enforced again by database triggers so a direct
- * write cannot bypass them (drizzle/0004).
+ * write cannot bypass them (latest tasks_completion_requires_proof trigger).
  */
 
 export const completionCriteriaSchema = z
@@ -30,6 +37,17 @@ export const completionCriteriaSchema = z
     requireArtifact: z.boolean().default(false),
     /** DecisionRequest categories that must each have an approved decision. */
     requiredDecisionCategories: z.array(z.string().min(1)).default([]),
+    /** Opt-in progressive proof contract. Absent on legacy tasks, which retain
+     * their existing minimum-verification completion semantics. */
+    progressiveValidation: z
+      .object({
+        riskSpecificChecks: z.array(z.string().min(1)).default([]),
+        broaderValidationTriggers: z.enum(BROADER_VALIDATION_TRIGGERS).array().default([]),
+        repositoryPolicyRequiresBroadValidation: z.boolean().default(false),
+        review: z.enum(REVIEW_LEVELS).default('focused'),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -44,8 +62,22 @@ export interface CompletionProofResult extends CompletionProof {
   checkedAt: string;
 }
 
-/** Severities that count as P0/P1 and must be resolved before completion. */
-const BLOCKING_SEVERITIES = ['critical', 'major'] as const;
+export const REVIEW_SEVERITY_STORAGE = {
+  BLOCKER: 'critical',
+  IMPORTANT: 'minor',
+  NIT: 'info',
+} as const satisfies Record<ReviewSeverity, 'critical' | 'minor' | 'info'>;
+
+/** `major` is the pre-SDLC storage alias for a blocking finding. Retaining it
+ * preserves existing rows while all new canonical BLOCKER writes use critical. */
+export const BLOCKING_STORED_REVIEW_SEVERITIES = ['critical', 'major'] as const;
+
+export function reviewSeverityFromStorage(
+  severity: 'info' | 'minor' | 'major' | 'critical',
+): ReviewSeverity {
+  if (severity === 'critical' || severity === 'major') return 'BLOCKER';
+  return severity === 'minor' ? 'IMPORTANT' : 'NIT';
+}
 
 export function evaluateCompletionProof(
   db: DbConn,
@@ -58,36 +90,39 @@ export function evaluateCompletionProof(
   // exit code 0, completed timestamps, provenance (a succeeded agent run of
   // this same task — the composite FK guarantees the task linkage), and an
   // immutable evidence row citing it.
-  const passedVerifications =
-    db
-      .select({ n: countDistinct(verificationRuns.id) })
-      .from(verificationRuns)
-      .innerJoin(
-        agentRuns,
-        and(
-          eq(verificationRuns.agentRunId, agentRuns.id),
-          eq(agentRuns.taskId, verificationRuns.taskId),
-        ),
-      )
-      .innerJoin(
-        evidence,
-        and(
-          eq(evidence.ref, verificationRuns.id),
-          eq(evidence.kind, 'verification_run'),
-          eq(evidence.taskId, verificationRuns.taskId),
-        ),
-      )
-      .where(
-        and(
-          eq(verificationRuns.taskId, taskId),
-          eq(verificationRuns.status, 'passed'),
-          eq(verificationRuns.exitCode, 0),
-          isNotNull(verificationRuns.startedAt),
-          isNotNull(verificationRuns.endedAt),
-          eq(agentRuns.status, 'succeeded'),
-        ),
-      )
-      .get()?.n ?? 0;
+  const qualifyingVerifications = db
+    .selectDistinct({
+      id: verificationRuns.id,
+      validationSubject: verificationRuns.validationSubject,
+    })
+    .from(verificationRuns)
+    .innerJoin(
+      agentRuns,
+      and(
+        eq(verificationRuns.agentRunId, agentRuns.id),
+        eq(agentRuns.taskId, verificationRuns.taskId),
+      ),
+    )
+    .innerJoin(
+      evidence,
+      and(
+        eq(evidence.ref, verificationRuns.id),
+        eq(evidence.kind, 'verification_run'),
+        eq(evidence.taskId, verificationRuns.taskId),
+      ),
+    )
+    .where(
+      and(
+        eq(verificationRuns.taskId, taskId),
+        eq(verificationRuns.status, 'passed'),
+        eq(verificationRuns.exitCode, 0),
+        isNotNull(verificationRuns.startedAt),
+        isNotNull(verificationRuns.endedAt),
+        eq(agentRuns.status, 'succeeded'),
+      ),
+    )
+    .all();
+  const passedVerifications = qualifyingVerifications.length;
   if (passedVerifications < criteria.minPassedVerificationRuns) {
     failures.push(
       `requires ${criteria.minPassedVerificationRuns} qualifying passed verification run(s) ` +
@@ -104,14 +139,53 @@ export function evaluateCompletionProof(
         and(
           eq(reviewFindings.taskId, taskId),
           eq(reviewFindings.status, 'open'),
-          inArray(reviewFindings.severity, [...BLOCKING_SEVERITIES]),
+          inArray(reviewFindings.severity, [...BLOCKING_STORED_REVIEW_SEVERITIES]),
         ),
       )
       .get()?.n ?? 0;
-  if (openBlockingFindings > 0) {
-    failures.push(
-      `${openBlockingFindings} open critical/major review finding(s) without an approved disposition`,
+  const progressive = criteria.progressiveValidation;
+  if (progressive) {
+    const triggerSet = new Set(progressive.broaderValidationTriggers);
+    const plan = planProgressiveValidation({
+      riskSpecificChecks: progressive.riskSpecificChecks,
+      triggers: Object.fromEntries(
+        BROADER_VALIDATION_TRIGGERS.map((trigger) => [trigger, triggerSet.has(trigger)]),
+      ),
+      repositoryPolicyRequiresBroadValidation: progressive.repositoryPolicyRequiresBroadValidation,
+    });
+    const provenSubjects = new Set(
+      qualifyingVerifications
+        .map((verification) => verification.validationSubject)
+        .filter((subject): subject is string => subject !== null),
     );
+    const missingChecks = plan.requiredChecks.filter((check) => !provenSubjects.has(check));
+    if (missingChecks.length > 0) {
+      failures.push(`missing required progressive validation: ${missingChecks.join(', ')}`);
+    }
+
+    const reviewPassed =
+      progressive.review === 'none' ||
+      (db
+        .select({ n: count() })
+        .from(agentRuns)
+        .where(
+          and(
+            eq(agentRuns.taskId, taskId),
+            eq(agentRuns.purpose, 'review'),
+            eq(agentRuns.status, 'succeeded'),
+          ),
+        )
+        .get()?.n ?? 0) > 0;
+    const promotion = assessPromotion({
+      prePromotionEvidencePassed:
+        passedVerifications >= criteria.minPassedVerificationRuns && missingChecks.length === 0,
+      review: progressive.review,
+      reviewPassed,
+      blockerFindings: openBlockingFindings,
+    });
+    failures.push(...promotion.blockers);
+  } else if (openBlockingFindings > 0) {
+    failures.push(`${openBlockingFindings} open BLOCKER review finding(s)`);
   }
 
   const evidenceRows = db.select().from(evidence).where(eq(evidence.taskId, taskId)).all();

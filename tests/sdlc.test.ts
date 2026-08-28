@@ -84,6 +84,19 @@ describe('MVP-first SDLC policy', () => {
     });
   });
 
+  it('honours a repository policy broad-suite requirement without inventing a trigger', () => {
+    expect(planProgressiveValidation({ repositoryPolicyRequiresBroadValidation: true })).toEqual({
+      requiredChecks: [
+        'focused_tests',
+        'cheapest_compile_type_or_build',
+        'critical_path_behavior',
+        'broader_validation',
+      ],
+      broaderValidationRequired: true,
+      activeTriggers: [],
+    });
+  });
+
   it('blocks only blockers while triaging important findings for a usable safe MVP', () => {
     expect(reviewFindingBlocksPromotion({ severity: 'BLOCKER' })).toBe(true);
     expect(reviewFindingBlocksPromotion({ severity: 'IMPORTANT' })).toBe(false);
@@ -111,7 +124,7 @@ describe('MVP-first SDLC policy', () => {
       'LOADED',
       'FOLLOWED',
       'INSTALLED',
-      'BEHAVIOURALLY PROVEN',
+      'BEHAVIORALLY PROVEN',
     ]) {
       expect(template).toContain(`${state}:`);
     }
@@ -150,7 +163,7 @@ describe('MVP-first SDLC policy', () => {
   it('requires evidence only for delivery states applicable to the task', () => {
     expect(
       assessTaskDeliveryEvidence({
-        applicable: ['IMPLEMENTED', 'TESTED', 'INSTALLED', 'BEHAVIOURALLY PROVEN'],
+        applicable: ['IMPLEMENTED', 'TESTED', 'INSTALLED', 'BEHAVIORALLY PROVEN'],
         evidence: {
           IMPLEMENTED: ['src/domain/sdlc.ts'],
           TESTED: ['focused regression passed'],
@@ -165,7 +178,7 @@ describe('MVP-first SDLC policy', () => {
       LOADED: 'not_required',
       FOLLOWED: 'not_required',
       INSTALLED: 'unproven',
-      'BEHAVIOURALLY PROVEN': 'unproven',
+      'BEHAVIORALLY PROVEN': 'unproven',
     });
   });
 
@@ -186,8 +199,17 @@ describe('MVP-first SDLC policy', () => {
       LOADED: 'proven',
       FOLLOWED: 'proven',
       INSTALLED: 'not_required',
-      'BEHAVIOURALLY PROVEN': 'not_required',
+      'BEHAVIORALLY PROVEN': 'not_required',
     });
+  });
+
+  it('reads the legacy behavioural evidence spelling without emitting it', () => {
+    expect(
+      assessTaskDeliveryEvidence({
+        applicable: ['BEHAVIOURALLY PROVEN'],
+        evidence: { 'BEHAVIOURALLY PROVEN': ['legacy installed behavior receipt'] },
+      }),
+    ).toMatchObject({ 'BEHAVIORALLY PROVEN': 'proven' });
   });
 
   it('raises review based on consequence, not change size', () => {

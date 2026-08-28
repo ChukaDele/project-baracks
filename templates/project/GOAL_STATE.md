@@ -32,7 +32,7 @@ Delivery evidence (record only task-applicable rows; omitted rows are not requir
 - LOADED: [unproven / proven — runtime/configuration load evidence]
 - FOLLOWED: [unproven / proven — procedure/policy adherence evidence]
 - INSTALLED: [unproven / proven — exact-artifact installation evidence]
-- BEHAVIOURALLY PROVEN: [unproven / proven — representative outcome evidence]
+- BEHAVIORALLY PROVEN: [unproven / proven — representative outcome evidence]
 
 ## Critical-path dependencies
 

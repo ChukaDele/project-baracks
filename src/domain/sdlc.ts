@@ -21,10 +21,12 @@ export const DELIVERY_EVIDENCE_KINDS = [
   'LOADED',
   'FOLLOWED',
   'INSTALLED',
-  'BEHAVIOURALLY PROVEN',
+  'BEHAVIORALLY PROVEN',
 ] as const;
 export type DeliveryEvidenceKind = (typeof DELIVERY_EVIDENCE_KINDS)[number];
 export type DeliveryEvidenceMatrix = Record<DeliveryEvidenceKind, ProofState>;
+export const LEGACY_BEHAVIOURAL_EVIDENCE_KIND = 'BEHAVIOURALLY PROVEN' as const;
+type AcceptedDeliveryEvidenceKind = DeliveryEvidenceKind | typeof LEGACY_BEHAVIOURAL_EVIDENCE_KIND;
 
 export const VALIDATION_CHECKS = [
   'focused_tests',
@@ -155,6 +157,7 @@ export function validateSdlcIntent(
 export function planProgressiveValidation(input: {
   riskSpecificChecks?: string[];
   triggers?: Partial<Record<BroaderValidationTrigger, boolean>>;
+  repositoryPolicyRequiresBroadValidation?: boolean;
 }): {
   requiredChecks: ValidationCheck[];
   broaderValidationRequired: boolean;
@@ -169,10 +172,13 @@ export function planProgressiveValidation(input: {
   if (input.riskSpecificChecks?.some((check) => check.trim().length > 0)) {
     requiredChecks.push('risk_specific_checks');
   }
-  if (activeTriggers.length > 0) requiredChecks.push('broader_validation');
+  if (activeTriggers.length > 0 || input.repositoryPolicyRequiresBroadValidation) {
+    requiredChecks.push('broader_validation');
+  }
   return {
     requiredChecks,
-    broaderValidationRequired: activeTriggers.length > 0,
+    broaderValidationRequired:
+      activeTriggers.length > 0 || input.repositoryPolicyRequiresBroadValidation === true,
     activeTriggers,
   };
 }
@@ -205,14 +211,21 @@ export function assessPromotion(input: {
  * evidence record; every other state is explicitly not required.
  */
 export function assessTaskDeliveryEvidence(input: {
-  applicable: DeliveryEvidenceKind[];
-  evidence?: Partial<Record<DeliveryEvidenceKind, string[]>>;
+  applicable: AcceptedDeliveryEvidenceKind[];
+  evidence?: Partial<Record<AcceptedDeliveryEvidenceKind, string[]>>;
 }): DeliveryEvidenceMatrix {
-  const applicable = new Set(input.applicable);
+  const normalize = (kind: AcceptedDeliveryEvidenceKind): DeliveryEvidenceKind =>
+    kind === LEGACY_BEHAVIOURAL_EVIDENCE_KIND ? 'BEHAVIORALLY PROVEN' : kind;
+  const applicable = new Set(input.applicable.map(normalize));
   return Object.fromEntries(
     DELIVERY_EVIDENCE_KINDS.map((kind) => {
       if (!applicable.has(kind)) return [kind, 'not_required'];
-      const proven = input.evidence?.[kind]?.some((item) => item.trim().length > 0) ?? false;
+      const evidence =
+        input.evidence?.[kind] ??
+        (kind === 'BEHAVIORALLY PROVEN'
+          ? input.evidence?.[LEGACY_BEHAVIOURAL_EVIDENCE_KIND]
+          : undefined);
+      const proven = evidence?.some((item) => item.trim().length > 0) ?? false;
       return [kind, proven ? 'proven' : 'unproven'];
     }),
   ) as DeliveryEvidenceMatrix;

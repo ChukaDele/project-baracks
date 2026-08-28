@@ -8,7 +8,12 @@ import {
   roadmapItems,
   tasks,
 } from '../src/db/schema.js';
-import { evaluateCompletionProof, parseCompletionCriteria } from '../src/domain/completion.js';
+import {
+  evaluateCompletionProof,
+  parseCompletionCriteria,
+  REVIEW_SEVERITY_STORAGE,
+  reviewSeverityFromStorage,
+} from '../src/domain/completion.js';
 import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
 import {
@@ -293,10 +298,88 @@ describe('completion proof and guarded completion transition', () => {
       .run();
     const blocked = evaluateCompletionProof(db, task.id, defaultCriteria());
     expect(blocked.ok).toBe(false);
-    expect(blocked.failures.join('; ')).toMatch(/open critical\/major/);
+    expect(blocked.failures.join('; ')).toMatch(/open BLOCKER/);
 
     db.update(reviewFindings).set({ status: 'fixed' }).run();
     expect(evaluateCompletionProof(db, task.id, defaultCriteria()).ok).toBe(true);
+  });
+
+  it('maps canonical review severities onto storage without losing the legacy blocker alias', () => {
+    expect(REVIEW_SEVERITY_STORAGE).toEqual({
+      BLOCKER: 'critical',
+      IMPORTANT: 'minor',
+      NIT: 'info',
+    });
+    expect(reviewSeverityFromStorage('critical')).toBe('BLOCKER');
+    expect(reviewSeverityFromStorage('major')).toBe('BLOCKER');
+    expect(reviewSeverityFromStorage('minor')).toBe('IMPORTANT');
+    expect(reviewSeverityFromStorage('info')).toBe('NIT');
+  });
+
+  it('connects progressive proof and PROMOTABLE semantics to durable completion', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const task = addTask(db, {
+      projectId: project.id,
+      title: 'progressively validated candidate',
+      completionCriteriaJson: JSON.stringify({
+        progressiveValidation: { review: 'focused' },
+      }),
+    });
+    transitionTask(db, task.id, 'ready');
+    for (const status of [
+      'queued',
+      'running',
+      'verifying',
+      'reviewing',
+      'ready_to_merge',
+    ] as const) {
+      transitionTask(db, task.id, status);
+    }
+    for (const validationSubject of [
+      'focused_tests',
+      'cheapest_compile_type_or_build',
+      'critical_path_behavior',
+    ]) {
+      recordQualifyingVerification(db, task.id, { validationSubject });
+    }
+    const providerId = newId('aprov');
+    db.insert(agentProviders).values({ id: providerId, name: 'focused-reviewer' }).run();
+    ensureObservedModel(db, providerId, 'codex');
+    const reviewRun = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelRef: 'codex',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'focused review',
+    });
+    setRunStatus(db, reviewRun.id, 'succeeded');
+    const criteria = parseCompletionCriteria(getTask(db, task.id).completionCriteriaSnapshotJson);
+
+    db.insert(reviewFindings)
+      .values({
+        id: newId('rfind'),
+        taskId: task.id,
+        agentRunId: reviewRun.id,
+        severity: REVIEW_SEVERITY_STORAGE.IMPORTANT,
+        summary: 'valuable follow-up that does not prevent a safe MVP',
+      })
+      .run();
+    expect(evaluateCompletionProof(db, task.id, criteria).ok).toBe(true);
+
+    db.insert(reviewFindings)
+      .values({
+        id: newId('rfind'),
+        taskId: task.id,
+        agentRunId: reviewRun.id,
+        severity: REVIEW_SEVERITY_STORAGE.BLOCKER,
+        summary: 'unsafe promotion boundary',
+      })
+      .run();
+    const blocked = evaluateCompletionProof(db, task.id, criteria);
+    expect(blocked.ok).toBe(false);
+    expect(blocked.failures).toContain('BLOCKER findings remain');
   });
 
   it('enforces task-specific criteria (artifact and required decisions)', () => {
