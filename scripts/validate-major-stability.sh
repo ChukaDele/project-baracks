@@ -80,7 +80,8 @@ grep -Fq 'runProjectContextCli' src/entry.ts || fail "project context CLI is not
 grep -Fq 'PROJECT CONTEXT: REROUTE' src/context/project-integrity.ts || fail "wrong-repo reroute signal missing"
 grep -Fq 'major project guard' skills/internal/project-context-integrity/SKILL.md || fail "project guard command missing from skill"
 grep -Fq 'safe parking protocol' -i skills/internal/workspace-lifecycle-management/SKILL.md || fail "workspace lifecycle safe parking protocol missing"
-grep -Fq 'commondir' src/supervisor/state.ts || fail "project resolution is not Git-worktree aware"
+grep -Fq 'gitCommonDir' src/supervisor/state.ts || fail "project resolution does not integrate the canonical Git common-directory resolver"
+grep -Fq "join(gitDir, 'commondir')" src/supervisor/source-identity.ts || fail "Git common-directory resolution does not implement linked-worktree commondir"
 grep -Fq 'sessionMatches' src/supervisor/state.ts || fail "project resolution ignores prior attached sessions"
 
 grep -Fq 'GLOBAL_SKILLS_DEST' scripts/install-major-global-rules.sh || fail "global internal skill sync missing"

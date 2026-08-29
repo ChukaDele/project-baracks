@@ -67,6 +67,9 @@ Bounded review failover now reuses the single-dispatch foreground continuation: 
 crash, missing-result, missing-verdict, or missing-session attempts are durably recorded, their capacity
 key is excluded, and the next fresh review runs only after the prior lease is released. Three
 inconclusive attempts produce an availability checkpoint, never an implementation BLOCKER verdict.
+The release stability validator now verifies the real split worktree contract: `state.ts` must integrate
+`gitCommonDir`, and `source-identity.ts` must implement the linked-worktree `commondir` lookup. This
+repairs the obsolete same-file marker without weakening either required side of the invariant.
 
 ## Critical-path dependencies
 
