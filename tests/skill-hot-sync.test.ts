@@ -108,6 +108,21 @@ describe('Major hot skill sync', () => {
     );
   });
 
+  it('is idempotent when the content-addressed destination is already active', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-idempotent-home-'));
+    const source = sourceCopy('major-skill-idempotent-source-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+
+    const first = syncMajorSkills({ sourceRoot: source });
+    const markerBefore = readFileSync(join(first.activeBundle, 'bundle.json'), 'utf8');
+    const second = syncMajorSkills({ sourceRoot: source });
+
+    expect(second).toEqual(first);
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(first.bundleId);
+    expect(readFileSync(join(first.activeBundle, 'bundle.json'), 'utf8')).toBe(markerBefore);
+  });
+
   it('rejects a changed referenced skill resource when the catalogue identity is stale', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-skill-resource-identity-home-'));
     const source = sourceCopy('major-skill-resource-identity-source-');
@@ -120,6 +135,21 @@ describe('Major hot skill sync', () => {
       /generated skill catalog does not match the canonical registry/,
     );
     expect(existsSync(join(home, 'skill-bundles', 'current'))).toBe(false);
+  });
+
+  it('rejects aliases that collide with another canonical id', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-alias-collision-home-'));
+    const source = sourceCopy('major-skill-alias-collision-source-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    const registryPath = join(source, 'guidance', 'skills.registry.json');
+    const registry = JSON.parse(readFileSync(registryPath, 'utf8')) as {
+      entries: Array<{ id: string; aliases?: string[] }>;
+    };
+    registry.entries[0]!.aliases = [registry.entries[1]!.id];
+    writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
+
+    expect(() => syncMajorSkills({ sourceRoot: source })).toThrow(/duplicate skill id or alias/);
   });
 
   it.each([

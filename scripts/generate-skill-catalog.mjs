@@ -1,10 +1,23 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
+const canonicalSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+function assertSlug(value, label) {
+  if (typeof value !== 'string' || !canonicalSlug.test(value))
+    throw new Error(`${label} must be a safe canonical slug: ${JSON.stringify(value)}`);
+}
+function containedSkillRoot(id) {
+  assertSlug(id, 'skill registry id');
+  const internal = resolve(root, 'skills/internal');
+  const target = resolve(internal, id);
+  if (!target.startsWith(`${internal}${sep}`))
+    throw new Error(`skill path escapes internal root: ${id}`);
+  return target;
+}
 function skillContentSha256(skillRoot) {
   const files = [];
   const walk = (directory) => {
@@ -28,11 +41,26 @@ function skillContentSha256(skillRoot) {
   return hash.digest('hex');
 }
 const registry = JSON.parse(readFileSync(join(root, 'guidance/skills.registry.json'), 'utf8'));
+if (!Number.isInteger(registry.version) || !Array.isArray(registry.entries))
+  throw new Error('invalid canonical skill registry');
+const owners = new Map();
+for (const entry of registry.entries) {
+  assertSlug(entry.id, 'skill registry id');
+  if (entry.aliases !== undefined && !Array.isArray(entry.aliases))
+    throw new Error(`invalid aliases for ${entry.id}`);
+  for (const slug of [entry.id, ...(entry.aliases ?? [])]) {
+    assertSlug(slug, `skill registry ${entry.id} alias`);
+    if (owners.has(slug) && owners.get(slug) !== entry.id)
+      throw new Error(`duplicate skill id or alias ${JSON.stringify(slug)}`);
+    owners.set(slug, entry.id);
+  }
+}
+const knownIds = new Set(registry.entries.map((entry) => entry.id));
 const entries = registry.entries
   .map((entry) => {
     let description = entry.load.replaceAll('-', ' ');
     if (entry.source === 'major-internal') {
-      const text = readFileSync(join(root, 'skills/internal', entry.id, 'SKILL.md'), 'utf8');
+      const text = readFileSync(join(containedSkillRoot(entry.id), 'SKILL.md'), 'utf8');
       description =
         text
           .match(/^description:\s*(.+)$/m)?.[1]
@@ -41,18 +69,38 @@ const entries = registry.entries
     }
     const contentSha256 =
       entry.source === 'major-internal'
-        ? skillContentSha256(join(root, 'skills/internal', entry.id))
+        ? skillContentSha256(containedSkillRoot(entry.id))
         : undefined;
+    const sourceText =
+      entry.source === 'major-internal'
+        ? readFileSync(join(containedSkillRoot(entry.id), 'SKILL.md'), 'utf8')
+        : '';
+    const dependencies = [
+      ...(entry.dependencies ?? []),
+      ...[...knownIds].filter((id) => id !== entry.id && sourceText.includes(id)),
+    ].filter((id, index, all) => all.indexOf(id) === index);
     return {
       id: entry.id,
+      name: entry.id,
       title: entry.id
         .split('-')
         .map((part) => part[0].toUpperCase() + part.slice(1))
         .join(' '),
       description,
+      shortDescription: description,
       aliases: entry.aliases ?? [],
+      triggerConditions: [entry.load],
+      category: entry.category ?? 'uncategorized',
+      version: String(entry.version ?? registry.version),
+      lifecycle: entry.deprecated ? 'deprecated' : entry.experimental ? 'experimental' : 'active',
       availability: entry.availability,
+      applicableProjects: [entry.availability],
       source: entry.source,
+      provenance: entry.provenance ?? {
+        kind: 'canonical-registry',
+        registryVersion: registry.version,
+      },
+      dependencies,
       sourceKind:
         entry.sourceKind ??
         (entry.source === 'major-internal'

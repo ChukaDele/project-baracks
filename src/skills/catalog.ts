@@ -5,11 +5,20 @@ import type { SkillRegistryEntry } from './resolver.js';
 
 export interface SkillCatalogEntry {
   id: string;
+  name: string;
   title: string;
   description: string;
+  shortDescription: string;
   aliases: string[];
+  triggerConditions: string[];
+  category: string;
+  version: string;
+  lifecycle: 'active' | 'deprecated' | 'experimental';
   availability: string;
+  applicableProjects: string[];
   source: string;
+  provenance: Record<string, unknown>;
+  dependencies: string[];
   sourceKind: string;
   registryVersion: number;
   contentSha256?: string;
@@ -56,19 +65,42 @@ export function buildSkillCatalog(
   locate: (entry: SkillRegistryEntry) => string | undefined,
   registryVersion = 1,
 ): SkillCatalogEntry[] {
+  const knownIds = new Set(entries.map((entry) => entry.id));
   return entries
     .map((entry) => {
       const path = locate(entry);
+      const description = frontmatterDescription(path) ?? entry.load.replaceAll('-', ' ');
+      const sourceText = path ? readFileSync(lstatSync(path).isDirectory() ? join(path, 'SKILL.md') : path, 'utf8') : '';
+      const lifecycle: SkillCatalogEntry['lifecycle'] = entry.deprecated
+        ? 'deprecated'
+        : entry.experimental
+          ? 'experimental'
+          : 'active';
+      const dependencies = [
+        ...(entry.dependencies ?? []),
+        ...[...knownIds].filter(
+          (id) => id !== entry.id && sourceText.includes(id),
+        ),
+      ].filter((id, index, all) => all.indexOf(id) === index);
       return {
       id: entry.id,
+      name: entry.id,
       title: entry.id
         .split('-')
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(' '),
-      description: frontmatterDescription(path) ?? entry.load.replaceAll('-', ' '),
+      description,
+      shortDescription: description,
       aliases: entry.aliases,
+      triggerConditions: [entry.load],
+      category: entry.category ?? 'uncategorized',
+      version: String(entry.version ?? registryVersion),
+      lifecycle,
       availability: entry.availability,
+      applicableProjects: [entry.availability],
       source: entry.source,
+      provenance: entry.provenance ?? { kind: 'canonical-registry', registryVersion },
+      dependencies,
       sourceKind:
         entry.sourceKind ??
         (entry.source === 'major-internal'

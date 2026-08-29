@@ -29,8 +29,9 @@ import {
   type VendorSkillSelection,
   type VendorSourceState,
 } from './vendor.js';
+import { CANONICAL_SKILL_SLUG, containedSkillPath } from './slug.js';
 
-const canonicalSkillSlug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a safe canonical slug');
+const canonicalSkillSlug = z.string().regex(CANONICAL_SKILL_SLUG, 'must be a safe canonical slug');
 
 const registryEntrySchema = z.object({
   id: canonicalSkillSlug,
@@ -41,6 +42,11 @@ const registryEntrySchema = z.object({
   load: z.string(),
   aliases: z.array(canonicalSkillSlug).default([]),
   disclosure: z.enum(['hot', 'specialist']).default('specialist'),
+  category: z.string().min(1).optional(),
+  version: z.union([z.string().min(1), z.number().positive()]).optional(),
+  experimental: z.boolean().optional(),
+  provenance: z.record(z.string(), z.unknown()).optional(),
+  dependencies: z.array(canonicalSkillSlug).optional(),
   deprecated: z
     .object({ replacement: z.string().min(1).optional(), message: z.string().min(1).optional() })
     .optional(),
@@ -186,7 +192,17 @@ function runtimeRoot(): string {
 }
 
 function readRegistry(path: string): z.infer<typeof registrySchema> {
-  return registrySchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+  const registry = registrySchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+  const owners = new Map<string, string>();
+  for (const entry of registry.entries) {
+    for (const slug of [entry.id, ...entry.aliases]) {
+      const owner = owners.get(slug);
+      if (owner && owner !== entry.id)
+        throw new Error(`duplicate skill id or alias ${JSON.stringify(slug)}`);
+      owners.set(slug, entry.id);
+    }
+  }
+  return registry;
 }
 
 /**
@@ -387,7 +403,7 @@ export function installedSkillPath(id: string, cwd: string, source: string): str
           immutable,
         ];
   for (const root of roots) {
-    const path = join(root, id, 'SKILL.md');
+    const path = containedSkillPath(root, id, 'SKILL.md');
     if (existsSync(path)) return path;
   }
   return undefined;

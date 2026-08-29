@@ -194,7 +194,17 @@ describe('runtime skill resolver', () => {
     expect(catalog).toHaveLength(loadSkillRegistry().length);
     expect(searchSkillCatalog(catalog, 'root cause regression')[0]).toMatchObject({
       id: 'root-cause-qa',
+      name: 'root-cause-qa',
+      shortDescription: expect.any(String),
+      aliases: ['root-cause-analysis', 'failure-investigation'],
+      triggerConditions: ['bug-failure-regression'],
+      category: 'quality',
+      version: expect.any(String),
+      lifecycle: 'active',
       source: 'major-internal',
+      provenance: expect.any(Object),
+      applicableProjects: ['all-projects'],
+      dependencies: expect.any(Array),
     });
   });
 
@@ -294,11 +304,20 @@ describe('runtime skill resolver', () => {
         entries: [
           {
             id: 'hot-skill',
+            name: 'hot-skill',
             title: 'Hot Skill',
             description: 'hot',
+            shortDescription: 'hot',
             aliases: [],
+            triggerConditions: ['hot skill immediate sync'],
+            category: 'uncategorized',
+            version: '999',
+            lifecycle: 'active',
             availability: 'all-projects',
+            applicableProjects: ['all-projects'],
             source: 'major-internal',
+            provenance: { kind: 'canonical-registry', registryVersion: 999 },
+            dependencies: [],
             sourceKind: 'INTERNAL_DURABLE',
             registryVersion: 999,
             contentSha256: skillContentSha256(join(bundle, 'skills', 'internal', 'hot-skill')),

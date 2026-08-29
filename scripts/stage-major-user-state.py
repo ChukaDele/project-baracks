@@ -15,6 +15,38 @@ MANAGED_START = "<!-- MAJOR-GLOBAL-START -->"
 MANAGED_END = "<!-- MAJOR-GLOBAL-END -->"
 OLD_START = "<!-- MAJOR-COMMUNICATION-START -->"
 OLD_END = "<!-- MAJOR-COMMUNICATION-END -->"
+CANONICAL_SKILL_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def validate_catalog_skills(catalog: dict) -> list[dict]:
+    skills = catalog.get("entries")
+    if not isinstance(skills, list):
+        raise SystemExit("invalid generated skill catalogue entries")
+    owners: dict[str, str] = {}
+    for skill in skills:
+        skill_id = skill.get("id") if isinstance(skill, dict) else None
+        aliases = skill.get("aliases", []) if isinstance(skill, dict) else None
+        if not isinstance(skill_id, str) or not CANONICAL_SKILL_SLUG.fullmatch(skill_id):
+            raise SystemExit("invalid generated skill catalogue id: safe canonical slug required")
+        if not isinstance(aliases, list):
+            raise SystemExit(f"invalid generated skill catalogue aliases: {skill_id}")
+        for slug in [skill_id, *aliases]:
+            if not isinstance(slug, str) or not CANONICAL_SKILL_SLUG.fullmatch(slug):
+                raise SystemExit(f"invalid generated skill catalogue alias: {skill_id}")
+            if slug in owners and owners[slug] != skill_id:
+                raise SystemExit(f"duplicate generated skill id or alias: {slug}")
+            owners[slug] = skill_id
+    return skills
+
+
+def contained_command_path(root: Path, skill_id: str, suffix: str) -> Path:
+    if not CANONICAL_SKILL_SLUG.fullmatch(skill_id):
+        raise SystemExit("generated command id must be a safe canonical slug")
+    target = (root / "major" / f"{skill_id}{suffix}").resolve()
+    command_root = (root / "major").resolve()
+    if command_root not in target.parents:
+        raise SystemExit("generated command path escapes its root")
+    return target
 
 
 def read_text(path: Path) -> str:
@@ -237,9 +269,7 @@ def add_absent(entries: list[dict[str, str]], target: Path) -> None:
 def stage_skill_commands(
     stage: Path, home: Path, codex_home: Path, catalog: dict, entries: list[dict[str, str]]
 ) -> None:
-    skills = catalog.get("entries")
-    if not isinstance(skills, list):
-        raise SystemExit("invalid generated skill catalogue entries")
+    skills = validate_catalog_skills(catalog)
     discovery = (
         "Use Major's installed canonical catalogue. Run `major skill search --query \"$ARGUMENTS\"` "
         "for discovery, or `major skill resolve --task \"$ARGUMENTS\" --json` for automatic routing.\n"
@@ -259,7 +289,7 @@ def stage_skill_commands(
             add_file(
                 entries,
                 write_stage_file(stage, f"{host}-major-{skill_id}{suffix}", body),
-                target_root / "major" / f"{skill_id}{suffix}",
+                contained_command_path(target_root, skill_id, suffix),
             )
     add_file(
         entries,
@@ -279,7 +309,7 @@ def stage_skill_commands(
                 f"gemini-major-{skill_id}.toml",
                 f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{args}} --skill {skill_id} --json`; the named skill is mandatory."\n',
             ),
-            home / ".gemini" / "commands" / "major" / f"{skill_id}.toml",
+            contained_command_path(home / ".gemini" / "commands", skill_id, ".toml"),
         )
 
 

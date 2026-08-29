@@ -68,12 +68,23 @@ if not isinstance(version, int) or version < 1 or not isinstance(entries, list):
     raise SystemExit('ERROR: invalid Major skills registry schema')
 ids = []
 internal_ids = []
+owners = {}
+slug_pattern = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 for entry in entries:
     if not isinstance(entry, dict):
         raise SystemExit('ERROR: invalid Major skill registry entry')
     skill_id = entry.get('id')
-    if not isinstance(skill_id, str) or not skill_id:
-        raise SystemExit('ERROR: Major skill registry entry missing id')
+    if not isinstance(skill_id, str) or not slug_pattern.fullmatch(skill_id):
+        raise SystemExit('ERROR: Major skill registry id must be a safe canonical slug')
+    aliases = entry.get('aliases', [])
+    if not isinstance(aliases, list):
+        raise SystemExit(f'ERROR: invalid Major skill aliases: {skill_id}')
+    for slug in [skill_id, *aliases]:
+        if not isinstance(slug, str) or not slug_pattern.fullmatch(slug):
+            raise SystemExit(f'ERROR: Major skill alias must be a safe canonical slug: {skill_id}')
+        if slug in owners and owners[slug] != skill_id:
+            raise SystemExit(f'ERROR: duplicate Major skill id or alias: {slug}')
+        owners[slug] = skill_id
     if not all(isinstance(entry.get(k), str) and entry.get(k) for k in ('source','availability','load')):
         raise SystemExit(f'ERROR: incomplete Major skill registry entry: {skill_id}')
     ids.append(skill_id)
@@ -175,6 +186,24 @@ except Exception:
     print('')
 PY
 )"
+if python3 - "$BUNDLES/current" "$DEST" "$SHA" <<'PY'
+import json
+import sys
+from pathlib import Path
+current, destination, sha = map(Path, sys.argv[1:])
+try:
+    marker = json.loads((destination / 'bundle.json').read_text())
+    raise SystemExit(0 if current.resolve() == destination.resolve() and marker.get('sha') == str(sha) else 1)
+except Exception:
+    raise SystemExit(1)
+PY
+then
+  echo "Major hot skills already synced and active"
+  echo "SHA: $SHA"
+  echo "Registry version: $REGISTRY_VERSION"
+  echo "Active bundle: $DEST"
+  exit 0
+fi
 rm -rf "$STAGED"
 mkdir -p "$STAGED/guidance" "$STAGED/package" "$STAGED/skills" "$STAGED/evals"
 cp "$REGISTRY" "$STAGED/guidance/skills.registry.json"

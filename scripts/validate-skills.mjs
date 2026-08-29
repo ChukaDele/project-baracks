@@ -88,6 +88,8 @@ if (!Number.isInteger(registry.version) || !Array.isArray(registry.entries))
   fail('skills registry schema is invalid');
 const registryEntries = registry.entries.map((entry) => object(entry, 'skill registry entry'));
 const allRegistered = registryEntries.map((entry) => nonEmpty(entry.id, 'skill registry entry id'));
+const canonicalSkillSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const slugOwners = new Map();
 const registered = registryEntries
   .filter((entry) => entry.source === 'major-internal')
   .map((entry) => nonEmpty(entry.id, 'skill registry entry id'));
@@ -98,6 +100,17 @@ const sourceKinds = new Set([
   'DORMANT_REFERENCE',
 ]);
 for (const entry of registryEntries) {
+  if (!canonicalSkillSlug.test(entry.id))
+    fail(`skill registry entry ${entry.id}.id is not a safe canonical slug`);
+  const aliases = entry.aliases ?? [];
+  if (!Array.isArray(aliases)) fail(`skill registry entry ${entry.id}.aliases is invalid`);
+  for (const slug of [entry.id, ...aliases]) {
+    if (typeof slug !== 'string' || !canonicalSkillSlug.test(slug))
+      fail(`skill registry entry ${entry.id} has an unsafe alias`);
+    if (slugOwners.has(slug) && slugOwners.get(slug) !== entry.id)
+      fail(`duplicate skill id or alias ${slug}`);
+    slugOwners.set(slug, entry.id);
+  }
   if (entry.sourceKind !== undefined && !sourceKinds.has(entry.sourceKind))
     fail(`skill registry entry ${entry.id}.sourceKind is invalid`);
   if (entry.sourceKind === 'VENDOR_LIVE')

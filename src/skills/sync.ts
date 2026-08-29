@@ -20,6 +20,11 @@ import { majorHome } from '../supervisor/state.js';
 import { cloneGitBranch } from '../resources/tools.js';
 import { buildSkillCatalog } from './catalog.js';
 import {
+  assertCanonicalSkillSlug,
+  containedGeneratedCommandPath,
+  containedSkillPath,
+} from './slug.js';
+import {
   findVendorSkill,
   loadVendorCatalog,
   SKILL_SOURCE_KINDS,
@@ -36,6 +41,11 @@ interface RegistryEntry {
   aliases: string[];
   disclosure: 'hot' | 'specialist';
   deprecated?: { replacement?: string; message?: string };
+  category?: string;
+  version?: string | number;
+  experimental?: boolean;
+  provenance?: Record<string, unknown>;
+  dependencies?: string[];
 }
 
 interface Registry {
@@ -47,14 +57,6 @@ interface BundleMarker {
   version: 1;
   sha: string;
   previousBundle?: string;
-}
-
-const CANONICAL_SKILL_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-function assertCanonicalSkillSlug(value: string, label: string): void {
-  if (!CANONICAL_SKILL_SLUG.test(value)) {
-    throw new Error(`${label} must be a safe canonical slug: ${JSON.stringify(value)}`);
-  }
 }
 
 export interface SkillSyncResult {
@@ -132,6 +134,17 @@ function assertRegistry(value: unknown): Registry {
         row.disclosure === 'hot' || row.disclosure === 'specialist'
           ? row.disclosure
           : 'specialist',
+      ...(typeof row.category === 'string' ? { category: row.category } : {}),
+      ...(typeof row.version === 'string' || typeof row.version === 'number'
+        ? { version: row.version }
+        : {}),
+      ...(typeof row.experimental === 'boolean' ? { experimental: row.experimental } : {}),
+      ...(row.provenance && typeof row.provenance === 'object' && !Array.isArray(row.provenance)
+        ? { provenance: row.provenance as Record<string, unknown> }
+        : {}),
+      ...(Array.isArray(row.dependencies) && row.dependencies.every((id) => typeof id === 'string')
+        ? { dependencies: row.dependencies }
+        : {}),
       ...(row.deprecated && typeof row.deprecated === 'object'
         ? {
             deprecated: {
@@ -149,6 +162,17 @@ function assertRegistry(value: unknown): Registry {
   });
   const ids = entries.map((entry) => entry.id);
   if (new Set(ids).size !== ids.length) throw new Error('duplicate Major skill ids in registry');
+  const owners = new Map<string, string>();
+  for (const entry of entries) {
+    for (const slug of [entry.id, ...entry.aliases]) {
+      const owner = owners.get(slug);
+      if (owner && owner !== entry.id)
+        throw new Error(`duplicate skill id or alias ${JSON.stringify(slug)}`);
+      owners.set(slug, entry.id);
+    }
+    for (const dependency of entry.dependencies ?? [])
+      assertCanonicalSkillSlug(dependency, `skill registry entry ${entry.id} dependency`);
+  }
   return { version: Number(record.version), entries };
 }
 
@@ -246,7 +270,7 @@ function validateSource(sourceRoot: string): {
     registry.entries,
     (entry) =>
       entry.source === 'major-internal'
-        ? join(internalRoot, entry.id, 'SKILL.md')
+        ? containedSkillPath(internalRoot, entry.id, 'SKILL.md')
         : undefined,
     registry.version,
   );
@@ -330,7 +354,7 @@ function validateSource(sourceRoot: string): {
   }
 
   for (const skillId of installed) {
-    const text = readFileSync(join(internalRoot, skillId, 'SKILL.md'), 'utf8');
+    const text = readFileSync(containedSkillPath(internalRoot, skillId, 'SKILL.md'), 'utf8');
     if (!text.startsWith('---\n')) throw new Error(`${skillId}/SKILL.md missing frontmatter`);
     const end = text.indexOf('\n---\n', 4);
     if (end < 0) throw new Error(`${skillId}/SKILL.md has malformed frontmatter`);
@@ -473,7 +497,7 @@ function hostSkillArtifactReplacements(
     replacements.push(stageArtifact(join(root, 'major'), (stage) => {
       mkdirSync(stage, { recursive: true });
       for (const { id } of catalog.entries) {
-        writeFileSync(join(stage, `${id}.md`), `Run \`major skill resolve --task "$ARGUMENTS" --skill ${id} --json\`; the named skill is mandatory.\n`);
+        writeFileSync(containedGeneratedCommandPath(stage, id, '.md'), `Run \`major skill resolve --task "$ARGUMENTS" --skill ${id} --json\`; the named skill is mandatory.\n`);
       }
     }));
   }
@@ -482,7 +506,7 @@ function hostSkillArtifactReplacements(
   replacements.push(stageArtifact(join(geminiRoot, 'major'), (stage) => {
     mkdirSync(stage, { recursive: true });
     for (const { id } of catalog.entries) {
-      writeFileSync(join(stage, `${id}.toml`), `description = "Invoke Major skill ${id}"\nprompt = "Run \`major skill resolve --task {{args}} --skill ${id} --json\`."\n`);
+      writeFileSync(containedGeneratedCommandPath(stage, id, '.toml'), `description = "Invoke Major skill ${id}"\nprompt = "Run \`major skill resolve --task {{args}} --skill ${id} --json\`."\n`);
     }
   }));
   return replacements;
@@ -577,6 +601,27 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
       previousBundle = readBundleMarker(realpathSync(current)).sha;
     } catch {
       // A malformed predecessor is not retained or referenced by a new bundle.
+    }
+  }
+  if (existsSync(destination)) {
+    try {
+      const existing = readBundleMarker(destination);
+      if (existing.sha === bundleId) {
+        activateBundle(destination, current);
+        retainRollbackBundles(bundlesRoot, bundleId, previousBundle);
+        return {
+          sourceRoot: sourceLabel ?? sourceRoot,
+          bundleId,
+          registryVersion: validated.registry.version,
+          activeBundle: destination,
+          internalSkillCount: validated.internalIds.length,
+          vendorSkillCount: validated.registry.entries.filter(
+            (entry) => entry.sourceKind === 'VENDOR_LIVE',
+          ).length,
+        };
+      }
+    } catch {
+      // A corrupt path with this content address is replaced by the validated source below.
     }
   }
   rmSync(staged, { recursive: true, force: true });

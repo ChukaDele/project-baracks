@@ -181,18 +181,42 @@ cp "$ADAPTERS/RULE.mdc" "$TARGET/.cursor/rules/major-skills/RULE.mdc"
 cp "$ADAPTERS/GEMINI.md" "$TARGET/.gemini/MAJOR_SKILLS.md"
 python3 - "$CATALOG" "$TARGET" <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
 catalog = json.loads(Path(sys.argv[1]).read_text())
 target = Path(sys.argv[2])
+slug_pattern = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+owners = {}
+for entry in catalog.get('entries', []):
+    skill_id = entry.get('id') if isinstance(entry, dict) else None
+    aliases = entry.get('aliases', []) if isinstance(entry, dict) else None
+    if not isinstance(skill_id, str) or not slug_pattern.fullmatch(skill_id):
+        raise SystemExit('ERROR: generated skill id must be a safe canonical slug')
+    if not isinstance(aliases, list):
+        raise SystemExit(f'ERROR: invalid generated skill aliases: {skill_id}')
+    for slug in [skill_id, *aliases]:
+        if not isinstance(slug, str) or not slug_pattern.fullmatch(slug):
+            raise SystemExit(f'ERROR: generated skill alias must be a safe canonical slug: {skill_id}')
+        if slug in owners and owners[slug] != skill_id:
+            raise SystemExit(f'ERROR: duplicate generated skill id or alias: {slug}')
+        owners[slug] = skill_id
+
+def command_path(root, skill_id, suffix):
+    path = (root / 'major' / f'{skill_id}{suffix}').resolve()
+    command_root = (root / 'major').resolve()
+    if command_root not in path.parents:
+        raise SystemExit('ERROR: generated command path escapes its root')
+    return path
+
 discovery = 'Use the installed Major catalogue. Run `major skill search --query "$ARGUMENTS"` or `major skill resolve --task "$ARGUMENTS" --json`.\n'
 for root in (target / '.claude/commands', target / '.codex/prompts', target / '.cursor/commands'):
     (root / 'major').mkdir(parents=True, exist_ok=True)
     (root / 'major.md').write_text(discovery)
     for entry in catalog['entries']:
         skill_id = entry['id']
-        (root / 'major' / f'{skill_id}.md').write_text(
+        command_path(root, skill_id, '.md').write_text(
             f'Run `major skill resolve --task "$ARGUMENTS" --skill {skill_id} --json`; the named skill is mandatory.\n'
         )
 gemini = target / '.gemini/commands'
@@ -200,7 +224,7 @@ gemini = target / '.gemini/commands'
 (gemini / 'major.toml').write_text('description = "Discover Major skills"\nprompt = "Run `major skill search --query {{args}}`."\n')
 for entry in catalog['entries']:
     skill_id = entry['id']
-    (gemini / 'major' / f'{skill_id}.toml').write_text(
+    command_path(gemini, skill_id, '.toml').write_text(
         f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{args}} --skill {skill_id} --json`."\n'
     )
 PY

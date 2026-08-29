@@ -4,14 +4,33 @@
   "entries": [
     {
       "id": "academic-verify",
+      "name": "academic-verify",
       "title": "Academic Verify",
       "description": "Use when a consequential scholarly or scientific claim warrants provider-neutral verification from claim to paper, methodology, result, limitations and replication or contradiction.",
+      "shortDescription": "Use when a consequential scholarly or scientific claim warrants provider-neutral verification from claim to paper, methodology, result, limitations and replication or contradiction.",
       "aliases": [
         "paper-verification",
         "literature-verification"
       ],
+      "triggerConditions": [
+        "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "review",
+        "verification"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "99e915b35c946da66c05bb5f3b6ba501096bed346fbc89216c648b2f9ecfe98b",
@@ -21,11 +40,27 @@
     },
     {
       "id": "algorithmic-art",
+      "name": "algorithmic-art",
       "title": "Algorithmic Art",
       "description": "generative art particles flow fields p5",
+      "shortDescription": "generative art particles flow fields p5",
       "aliases": [],
+      "triggerConditions": [
+        "generative-art-particles-flow-fields-p5"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "exploratory-ui-projects",
+      "applicableProjects": [
+        "exploratory-ui-projects"
+      ],
       "source": "github:anthropics/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -39,11 +74,34 @@
     },
     {
       "id": "analytics-with-shaper",
+      "name": "analytics-with-shaper",
       "title": "Analytics With Shaper",
       "description": "Use when a task needs SQL-first dashboards, operational analytics, repeated reporting, alerts, exports, embedded analytics, or control-plane visualisation with Taleshape Shaper. Keep Shaper optional and Major authoritative.",
+      "shortDescription": "Use when a task needs SQL-first dashboards, operational analytics, repeated reporting, alerts, exports, embedded analytics, or control-plane visualisation with Taleshape Shaper. Keep Shaper optional and Major authoritative.",
       "aliases": [],
+      "triggerConditions": [
+        "taleshape-shaper-sql-dashboard-analytics-observability-telemetry-csv"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "debugging",
+        "review",
+        "dependency",
+        "deployment",
+        "api",
+        "database"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4fc41b18312d7f03fb9b9b5e387704df985d9468ece058d9f718505e18c8e193",
@@ -60,13 +118,32 @@
     },
     {
       "id": "api",
+      "name": "api",
       "title": "Api",
       "description": "Use when applying the staged api procedure. Apply the narrow api procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged api procedure. Apply the narrow api procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "api"
       ],
+      "triggerConditions": [
+        "api endpoint contract integration"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c43fd443763e3d71f9d26b20cd40d2626ff4377bcd24f495f88cb771a69594b0",
@@ -76,13 +153,32 @@
     },
     {
       "id": "ar-ap-invoice",
+      "name": "ar-ap-invoice",
       "title": "Ar Ap Invoice",
       "description": "Use when applying the staged ar ap invoice procedure. Investigate receivables, payables and invoice state without issuing, collecting, paying or mutating the system of record.",
+      "shortDescription": "Use when applying the staged ar ap invoice procedure. Investigate receivables, payables and invoice state without issuing, collecting, paying or mutating the system of record.",
       "aliases": [
         "ar-ap-invoice"
       ],
+      "triggerConditions": [
+        "accounts receivable payable invoice collections"
+      ],
+      "category": "finance-accounting",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "73f38ae00f3a53f64e822c971d3cd59f78b0dec5420e9623a7686733030a91fc",
@@ -92,13 +188,32 @@
     },
     {
       "id": "architecture",
+      "name": "architecture",
       "title": "Architecture",
       "description": "Use when applying the staged architecture procedure. Apply the narrow architecture procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged architecture procedure. Apply the narrow architecture procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "architecture"
       ],
+      "triggerConditions": [
+        "software architecture system design module boundary"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "938ff4bb9af35f58830ebe21cebd3760ed8d6a664d033bd5bf091fb7cd7bf3eb",
@@ -108,13 +223,32 @@
     },
     {
       "id": "auth-security",
+      "name": "auth-security",
       "title": "Auth Security",
       "description": "Use when applying the staged auth security procedure. Apply the narrow auth security procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged auth security procedure. Apply the narrow auth security procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "auth-security"
       ],
+      "triggerConditions": [
+        "authentication authorization security access"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "6793ab8ca4caea86d7dc81f264559e5016d9d24696a9d23f959840f7b53202d2",
@@ -124,11 +258,27 @@
     },
     {
       "id": "behavior-reward-system",
+      "name": "behavior-reward-system",
       "title": "Behavior Reward System",
       "description": "Reward autonomous engineering for durable verified product progress rather than visible activity.",
+      "shortDescription": "Reward autonomous engineering for durable verified product progress rather than visible activity.",
       "aliases": [],
+      "triggerConditions": [
+        "autonomous-or-long-running-work"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "195b9c192a84630c0bec7ca94e28580da60ecbd8e1898f20de82a8ccc0e39ac3",
@@ -142,13 +292,32 @@
     },
     {
       "id": "browser-release-qa",
+      "name": "browser-release-qa",
       "title": "Browser Release Qa",
       "description": "Use when applying the staged browser release qa procedure. Apply the narrow browser release qa procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged browser release qa procedure. Apply the narrow browser release qa procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "browser-release-qa"
       ],
+      "triggerConditions": [
+        "browser release quality assurance acceptance"
+      ],
+      "category": "quality",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "91cb5a2b88e1558c4542c678fa207b973dc3681bd1af7300c27dcee251459b09",
@@ -158,13 +327,32 @@
     },
     {
       "id": "capability-freshness",
+      "name": "capability-freshness",
       "title": "Capability Freshness",
       "description": "Use when assessing an upstream skill, MCP, model, runtime or SDK update for a staged capability. Do not auto-upgrade or activate production capability.",
+      "shortDescription": "Use when assessing an upstream skill, MCP, model, runtime or SDK update for a staged capability. Do not auto-upgrade or activate production capability.",
       "aliases": [
         "capability-freshness"
       ],
+      "triggerConditions": [
+        "capability freshness version compatibility evidence"
+      ],
+      "category": "system",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "d1613aea2540a1dfd49c8b0589ebb66047f6c71f31b208210287ebf744dc7ec3",
@@ -174,13 +362,34 @@
     },
     {
       "id": "chief-of-staff-boundary",
+      "name": "chief-of-staff-boundary",
       "title": "Chief Of Staff Boundary",
       "description": "Use when applying the staged chief of staff boundary procedure. Own strategic prioritisation and decision coordination while excluding administrative execution owned by the Executive Assistant.",
+      "shortDescription": "Use when applying the staged chief of staff boundary procedure. Own strategic prioritisation and decision coordination while excluding administrative execution owned by the Executive Assistant.",
       "aliases": [
         "chief-of-staff-boundary"
       ],
+      "triggerConditions": [
+        "chief of staff strategic coordination executive assistant boundary"
+      ],
+      "category": "management",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "executive-assistant"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "13a45f3fe3b7d9ad6fa1f84bf58424bb654ce8e2d4881bfa13348b9cbfe681a8",
@@ -190,11 +399,30 @@
     },
     {
       "id": "ci-recovery",
+      "name": "ci-recovery",
       "title": "Ci Recovery",
       "description": "Use when CI, GitHub Actions or a pull-request check fails. Inspect the exact failing check, find the root cause, fix safe issues autonomously, and rerun only the relevant validation.",
+      "shortDescription": "Use when CI, GitHub Actions or a pull-request check fails. Inspect the exact failing check, find the root cause, fix safe issues autonomously, and rerun only the relevant validation.",
       "aliases": [],
+      "triggerConditions": [
+        "ci-github-actions-pr-check-failure"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "review",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c2d79aea6453c8d299fa6439b0b1e31cd3d9200ec985713973576dccaa21bf48",
@@ -209,13 +437,37 @@
     },
     {
       "id": "codebase-design",
+      "name": "codebase-design",
       "title": "Codebase Design",
       "description": "Use when a driver needs a reference lens for module shape, interfaces, information hiding, or architecture coherence. Do not use it to initiate a broad refactor.",
+      "shortDescription": "Use when a driver needs a reference lens for module shape, interfaces, information hiding, or architecture coherence. Do not use it to initiate a broad refactor.",
       "aliases": [
         "codebase-design"
       ],
+      "triggerConditions": [
+        "codebase design module ownership boundaries"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "planning",
+        "debugging",
+        "architecture",
+        "engineering-design-doctrine"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "8a1420cba0d0865e578c0578ae07d0788110c846fc7eda8fdad1ead9c8d504ee",
@@ -225,11 +477,29 @@
     },
     {
       "id": "competitive-product-audit",
+      "name": "competitive-product-audit",
       "title": "Competitive Product Audit",
       "description": "Time-boxed review of similar and best-in-class products to extract workflow and usability patterns that materially affect the product.",
+      "shortDescription": "Time-boxed review of similar and best-in-class products to extract workflow and usability patterns that materially affect the product.",
       "aliases": [],
+      "triggerConditions": [
+        "project-start-or-material-product-work"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "ead6f57d152c5170a4542e17b3c366348e4db8ce670eda0bb3c392dd2b02aa87",
@@ -244,13 +514,29 @@
     },
     {
       "id": "concept-synthesis",
+      "name": "concept-synthesis",
       "title": "Concept Synthesis",
       "description": "Use on demand to reduce retrieval noise across existing knowledge by distinguishing duplicates, related concepts and contradictions while preserving provenance, backlinks, minority and abandoned branches.",
+      "shortDescription": "Use on demand to reduce retrieval noise across existing knowledge by distinguishing duplicates, related concepts and contradictions while preserving provenance, backlinks, minority and abandoned branches.",
       "aliases": [
         "knowledge-synthesis"
       ],
+      "triggerConditions": [
+        "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "5a4bdfb5d3b1c580334981f95ba61f5915d441ee033a5c55ea094c22b9f9e285",
@@ -260,13 +546,32 @@
     },
     {
       "id": "concurrency",
+      "name": "concurrency",
       "title": "Concurrency",
       "description": "Use when applying the staged concurrency procedure. Apply the narrow concurrency procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged concurrency procedure. Apply the narrow concurrency procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "concurrency"
       ],
+      "triggerConditions": [
+        "concurrency race condition parallel locking"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "a8658aa189a6f1cae53dce54768e2f586b965edc1c2077bf30b8c32ada5fb38b",
@@ -276,13 +581,34 @@
     },
     {
       "id": "controller-bookkeeping",
+      "name": "controller-bookkeeping",
       "title": "Controller Bookkeeping",
       "description": "Use when applying the staged controller bookkeeping procedure. Classify accounting evidence and prepare reviewable bookkeeping proposals while the ledger owns posting and arithmetic.",
+      "shortDescription": "Use when applying the staged controller bookkeeping procedure. Classify accounting evidence and prepare reviewable bookkeeping proposals while the ledger owns posting and arithmetic.",
       "aliases": [
         "controller-bookkeeping"
       ],
+      "triggerConditions": [
+        "bookkeeping ledger journal controller accounting"
+      ],
+      "category": "finance-accounting",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "75446c6d410a8258fbabee1dddbbf99b3ae67b22a5a33f8a3c81eced07c5ba9d",
@@ -292,11 +618,27 @@
     },
     {
       "id": "cost-control",
+      "name": "cost-control",
       "title": "Cost Control",
       "description": "Manage provider subscriptions, rate limits, paid APIs, browsers/proxies and infrastructure for throughput without uncontrolled spend.",
+      "shortDescription": "Manage provider subscriptions, rate limits, paid APIs, browsers/proxies and infrastructure for throughput without uncontrolled spend.",
       "aliases": [],
+      "triggerConditions": [
+        "provider-model-browser-infrastructure-cost"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "d3ac07d364b178bbf15179e35c919a9ffecb06a140f0bc29eef26614eb2d07cb",
@@ -310,13 +652,34 @@
     },
     {
       "id": "cross-modal-review",
+      "name": "cross-modal-review",
       "title": "Cross Modal Review",
       "description": "Use when applying the staged cross modal review procedure. Apply the narrow cross modal review procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged cross modal review procedure. Apply the narrow cross modal review procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "cross-modal-review"
       ],
+      "triggerConditions": [
+        "cross modal visual document evidence review"
+      ],
+      "category": "quality",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "3bd2ffacea2ab9525c90affa0e99592d7610d978ff5bbae3b0563ffcaa27aa76",
@@ -326,11 +689,27 @@
     },
     {
       "id": "data-learning-loop",
+      "name": "data-learning-loop",
       "title": "Data Learning Loop",
       "description": "Build outcome-learning systems without leakage, false causality or uncontrolled self-modification.",
+      "shortDescription": "Build outcome-learning systems without leakage, false causality or uncontrolled self-modification.",
       "aliases": [],
+      "triggerConditions": [
+        "outcome-data-scoring-learning"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "bd19b04746cd87883a84d80e7b092cfeb93ea4e1b9187718789aeadc8ec81e2f",
@@ -343,13 +722,32 @@
     },
     {
       "id": "database",
+      "name": "database",
       "title": "Database",
       "description": "Use when applying the staged database procedure. Apply the narrow database procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged database procedure. Apply the narrow database procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "database"
       ],
+      "triggerConditions": [
+        "database schema query migration"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "ed8312ba05a500e2ab5b7aec75cb8fcb1927c52bd594b8de1cca95f78bbf7fd6",
@@ -359,13 +757,32 @@
     },
     {
       "id": "debugging",
+      "name": "debugging",
       "title": "Debugging",
       "description": "Use when applying the staged debugging procedure. Apply the narrow debugging procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged debugging procedure. Apply the narrow debugging procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "debugging"
       ],
+      "triggerConditions": [
+        "debug investigate root cause failure"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "fdb37ef54f826d1a8b60a06db09086926c4e01200915e5c76f855de2ab4897d1",
@@ -375,13 +792,32 @@
     },
     {
       "id": "dependency",
+      "name": "dependency",
       "title": "Dependency",
       "description": "Use when applying the staged dependency procedure. Apply the narrow dependency procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged dependency procedure. Apply the narrow dependency procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "dependency"
       ],
+      "triggerConditions": [
+        "dependency package upgrade vulnerability"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "712ff2f8070dd56ed6a3ee0528693828d853f0613c5b2ba990027f5793ed0988",
@@ -391,14 +827,30 @@
     },
     {
       "id": "deploy-to-vercel",
+      "name": "deploy-to-vercel",
       "title": "Deploy To Vercel",
       "description": "current Vercel deploy deployment preview claim framework detection guidance",
+      "shortDescription": "current Vercel deploy deployment preview claim framework detection guidance",
       "aliases": [
         "vercel-deploy-claimable",
         "vercel-preview-deployment"
       ],
+      "triggerConditions": [
+        "current Vercel deploy deployment preview claim framework detection guidance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
@@ -407,13 +859,32 @@
     },
     {
       "id": "deployment",
+      "name": "deployment",
       "title": "Deployment",
       "description": "Use when applying the staged deployment procedure. Apply the narrow deployment procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged deployment procedure. Apply the narrow deployment procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "deployment"
       ],
+      "triggerConditions": [
+        "deployment release rollout rollback"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4d1201f0fa5dfd622f2452963f1a318a502da636dcf85a16a73aa8a8705b68d7",
@@ -423,11 +894,40 @@
     },
     {
       "id": "design-direction-and-taste",
+      "name": "design-direction-and-taste",
       "title": "Design Direction And Taste",
       "description": "Use before substantial UI/website creation, redesign, art-direction changes, or when the user says the design feels generic, bland, AI-looking, too safe, too loud, or lacks taste. Own the design read, surface mode, preserve-vs-redesign decision, visual grammar and calibrated variance/motion/density. Do not own browser QA or motion implementation; hand those to website-design-qa and responsive-motion-systems.",
+      "shortDescription": "Use before substantial UI/website creation, redesign, art-direction changes, or when the user says the design feels generic, bland, AI-looking, too safe, too loud, or lacks taste. Own the design read, surface mode, preserve-vs-redesign decision, visual grammar and calibrated variance/motion/density. Do not own browser QA or motion implementation; hand those to website-design-qa and responsive-motion-systems.",
       "aliases": [],
+      "triggerConditions": [
+        "substantial-ui-website-creation-redesign-art-direction-generic-ai-design-too-safe-too-loud-taste"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "ui-projects",
+      "applicableProjects": [
+        "ui-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "remote-first-web-development",
+        "website-design-qa",
+        "responsive-motion-systems",
+        "competitive-product-audit",
+        "nontechnical-ux",
+        "root-cause-qa",
+        "frontend-design",
+        "review",
+        "incident",
+        "architecture",
+        "frontend",
+        "performance"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "3b1cd1f5c8d978fe3fe14ff30cb36d2a9c924612cdc2cc681c23ea953f309a45",
@@ -451,13 +951,32 @@
     },
     {
       "id": "deterministic-accounting-boundary",
+      "name": "deterministic-accounting-boundary",
       "title": "Deterministic Accounting Boundary",
       "description": "Use when applying the staged deterministic accounting boundary procedure. Fail closed unless debits, credits, balances, dates and state are computed and validated deterministically.",
+      "shortDescription": "Use when applying the staged deterministic accounting boundary procedure. Fail closed unless debits, credits, balances, dates and state are computed and validated deterministically.",
       "aliases": [
         "deterministic-accounting-boundary"
       ],
+      "triggerConditions": [
+        "deterministic accounting arithmetic ledger balances"
+      ],
+      "category": "finance-accounting",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "443889fcb395fd811edb39d7481da99686306351646f1295d26d6c9b0cda3c4c",
@@ -467,11 +986,30 @@
     },
     {
       "id": "dev-server-management",
+      "name": "dev-server-management",
       "title": "Dev Server Management",
       "description": "Coordinate an explicitly owner-approved local web-server exception. Cloudflare previews are the default for every web project.",
+      "shortDescription": "Coordinate an explicitly owner-approved local web-server exception. Cloudflare previews are the default for every web project.",
       "aliases": [],
+      "triggerConditions": [
+        "explicit-owner-approved-localhost-exception-only"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "web-projects",
+      "applicableProjects": [
+        "web-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "remote-first-web-development",
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "bf89604a352477741ca16c436d6674930d6c10dee5b2447244fc06f2a6c536fc",
@@ -486,13 +1024,32 @@
     },
     {
       "id": "domain-modeling",
+      "name": "domain-modeling",
       "title": "Domain Modeling",
       "description": "Use when a material domain term is ambiguous, conflicting, or hard to reverse and a driver needs a shared glossary or bounded-context lens. Do not use for ordinary implementation detail.",
+      "shortDescription": "Use when a material domain term is ambiguous, conflicting, or hard to reverse and a driver needs a shared glossary or bounded-context lens. Do not use for ordinary implementation detail.",
       "aliases": [
         "domain-modeling"
       ],
+      "triggerConditions": [
+        "domain model entities business rules"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "27a3be1d77fe91707f29a652c89de4b25f3d76d20415d8c097bdfc58e70fbf9f",
@@ -502,11 +1059,27 @@
     },
     {
       "id": "emil-kowalski-complete",
+      "name": "emil-kowalski-complete",
       "title": "Emil Kowalski Complete",
       "description": "task relevant",
+      "shortDescription": "task relevant",
       "aliases": [],
+      "triggerConditions": [
+        "task-relevant"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-ui-projects",
+      "applicableProjects": [
+        "all-ui-projects"
+      ],
       "source": "github:emilkowalski/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -516,13 +1089,32 @@
     },
     {
       "id": "engineering-design-doctrine",
+      "name": "engineering-design-doctrine",
       "title": "Engineering Design Doctrine",
       "description": "Use when evaluating a material design, module seam, abstraction, domain boundary, or multi-worker design conflict. Provide reference principles only; do not start a refactor or widen scope.",
+      "shortDescription": "Use when evaluating a material design, module seam, abstraction, domain boundary, or multi-worker design conflict. Provide reference principles only; do not start a refactor or widen scope.",
       "aliases": [
         "engineering-design-doctrine"
       ],
+      "triggerConditions": [
+        "engineering design doctrine maintainable modular code"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "66a2d375aff08308bd4e0222b03ce7ebfe7446e66eb8719dad3c488118c7dbb5",
@@ -532,14 +1124,36 @@
     },
     {
       "id": "exact-head-pr-review",
+      "name": "exact-head-pr-review",
       "title": "Exact Head Pr Review",
       "description": "Review a pull request against the exact current head SHA and determine truthful readiness.",
+      "shortDescription": "Review a pull request against the exact current head SHA and determine truthful readiness.",
       "aliases": [
         "immutable-pr-review",
         "frozen-candidate-review"
       ],
+      "triggerConditions": [
+        "pr-review-or-release"
+      ],
+      "category": "quality",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "merged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "localized-independent-content; historical hashes do not block this capability",
+        "disposition": "MERGE"
+      },
+      "dependencies": [
+        "review",
+        "migration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "50bfd8ccbfaaad6a883b406f9252f7c97e0de18b1b29a7e78a3bb94c8a948558",
@@ -552,13 +1166,34 @@
     },
     {
       "id": "executive-assistant",
+      "name": "executive-assistant",
       "title": "Executive Assistant",
       "description": "Use when applying the staged executive assistant procedure. Coordinate briefings, inbox, calendar, meetings, tasks, drafts, follow-up and commitments without strategic decision authority.",
+      "shortDescription": "Use when applying the staged executive assistant procedure. Coordinate briefings, inbox, calendar, meetings, tasks, drafts, follow-up and commitments without strategic decision authority.",
       "aliases": [
         "executive-assistant"
       ],
+      "triggerConditions": [
+        "executive assistant calendar correspondence meeting preparation"
+      ],
+      "category": "management",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "chief-of-staff-boundary"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "44bf8ee0d7fd29e661c0d8535cbfa8486710e72519b2fffdc46af01b7f2c2d16",
@@ -568,11 +1203,36 @@
     },
     {
       "id": "exploratory-creative-dev",
+      "name": "exploratory-creative-dev",
       "title": "Exploratory Creative Dev",
       "description": "Build experimental, Awwwards/FWA-style, heavy-motion, immersive or illustration-led web experiences after the art direction is settled. Own specialised creative execution, not generic taste selection.",
+      "shortDescription": "Build experimental, Awwwards/FWA-style, heavy-motion, immersive or illustration-led web experiences after the art direction is settled. Own specialised creative execution, not generic taste selection.",
       "aliases": [],
+      "triggerConditions": [
+        "exploratory-awwwards-fwa-heavy-motion-immersive-illustrative"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "ui-projects",
+      "applicableProjects": [
+        "ui-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "design-direction-and-taste",
+        "website-design-qa",
+        "responsive-motion-systems",
+        "competitive-product-audit",
+        "review",
+        "verification",
+        "frontend",
+        "performance"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "0aae7785b0567d43e88a8d1dd152f168d59bf33f417946ba321c2e315c1ff5fb",
@@ -588,11 +1248,27 @@
     },
     {
       "id": "figma-generate-design",
+      "name": "figma-generate-design",
       "title": "Figma Generate Design",
       "description": "create or update figma screen",
+      "shortDescription": "create or update figma screen",
       "aliases": [],
+      "triggerConditions": [
+        "create-or-update-figma-screen"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "figma-enabled-projects",
+      "applicableProjects": [
+        "figma-enabled-projects"
+      ],
       "source": "github:openai/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -605,11 +1281,27 @@
     },
     {
       "id": "figma-implement-design",
+      "name": "figma-implement-design",
       "title": "Figma Implement Design",
       "description": "implement code from figma",
+      "shortDescription": "implement code from figma",
       "aliases": [],
+      "triggerConditions": [
+        "implement-code-from-figma"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "figma-enabled-projects",
+      "applicableProjects": [
+        "figma-enabled-projects"
+      ],
       "source": "github:openai/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -621,11 +1313,27 @@
     },
     {
       "id": "figma-use",
+      "name": "figma-use",
       "title": "Figma Use",
       "description": "programmatic figma read write",
+      "shortDescription": "programmatic figma read write",
       "aliases": [],
+      "triggerConditions": [
+        "programmatic-figma-read-write"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "figma-enabled-projects",
+      "applicableProjects": [
+        "figma-enabled-projects"
+      ],
       "source": "github:openai/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -637,13 +1345,32 @@
     },
     {
       "id": "fpa-forecasting-extrapolation",
+      "name": "fpa-forecasting-extrapolation",
       "title": "Fpa Forecasting Extrapolation",
       "description": "Use when applying the staged fpa forecasting extrapolation procedure. Build assumption-labelled forecasts from sufficient history using deterministic calculations.",
+      "shortDescription": "Use when applying the staged fpa forecasting extrapolation procedure. Build assumption-labelled forecasts from sufficient history using deterministic calculations.",
       "aliases": [
         "fpa-forecasting-extrapolation"
       ],
+      "triggerConditions": [
+        "financial planning forecast extrapolation budget"
+      ],
+      "category": "finance-accounting",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "d5ef270f3c973e8bf0fcd3ed33aa953952ff06db824b44b5512091c18403ba53",
@@ -653,13 +1380,32 @@
     },
     {
       "id": "frontend",
+      "name": "frontend",
       "title": "Frontend",
       "description": "Use when applying the staged frontend procedure. Apply the narrow frontend procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged frontend procedure. Apply the narrow frontend procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "frontend"
       ],
+      "triggerConditions": [
+        "frontend ui component interface"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "84dbb80a7e45b1c100ff3b904ff30f4f46b34540e50c949181730d86fb2043d4",
@@ -669,11 +1415,27 @@
     },
     {
       "id": "frontend-design",
+      "name": "frontend-design",
       "title": "Frontend Design",
       "description": "frontend design work",
+      "shortDescription": "frontend design work",
       "aliases": [],
+      "triggerConditions": [
+        "frontend-design-work"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-ui-projects",
+      "applicableProjects": [
+        "all-ui-projects"
+      ],
       "source": "github:anthropics/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -684,11 +1446,31 @@
     },
     {
       "id": "gaussian-splatting-spatial-reconstruction",
+      "name": "gaussian-splatting-spatial-reconstruction",
       "title": "Gaussian Splatting Spatial Reconstruction",
       "description": "Use for physical-space or object reconstruction, spatial visualisation, or novel-view rendering with 3D Gaussian Splatting. Treat it as one candidate technique and gate execution by data, hardware, privacy, alternatives, and license.",
+      "shortDescription": "Use for physical-space or object reconstruction, spatial visualisation, or novel-view rendering with 3D Gaussian Splatting. Treat it as one candidate technique and gate execution by data, hardware, privacy, alternatives, and license.",
       "aliases": [],
+      "triggerConditions": [
+        "3d-gaussian-splatting-spatial-reconstruction-radiance-field-colmap-novel-view-splat"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "spatial-projects",
+      "applicableProjects": [
+        "spatial-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "review",
+        "dependency",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "3ee26a2b29bd7766bd6c50326ca05f52be3e1596245adf3b35aa4671eab8ce55",
@@ -708,11 +1490,27 @@
     },
     {
       "id": "graph-engineering",
+      "name": "graph-engineering",
       "title": "Graph Engineering",
       "description": "deep graph orchestration",
+      "shortDescription": "deep graph orchestration",
       "aliases": [],
+      "triggerConditions": [
+        "deep-graph-orchestration"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "github:codejunkie99/graph-engineering",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -723,11 +1521,31 @@
     },
     {
       "id": "human-blocker-orchestration",
+      "name": "human-blocker-orchestration",
       "title": "Human Blocker Orchestration",
       "description": "Surface human-only authentication and approval blockers in the visible Codex in-app browser, notify the owner, and continue independent work.",
+      "shortDescription": "Surface human-only authentication and approval blockers in the visible Codex in-app browser, notify the owner, and continue independent work.",
       "aliases": [],
+      "triggerConditions": [
+        "authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "review",
+        "dependency",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4f84c39863bb4f4cdfdb672097698413951f20bc14e373ba91e51697131f11d8",
@@ -747,13 +1565,29 @@
     },
     {
       "id": "idea-lineage",
+      "name": "idea-lineage",
       "title": "Idea Lineage",
       "description": "Use to reconstruct the evidence-qualified history of an idea or view from existing provenance and temporal facts, including first appearance, changes, causes, superseded versions, conflicts, abandoned branches and the current canonical view.",
+      "shortDescription": "Use to reconstruct the evidence-qualified history of an idea or view from existing provenance and temporal facts, including first appearance, changes, causes, superseded versions, conflicts, abandoned branches and the current canonical view.",
       "aliases": [
         "view-lineage"
       ],
+      "triggerConditions": [
+        "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "a73e4523bc031f48109184327116e1428b81a6a5b1b9599f1e460375204b2397",
@@ -763,13 +1597,32 @@
     },
     {
       "id": "incident",
+      "name": "incident",
       "title": "Incident",
       "description": "Use when applying the staged incident procedure. Apply the narrow incident procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged incident procedure. Apply the narrow incident procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "incident"
       ],
+      "triggerConditions": [
+        "production incident outage recovery"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "35eac013c91841f66a665b98bc47a15952d7139b29ea22d91a098c60067a0e59",
@@ -779,13 +1632,32 @@
     },
     {
       "id": "integration",
+      "name": "integration",
       "title": "Integration",
       "description": "Use when applying the staged integration procedure. Apply the narrow integration procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged integration procedure. Apply the narrow integration procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "integration"
       ],
+      "triggerConditions": [
+        "third party integration adapter connector"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "86aa985f78d21750193e89aa6f8b9b52567a20761f616587d5ce737a1c373f89",
@@ -795,13 +1667,31 @@
     },
     {
       "id": "knowledge-ingest",
+      "name": "knowledge-ingest",
       "title": "Knowledge Ingest",
       "description": "Use to dispatch notes, pasted text, documents, transcripts, URLs, research or repositories into existing Major and GBrain knowledge interfaces with provenance, identity resolution, dedupe and notability filtering.",
+      "shortDescription": "Use to dispatch notes, pasted text, documents, transcripts, URLs, research or repositories into existing Major and GBrain knowledge interfaces with provenance, identity resolution, dedupe and notability filtering.",
       "aliases": [
         "knowledge-dispatcher"
       ],
+      "triggerConditions": [
+        "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "source-ingestion"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "2d6897d9767ef81560a869c1b496ec21579ccc6d30f4f76fae48c095cc5954b8",
@@ -811,11 +1701,31 @@
     },
     {
       "id": "knowledge-work",
+      "name": "knowledge-work",
       "title": "Knowledge Work",
       "description": "Use for substantial research, strategy, synthesis, comparisons, decision memos, market/product analysis or other knowledge work where source quality and reasoning matter. Define the decision, ingest primary sources with the right tools, scale research depth to stakes, use independent skeptic review when useful, and stop once there is enough evidence to make the next good decision.",
+      "shortDescription": "Use for substantial research, strategy, synthesis, comparisons, decision memos, market/product analysis or other knowledge work where source quality and reasoning matter. Define the decision, ingest primary sources with the right tools, scale research depth to stakes, use independent skeptic review when useful, and stop once there is enough evidence to make the next good decision.",
       "aliases": [],
+      "triggerConditions": [
+        "research-strategy-synthesis-comparison-decision-work"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "source-ingestion",
+        "review",
+        "verification"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "ae8a0f1a5daf6757e778a6f698ae79cf95708daf5e961bee41ae1ccf38132038",
@@ -830,11 +1740,30 @@
     },
     {
       "id": "lean-graph-engineering",
+      "name": "lean-graph-engineering",
       "title": "Lean Graph Engineering",
       "description": "Design lean task graphs for complex autonomous builds using explicit dependencies, parallel branches, verifiers, repair loops, human gates and stop rules.",
+      "shortDescription": "Design lean task graphs for complex autonomous builds using explicit dependencies, parallel branches, verifiers, repair loops, human gates and stop rules.",
       "aliases": [],
+      "triggerConditions": [
+        "complex-autonomous-or-parallel-work"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "graph-engineering",
+        "verification"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4ab2a81c53c998a60b672fc8d48f44665c484dadf4f7152a78f49335c2b9a2df",
@@ -848,14 +1777,38 @@
     },
     {
       "id": "lean-quality",
+      "name": "lean-quality",
       "title": "Lean Quality",
       "description": "Use for test strategy, release confidence and verification planning. Maximize confidence per minute with risk-proportional tests instead of exhaustive ceremony.",
+      "shortDescription": "Use for test strategy, release confidence and verification planning. Maximize confidence per minute with risk-proportional tests instead of exhaustive ceremony.",
       "aliases": [
         "quality-gate",
         "lean-verification"
       ],
+      "triggerConditions": [
+        "test-strategy-verification-release-confidence"
+      ],
+      "category": "quality",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "merged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "localized-independent-content; historical hashes do not block this capability",
+        "disposition": "MERGE"
+      },
+      "dependencies": [
+        "planning",
+        "review",
+        "verification",
+        "migration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "22b698eb349f7ef10cc7e0f19c0928a73f9416c99fe1e9d2d9d3e0c9178e8811",
@@ -869,11 +1822,36 @@
     },
     {
       "id": "learning-capture",
+      "name": "learning-capture",
       "title": "Learning Capture",
       "description": "Use when the user explicitly corrects agent behavior, says a mistake has happened before, identifies a recurring failure, or a reusable procedure succeeds. Fix the current task first, then capture the lesson and decide whether it stays project-local, becomes global guidance, or should be skillified.",
+      "shortDescription": "Use when the user explicitly corrects agent behavior, says a mistake has happened before, identifies a recurring failure, or a reusable procedure succeeds. Fix the current task first, then capture the lesson and decide whether it stays project-local, becomes global guidance, or should be skillified.",
       "aliases": [],
+      "triggerConditions": [
+        "explicit-user-correction-repeated-mistake-recurring-failure-reusable-success"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "project-context-integrity",
+        "skillify",
+        "website-design-qa",
+        "mcp-integration-ops",
+        "data-learning-loop",
+        "review",
+        "verification",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "e10bcda8ccbd9e3b5696a3877caa0c73f3268c130f579acd232ed9d6d35fbea5",
@@ -891,11 +1869,30 @@
     },
     {
       "id": "legacy-cleanup",
+      "name": "legacy-cleanup",
       "title": "Legacy Cleanup",
       "description": "Complete migrations and replacements by removing obsolete active code, configuration, guidance, names and duplicate paths after the successor is verified.",
+      "shortDescription": "Complete migrations and replacements by removing obsolete active code, configuration, guidance, names and duplicate paths after the successor is verified.",
       "aliases": [],
+      "triggerConditions": [
+        "rename-migration-provider-swap-architecture-replacement"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "architecture",
+        "migration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "55cea083641968cdde74a1c3016245043c26557c851d8cf9cbc0d3f4c3ca618e",
@@ -910,11 +1907,31 @@
     },
     {
       "id": "major-self-maintenance",
+      "name": "major-self-maintenance",
       "title": "Major Self Maintenance",
       "description": "Use whenever Major modifies its own repository, skills, resolver, policies, runtime, installers or learning system. Never leave Major main red. Batch changes on an unopened branch, keep skill registry/evals/catalog atomic, run the complete local gate, use independent review for material behavior changes, and merge only after the exact head is green.",
+      "shortDescription": "Use whenever Major modifies its own repository, skills, resolver, policies, runtime, installers or learning system. Never leave Major main red. Batch changes on an unopened branch, keep skill registry/evals/catalog atomic, run the complete local gate, use independent review for material behavior changes, and merge only after the exact head is green.",
       "aliases": [],
+      "triggerConditions": [
+        "major-self-change-skill-routing-learning-policy-runtime-installer"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "major-repo",
+      "applicableProjects": [
+        "major-repo"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "simple-modular-code",
+        "worktree",
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "eac7daff75f5973230148e4b0ef1ed063ee48cc4a7717308782c5e3711b77c74",
@@ -932,11 +1949,27 @@
     },
     {
       "id": "mcp-builder",
+      "name": "mcp-builder",
       "title": "Mcp Builder",
       "description": "build or improve mcp server",
+      "shortDescription": "build or improve mcp server",
       "aliases": [],
+      "triggerConditions": [
+        "build-or-improve-mcp-server"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "github:anthropics/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -949,11 +1982,34 @@
     },
     {
       "id": "mcp-integration-ops",
+      "name": "mcp-integration-ops",
       "title": "Mcp Integration Ops",
       "description": "Use for MCP servers, plugins, connectors, provider tools, OAuth-backed integrations, tool exposure failures, reconnects, missing capabilities or claims that an integration is installed/connected. Distinguish installed, configured, exposed, authenticated, permissioned and proven by a real operation; diagnose the earliest broken boundary and use the native integration before browser workarounds.",
+      "shortDescription": "Use for MCP servers, plugins, connectors, provider tools, OAuth-backed integrations, tool exposure failures, reconnects, missing capabilities or claims that an integration is installed/connected. Distinguish installed, configured, exposed, authenticated, permissioned and proven by a real operation; diagnose the earliest broken boundary and use the native integration before browser workarounds.",
       "aliases": [],
+      "triggerConditions": [
+        "mcp-connector-plugin-integration-authentication-tool-exposure-reconnect-permission-provider-operation"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "legacy-cleanup",
+        "human-blocker-orchestration",
+        "source-ingestion",
+        "mcp-builder",
+        "api",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "06bab0e3f1d24fa4aefb518f8cdaacccb5d22abbe9febf0e1fd12727d3748dff",
@@ -973,13 +2029,32 @@
     },
     {
       "id": "migration",
+      "name": "migration",
       "title": "Migration",
       "description": "Use when applying the staged migration procedure. Apply the narrow migration procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged migration procedure. Apply the narrow migration procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "migration"
       ],
+      "triggerConditions": [
+        "data schema platform migration"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "47d7e41aeb232bc3f1c4bef82903aebf78d177fca17845e261457b4104c45662",
@@ -989,11 +2064,27 @@
     },
     {
       "id": "mvp-speed-prioritisation",
+      "name": "mvp-speed-prioritisation",
       "title": "Mvp Speed Prioritisation",
       "description": "Always simplify broad requirements into the fastest credible MVP proof before expanding scope.",
+      "shortDescription": "Always simplify broad requirements into the fastest credible MVP proof before expanding scope.",
       "aliases": [],
+      "triggerConditions": [
+        "always-on-project-and-large-feature-planning"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "f2e0e9793639987d40c9bb70e633586712effcbfe666b31a20c2cfbf8a56baec",
@@ -1009,11 +2100,27 @@
     },
     {
       "id": "nontechnical-ux",
+      "name": "nontechnical-ux",
       "title": "Nontechnical Ux",
       "description": "Design workflows for non-technical operators with plain language, safe defaults, visible status and guided recovery.",
+      "shortDescription": "Design workflows for non-technical operators with plain language, safe defaults, visible status and guided recovery.",
       "aliases": [],
+      "triggerConditions": [
+        "operator-or-user-workflow"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-product-projects",
+      "applicableProjects": [
+        "all-product-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c4b81201ed5eff9d54fb8d2b2350600534fe95a1582ab56cb29575f5498e26df",
@@ -1026,13 +2133,32 @@
     },
     {
       "id": "observability",
+      "name": "observability",
       "title": "Observability",
       "description": "Use when applying the staged observability procedure. Apply the narrow observability procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged observability procedure. Apply the narrow observability procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "observability"
       ],
+      "triggerConditions": [
+        "logging metrics tracing observability"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "0fda860b56a7bf35d4003e0a158f9ed4789e7887890a0c84f1edd4ae395eb19b",
@@ -1042,11 +2168,29 @@
     },
     {
       "id": "open-source-leverage",
+      "name": "open-source-leverage",
       "title": "Open Source Leverage",
       "description": "Find and evaluate maintained open-source tools or products that can reduce build time without unsafe lock-in.",
+      "shortDescription": "Find and evaluate maintained open-source tools or products that can reduce build time without unsafe lock-in.",
       "aliases": [],
+      "triggerConditions": [
+        "project-start-or-commodity-build"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "architecture"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "d2c5db532ed2cec1041e280a593e0693eeae3b4b35d6a21803875cb656150784",
@@ -1060,13 +2204,36 @@
     },
     {
       "id": "operations-improvement-core",
+      "name": "operations-improvement-core",
       "title": "Operations Improvement Core",
       "description": "Use for process maps, workflow improvement, constraint analysis, SOPs, automation opportunities, tool evaluation, capacity planning, KPI review, incident learning or waste detection.",
+      "shortDescription": "Use for process maps, workflow improvement, constraint analysis, SOPs, automation opportunities, tool evaluation, capacity planning, KPI review, incident learning or waste detection.",
       "aliases": [
         "operations-improvement-core"
       ],
+      "triggerConditions": [
+        "operations process improvement workflow efficiency"
+      ],
+      "category": "operations",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "planning",
+        "review",
+        "incident"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "e9596e7931a1420cfb011a74f3ca22dc46f3373f1a6f4dc809172cf9bb4f93fb",
@@ -1076,11 +2243,27 @@
     },
     {
       "id": "pdf",
+      "name": "pdf",
       "title": "Pdf",
       "description": "pdf task",
+      "shortDescription": "pdf task",
       "aliases": [],
+      "triggerConditions": [
+        "pdf-task"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "github:openai/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -1090,11 +2273,30 @@
     },
     {
       "id": "pdf-reporting-qa",
+      "name": "pdf-reporting-qa",
       "title": "Pdf Reporting Qa",
       "description": "Generate and review reliable PDF reports with stable pagination, readable hierarchy and no clipping/orphaned content.",
+      "shortDescription": "Generate and review reliable PDF reports with stable pagination, readable hierarchy and no clipping/orphaned content.",
       "aliases": [],
+      "triggerConditions": [
+        "generated-pdf-reporting"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "pdf",
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "14f4b23a56ee0179fe078dab6870fc4ae742f7bba4e3cbf36aac2b5b4f80be0e",
@@ -1106,13 +2308,32 @@
     },
     {
       "id": "performance",
+      "name": "performance",
       "title": "Performance",
       "description": "Use when applying the staged performance procedure. Apply the narrow performance procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged performance procedure. Apply the narrow performance procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "performance"
       ],
+      "triggerConditions": [
+        "performance latency throughput optimize"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "8ffe590b4f29273cf4c0aa6549821faacd07add0c52647cb7d797a07e09bed80",
@@ -1122,11 +2343,32 @@
     },
     {
       "id": "performance-caching",
+      "name": "performance-caching",
       "title": "Performance Caching",
       "description": "Use when a real workflow, page, query, build or integration is measurably slow. Find the dominant bottleneck and apply the simplest high-leverage performance fix before rewriting architecture.",
+      "shortDescription": "Use when a real workflow, page, query, build or integration is measurably slow. Find the dominant bottleneck and apply the simplest high-leverage performance fix before rewriting architecture.",
       "aliases": [],
+      "triggerConditions": [
+        "measured-slow-workflow-page-query-build-integration"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "architecture",
+        "database",
+        "performance",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "ad07ddcd2a2569bed4e5886f843cc1cd74d061c0bfda358471e63c9ae3b77d0e",
@@ -1142,13 +2384,32 @@
     },
     {
       "id": "planning",
+      "name": "planning",
       "title": "Planning",
       "description": "Use when applying the staged planning procedure. Apply the narrow planning procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged planning procedure. Apply the narrow planning procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "planning"
       ],
+      "triggerConditions": [
+        "engineering implementation planning task breakdown"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "393d15ab1f6a863f4f42ce07b9dc2eab47f179811139604794e65b9cdfdec51f",
@@ -1158,11 +2419,27 @@
     },
     {
       "id": "playwright",
+      "name": "playwright",
       "title": "Playwright",
       "description": "real browser automation debugging qa",
+      "shortDescription": "real browser automation debugging qa",
       "aliases": [],
+      "triggerConditions": [
+        "real-browser-automation-debugging-qa"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "web-projects",
+      "applicableProjects": [
+        "web-projects"
+      ],
       "source": "github:openai/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -1175,11 +2452,37 @@
     },
     {
       "id": "presentation-storylining",
+      "name": "presentation-storylining",
       "title": "Presentation Storylining",
       "description": "Use for substantial presentations, slide decks, board decks, strategy decks, consulting-style decks, investor/sales proposals, executive updates, or any slide artifact where the argument and decision logic matter. Turn evidence into a governing thought, structured storyline, ghost deck, assertion-led slide titles, slide-level proof and adversarial QA before visual rendering. Compose with knowledge-work for research and decision analysis, and with design/rendering skills only after the story is sound.",
+      "shortDescription": "Use for substantial presentations, slide decks, board decks, strategy decks, consulting-style decks, investor/sales proposals, executive updates, or any slide artifact where the argument and decision logic matter. Turn evidence into a governing thought, structured storyline, ghost deck, assertion-led slide titles, slide-level proof and adversarial QA before visual rendering. Compose with knowledge-work for research and decision analysis, and with design/rendering skills only after the story is sound.",
       "aliases": [],
+      "triggerConditions": [
+        "presentation-slide-deck-board-deck-strategy-deck-consulting-deck-investor-deck-sales-deck-proposal-executive-update-pitch-storyline-action-title-ghost-deck"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "learning-capture",
+        "skillify",
+        "design-direction-and-taste",
+        "source-ingestion",
+        "knowledge-work",
+        "pdf-reporting-qa",
+        "pdf",
+        "planning",
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4a5f476c91e1abaa3f2f3192c434d20d1c39b70712eed87bfd097eb7c0f8c61c",
@@ -1210,11 +2513,33 @@
     },
     {
       "id": "prior-art-discovery",
+      "name": "prior-art-discovery",
       "title": "Prior Art Discovery",
       "description": "Required gate before substantial new infrastructure: search existing implementations and record an ADOPT, WRAP, BORROW or BUILD decision.",
+      "shortDescription": "Required gate before substantial new infrastructure: search existing implementations and record an ADOPT, WRAP, BORROW or BUILD decision.",
       "aliases": [],
+      "triggerConditions": [
+        "new-subsystem-provider-integration-agent-runtime-sandbox-router-memory-auth-scraper-workflow-engine-browser-mcp-installation-deployment-major-dependency"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "open-source-leverage",
+        "dependency",
+        "deployment",
+        "migration",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "0aad51fd5528ec867a0d452978ccad188d82a8b0ad529768e5da51ed0b2893de",
@@ -1242,13 +2567,32 @@
     },
     {
       "id": "product-management-core",
+      "name": "product-management-core",
       "title": "Product Management Core",
       "description": "Use when framing a product problem, discovery, requirement, prioritisation, roadmap decision, experiment, metric, scope decision or post-launch learning. Compose research, design and analytics rather than duplicate them.",
+      "shortDescription": "Use when framing a product problem, discovery, requirement, prioritisation, roadmap decision, experiment, metric, scope decision or post-launch learning. Compose research, design and analytics rather than duplicate them.",
       "aliases": [
         "product-management-core"
       ],
+      "triggerConditions": [
+        "product management discovery roadmap prioritisation"
+      ],
+      "category": "product",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "2b55a0b626a3a5857be71c2a81638fcb92619f837b8f1c504944106a07a3a8f9",
@@ -1258,11 +2602,31 @@
     },
     {
       "id": "project-context-integrity",
+      "name": "project-context-integrity",
       "title": "Project Context Integrity",
       "description": "Use whenever a task names, implies, links to, or references a project/repository and before cross-project edits, handoffs, migrations or fixes. Confirm that the active repo is the intended target. If the task clearly belongs to another known project, do not patch the current repo; reroute to the correct repo automatically when unambiguous, or stop and surface the mismatch when ambiguous.",
+      "shortDescription": "Use whenever a task names, implies, links to, or references a project/repository and before cross-project edits, handoffs, migrations or fixes. Confirm that the active repo is the intended target. If the task clearly belongs to another known project, do not patch the current repo; reroute to the correct repo automatically when unambiguous, or stop and surface the mismatch when ambiguous.",
       "aliases": [],
+      "triggerConditions": [
+        "named-project-repository-path-cross-project-edit-handoff-migration-wrong-project"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "deployment",
+        "architecture",
+        "migration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "93df50e5ae6dbb205bcd3b8564fb62264ddb11878f34a57356364a7b60145e66",
@@ -1282,11 +2646,30 @@
     },
     {
       "id": "project-start",
+      "name": "project-start",
       "title": "Project Start",
       "description": "Prepare a new repository quickly by clarifying the outcome, inspecting related assets, installing skills, selecting the first vertical slice and establishing concise project truth.",
+      "shortDescription": "Prepare a new repository quickly by clarifying the outcome, inspecting related assets, installing skills, selecting the first vertical slice and establishing concise project truth.",
       "aliases": [],
+      "triggerConditions": [
+        "project-start"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "project-context-integrity",
+        "workspace-lifecycle-management"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "b471181bbc7e479f22dd7493bf5e32a1d0d4d00a6c6db32b0fce33b27fe3f2f5",
@@ -1297,11 +2680,29 @@
     },
     {
       "id": "rapid-ui-prototype",
+      "name": "rapid-ui-prototype",
       "title": "Rapid Ui Prototype",
       "description": "Compare a small number of credible interaction approaches before committing to a consequential UI pattern.",
+      "shortDescription": "Compare a small number of credible interaction approaches before committing to a consequential UI pattern.",
       "aliases": [],
+      "triggerConditions": [
+        "multiple-credible-ui-options"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "ui-projects",
+      "applicableProjects": [
+        "ui-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "api"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c30a39d7464a9e78a764fd755235aefc73c63d15ac6229e88d81862ca4f4fc40",
@@ -1314,13 +2715,32 @@
     },
     {
       "id": "reconciliation-close-statements",
+      "name": "reconciliation-close-statements",
       "title": "Reconciliation Close Statements",
       "description": "Use when applying the staged reconciliation close statements procedure. Prepare deterministic reconciliations, close checklists and statement tie-outs with explicit exceptions.",
+      "shortDescription": "Use when applying the staged reconciliation close statements procedure. Prepare deterministic reconciliations, close checklists and statement tie-outs with explicit exceptions.",
       "aliases": [
         "reconciliation-close-statements"
       ],
+      "triggerConditions": [
+        "account reconciliation close financial statements"
+      ],
+      "category": "finance-accounting",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "419f1725d2df08819bb28338a04ad2d033889182dcb5f2c076f4741eb557d218",
@@ -1330,11 +2750,31 @@
     },
     {
       "id": "remote-first-web-development",
+      "name": "remote-first-web-development",
       "title": "Remote First Web Development",
       "description": "Enforce GitHub plus Cloudflare preview before browser work on a web project. Deny local browser targets unless the owner explicitly approves a project-specific exception.",
+      "shortDescription": "Enforce GitHub plus Cloudflare preview before browser work on a web project. Deny local browser targets unless the owner explicitly approves a project-specific exception.",
       "aliases": [],
+      "triggerConditions": [
+        "all-web-project-ui-work-browser-preview-visual-qa-acceptance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "web-projects",
+      "applicableProjects": [
+        "web-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "dev-server-management",
+        "review",
+        "deployment"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "44d6b983aa08e6a49117cbadfafa1f7bedd4024116851edfcc5025201e731e1c",
@@ -1353,13 +2793,29 @@
     },
     {
       "id": "research-compendium",
+      "name": "research-compendium",
       "title": "Research Compendium",
       "description": "Use to create or update a reusable structured research asset containing question, scope, source index, claim map, findings, contradictions, uncertainty, gaps, synthesis, implications, freshness and project or entity links.",
+      "shortDescription": "Use to create or update a reusable structured research asset containing question, scope, source index, claim map, findings, contradictions, uncertainty, gaps, synthesis, implications, freshness and project or entity links.",
       "aliases": [
         "research-dossier"
       ],
+      "triggerConditions": [
+        "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "2064277af81ad0f72fc8104be0631035f9de2fc378392931131024f4689451db",
@@ -1369,11 +2825,35 @@
     },
     {
       "id": "responsive-motion-systems",
+      "name": "responsive-motion-systems",
       "title": "Responsive Motion Systems",
       "description": "Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.",
+      "shortDescription": "Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.",
       "aliases": [],
+      "triggerConditions": [
+        "gsap-scrolltrigger-sticky-pinned-scrollytelling-card-stacking-hero-video-parallax-threejs-zoom-motion"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "web-projects",
+      "applicableProjects": [
+        "web-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "website-design-qa",
+        "debugging",
+        "review",
+        "deployment",
+        "incident",
+        "architecture",
+        "frontend"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c86cf077b78ee5b32a92ebc114dd1014908d68789de48c9ab4d5150894bfccce",
@@ -1395,13 +2875,34 @@
     },
     {
       "id": "reusable-asset-discovery",
+      "name": "reusable-asset-discovery",
       "title": "Reusable Asset Discovery",
       "description": "Use before material new implementation to retrieve a compatible reusable implementation in the required local-map, GBrain-index, canonical-package, historical-candidate and prior-art order. Use when deciding whether code, a component, a template, a validator, a schema, an adapter or a calculator should be reused, wrapped, promoted or built. Do not create a new asset registry or copy source trees into GBrain.",
+      "shortDescription": "Use before material new implementation to retrieve a compatible reusable implementation in the required local-map, GBrain-index, canonical-package, historical-candidate and prior-art order. Use when deciding whether code, a component, a template, a validator, a schema, an adapter or a calculator should be reused, wrapped, promoted or built. Do not create a new asset registry or copy source trees into GBrain.",
       "aliases": [
         "reusable-asset-discovery"
       ],
+      "triggerConditions": [
+        "reusable asset component template package discovery reuse"
+      ],
+      "category": "system",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "582f47594b1b4e1ba33f8b9f166a70b0b9795e4aebcc6de708547f57590f9863",
@@ -1411,13 +2912,34 @@
     },
     {
       "id": "review",
+      "name": "review",
       "title": "Review",
       "description": "Use when applying the staged review procedure. Apply the narrow review procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged review procedure. Apply the narrow review procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "review"
       ],
+      "triggerConditions": [
+        "code review implementation review"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "exact-head-pr-review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "a0b47b99d0337c6d95cbe9df58e1e42f1adbfd8b2b50def820f9082c7ad18e2c",
@@ -1427,14 +2949,33 @@
     },
     {
       "id": "root-cause-qa",
+      "name": "root-cause-qa",
       "title": "Root Cause Qa",
       "description": "Diagnose failures and regressions, fix the underlying cause and add only valuable regression protection.",
+      "shortDescription": "Diagnose failures and regressions, fix the underlying cause and add only valuable regression protection.",
       "aliases": [
         "root-cause-analysis",
         "failure-investigation"
       ],
+      "triggerConditions": [
+        "bug-failure-regression"
+      ],
+      "category": "quality",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "merged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "localized-independent-content; historical hashes do not block this capability",
+        "disposition": "MERGE"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "919216b1235d0ebebe50e72ae26b3065cbab23e31352504407edb8c5b8e60494",
@@ -1446,13 +2987,34 @@
     },
     {
       "id": "sales-commercial-core",
+      "name": "sales-commercial-core",
       "title": "Sales Commercial Core",
       "description": "Use for account prioritisation, company research, meeting preparation, deal strategy, follow-up drafts, pipeline review, forecasting, CRM hygiene analysis or customer evidence. Keep provider actions in adapters.",
+      "shortDescription": "Use for account prioritisation, company research, meeting preparation, deal strategy, follow-up drafts, pipeline review, forecasting, CRM hygiene analysis or customer evidence. Keep provider actions in adapters.",
       "aliases": [
         "sales-commercial-core"
       ],
+      "triggerConditions": [
+        "sales commercial pipeline customer revenue"
+      ],
+      "category": "sales",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "f2ab6231938a9c1c316ff27f6c27183affed667cfd9d7626cd15c830e7b116e2",
@@ -1462,13 +3024,32 @@
     },
     {
       "id": "security-audit",
+      "name": "security-audit",
       "title": "Security Audit",
       "description": "Use when applying the staged security audit procedure. Apply the narrow security audit procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged security audit procedure. Apply the narrow security audit procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "security-audit"
       ],
+      "triggerConditions": [
+        "security audit vulnerability review"
+      ],
+      "category": "quality",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "25b8ccdecddb2ca4d9968da61f668174d8679ad4db426187bb7435851335da81",
@@ -1478,11 +3059,27 @@
     },
     {
       "id": "security-threat-model",
+      "name": "security-threat-model",
       "title": "Security Threat Model",
       "description": "material security risk",
+      "shortDescription": "material security risk",
       "aliases": [],
+      "triggerConditions": [
+        "material-security-risk"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "github:openai/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -1493,11 +3090,46 @@
     },
     {
       "id": "seo-os",
+      "name": "seo-os",
       "title": "Seo Os",
       "description": "Use for substantive SEO, search growth, technical SEO, keyword/content opportunity research, site architecture, authority/link work, local SEO, AI-search visibility/GEO/AEO, SEO measurement, or autonomous SEO improvement. Orchestrates evidence, prioritisation, safe execution, verification and learning while reusing OpenSEO and other mature providers instead of rebuilding commodity tooling.",
+      "shortDescription": "Use for substantive SEO, search growth, technical SEO, keyword/content opportunity research, site architecture, authority/link work, local SEO, AI-search visibility/GEO/AEO, SEO measurement, or autonomous SEO improvement. Orchestrates evidence, prioritisation, safe execution, verification and learning while reusing OpenSEO and other mature providers instead of rebuilding commodity tooling.",
       "aliases": [],
+      "triggerConditions": [
+        "seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "web-projects",
+      "applicableProjects": [
+        "web-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "website-design-qa",
+        "mcp-integration-ops",
+        "source-ingestion",
+        "knowledge-work",
+        "open-source-leverage",
+        "prior-art-discovery",
+        "root-cause-qa",
+        "data-learning-loop",
+        "source-adapter-engineering",
+        "cost-control",
+        "review",
+        "verification",
+        "dependency",
+        "deployment",
+        "architecture",
+        "performance",
+        "migration",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "b20e0b0355bd512440f116611e8c7bf06ac6409035a967569a526d8b16def230",
@@ -1541,11 +3173,30 @@
     },
     {
       "id": "simple-modular-code",
+      "name": "simple-modular-code",
       "title": "Simple Modular Code",
       "description": "Produce the simplest correct, reusable and replaceable implementation for architecture and coding tasks.",
+      "shortDescription": "Produce the simplest correct, reusable and replaceable implementation for architecture and coding tasks.",
       "aliases": [],
+      "triggerConditions": [
+        "architecture-or-implementation"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "architecture",
+        "database"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "2796b79bb9217078da14648f6007fc97393fdde80356d633fe9f64d71eb07f05",
@@ -1557,11 +3208,27 @@
     },
     {
       "id": "skill-creator",
+      "name": "skill-creator",
       "title": "Skill Creator",
       "description": "create evaluate or improve persistent skill",
+      "shortDescription": "create evaluate or improve persistent skill",
       "aliases": [],
+      "triggerConditions": [
+        "create-evaluate-or-improve-persistent-skill"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "github:anthropics/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -1575,14 +3242,32 @@
     },
     {
       "id": "skill-harvest",
+      "name": "skill-harvest",
       "title": "Skill Harvest",
       "description": "Use to discover and assess prior art for a recurring capability, then reuse, configure, integrate, harvest a generic pattern, build only the missing delta, or reject it with evidence before proposing activation through Major's existing skill lifecycle.",
+      "shortDescription": "Use to discover and assess prior art for a recurring capability, then reuse, configure, integrate, harvest a generic pattern, build only the missing delta, or reject it with evidence before proposing activation through Major's existing skill lifecycle.",
       "aliases": [
         "skillpack-harvest",
         "capability-harvest"
       ],
+      "triggerConditions": [
+        "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "skillify"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "0beaaada6bf7cd167871ae16cfbfdfbcdaf5e485425724b7bac410c2cf246fa0",
@@ -1592,11 +3277,30 @@
     },
     {
       "id": "skill-resolver",
+      "name": "skill-resolver",
       "title": "Skill Resolver",
       "description": "Use at the start of substantive work to select only the small set of Major skills that materially improve the task. Prefer precise trigger matching and avoid loading overlapping or irrelevant skills.",
+      "shortDescription": "Use at the start of substantive work to select only the small set of Major skills that materially improve the task. Prefer precise trigger matching and avoid loading overlapping or irrelevant skills.",
       "aliases": [],
+      "triggerConditions": [
+        "start-of-substantive-work-select-relevant-skills"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "skillify",
+        "review"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "5c751f66e011b59f7c872cd91fb7dc1ddd69cdcf398b04cab9fb2cd177495dae",
@@ -1612,11 +3316,30 @@
     },
     {
       "id": "skillify",
+      "name": "skillify",
       "title": "Skillify",
       "description": "Use after a novel workflow succeeds or a recurring failure is solved and the procedure is likely to recur. Convert the working procedure into a tested reusable skill pack instead of adding more permanent orchestration code or raw memory.",
+      "shortDescription": "Use after a novel workflow succeeds or a recurring failure is solved and the procedure is likely to recur. Convert the working procedure into a tested reusable skill pack instead of adding more permanent orchestration code or raw memory.",
       "aliases": [],
+      "triggerConditions": [
+        "reusable-successful-procedure-or-recurring-solved-failure"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "review",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "5d2c0f7e2a7d2d19b779788fc741e7e9e54e41e90d5c8483506a4cea1458c831",
@@ -1632,13 +3355,32 @@
     },
     {
       "id": "software-engineering",
+      "name": "software-engineering",
       "title": "Software Engineering",
       "description": "Use when applying the staged software engineering procedure. Compose the smallest relevant engineering procedures without duplicating their contracts.",
+      "shortDescription": "Use when applying the staged software engineering procedure. Compose the smallest relevant engineering procedures without duplicating their contracts.",
       "aliases": [
         "software-engineering"
       ],
+      "triggerConditions": [
+        "software implementation feature bug code engineering"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "2e58c8047f23e6bc21f1de0c3e8f6aa49c38a97a8122cbca0cf0950fecde0906",
@@ -1648,11 +3390,27 @@
     },
     {
       "id": "source-adapter-engineering",
+      "name": "source-adapter-engineering",
       "title": "Source Adapter Engineering",
       "description": "Build modular external-data sourcing using official structured sources first, replaceable adapters, deduplication, retries and health monitoring.",
+      "shortDescription": "Build modular external-data sourcing using official structured sources first, replaceable adapters, deduplication, retries and health monitoring.",
       "aliases": [],
+      "triggerConditions": [
+        "api-scraping-feed-external-data"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "b4e9a03052478484df757a3b5e0af9566da17d43514716937abe69454846d9f6",
@@ -1666,11 +3424,27 @@
     },
     {
       "id": "source-ingestion",
+      "name": "source-ingestion",
       "title": "Source Ingestion",
       "description": "Use whenever the user asks to summarize, analyze, extract, compare or learn from a specific URL, video, file, repository, document, audio source or other named primary source. Route to the best native/deterministic tool, follow source-specific fallbacks, preserve provenance, and never substitute secondary-source reconstruction without saying so.",
+      "shortDescription": "Use whenever the user asks to summarize, analyze, extract, compare or learn from a specific URL, video, file, repository, document, audio source or other named primary source. Route to the best native/deterministic tool, follow source-specific fallbacks, preserve provenance, and never substitute secondary-source reconstruction without saying so.",
       "aliases": [],
+      "triggerConditions": [
+        "named-url-file-video-audio-document-primary-source"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "49b0bd95bf0b1289d09e512959201a10e03105675b3b378fe364f25ee122c6c8",
@@ -1687,13 +3461,32 @@
     },
     {
       "id": "staged-quality-controls",
+      "name": "staged-quality-controls",
       "title": "Staged Quality Controls",
       "description": "Use when applying the staged staged quality controls procedure. Apply the narrow staged quality controls procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged staged quality controls procedure. Apply the narrow staged quality controls procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "staged-quality-controls"
       ],
+      "triggerConditions": [
+        "quality gate staged validation release controls"
+      ],
+      "category": "quality",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c889ea1cde4b97feeed9312a6f3bc48cd5f0c7a70e68fbc49a973bb2171ca856",
@@ -1703,13 +3496,31 @@
     },
     {
       "id": "strategic-reading",
+      "name": "strategic-reading",
       "title": "Strategic Reading",
       "description": "Use when reading substantive material to apply it to a real problem by extracting mechanisms, causes, limits, counterexamples, contradictions, implications, actions, risks and indicators rather than merely summarizing.",
+      "shortDescription": "Use when reading substantive material to apply it to a real problem by extracting mechanisms, causes, limits, counterexamples, contradictions, implications, actions, risks and indicators rather than merely summarizing.",
       "aliases": [
         "applied-reading"
       ],
+      "triggerConditions": [
+        "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "academic-verify"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "f4f9d6ed4549a19f40da77ab777d457d42085edf41b23de4b0ad3bdf910ab496",
@@ -1719,13 +3530,32 @@
     },
     {
       "id": "tdd",
+      "name": "tdd",
       "title": "Tdd",
       "description": "Use when applying the staged tdd procedure. Apply the narrow tdd procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged tdd procedure. Apply the narrow tdd procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "tdd"
       ],
+      "triggerConditions": [
+        "test driven development regression test"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "789c412b3699f74710643340886aa6023a8a5f7d773d247d87d70631d5d224e8",
@@ -1735,11 +3565,29 @@
     },
     {
       "id": "tools-as-code",
+      "name": "tools-as-code",
       "title": "Tools As Code",
       "description": "Use when a task needs repeated retrieval, filtering, fan-out, dedupe, ranking, transformation, or multi-step deterministic tool calls that would otherwise consume many model turns. Compose approved tools/CLIs/connectors with a short temporary program, then reason over the result.",
+      "shortDescription": "Use when a task needs repeated retrieval, filtering, fan-out, dedupe, ranking, transformation, or multi-step deterministic tool calls that would otherwise consume many model turns. Compose approved tools/CLIs/connectors with a short temporary program, then reason over the result.",
       "aliases": [],
+      "triggerConditions": [
+        "repeated-retrieval-filter-dedupe-rank-transform-tool-composition"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "skillify"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "5b85fd0fcb033b91d56e6580afc3036e9217f04d2817a52b4891b399b828adf4",
@@ -1756,13 +3604,32 @@
     },
     {
       "id": "valuation-investment-ma",
+      "name": "valuation-investment-ma",
       "title": "Valuation Investment Ma",
       "description": "Use when applying the staged valuation investment ma procedure. Prepare evidence-linked valuation and transaction analysis without investment or binding authority.",
+      "shortDescription": "Use when applying the staged valuation investment ma procedure. Prepare evidence-linked valuation and transaction analysis without investment or binding authority.",
       "aliases": [
         "valuation-investment-ma"
       ],
+      "triggerConditions": [
+        "valuation investment merger acquisition financial model"
+      ],
+      "category": "finance-accounting",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "13828d64bbf51971a4055953a56e652f7db870e2e246cf1d6228c1099096d8dc",
@@ -1772,15 +3639,31 @@
     },
     {
       "id": "vercel-cli-with-tokens",
+      "name": "vercel-cli-with-tokens",
       "title": "Vercel Cli With Tokens",
       "description": "current Vercel CLI token authentication project environment deployment configuration guidance",
+      "shortDescription": "current Vercel CLI token authentication project environment deployment configuration guidance",
       "aliases": [
         "vercel-cli-with-tokens",
         "vercel-token-cli",
         "vercel-environment-variables"
       ],
+      "triggerConditions": [
+        "current Vercel CLI token authentication project environment deployment configuration guidance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
@@ -1789,14 +3672,30 @@
     },
     {
       "id": "vercel-composition-patterns",
+      "name": "vercel-composition-patterns",
       "title": "Vercel Composition Patterns",
       "description": "current React component composition compound components state props guidance",
+      "shortDescription": "current React component composition compound components state props guidance",
       "aliases": [
         "react-composition-patterns",
         "component-composition"
       ],
+      "triggerConditions": [
+        "current React component composition compound components state props guidance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
@@ -1805,11 +3704,27 @@
     },
     {
       "id": "vercel-deploy",
+      "name": "vercel-deploy",
       "title": "Vercel Deploy",
       "description": "preview or production vercel deployment",
+      "shortDescription": "preview or production vercel deployment",
       "aliases": [],
+      "triggerConditions": [
+        "preview-or-production-vercel-deployment"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "github:openai/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -1822,16 +3737,32 @@
     },
     {
       "id": "vercel-optimize",
+      "name": "vercel-optimize",
       "title": "Vercel Optimize",
       "description": "vercel performance cost reliability caching functions billing",
+      "shortDescription": "vercel performance cost reliability caching functions billing",
       "aliases": [
         "vercel-optimize",
         "vercel-performance",
         "vercel-cost",
         "vercel-caching"
       ],
+      "triggerConditions": [
+        "vercel-performance-cost-reliability-caching-functions-billing"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
@@ -1846,15 +3777,31 @@
     },
     {
       "id": "vercel-react-best-practices",
+      "name": "vercel-react-best-practices",
       "title": "Vercel React Best Practices",
       "description": "current React Next.js performance rendering bundle server guidance",
+      "shortDescription": "current React Next.js performance rendering bundle server guidance",
       "aliases": [
         "react-best-practices",
         "nextjs-performance",
         "react-performance"
       ],
+      "triggerConditions": [
+        "current React Next.js performance rendering bundle server guidance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
@@ -1863,14 +3810,30 @@
     },
     {
       "id": "vercel-react-native-skills",
+      "name": "vercel-react-native-skills",
       "title": "Vercel React Native Skills",
       "description": "current React Native mobile list navigation animation guidance",
+      "shortDescription": "current React Native mobile list navigation animation guidance",
       "aliases": [
         "react-native-guidelines",
         "react-native-performance"
       ],
+      "triggerConditions": [
+        "current React Native mobile list navigation animation guidance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
@@ -1879,14 +3842,30 @@
     },
     {
       "id": "vercel-react-view-transitions",
+      "name": "vercel-react-view-transitions",
       "title": "Vercel React View Transitions",
       "description": "current React view transitions animation navigation guidance",
+      "shortDescription": "current React view transitions animation navigation guidance",
       "aliases": [
         "react-view-transitions",
         "view-transition-guidance"
       ],
+      "triggerConditions": [
+        "current React view transitions animation navigation guidance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
@@ -1895,13 +3874,32 @@
     },
     {
       "id": "verification",
+      "name": "verification",
       "title": "Verification",
       "description": "Use when applying the staged verification procedure. Apply the narrow verification procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged verification procedure. Apply the narrow verification procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "verification"
       ],
+      "triggerConditions": [
+        "verify validate acceptance evidence"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "8a48436f57e48a8c5af4d497abb27c0a2ff1715639e4623743d5f5acb173a10d",
@@ -1911,11 +3909,29 @@
     },
     {
       "id": "vertical-slice-delivery",
+      "name": "vertical-slice-delivery",
       "title": "Vertical Slice Delivery",
       "description": "Plan and implement the smallest end-to-end user outcome with visible result and evidence.",
+      "shortDescription": "Plan and implement the smallest end-to-end user outcome with visible result and evidence.",
       "aliases": [],
+      "triggerConditions": [
+        "planning-or-implementation"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "73fb1fe80ccdbabea16805024fccf5f7183b2a6e9c4b12fbe8d4e8bfed00fa2b",
@@ -1927,15 +3943,31 @@
     },
     {
       "id": "web-design-guidelines",
+      "name": "web-design-guidelines",
       "title": "Web Design Guidelines",
       "description": "current web design accessibility UX performance guidance",
+      "shortDescription": "current web design accessibility UX performance guidance",
       "aliases": [
         "web-design-guidelines",
         "vercel-web-design",
         "web-accessibility-guidance"
       ],
+      "triggerConditions": [
+        "current web design accessibility UX performance guidance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
@@ -1944,11 +3976,27 @@
     },
     {
       "id": "webapp-testing",
+      "name": "webapp-testing",
       "title": "Webapp Testing",
       "description": "browser or webapp qa",
+      "shortDescription": "browser or webapp qa",
       "aliases": [],
+      "triggerConditions": [
+        "browser-or-webapp-qa"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "web-projects",
+      "applicableProjects": [
+        "web-projects"
+      ],
       "source": "github:anthropics/skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
       "registryVersion": 19,
       "triggers": [
@@ -1960,11 +4008,34 @@
     },
     {
       "id": "website-design-qa",
+      "name": "website-design-qa",
       "title": "Website Design Qa",
       "description": "Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.",
+      "shortDescription": "Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.",
       "aliases": [],
+      "triggerConditions": [
+        "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "web-projects",
+      "applicableProjects": [
+        "web-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "responsive-motion-systems",
+        "debugging",
+        "review",
+        "architecture",
+        "frontend",
+        "performance"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "08457f8b070e37ee8c47a8c625e43ff0c25920eecf4b664fe06ae77208f3cb45",
@@ -1985,11 +4056,39 @@
     },
     {
       "id": "workspace-lifecycle-management",
+      "name": "workspace-lifecycle-management",
       "title": "Workspace Lifecycle Management",
       "description": "Use when creating, cloning, locating, moving, parking, deleting or archiving a project; when disk/storage pressure is high; when duplicate local project copies appear; when deciding local vs cloud development; or when handling large project assets, dependency caches and Docker storage. Preserve canonical project identity and non-Git state while keeping the Mac as a lean active workspace.",
+      "shortDescription": "Use when creating, cloning, locating, moving, parking, deleting or archiving a project; when disk/storage pressure is high; when duplicate local project copies appear; when deciding local vs cloud development; or when handling large project assets, dependency caches and Docker storage. Preserve canonical project identity and non-Git state while keeping the Mac as a lean active workspace.",
       "aliases": [],
+      "triggerConditions": [
+        "project-create-clone-locate-move-park-delete-archive-storage-disk-pressure-duplicate-repo-large-assets-local-cloud"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [
+        "project-context-integrity",
+        "legacy-cleanup",
+        "remote-first-web-development",
+        "cost-control",
+        "worktree",
+        "review",
+        "verification",
+        "dependency",
+        "deployment",
+        "migration",
+        "integration"
+      ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "b2b658b50129821f884be057401c8fa1469dbd20fc8c095c0c83117c5f5c8a23",
@@ -2015,13 +4114,32 @@
     },
     {
       "id": "worktree",
+      "name": "worktree",
       "title": "Worktree",
       "description": "Use when applying the staged worktree procedure. Apply the narrow worktree procedure and return evidence, exceptions and a bounded recommendation.",
+      "shortDescription": "Use when applying the staged worktree procedure. Apply the narrow worktree procedure and return evidence, exceptions and a bounded recommendation.",
       "aliases": [
         "worktree"
       ],
+      "triggerConditions": [
+        "git worktree isolated concurrent writer branch"
+      ],
+      "category": "engineering",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
       "source": "major-internal",
+      "provenance": {
+        "kind": "staged-localized",
+        "stagingCandidateDigest": "27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
+        "sourceLedger": "package/source-ledger.json",
+        "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
+        "disposition": "UPDATE_CANONICAL"
+      },
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "f6ea785d30d8b19be5be63db10fbda8eaa30afc4d78cf0e0d76427cd465f36bf",
@@ -2031,14 +4149,30 @@
     },
     {
       "id": "writing-guidelines",
+      "name": "writing-guidelines",
       "title": "Writing Guidelines",
       "description": "current Vercel writing copy content clarity voice structure guidance",
+      "shortDescription": "current Vercel writing copy content clarity voice structure guidance",
       "aliases": [
         "vercel-writing-guidelines",
         "vercel-copy-guidance"
       ],
+      "triggerConditions": [
+        "current Vercel writing copy content clarity voice structure guidance"
+      ],
+      "category": "uncategorized",
+      "version": "19",
+      "lifecycle": "active",
       "availability": "vercel-projects",
+      "applicableProjects": [
+        "vercel-projects"
+      ],
       "source": "vercel-agent-skills",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 19
+      },
+      "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
       "triggers": [
