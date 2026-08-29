@@ -280,7 +280,7 @@ function readBundleMarkerIdentity(root: string): string {
   return bundleSchema.parse(JSON.parse(readFileSync(join(root, 'bundle.json'), 'utf8'))).sha;
 }
 
-function registryPath(): string {
+function canonicalRegistryPath(): string {
   if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILLS_REGISTRY)
     return resolve(process.env.MAJOR_SKILLS_REGISTRY);
   const hot = hotSkillBundleRoot();
@@ -289,19 +289,65 @@ function registryPath(): string {
     : join(runtimeRoot(), 'guidance', 'skills.registry.json');
 }
 
-export function installedSkillCatalogPath(): string {
-  return join(dirname(registryPath()), 'skills.catalog.json');
+function validatedProjectRegistryPath(cwd: string): string | undefined {
+  const path = join(cwd, '.agents', 'skills.registry.json');
+  const catalogPath = join(cwd, '.agents', 'skills.catalog.json');
+  if (!existsSync(path) && !existsSync(catalogPath)) return undefined;
+  if (!existsSync(path) || !existsSync(catalogPath)) throw new Error('project skill registry/catalogue is incomplete');
+  const canonicalPath = canonicalRegistryPath();
+  const canonical = readRegistry(canonicalPath);
+  const rawCanonical = JSON.parse(readFileSync(canonicalPath, 'utf8')) as { entries?: Array<{ id?: string; source?: string; projectInstall?: { repository?: string; mode?: string } }> };
+  const raw = JSON.parse(readFileSync(path, 'utf8')) as { projectProjection?: { canonicalRegistryVersion?: number; sources?: Array<{ repository?: string; commit?: string }> } };
+  const projected = readRegistry(path);
+  const catalog = loadGeneratedSkillCatalog(catalogPath);
+  if (raw.projectProjection?.canonicalRegistryVersion !== canonical.version || projected.version !== canonical.version || catalog.registryVersion !== projected.version)
+    throw new Error('project skill registry/catalogue canonical identity mismatch');
+  const canonicalInternal = canonical.entries.filter((entry) => entry.source === 'major-internal').map((entry) => entry.id).sort();
+  const projectedInternal = projected.entries.filter((entry) => entry.source === 'major-internal').map((entry) => entry.id).sort();
+  if (JSON.stringify(canonicalInternal) !== JSON.stringify(projectedInternal)) throw new Error('project skill registry canonical entries drifted');
+  const catalogById = new Map(catalog.entries.map((entry) => [entry.id, entry]));
+  if (catalog.entries.length !== projected.entries.length || projected.entries.some((entry) => !catalogById.has(entry.id)))
+    throw new Error('project skill registry/catalogue entries drifted');
+  const canonicalCatalog = loadGeneratedSkillCatalog(join(dirname(canonicalPath), 'skills.catalog.json'));
+  const canonicalCatalogById = new Map(canonicalCatalog.entries.map((entry) => [entry.id, entry]));
+  for (const id of canonicalInternal) {
+    if (JSON.stringify(catalogById.get(id)) !== JSON.stringify(canonicalCatalogById.get(id)))
+      throw new Error(`project skill catalogue canonical entry drifted: ${id}`);
+  }
+  const sources = raw.projectProjection?.sources ?? [];
+  for (const entry of projected.entries.filter((candidate) => candidate.sourceKind === 'PROJECT_INSTALLED')) {
+    const identity = catalogById.get(entry.id);
+    const body = containedSkillPath(join(cwd, '.agents', 'skills'), entry.id, 'SKILL.md');
+    const provenance = entry.provenance as { repository?: unknown; commit?: unknown; bundle?: unknown } | undefined;
+    const contract = rawCanonical.entries?.find((candidate) => candidate.id === provenance?.bundle);
+    if (!identity?.contentSha256 || !existsSync(body) || skillContentSha256(body) !== identity.contentSha256 ||
+      typeof provenance?.repository !== 'string' || typeof provenance.commit !== 'string' ||
+      !sources.some((source) => source.repository === provenance.repository && source.commit === provenance.commit) ||
+      !contract?.projectInstall || contract.projectInstall.repository !== provenance.repository ||
+      contract.source !== entry.source || (contract.projectInstall.mode !== 'bundle' && contract.id !== entry.id) ||
+      identity.source !== entry.source || identity.version !== provenance.commit)
+      throw new Error(`project installed skill content/provenance drifted: ${entry.id}`);
+  }
+  return path;
 }
 
-function registryVersion(): number {
-  return readRegistry(registryPath()).version;
+function registryPath(cwd?: string): string {
+  return cwd ? validatedProjectRegistryPath(resolve(cwd)) ?? canonicalRegistryPath() : canonicalRegistryPath();
 }
 
-function generatedCatalog(): Map<string, SkillCatalogEntry> {
-  const path = installedSkillCatalogPath();
+export function installedSkillCatalogPath(cwd?: string): string {
+  return join(dirname(registryPath(cwd)), 'skills.catalog.json');
+}
+
+function registryVersion(cwd?: string): number {
+  return readRegistry(registryPath(cwd)).version;
+}
+
+function generatedCatalog(cwd?: string): Map<string, SkillCatalogEntry> {
+  const path = installedSkillCatalogPath(cwd);
   if (!existsSync(path)) return new Map();
   const catalog = loadGeneratedSkillCatalog(path);
-  if (catalog.registryVersion !== registryVersion())
+  if (catalog.registryVersion !== registryVersion(cwd))
     throw new Error('generated skill catalogue registry identity mismatch');
   return new Map(catalog.entries.map((entry) => [entry.id, entry]));
 }
@@ -316,7 +362,7 @@ function resolverEvalPath(): string {
 
 function vendorCatalogPath(): string {
   if (process.env.MAJOR_VENDOR_SOURCES) return resolve(process.env.MAJOR_VENDOR_SOURCES);
-  return join(dirname(registryPath()), 'vendor-sources.json');
+  return join(dirname(canonicalRegistryPath()), 'vendor-sources.json');
 }
 
 function readVendorCatalog(): VendorCatalog | undefined {
@@ -350,8 +396,8 @@ function resolverExamples(): Map<string, ResolverExamples> {
   return examples;
 }
 
-export function loadSkillRegistry(): SkillRegistryEntry[] {
-  return readRegistry(registryPath()).entries;
+export function loadSkillRegistry(cwd?: string): SkillRegistryEntry[] {
+  return readRegistry(registryPath(cwd)).entries;
 }
 
 function vendorSelectionForEntry(
@@ -439,9 +485,9 @@ function exactInstalledSkillPath(
 ): string | undefined {
   const path = installedSkillPath(entry.id, cwd, entry.source);
   if (!path) return undefined;
-  if (entry.source !== 'major-internal') return path;
+  if (entry.source !== 'major-internal' && entry.sourceKind !== 'PROJECT_INSTALLED') return path;
   const identity = catalog.get(entry.id);
-  if (!identity?.contentSha256 || identity.registryVersion !== registryVersion()) return undefined;
+  if (!identity?.contentSha256 || identity.registryVersion !== registryVersion(cwd)) return undefined;
   const actual = skillContentSha256(path);
   return actual === identity.contentSha256 ? path : undefined;
 }
@@ -603,10 +649,10 @@ function resolveSkillsInternal(input: {
   const cwd = resolve(input.cwd ?? process.cwd());
   const now = input.now ?? new Date();
   const vendorCatalog = readVendorCatalog();
-  const catalog = generatedCatalog();
+  const catalog = generatedCatalog(cwd);
   const examples = resolverExamples();
   const generated = loadActiveGeneratedSkills(cwd);
-  const registry = loadSkillRegistry();
+  const registry = loadSkillRegistry(cwd);
   const context = projectContext(cwd, task);
   const requested = [...new Set((input.skills ?? []).map((id) => id.trim()).filter(Boolean))];
   if (input.skills && requested.length === 0) {
@@ -794,7 +840,7 @@ function resolveSkillsInternal(input: {
               : 'canonical registry vendor reference',
         source: skill.source,
         provenance: {
-          registryVersion: registryVersion(),
+          registryVersion: registryVersion(cwd),
           installedRoot: hotSkillBundleRoot() ?? runtimeRoot(),
           ...(hotSkillBundleRoot()
             ? { bundle: readBundleMarkerIdentity(hotSkillBundleRoot()!) }
@@ -901,7 +947,7 @@ export function discloseSkills(input: {
 }): SkillDisclosure {
   const cwd = resolve(input.cwd ?? process.cwd());
   const now = input.now ?? new Date();
-  const registry = loadSkillRegistry();
+  const registry = loadSkillRegistry(cwd);
   const resolution = resolveSkills({
     task: input.task,
     cwd,

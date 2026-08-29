@@ -97,6 +97,7 @@ const sourceKinds = new Set([
   'INTERNAL_DURABLE',
   'VENDOR_LIVE',
   'PROJECT_LOCAL',
+  'PROJECT_INSTALLED',
   'DORMANT_REFERENCE',
 ]);
 for (const entry of registryEntries) {
@@ -113,6 +114,28 @@ for (const entry of registryEntries) {
   }
   if (entry.sourceKind !== undefined && !sourceKinds.has(entry.sourceKind))
     fail(`skill registry entry ${entry.id}.sourceKind is invalid`);
+  if (entry.projectInstall !== undefined) {
+    const contract = object(
+      entry.projectInstall,
+      `skill registry entry ${entry.id}.projectInstall`,
+    );
+    if (
+      !canonicalSkillSlug.test(
+        nonEmpty(contract.sourceKey, `skill registry entry ${entry.id} project source key`),
+      )
+    )
+      fail(`skill registry entry ${entry.id} has an unsafe project source key`);
+    if (!['bundle', 'selected'].includes(contract.mode))
+      fail(`skill registry entry ${entry.id} has an invalid project install mode`);
+    if (!Array.isArray(contract.profiles) || contract.profiles.length === 0)
+      fail(`skill registry entry ${entry.id} has no project install profiles`);
+    if (
+      !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/.test(
+        nonEmpty(contract.repository, `skill registry entry ${entry.id} project repository`),
+      )
+    )
+      fail(`skill registry entry ${entry.id} has an invalid project repository`);
+  }
   if (entry.sourceKind === 'VENDOR_LIVE')
     nonEmpty(entry.vendorSkill, `skill registry entry ${entry.id}.vendorSkill`);
   const dependencies = entry.dependencies ?? [];

@@ -54,6 +54,18 @@ for (const entry of registry.entries) {
       throw new Error(`duplicate skill id or alias ${JSON.stringify(slug)}`);
     owners.set(slug, entry.id);
   }
+  if (entry.projectInstall !== undefined) {
+    const contract = entry.projectInstall;
+    assertSlug(contract.sourceKey, `skill registry ${entry.id} project source key`);
+    if (!['bundle', 'selected'].includes(contract.mode))
+      throw new Error(`invalid project install mode for ${entry.id}`);
+    if (!Array.isArray(contract.profiles) || contract.profiles.length === 0)
+      throw new Error(`missing project install profiles for ${entry.id}`);
+    if (!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/.test(contract.repository))
+      throw new Error(`invalid project install repository for ${entry.id}`);
+    for (const feature of contract.features ?? [])
+      assertSlug(feature, `skill registry ${entry.id} project feature`);
+  }
 }
 const vendorCatalog = JSON.parse(readFileSync(join(root, 'guidance/vendor-sources.json'), 'utf8'));
 const knownIds = new Set(registry.entries.map((entry) => entry.id));

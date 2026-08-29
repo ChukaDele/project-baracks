@@ -23,6 +23,39 @@ type CommandAdapter = {
   explicitDescription?: string;
 };
 
+function fixtureRepository(root: string, name: string, ids: string[]): void {
+  const repository = join(root, name);
+  mkdirSync(repository, { recursive: true });
+  for (const id of ids) {
+    const body = join(repository, 'skills', id, 'SKILL.md');
+    mkdirSync(dirname(body), { recursive: true });
+    writeFileSync(
+      body,
+      `---\ndescription: Fixture body for ${id}\n---\n\n# Exact ${id} fixture body\n`,
+    );
+  }
+  for (const args of [
+    ['init', '-q'],
+    ['add', '.'],
+    [
+      '-c',
+      'user.name=Major Tests',
+      '-c',
+      'user.email=major@example.invalid',
+      'commit',
+      '-qm',
+      'fixture',
+    ],
+  ]) {
+    const result = spawnSync('git', args, {
+      cwd: repository,
+      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' },
+      encoding: 'utf8',
+    });
+    expect(result.status, result.stderr).toBe(0);
+  }
+}
+
 function markdownAdapter(discovery: string, explicit: string): CommandAdapter {
   const parse = (artifact: string, path: string): string[] => {
     const lines = artifact.trimEnd().split('\n');
@@ -294,4 +327,121 @@ describe('installed host skill commands', () => {
     expect(failed.status).not.toBe(0);
     expect(failed.stderr).toContain('unknown skill "missing-skill"');
   }, 15_000);
+
+  it('materializes a source-locked full-profile registry, catalogue, commands, and resolver', () => {
+    const target = mkdtempSync(join(tmpdir(), 'major-full-skill-install-'));
+    const fixtures = mkdtempSync(join(tmpdir(), 'major-skill-sources-'));
+    const home = mkdtempSync(join(tmpdir(), 'major-full-skill-home-'));
+    roots.push(target, fixtures, home);
+    fixtureRepository(fixtures, 'emil', [
+      'animate',
+      'animation-vocabulary',
+      'apple-design',
+      'emil-design-eng',
+      'find-animation-opportunities',
+      'improve-animations',
+      'pick-ui-library',
+      'prototype',
+      'review-animations',
+    ]);
+    fixtureRepository(fixtures, 'anthropic', [
+      'frontend-design',
+      'webapp-testing',
+      'algorithmic-art',
+      'mcp-builder',
+      'skill-creator',
+    ]);
+    fixtureRepository(fixtures, 'openai', [
+      'playwright',
+      'vercel-deploy',
+      'figma-use',
+      'figma-implement-design',
+      'figma-generate-design',
+      'security-threat-model',
+      'pdf',
+    ]);
+    fixtureRepository(fixtures, 'graph', ['graph-engineering']);
+    writeFileSync(join(target, 'package.json'), '{"name":"fixture-web"}\n');
+    const custom = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
+    mkdirSync(dirname(custom), { recursive: true });
+    writeFileSync(custom, '# preserved project body\n');
+    const env = {
+      ...process.env,
+      HOME: home,
+      MAJOR_HOME: join(home, '.major'),
+      MAJOR_SKILL_FIXTURE_ROOT: fixtures,
+      NODE_ENV: 'test',
+      MAJOR_SKILLS_REGISTRY: resolve('guidance/skills.registry.json'),
+      GIT_CONFIG_GLOBAL: '/dev/null',
+    };
+    const installed = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'full'], {
+      env,
+      encoding: 'utf8',
+    });
+    expect(installed.status, installed.stderr).toBe(0);
+    expect(readFileSync(custom, 'utf8')).toBe('# preserved project body\n');
+    const registry = JSON.parse(
+      readFileSync(join(target, '.agents', 'skills.registry.json'), 'utf8'),
+    ) as { entries: Array<{ id: string; sourceKind?: string }> };
+    const catalog = JSON.parse(
+      readFileSync(join(target, '.agents', 'skills.catalog.json'), 'utf8'),
+    ) as { entries: Array<{ id: string }> };
+    const managed = registry.entries.map((entry) => entry.id).sort();
+    expect(catalog.entries.map((entry) => entry.id).sort()).toEqual(managed);
+    expect(managed).toContain('animate');
+    expect(managed).not.toContain('project-owned');
+    expect(readFileSync(join(target, 'MAJOR_SKILLS.lock'), 'utf8')).not.toContain(
+      '\nproject-owned\n',
+    );
+    for (const id of managed) {
+      expect(existsSync(join(target, '.claude', 'commands', 'major', `${id}.md`))).toBe(true);
+      expect(existsSync(join(target, '.codex', 'prompts', 'major', `${id}.md`))).toBe(true);
+      expect(existsSync(join(target, '.cursor', 'commands', 'major', `${id}.md`))).toBe(true);
+      expect(existsSync(join(target, '.gemini', 'commands', 'major', `${id}.toml`))).toBe(true);
+    }
+    const cli = (args: string[]) =>
+      spawnSync(process.execPath, [resolve('dist/entry.js'), ...args], {
+        cwd: target,
+        env,
+        encoding: 'utf8',
+      });
+    const search = cli(['skill', 'search', '--query', 'animate']);
+    expect(search.status, search.stderr).toBe(0);
+    expect(search.stdout).toContain('animate');
+    const explicit = cli([
+      'skill',
+      'resolve',
+      '--task',
+      'Animate this interface',
+      '--skill',
+      'animate',
+      '--json',
+    ]);
+    expect(explicit.status, explicit.stderr).toBe(0);
+    const explicitResult = JSON.parse(explicit.stdout) as { skills: Array<{ path: string }> };
+    expect(readFileSync(explicitResult.skills[0]!.path, 'utf8')).toContain(
+      'Exact animate fixture body',
+    );
+    const automatic = cli([
+      'skill',
+      'resolve',
+      '--task',
+      'Use animate for this frontend design',
+      '--json',
+    ]);
+    expect(automatic.status, automatic.stderr).toBe(0);
+    const automaticResult = JSON.parse(automatic.stdout) as { receipt: { mode: string } };
+    expect(automaticResult.receipt.mode).toBe('automatic');
+    const unknown = cli([
+      'skill',
+      'resolve',
+      '--task',
+      'Unknown',
+      '--skill',
+      'not-installed',
+      '--json',
+    ]);
+    expect(unknown.status).not.toBe(0);
+    expect(unknown.stderr).toContain('unknown skill "not-installed"');
+  }, 30_000);
 });

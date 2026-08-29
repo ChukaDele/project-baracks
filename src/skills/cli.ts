@@ -84,7 +84,8 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
     return true;
   }
   if (args[1] === 'search' || args[1] === 'catalog') {
-    const catalog = loadGeneratedSkillCatalog(installedSkillCatalogPath()).entries;
+    const cwd = flag(args, '--cwd') ?? process.cwd();
+    const catalog = loadGeneratedSkillCatalog(installedSkillCatalogPath(cwd)).entries;
     const query = flag(args, '--query');
     const result = query ? searchSkillCatalog(catalog, query) : catalog;
     if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
