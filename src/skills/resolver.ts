@@ -762,11 +762,7 @@ function resolveSkillsInternal(input: {
     ...(requested.length > 0
       ? explicitEntries
       : registry
-          .filter(
-            (entry) =>
-              !entry.deprecated &&
-              !(entry.sourceKind === 'PROJECT_LOCAL' && entry.source !== 'gbrain-generated'),
-          )
+          .filter((entry) => !entry.deprecated)
           .map((entry) => ({ entry, generated: undefined }))),
     ...(requested.length > 0 ? [] : generated)
       .filter(

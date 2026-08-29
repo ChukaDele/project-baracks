@@ -472,8 +472,25 @@ describe('installed host skill commands', () => {
       '--json',
     ]);
     expect(automatic.status, automatic.stderr).toBe(0);
-    const automaticResult = JSON.parse(automatic.stdout) as { receipt: { mode: string } };
-    expect(automaticResult.receipt.mode).toBe('automatic');
+    const automaticResult = JSON.parse(automatic.stdout) as {
+      skills: Array<{ id: string; score: number }>;
+      receipt: {
+        mode: string;
+        selected: string[];
+        rejected: Array<{ id: string; reason: string; score: number }>;
+      };
+    };
+    expect(automaticResult.receipt.mode).toBe('project');
+    expect(automaticResult.receipt.selected).toContain('animate');
+    const animateMatch = automaticResult.skills.find((skill) => skill.id === 'animate');
+    const competingInternal = automaticResult.receipt.rejected.find(
+      (skill) => skill.id === 'design-direction-and-taste',
+    );
+    expect(animateMatch).toBeDefined();
+    expect(competingInternal).toMatchObject({
+      reason: expect.stringContaining('lower precedence than selected candidates'),
+    });
+    expect(animateMatch!.score).toBeGreaterThan(competingInternal!.score);
     const unknown = cli([
       'skill',
       'resolve',
