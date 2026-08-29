@@ -102,7 +102,7 @@ A run that only proves `major` exists, state persists, or a process starts is a 
 
 ## Independent grade
 
-The builder/provider that performed the last coordinator pass cannot grade the run.
+The execution that performed the last coordinator pass cannot grade itself.
 
 Use a separately dispatched provider execution in read-only/isolated review mode to inspect (provider diversity is useful provenance, not the independence predicate):
 
@@ -119,13 +119,13 @@ Record the result:
 
 ```sh
 major project grade jss-tool \
-  --provider <independent-provider> \
-  --result pass \
-  --goal-id <goal-id> \
-  --evidence "<short exact evidence summary>"
+  --review-receipt-id <major-owned-review-receipt-id> \
+  --goal-id <goal-id>
 ```
 
-Major refuses the grade when the provider matches the recorded last coordinator.
+Major refuses a reused, writable, self-issued, or otherwise compromised review execution. A
+same-provider grade is accepted only from the distinct Major-owned review dispatch bound to the
+pending claim, exact candidate, and persisted provider/account/run provenance.
 
 ## Promotion
 

@@ -302,6 +302,16 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   targeted lint, formatting, skill validation, and the primary Major validator passed. The stability
   validator reached its unchanged frozen-candidate exception: it greps lowercase `commondir` while the
   worktree-aware implementation uses `commonDir`; this patch changes neither file.
+- Active-documentation parity repair: exact candidate `3a00614` still stated that the grader must use
+  a different provider and documented an obsolete caller-supplied grade command. Active readiness and
+  pilot guidance now require a distinct uncompromised canonical review execution, preserve exact
+  provider/account/run provenance, describe diversity only as optional corroboration, and consume the
+  Major-owned review receipt. The focused documentation/policy gate passed 28/28 tests. Because the
+  frozen contract carries a blast-radius trigger, the bounded 12-file authority, persistence, runtime,
+  migration, trust-policy, guidance, and skill-lifecycle gate was also run: 162/162 tests passed in
+  9.50 seconds. That cost had high expected information gain across every active consumer of the rule
+  without paying for the unrelated full matrix. Typecheck, targeted lint/format, skill validation, and
+  the primary Major validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
 - Final ordinary gate for `7385b13`: 106/106 files and 910/910 tests passed.
 - Final resource gate for `7385b13`: 139 tests passed with 5 expected skips.
@@ -310,6 +320,11 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   failure and not a readiness claim.
 
 ## Failure regression
+
+- Active-documentation regression: `3a00614` aligned runtime, project trust policy, catalog metadata,
+  and review skills but left mandatory provider inequality in the active readiness guide and pilot
+  runbook, including an obsolete CLI grading example. A committed guidance test now rejects those
+  phrases and requires the Major-owned review-receipt path.
 
 - Candidate regression: `d5735a9` used outcome/acceptance and P0-P3 vocabulary. Focused tests now
   require exact intent/spec/plan/evidence headings and BLOCKER/IMPORTANT/NIT semantics, including

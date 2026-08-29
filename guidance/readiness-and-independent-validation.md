@@ -10,13 +10,14 @@ Builder-authored tests and CI may support this claim. They do not by themselves 
 
 ## Validated
 
-The implementation passed relevant deterministic checks **and** an independent grader/provider attempted to falsify the important claims.
+The implementation passed relevant deterministic checks **and** a distinct, uncompromised review execution attempted to falsify the important claims.
 
 For consequential Major/harness changes:
 
-- the grader must not be the provider that performed the last substantive build/coordinator pass;
-- the grader should inspect the exact head/artefact and objective evidence;
-- the grader should be read-only or isolated from the integration branch;
+- the review must use a canonical execution distinct from the substantive build/coordinator execution;
+- the review must retain its run, provider, account, and exact-head/artefact provenance;
+- the review execution should be read-only or isolated from the integration branch;
+- provider diversity is useful corroboration when available, but it is not the independence predicate;
 - a failing independent grade blocks trust promotion.
 
 ## Ready
