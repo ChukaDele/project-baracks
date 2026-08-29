@@ -15,6 +15,38 @@ MANAGED_START = "<!-- MAJOR-GLOBAL-START -->"
 MANAGED_END = "<!-- MAJOR-GLOBAL-END -->"
 OLD_START = "<!-- MAJOR-COMMUNICATION-START -->"
 OLD_END = "<!-- MAJOR-COMMUNICATION-END -->"
+CANONICAL_SKILL_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def validate_catalog_skills(catalog: dict) -> list[dict]:
+    skills = catalog.get("entries")
+    if not isinstance(skills, list):
+        raise SystemExit("invalid generated skill catalogue entries")
+    owners: dict[str, str] = {}
+    for skill in skills:
+        skill_id = skill.get("id") if isinstance(skill, dict) else None
+        aliases = skill.get("aliases", []) if isinstance(skill, dict) else None
+        if not isinstance(skill_id, str) or not CANONICAL_SKILL_SLUG.fullmatch(skill_id):
+            raise SystemExit("invalid generated skill catalogue id: safe canonical slug required")
+        if not isinstance(aliases, list):
+            raise SystemExit(f"invalid generated skill catalogue aliases: {skill_id}")
+        for slug in [skill_id, *aliases]:
+            if not isinstance(slug, str) or not CANONICAL_SKILL_SLUG.fullmatch(slug):
+                raise SystemExit(f"invalid generated skill catalogue alias: {skill_id}")
+            if slug in owners and owners[slug] != skill_id:
+                raise SystemExit(f"duplicate generated skill id or alias: {slug}")
+            owners[slug] = skill_id
+    return skills
+
+
+def contained_command_path(root: Path, skill_id: str, suffix: str) -> Path:
+    if not CANONICAL_SKILL_SLUG.fullmatch(skill_id):
+        raise SystemExit("generated command id must be a safe canonical slug")
+    target = (root / "major" / f"{skill_id}{suffix}").resolve()
+    command_root = (root / "major").resolve()
+    if command_root not in target.parents:
+        raise SystemExit("generated command path escapes its root")
+    return target
 
 
 def read_text(path: Path) -> str:
@@ -234,6 +266,53 @@ def add_absent(entries: list[dict[str, str]], target: Path) -> None:
     entries.append({"type": "absent", "target": str(target)})
 
 
+def stage_skill_commands(
+    stage: Path, home: Path, codex_home: Path, catalog: dict, entries: list[dict[str, str]]
+) -> None:
+    skills = validate_catalog_skills(catalog)
+    discovery = (
+        "Use Major's installed canonical catalogue. Run `major skill search --query \"$ARGUMENTS\"` "
+        "for discovery, or `major skill resolve --task \"$ARGUMENTS\" --json` for automatic routing.\n"
+    )
+    command_roots = (
+        ("claude", home / ".claude" / "commands", ".md"),
+        ("codex", codex_home / "prompts", ".md"),
+        ("cursor", home / ".cursor" / "commands", ".md"),
+    )
+    for host, target_root, suffix in command_roots:
+        add_file(entries, write_stage_file(stage, f"{host}-major{suffix}", discovery), target_root / f"major{suffix}")
+        for skill in skills:
+            skill_id = skill.get("id") if isinstance(skill, dict) else None
+            if not isinstance(skill_id, str):
+                raise SystemExit("invalid generated skill catalogue id")
+            body = f'Run `major skill resolve --task "$ARGUMENTS" --skill {skill_id} --json`; the named skill is mandatory.\n'
+            add_file(
+                entries,
+                write_stage_file(stage, f"{host}-major-{skill_id}{suffix}", body),
+                contained_command_path(target_root, skill_id, suffix),
+            )
+    add_file(
+        entries,
+        write_stage_file(
+            stage,
+            "gemini-major.toml",
+            'description = "Discover or automatically resolve Major skills"\nprompt = "Run `major skill search --query {{args}}` and report the installed matches."\n',
+        ),
+        home / ".gemini" / "commands" / "major.toml",
+    )
+    for skill in skills:
+        skill_id = skill["id"]
+        add_file(
+            entries,
+            write_stage_file(
+                stage,
+                f"gemini-major-{skill_id}.toml",
+                f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{{{args}}}} --skill {skill_id} --json`; the named skill is mandatory."\n',
+            ),
+            contained_command_path(home / ".gemini" / "commands", skill_id, ".toml"),
+        )
+
+
 def learning_project_path(root: Path, project: str) -> Path:
     key = hashlib.sha256(project.encode()).hexdigest()[:24]
     return root / "projects" / f"{key}.json"
@@ -450,7 +529,9 @@ def main() -> None:
     global_base = root / "guidance" / "global-worker-rules.md"
     stability = root / "guidance" / "stability-invariants.md"
     skills_src = root / "skills" / "internal"
-    for required in (global_base, stability, skills_src):
+    catalog_src = root / "guidance" / "skills.catalog.json"
+    adapters_src = root / "adapters" / "skills"
+    for required in (global_base, stability, skills_src, catalog_src, adapters_src):
         if not required.exists():
             raise SystemExit(f"required Major source missing: {required}")
 
@@ -466,6 +547,10 @@ def main() -> None:
 
     global_rules = write_stage_file(stage, "global-worker-rules.md", rules)
     add_file(entries, global_rules, home / ".major" / "global-worker-rules.md")
+    catalog_stage = write_stage_file(stage, "skills.catalog.json", catalog_src.read_text())
+    add_file(entries, catalog_stage, home / ".major" / "skills.catalog.json")
+    catalog = json.loads(catalog_src.read_text())
+    stage_skill_commands(stage, home, codex_home, catalog, entries)
 
     skills_stage = stage / "skills" / "internal"
     shutil.copytree(skills_src, skills_stage)
@@ -477,7 +562,9 @@ def main() -> None:
         }
     )
 
-    claude_rule = write_stage_file(stage, "claude-major-global.md", rules)
+    claude_rule = write_stage_file(
+        stage, "claude-major-global.md", rules + "\n" + (adapters_src / "CLAUDE.md").read_text()
+    )
     add_file(entries, claude_rule, home / ".claude" / "major-global.md")
 
     claude_root_stage = write_stage_file(
@@ -491,21 +578,31 @@ def main() -> None:
     codex_stage = write_stage_file(
         stage,
         "codex-agents.md",
-        managed_block(read_text(codex_home / "AGENTS.md"), rules),
+        managed_block(
+            read_text(codex_home / "AGENTS.md"),
+            rules + "\n" + (adapters_src / "CODEX.md").read_text(),
+        ),
     )
     add_file(entries, codex_stage, codex_home / "AGENTS.md")
 
     gemini_stage = write_stage_file(
         stage,
         "gemini.md",
-        managed_block(read_text(home / ".gemini" / "GEMINI.md"), rules),
+        managed_block(
+            read_text(home / ".gemini" / "GEMINI.md"),
+            rules + "\n" + (adapters_src / "GEMINI.md").read_text(),
+        ),
     )
     add_file(entries, gemini_stage, home / ".gemini" / "GEMINI.md")
 
     # Cursor rules require the .mdc extension with YAML frontmatter
     # (description/globs/alwaysApply); a bare .md file is silently not
     # loaded. Clean up the earlier, incorrectly-formatted file on upgrade.
-    cursor_stage = write_stage_file(stage, "cursor-rule.mdc", cursor_mdc_rule(rules))
+    cursor_stage = write_stage_file(
+        stage,
+        "cursor-rule.mdc",
+        cursor_mdc_rule(rules + "\n" + (adapters_src / "RULE.mdc").read_text()),
+    )
     add_file(
         entries,
         cursor_stage,
@@ -559,7 +656,11 @@ def main() -> None:
         )
         add_file(
             entries,
-            write_stage_file(stage, "gemini-plugin-rule.md", rules),
+            write_stage_file(
+                stage,
+                "gemini-plugin-rule.md",
+                rules + "\n" + (adapters_src / "GEMINI.md").read_text(),
+            ),
             plugin_root / "rules" / "major-global.md",
         )
         add_file(

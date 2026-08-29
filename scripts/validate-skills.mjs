@@ -88,6 +88,8 @@ if (!Number.isInteger(registry.version) || !Array.isArray(registry.entries))
   fail('skills registry schema is invalid');
 const registryEntries = registry.entries.map((entry) => object(entry, 'skill registry entry'));
 const allRegistered = registryEntries.map((entry) => nonEmpty(entry.id, 'skill registry entry id'));
+const canonicalSkillSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const slugOwners = new Map();
 const registered = registryEntries
   .filter((entry) => entry.source === 'major-internal')
   .map((entry) => nonEmpty(entry.id, 'skill registry entry id'));
@@ -95,13 +97,72 @@ const sourceKinds = new Set([
   'INTERNAL_DURABLE',
   'VENDOR_LIVE',
   'PROJECT_LOCAL',
+  'PROJECT_INSTALLED',
   'DORMANT_REFERENCE',
 ]);
 for (const entry of registryEntries) {
+  if (!canonicalSkillSlug.test(entry.id))
+    fail(`skill registry entry ${entry.id}.id is not a safe canonical slug`);
+  const aliases = entry.aliases ?? [];
+  if (!Array.isArray(aliases)) fail(`skill registry entry ${entry.id}.aliases is invalid`);
+  for (const slug of [entry.id, ...aliases]) {
+    if (typeof slug !== 'string' || !canonicalSkillSlug.test(slug))
+      fail(`skill registry entry ${entry.id} has an unsafe alias`);
+    if (slugOwners.has(slug) && slugOwners.get(slug) !== entry.id)
+      fail(`duplicate skill id or alias ${slug}`);
+    slugOwners.set(slug, entry.id);
+  }
   if (entry.sourceKind !== undefined && !sourceKinds.has(entry.sourceKind))
     fail(`skill registry entry ${entry.id}.sourceKind is invalid`);
+  if (entry.projectInstall !== undefined) {
+    const contract = object(
+      entry.projectInstall,
+      `skill registry entry ${entry.id}.projectInstall`,
+    );
+    if (
+      !canonicalSkillSlug.test(
+        nonEmpty(contract.sourceKey, `skill registry entry ${entry.id} project source key`),
+      )
+    )
+      fail(`skill registry entry ${entry.id} has an unsafe project source key`);
+    if (!['bundle', 'selected'].includes(contract.mode))
+      fail(`skill registry entry ${entry.id} has an invalid project install mode`);
+    if (!Array.isArray(contract.profiles) || contract.profiles.length === 0)
+      fail(`skill registry entry ${entry.id} has no project install profiles`);
+    if (
+      !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/.test(
+        nonEmpty(contract.repository, `skill registry entry ${entry.id} project repository`),
+      )
+    )
+      fail(`skill registry entry ${entry.id} has an invalid project repository`);
+    const members = contract.mode === 'bundle' ? contract.members : [entry.id];
+    if (!Array.isArray(members) || members.length === 0)
+      fail(`skill registry entry ${entry.id} has no project install members`);
+    for (const id of members) {
+      if (typeof id !== 'string' || !canonicalSkillSlug.test(id))
+        fail(`skill registry entry ${entry.id} has an unsafe project member`);
+      const skillPath =
+        contract.mode === 'bundle'
+          ? contract.skillPathPattern?.replace('{id}', id)
+          : contract.skillPath;
+      if (skillPath !== `skills/${id}`)
+        fail(`skill registry entry ${entry.id} has an invalid project skill path`);
+    }
+  }
   if (entry.sourceKind === 'VENDOR_LIVE')
     nonEmpty(entry.vendorSkill, `skill registry entry ${entry.id}.vendorSkill`);
+  const dependencies = entry.dependencies ?? [];
+  if (!Array.isArray(dependencies))
+    fail(`skill registry entry ${entry.id}.dependencies is invalid`);
+  if (new Set(dependencies).size !== dependencies.length)
+    fail(`skill registry entry ${entry.id} has duplicate dependencies`);
+  for (const dependency of dependencies) {
+    if (typeof dependency !== 'string' || !canonicalSkillSlug.test(dependency))
+      fail(`skill registry entry ${entry.id} has an unsafe dependency`);
+    if (dependency === entry.id) fail(`skill registry entry ${entry.id} depends on itself`);
+    if (!allRegistered.includes(dependency))
+      fail(`skill registry entry ${entry.id} has unknown dependency ${dependency}`);
+  }
 }
 if (new Set(allRegistered).size !== allRegistered.length) fail('skills registry has duplicate ids');
 if (new Set(registered).size !== registered.length)
@@ -137,12 +198,29 @@ for (const source of vendorCatalog.sources) {
     'vendor',
     'sourceUrl',
     'repositoryUrl',
-    'revision',
     'license',
     'licenseStatus',
     'provenance',
   ]) {
     nonEmpty(row[key], `vendor source ${sourceId}.${key}`);
+  }
+  const revision = object(row.revision, `vendor source ${sourceId}.revision`);
+  if (!['branch', 'tag', 'commit', 'content-digest'].includes(revision.type))
+    fail(`vendor source ${sourceId}.revision.type is invalid`);
+  nonEmpty(revision.value, `vendor source ${sourceId}.revision.value`);
+  if (typeof revision.immutable !== 'boolean')
+    fail(`vendor source ${sourceId}.revision.immutable must be boolean`);
+  const contentIdentity = object(row.contentIdentity, `vendor source ${sourceId}.contentIdentity`);
+  if (!['verified', 'unverified'].includes(contentIdentity.status))
+    fail(`vendor source ${sourceId}.contentIdentity.status is invalid`);
+  if (contentIdentity.status === 'unverified') {
+    if (contentIdentity.type !== null || contentIdentity.value !== null)
+      fail(`vendor source ${sourceId} unverified content identity must not imply an identity`);
+    nonEmpty(contentIdentity.reason, `vendor source ${sourceId}.contentIdentity.reason`);
+  } else {
+    if (!['commit', 'content-digest'].includes(contentIdentity.type))
+      fail(`vendor source ${sourceId}.contentIdentity.type is invalid`);
+    nonEmpty(contentIdentity.value, `vendor source ${sourceId}.contentIdentity.value`);
   }
   for (const key of ['sourceUrl', 'repositoryUrl']) {
     try {
@@ -344,11 +422,16 @@ for (const fixture of readdirSync(evalRoot).filter((name) => name.endsWith('.jso
   if (registered.includes(skill)) fixtureIds.add(skill);
   const positive = list(value.should_trigger, `resolver fixture ${fixture}.should_trigger`);
   const negative = list(value.should_not_trigger, `resolver fixture ${fixture}.should_not_trigger`);
-  if (positive.length === 0 || negative.length === 0)
+  const metadataOnly = value.metadataOnly === true;
+  if (metadataOnly && (positive.length !== 0 || negative.length !== 0))
+    fail(`metadata-only resolver fixture ${fixture} must not contain routing cases`);
+  if (!metadataOnly && (positive.length === 0 || negative.length === 0))
     fail(`resolver fixture ${fixture} requires positive and negative cases`);
+  if (registered.includes(skill) && metadataOnly)
+    fail(`internal resolver fixture ${fixture} must contain positive and negative cases`);
 }
-for (const id of registered) {
-  if (!fixtureIds.has(id)) fail(`internal skill ${id} has no resolver fixture`);
+for (const id of allRegistered) {
+  if (!allFixtureIds.has(id)) fail(`canonical skill ${id} has no resolver fixture`);
 }
 
 const reconciliation = object(

@@ -5,6 +5,7 @@ export const SKILL_SOURCE_KINDS = [
   'INTERNAL_DURABLE',
   'VENDOR_LIVE',
   'PROJECT_LOCAL',
+  'PROJECT_INSTALLED',
   'DORMANT_REFERENCE',
 ] as const;
 
@@ -52,7 +53,24 @@ const vendorSourceSchema = z.object({
   vendor: z.string().min(1),
   sourceUrl: z.string().url(),
   repositoryUrl: z.string().url(),
-  revision: z.string().min(1),
+  revision: z.object({
+    type: z.enum(['branch', 'tag', 'commit', 'content-digest']),
+    value: z.string().min(1),
+    immutable: z.boolean(),
+  }),
+  contentIdentity: z.discriminatedUnion('status', [
+    z.object({
+      status: z.literal('verified'),
+      type: z.enum(['commit', 'content-digest']),
+      value: z.string().min(1),
+    }),
+    z.object({
+      status: z.literal('unverified'),
+      type: z.null(),
+      value: z.null(),
+      reason: z.string().min(1),
+    }),
+  ]),
   version: z.string().nullable(),
   lastChecked: z.string().min(1),
   freshnessTtlMs: z.number().int().positive().max(31_536_000_000),
@@ -88,15 +106,17 @@ export interface VendorSkillSelection {
   classification: VendorSkill['classification'];
   harvestDecision: VendorSkill['harvestDecision'];
   title: string;
+  skillUrl: string;
   sectionId: string;
   sectionTitle: string;
   referenceUrl: string;
   retrievalUrl: string;
   sourceUrl: string;
   repositoryUrl: string;
-  revision: string;
-  sourceVersion: string | null;
-  skillVersion?: string;
+  revision: VendorSource['revision'];
+  contentIdentity: VendorSource['contentIdentity'];
+  assertedSourceVersion: string | null;
+  assertedSkillVersion?: string;
   lastChecked: string;
   freshnessTtlMs: number;
   freshness: VendorFreshness;
@@ -200,6 +220,7 @@ export function selectVendorSkill(input: {
     classification: input.skill.classification,
     harvestDecision: input.skill.harvestDecision,
     title: input.skill.title,
+    skillUrl: input.skill.skillUrl,
     sectionId: section.id,
     sectionTitle: section.title,
     referenceUrl: section.referenceUrl,
@@ -207,8 +228,9 @@ export function selectVendorSkill(input: {
     sourceUrl: input.source.sourceUrl,
     repositoryUrl: input.source.repositoryUrl,
     revision: input.source.revision,
-    sourceVersion: input.source.version,
-    ...(input.skill.version ? { skillVersion: input.skill.version } : {}),
+    contentIdentity: input.source.contentIdentity,
+    assertedSourceVersion: input.source.version,
+    ...(input.skill.version ? { assertedSkillVersion: input.skill.version } : {}),
     lastChecked: input.source.lastChecked,
     freshnessTtlMs: input.source.freshnessTtlMs,
     freshness: sourceStateFreshness(state),
@@ -282,7 +304,7 @@ export function formatVendorReference(
     `Harvest disposition: ${selection.harvestDecision}`,
     `Selected section: ${selection.sectionTitle}`,
     `Source state: ${selection.state} (availability=${selection.availability}, freshness=${selection.freshness})`,
-    `Source revision: ${selection.revision}; source version: ${selection.sourceVersion ?? 'not declared'}; skill version: ${selection.skillVersion ?? 'not declared'}; last checked: ${selection.lastChecked}; TTL: ${selection.freshnessTtlMs}ms`,
+    `Source revision: ${selection.revision.type}:${selection.revision.value} (${selection.revision.immutable ? 'immutable' : 'mutable'}); asserted source version: ${selection.assertedSourceVersion ?? 'not declared'}; asserted skill version: ${selection.assertedSkillVersion ?? 'not declared'}; upstream content identity: ${selection.contentIdentity.status}; last checked: ${selection.lastChecked}; TTL: ${selection.freshnessTtlMs}ms`,
     `Official section reference: ${selection.referenceUrl}`,
     `Section retrieval URL: ${selection.retrievalUrl}`,
     `Source license/provenance: ${selection.licenseStatus}; ${selection.license}`,

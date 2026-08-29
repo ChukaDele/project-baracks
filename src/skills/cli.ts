@@ -1,4 +1,9 @@
-import { auditSkillReachability, resolveSkills } from './resolver.js';
+import {
+  auditSkillReachability,
+  installedSkillCatalogPath,
+  resolveSkills,
+} from './resolver.js';
+import { loadGeneratedSkillCatalog, searchSkillCatalog } from './catalog.js';
 import {
   deprecateGeneratedSkill,
   listSkillCandidates,
@@ -15,8 +20,27 @@ import type { SkillOptimizationEvidence } from './optimizer-validation.js';
 import { fetchVendorSection } from './vendor.js';
 
 function flag(args: string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  return index >= 0 ? args[index + 1] : undefined;
+  let result: string | undefined;
+  for (const [index, value] of args.entries()) {
+    if (value !== name) continue;
+    const selected = args[index + 1];
+    if (!selected || selected.startsWith('-')) {
+      throw new Error(`missing required value for ${name}`);
+    }
+    result ??= selected;
+  }
+  return result;
+}
+
+function requiredFlags(args: string[], name: string): string[] {
+  return args.flatMap((value, index) => {
+    if (value !== name) return [];
+    const selected = args[index + 1];
+    if (!selected || selected.startsWith('-')) {
+      throw new Error(`missing required value for ${name}`);
+    }
+    return [selected];
+  });
 }
 
 export async function runSkillCli(args: string[]): Promise<boolean> {
@@ -56,14 +80,29 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
   if (args[1] === 'resolve') {
     const task = flag(args, '--task');
     if (!task) throw new Error('missing required --task');
-    const result = resolveSkills({ task, cwd: flag(args, '--cwd') ?? process.cwd() });
+    const selected = requiredFlags(args, '--skill');
+    const result = resolveSkills({
+      task,
+      cwd: flag(args, '--cwd') ?? process.cwd(),
+      ...(selected.length ? { skills: selected } : {}),
+    });
     if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
     else if (result.skills.length === 0) console.log('No installed Major skill matched this task.');
     else {
       for (const skill of result.skills) {
         console.log(`${skill.id}\t${skill.path ?? skill.reference}\t${skill.reason}`);
       }
+      console.log(`receipt\t${result.receipt.mode}\t${result.receipt.selected.join(',')}`);
     }
+    return true;
+  }
+  if (args[1] === 'search' || args[1] === 'catalog') {
+    const cwd = flag(args, '--cwd') ?? process.cwd();
+    const catalog = loadGeneratedSkillCatalog(installedSkillCatalogPath(cwd)).entries;
+    const query = flag(args, '--query');
+    const result = query ? searchSkillCatalog(catalog, query) : catalog;
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
+    else for (const skill of result) console.log(`${skill.id}\t${skill.description}`);
     return true;
   }
   if (args[1] === 'vendor') {

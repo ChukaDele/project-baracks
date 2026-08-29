@@ -2,22 +2,129 @@
 set -euo pipefail
 
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET="${1:-$(pwd)}"
+INSTALL_TARGET="${1:-$(pwd)}"
+[ ! -L "$INSTALL_TARGET" ] || { echo "ERROR: refusing symlinked project target: $INSTALL_TARGET" >&2; exit 2; }
+INSTALL_TARGET="$(python3 - "$INSTALL_TARGET" <<'PY'
+import os
+import stat
+import sys
+target = os.path.abspath(sys.argv[1])
+cursor = os.path.sep
+for component in target.split(os.path.sep)[1:]:
+    cursor = os.path.join(cursor, component)
+    try:
+        mode = os.lstat(cursor).st_mode
+    except FileNotFoundError:
+        continue
+    if stat.S_ISLNK(mode):
+        print(f"ERROR: refusing symlinked project target ancestor: {cursor}", file=sys.stderr)
+        raise SystemExit(2)
+print(os.path.realpath(target))
+PY
+)"
+
+# Project-controlled managed roots must be real directories/files. Reject links
+# anywhere below them before copying, removing, staging, or activating content.
+for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
+  candidate="$INSTALL_TARGET/$managed"
+  [ ! -L "$candidate" ] || { echo "ERROR: refusing symlinked managed project path: $candidate" >&2; exit 2; }
+  if [ -d "$candidate" ]; then
+    unsafe_link="$(find -P "$candidate" -type l -print -quit)"
+    [ -z "$unsafe_link" ] || { echo "ERROR: refusing symlink below managed project path: $unsafe_link" >&2; exit 2; }
+  fi
+done
+CANONICAL_MAJOR_HOME="$(python3 - <<'PY'
+import os
+import pwd
+print(os.path.join(pwd.getpwuid(os.getuid()).pw_dir, '.major'))
+PY
+)"
+if [ -n "${MAJOR_HOME:-}" ] && [ "$MAJOR_HOME" != "$CANONICAL_MAJOR_HOME" ]; then
+  echo "ERROR: MAJOR_HOME override is rejected; receipt authority is anchored to $CANONICAL_MAJOR_HOME" >&2
+  exit 2
+fi
+MAJOR_HOME="${MAJOR_HOME:-$CANONICAL_MAJOR_HOME}"
+[ ! -L "$MAJOR_HOME" ] || { echo "ERROR: refusing symlinked MAJOR_HOME receipt authority" >&2; exit 2; }
+[ ! -e "$MAJOR_HOME" ] || [ -d "$MAJOR_HOME" ] || { echo "ERROR: MAJOR_HOME receipt authority must be a directory" >&2; exit 2; }
+MAJOR_HOME="$(python3 - "$MAJOR_HOME" <<'PY'
+import os
+import sys
+print(os.path.realpath(sys.argv[1]))
+PY
+)"
+case "$MAJOR_HOME/" in
+  "$INSTALL_TARGET/"*) echo "ERROR: MAJOR_HOME must be outside the project tree for installer-owned receipts" >&2; exit 2 ;;
+esac
+RECEIPT_DIR="$MAJOR_HOME/project-skill-receipts"
+[ ! -L "$RECEIPT_DIR" ] || { echo "ERROR: refusing symlinked project-skill-receipts authority" >&2; exit 2; }
+[ ! -e "$RECEIPT_DIR" ] || [ -d "$RECEIPT_DIR" ] || { echo "ERROR: project-skill-receipts authority must be a directory" >&2; exit 2; }
+if [ -d "$RECEIPT_DIR" ]; then
+  [ "$(cd "$RECEIPT_DIR" && pwd -P)" = "$RECEIPT_DIR" ] || { echo "ERROR: project-skill-receipts authority is relocated or unsafe" >&2; exit 2; }
+fi
 PROFILE="${2:-core}"
 FEATURES="${3:-}"
-INTERNAL="$MAJOR_ROOT/skills/internal"
-AGENT_SKILLS="$TARGET/.agents/skills"
-CLAUDE_SKILLS="$TARGET/.claude/skills"
-CODEX_SKILLS="$TARGET/.codex/skills"
-LOCK="$TARGET/MAJOR_SKILLS.lock"
-TMP="${TMPDIR:-/tmp}/major-skills-$$"
 
 case "$PROFILE" in
   core|knowledge|web-ui|exploratory|full) ;;
   *) echo "ERROR: profile must be core, knowledge, web-ui, exploratory, or full" >&2; exit 2 ;;
 esac
 
-mkdir -p "$AGENT_SKILLS" "$CLAUDE_SKILLS" "$CODEX_SKILLS" "$TMP"
+INTERNAL="$MAJOR_ROOT/skills/internal"
+CATALOG="$MAJOR_ROOT/guidance/skills.catalog.json"
+ADAPTERS="$MAJOR_ROOT/adapters/skills"
+FEATURES="$(node "$MAJOR_ROOT/scripts/materialize-project-skill-registry.mjs" normalize-features "$MAJOR_ROOT" "$INSTALL_TARGET" "$PROFILE" "$FEATURES")"
+
+# Authenticate every project-controlled lock entry before staging or cleanup.
+# The allow-list includes canonical registry ids and declared bundle members so
+# a prior broader profile can be safely removed during a profile downgrade.
+if [ -f "$INSTALL_TARGET/MAJOR_SKILLS.lock" ]; then
+  node - "$MAJOR_ROOT/guidance/skills.registry.json" "$INSTALL_TARGET/MAJOR_SKILLS.lock" <<'JS'
+const fs = require('node:fs');
+const [registryPath, lockPath] = process.argv.slice(2);
+const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+const known = new Set();
+for (const entry of registry.entries ?? []) {
+  if (typeof entry.id === 'string') known.add(entry.id);
+  for (const member of entry.projectInstall?.members ?? []) {
+    if (typeof member === 'string') known.add(member);
+  }
+}
+const lines = fs.readFileSync(lockPath, 'utf8').split(/\r?\n/);
+const marker = lines.indexOf('[skills]');
+if (marker < 0) process.exit(0);
+for (const name of lines.slice(marker + 1).filter(Boolean)) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || !known.has(name)) {
+    console.error(`ERROR: unsafe or unknown managed skill lock entry: ${JSON.stringify(name)}`);
+    process.exit(2);
+  }
+}
+JS
+fi
+
+mkdir -p "$INSTALL_TARGET"
+mkdir -p "$MAJOR_HOME"
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/major-skills.XXXXXX")"
+STAGED_TARGET="$TMP/project"
+TARGET="$STAGED_TARGET"
+AGENT_SKILLS="$TARGET/.agents/skills"
+CLAUDE_SKILLS="$TARGET/.claude/skills"
+CODEX_SKILLS="$TARGET/.codex/skills"
+LOCK="$TARGET/MAJOR_SKILLS.lock"
+
+node "$MAJOR_ROOT/scripts/generate-skill-catalog.mjs" --check
+mkdir -p "$STAGED_TARGET" "$INSTALL_TARGET"
+for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
+  [ ! -e "$INSTALL_TARGET/$managed" ] || cp -R "$INSTALL_TARGET/$managed" "$STAGED_TARGET/$managed"
+done
+mkdir -p "$AGENT_SKILLS" "$CLAUDE_SKILLS" "$CODEX_SKILLS"
+
+# Rebuild only Major-owned projections and command namespaces. Preserve all
+# project-owned commands, prompts, skills, and host instructions.
+rm -f "$TARGET/.agents/skills.registry.json" "$TARGET/.agents/skills.catalog.json"
+rm -rf "$TARGET/.claude/commands/major" "$TARGET/.codex/prompts/major" \
+  "$TARGET/.cursor/commands/major" "$TARGET/.gemini/commands/major"
+rm -f "$TARGET/.claude/commands/major.md" "$TARGET/.codex/prompts/major.md" \
+  "$TARGET/.cursor/commands/major.md" "$TARGET/.gemini/commands/major.toml"
 
 # Remove only skills previously installed by Major. Preserve project-owned/custom skills.
 if [ -f "$LOCK" ]; then
@@ -28,12 +135,13 @@ if [ -f "$LOCK" ]; then
 fi
 
 copy_skill_dir() {
-  local src="$1" name
+  local src="$1" source_key="${2:-}" skill_path="${3:-}" name
   name="$(basename "$src")"
   rm -rf "$AGENT_SKILLS/$name" "$CLAUDE_SKILLS/$name" "$CODEX_SKILLS/$name"
   cp -R "$src" "$AGENT_SKILLS/$name"
   cp -R "$src" "$CLAUDE_SKILLS/$name"
   cp -R "$src" "$CODEX_SKILLS/$name"
+  [ -z "$source_key" ] || printf '%s\t%s\t%s\n' "$name" "$source_key" "$skill_path" >> "$TARGET/.agents/managed-external.tsv"
 }
 
 # All Major internal skills are available in every managed project; bodies remain trigger-loaded.
@@ -41,115 +149,36 @@ for dir in "$INTERNAL"/*; do
   [ -d "$dir" ] && copy_skill_dir "$dir"
 done
 
-has_feature() {
-  case ",${FEATURES}," in
-    *",$1,"*) return 0 ;;
-    *) return 1 ;;
-  esac
+PLAN="$TMP/project-install.tsv"
+node "$MAJOR_ROOT/scripts/materialize-project-skill-registry.mjs" plan "$MAJOR_ROOT" "$TARGET" "$PROFILE" "$FEATURES" > "$PLAN"
+: > "$TARGET/.agents/managed-external.tsv"
+clone_repo() {
+  local source_key="$1" repository="$2" destination="$3"
+  git clone --depth 1 "$repository" "$destination"
 }
-
-NEED_EMIL=0
-NEED_ANTHROPIC=0
-NEED_OPENAI=0
-NEED_GRAPH=0
-EXPECTED_EXTERNAL=""
-
-if [ "$PROFILE" = "web-ui" ] || [ "$PROFILE" = "exploratory" ] || [ "$PROFILE" = "full" ]; then
-  NEED_EMIL=1
-  NEED_ANTHROPIC=1
-  NEED_OPENAI=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL animate animation-vocabulary apple-design emil-design-eng find-animation-opportunities improve-animations pick-ui-library prototype review-animations frontend-design webapp-testing playwright"
-fi
-
-if [ "$PROFILE" = "exploratory" ] || [ "$PROFILE" = "full" ]; then
-  NEED_ANTHROPIC=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL algorithmic-art"
-fi
-
-if has_feature vercel || [ "$PROFILE" = "full" ]; then
-  NEED_OPENAI=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL vercel-deploy"
-fi
-if has_feature figma || [ "$PROFILE" = "full" ]; then
-  NEED_OPENAI=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL figma-use figma-implement-design figma-generate-design"
-fi
-if has_feature mcp || [ "$PROFILE" = "full" ]; then
-  NEED_ANTHROPIC=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL mcp-builder"
-fi
-if has_feature skill-authoring || [ "$PROFILE" = "full" ]; then
-  NEED_ANTHROPIC=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL skill-creator"
-fi
-if has_feature security || [ "$PROFILE" = "full" ]; then
-  NEED_OPENAI=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL security-threat-model"
-fi
-if has_feature pdf || [ "$PROFILE" = "full" ]; then
-  NEED_OPENAI=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL pdf"
-fi
-if has_feature deep-graph || [ "$PROFILE" = "full" ]; then
-  NEED_GRAPH=1
-  EXPECTED_EXTERNAL="$EXPECTED_EXTERNAL graph-engineering"
-fi
-
-clone_repo() { git clone --depth 1 "https://github.com/$1.git" "$2"; }
 copy_named() {
-  local root="$1" name="$2" found
-  found="$(find "$root" -type f -name SKILL.md -path "*/$name/SKILL.md" -print -quit || true)"
-  if [ -z "$found" ]; then
+  local root="$1" name="$2" source_key="$3" skill_path="$4" found
+  found="$root/$skill_path"
+  if [ ! -f "$found/SKILL.md" ]; then
     echo "ERROR: required selected skill missing upstream: $name" >&2
     return 1
   fi
-  copy_skill_dir "$(dirname "$found")"
+  [ "$(basename "$found")" = "$name" ] || { echo "ERROR: source path/id mismatch: $name" >&2; return 1; }
+  copy_skill_dir "$found" "$source_key" "$skill_path"
 }
-
-EMIL="$TMP/emil"
-ANTHROPIC="$TMP/anthropic"
-OPENAI="$TMP/openai"
-GRAPH="$TMP/graph"
 SOURCES=""
-
-if [ "$NEED_EMIL" -eq 1 ]; then
-  clone_repo emilkowalski/skills "$EMIL"
-  SOURCES="$SOURCES $EMIL"
-  # Full current Emil bundle by explicit policy.
-  while IFS= read -r skill; do copy_skill_dir "$(dirname "$skill")"; done < <(find "$EMIL" -type f -name SKILL.md)
-fi
-
-if [ "$NEED_ANTHROPIC" -eq 1 ]; then
-  clone_repo anthropics/skills "$ANTHROPIC"
-  SOURCES="$SOURCES $ANTHROPIC"
-  if [ "$PROFILE" = "web-ui" ] || [ "$PROFILE" = "exploratory" ] || [ "$PROFILE" = "full" ]; then
-    copy_named "$ANTHROPIC" frontend-design
-    copy_named "$ANTHROPIC" webapp-testing
+SOURCE_LOCKS=""
+while IFS=$'\t' read -r source_key repository skill_id skill_path; do
+  [ -n "$source_key" ] || continue
+  source_dir="$TMP/source-$source_key"
+  if [ ! -d "$source_dir/.git" ]; then
+    clone_repo "$source_key" "$repository" "$source_dir"
+    SOURCES="$SOURCES $source_dir"
+    commit="$(git -C "$source_dir" rev-parse HEAD)"
+    SOURCE_LOCKS="${SOURCE_LOCKS}${source_key}|${repository}|${commit};"
   fi
-  if [ "$PROFILE" = "exploratory" ] || [ "$PROFILE" = "full" ]; then copy_named "$ANTHROPIC" algorithmic-art; fi
-  if has_feature mcp || [ "$PROFILE" = "full" ]; then copy_named "$ANTHROPIC" mcp-builder; fi
-  if has_feature skill-authoring || [ "$PROFILE" = "full" ]; then copy_named "$ANTHROPIC" skill-creator; fi
-fi
-
-if [ "$NEED_OPENAI" -eq 1 ]; then
-  clone_repo openai/skills "$OPENAI"
-  SOURCES="$SOURCES $OPENAI"
-  if [ "$PROFILE" = "web-ui" ] || [ "$PROFILE" = "exploratory" ] || [ "$PROFILE" = "full" ]; then copy_named "$OPENAI" playwright; fi
-  if has_feature vercel || [ "$PROFILE" = "full" ]; then copy_named "$OPENAI" vercel-deploy; fi
-  if has_feature figma || [ "$PROFILE" = "full" ]; then
-    copy_named "$OPENAI" figma-use
-    copy_named "$OPENAI" figma-implement-design
-    copy_named "$OPENAI" figma-generate-design
-  fi
-  if has_feature security || [ "$PROFILE" = "full" ]; then copy_named "$OPENAI" security-threat-model; fi
-  if has_feature pdf || [ "$PROFILE" = "full" ]; then copy_named "$OPENAI" pdf; fi
-fi
-
-if [ "$NEED_GRAPH" -eq 1 ]; then
-  clone_repo codejunkie99/graph-engineering "$GRAPH"
-  SOURCES="$SOURCES $GRAPH"
-  copy_named "$GRAPH" graph-engineering
-fi
+  copy_named "$source_dir" "$skill_id" "$source_key" "$skill_path"
+done < "$PLAN"
 
 missing=0
 for dir in "$INTERNAL"/*; do
@@ -157,10 +186,69 @@ for dir in "$INTERNAL"/*; do
   name="$(basename "$dir")"
   [ -f "$AGENT_SKILLS/$name/SKILL.md" ] || { echo "ERROR: missing internal skill: $name" >&2; missing=1; }
 done
-for name in $EXPECTED_EXTERNAL; do
+while IFS=$'\t' read -r name source_key skill_path; do
   [ -f "$AGENT_SKILLS/$name/SKILL.md" ] || { echo "ERROR: missing selected external skill: $name" >&2; missing=1; }
-done
+done < "$TARGET/.agents/managed-external.tsv"
 [ "$missing" -eq 0 ] || { echo "Major skill installation incomplete; refusing success." >&2; exit 1; }
+
+node "$MAJOR_ROOT/scripts/materialize-project-skill-registry.mjs" materialize "$MAJOR_ROOT" "$TARGET" "$PROFILE" "$FEATURES" "$SOURCE_LOCKS"
+
+# Generated, host-native discovery/invocation hints. Existing project instructions are preserved.
+cp "$ADAPTERS/AGENTS.md" "$TARGET/.agents/MAJOR_SKILLS.md"
+cp "$ADAPTERS/CLAUDE.md" "$TARGET/.claude/MAJOR_SKILLS.md"
+cp "$ADAPTERS/CODEX.md" "$TARGET/.codex/MAJOR_SKILLS.md"
+mkdir -p "$TARGET/.cursor/rules/major-skills" "$TARGET/.gemini"
+cp "$ADAPTERS/RULE.mdc" "$TARGET/.cursor/rules/major-skills/RULE.mdc"
+cp "$ADAPTERS/GEMINI.md" "$TARGET/.gemini/MAJOR_SKILLS.md"
+python3 - "$TARGET/.agents/skills.catalog.json" "$TARGET" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+catalog = json.loads(Path(sys.argv[1]).read_text())
+target = Path(sys.argv[2])
+slug_pattern = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+owners = {}
+for entry in catalog.get('entries', []):
+    skill_id = entry.get('id') if isinstance(entry, dict) else None
+    aliases = entry.get('aliases', []) if isinstance(entry, dict) else None
+    if not isinstance(skill_id, str) or not slug_pattern.fullmatch(skill_id):
+        raise SystemExit('ERROR: generated skill id must be a safe canonical slug')
+    if not isinstance(aliases, list):
+        raise SystemExit(f'ERROR: invalid generated skill aliases: {skill_id}')
+    for slug in [skill_id, *aliases]:
+        if not isinstance(slug, str) or not slug_pattern.fullmatch(slug):
+            raise SystemExit(f'ERROR: generated skill alias must be a safe canonical slug: {skill_id}')
+        if slug in owners and owners[slug] != skill_id:
+            raise SystemExit(f'ERROR: duplicate generated skill id or alias: {slug}')
+        owners[slug] = skill_id
+
+def command_path(root, skill_id, suffix):
+    path = (root / 'major' / f'{skill_id}{suffix}').resolve()
+    command_root = (root / 'major').resolve()
+    if command_root not in path.parents:
+        raise SystemExit('ERROR: generated command path escapes its root')
+    return path
+
+discovery = 'Use the installed Major catalogue. Run `major skill search --query "$ARGUMENTS"` or `major skill resolve --task "$ARGUMENTS" --json`.\n'
+for root in (target / '.claude/commands', target / '.codex/prompts', target / '.cursor/commands'):
+    (root / 'major').mkdir(parents=True, exist_ok=True)
+    (root / 'major.md').write_text(discovery)
+    for entry in catalog['entries']:
+        skill_id = entry['id']
+        command_path(root, skill_id, '.md').write_text(
+            f'Run `major skill resolve --task "$ARGUMENTS" --skill {skill_id} --json`; the named skill is mandatory.\n'
+        )
+gemini = target / '.gemini/commands'
+(gemini / 'major').mkdir(parents=True, exist_ok=True)
+(gemini / 'major.toml').write_text('description = "Discover Major skills"\nprompt = "Run `major skill search --query {{args}}`."\n')
+for entry in catalog['entries']:
+    skill_id = entry['id']
+    command_path(gemini, skill_id, '.toml').write_text(
+        f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{{{args}}}} --skill {skill_id} --json`."\n'
+    )
+PY
 
 {
   echo "# Generated by Major skill installer"
@@ -172,11 +260,51 @@ done
     echo "source=$(git -C "$repo" remote get-url origin) commit=$(git -C "$repo" rev-parse HEAD)"
   done
   echo "[skills]"
-  find "$AGENT_SKILLS" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
+  python3 - "$TARGET/.agents/skills.catalog.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+for entry in json.loads(Path(sys.argv[1]).read_text())['entries']:
+    print(entry['id'])
+PY
 } > "$LOCK"
+rm -f "$TARGET/.agents/managed-external.tsv"
 
+PROJECT_IDENTITY="$(printf '%s' "$INSTALL_TARGET" | shasum -a 256 | awk '{print $1}')"
+RECEIPT="$RECEIPT_DIR/$PROJECT_IDENTITY.json"
+STAGED_RECEIPT="$TMP/project-skill-receipt.json"
+mkdir -p "$RECEIPT_DIR"
+node "$MAJOR_ROOT/scripts/materialize-project-skill-registry.mjs" receipt \
+  "$MAJOR_ROOT" "$TARGET" "$PROFILE" "$FEATURES" "$SOURCE_LOCKS" "$INSTALL_TARGET" > "$STAGED_RECEIPT"
+
+# Activate only after every source, skill, catalogue, rule and command artifact
+# has been staged and validated. Roll back all managed roots if activation fails.
+BACKUP="$TMP/backup"
+mkdir -p "$BACKUP"
+activated=""
+receipt_activated=0
+rollback_install() {
+  if [ "$receipt_activated" -eq 1 ]; then
+    rm -f "$RECEIPT"
+    [ ! -e "$BACKUP/receipt.json" ] || mv "$BACKUP/receipt.json" "$RECEIPT"
+  fi
+  for managed in $activated; do
+    rm -rf "$INSTALL_TARGET/$managed"
+    [ ! -e "$BACKUP/$managed" ] || mv "$BACKUP/$managed" "$INSTALL_TARGET/$managed"
+  done
+}
+trap 'rollback_install' ERR INT TERM
+for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
+  [ ! -e "$INSTALL_TARGET/$managed" ] || mv "$INSTALL_TARGET/$managed" "$BACKUP/$managed"
+  activated="$managed $activated"
+  [ ! -e "$STAGED_TARGET/$managed" ] || mv "$STAGED_TARGET/$managed" "$INSTALL_TARGET/$managed"
+done
+[ ! -e "$RECEIPT" ] || mv "$RECEIPT" "$BACKUP/receipt.json"
+receipt_activated=1
+mv "$STAGED_RECEIPT" "$RECEIPT"
+trap - ERR INT TERM
 rm -rf "$TMP"
-echo "Major skills installed and validated into $TARGET"
+echo "Major skills installed and validated into $INSTALL_TARGET"
 echo "Profile: $PROFILE"
 echo "Features: ${FEATURES:-none}"
 echo "Registry: $LOCK"

@@ -7,11 +7,13 @@ import { hostIntegrationStatus } from '../src/context/host-integration.js';
 let home = '';
 let priorHome: string | undefined;
 let priorCodexHome: string | undefined;
+let priorMajorHome: string | undefined;
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'major-host-integration-'));
   priorHome = process.env.HOME;
   priorCodexHome = process.env.CODEX_HOME;
+  priorMajorHome = process.env.MAJOR_HOME;
 });
 
 afterEach(() => {
@@ -19,6 +21,8 @@ afterEach(() => {
   else process.env.HOME = priorHome;
   if (priorCodexHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = priorCodexHome;
+  if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+  else process.env.MAJOR_HOME = priorMajorHome;
   rmSync(home, { recursive: true, force: true });
 });
 
@@ -26,6 +30,7 @@ afterEach(() => {
 // the fixture directory instead of the real developer machine's dotfiles.
 function useFixtureHome(): void {
   process.env.HOME = home;
+  process.env.MAJOR_HOME = join(home, '.major');
 }
 
 describe('host integration status: pure filesystem presence, no process spawn', () => {
@@ -69,8 +74,7 @@ describe('host integration status: pure filesystem presence, no process spawn', 
 
   it('detects Codex rules via the managed block marker and the hook via hooks.json', () => {
     useFixtureHome();
-    const codexHome = join(home, '.codex-custom');
-    process.env.CODEX_HOME = codexHome;
+    const codexHome = join(home, '.codex');
     mkdirSync(codexHome, { recursive: true });
     writeFileSync(
       join(codexHome, 'AGENTS.md'),

@@ -1,0 +1,6 @@
+{
+  "skill": "security-threat-model",
+  "metadataOnly": true,
+  "should_trigger": [],
+  "should_not_trigger": []
+}

@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { retrieveReusableAssets } from '../src/skills/assets.js';
+import { skillContentSha256 } from '../src/skills/catalog.js';
 import { resolveSkills } from '../src/skills/resolver.js';
 import { rollbackMajorSkills, syncMajorSkills } from '../src/skills/sync.js';
 
@@ -39,7 +40,7 @@ afterEach(() => {
 function sourceCopy(): string {
   const source = mkdtempSync(join(tmpdir(), 'major-skill-rollback-source-'));
   roots.push(source);
-  for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates']) {
+  for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates', 'adapters']) {
     cpSync(join(process.cwd(), directory), join(source, directory), { recursive: true });
   }
   return source;
@@ -81,6 +82,40 @@ function installLegacyBundle(home: string, source: string): string {
     join(bundle, 'skills', 'internal', 'presentation-storylining'),
     { recursive: true },
   );
+  const description = readFileSync(
+    join(bundle, 'skills', 'internal', 'presentation-storylining', 'SKILL.md'),
+    'utf8',
+  )
+    .match(/^---\n[\s\S]*?^description:\s*(.+)$/m)?.[1]
+    ?.trim()
+    .replace(/^['"]|['"]$/g, '');
+  writeFileSync(
+    join(bundle, 'guidance', 'skills.catalog.json'),
+    `${JSON.stringify(
+      {
+        version: 1,
+        registryVersion: 14,
+        entries: [
+          {
+            id: 'presentation-storylining',
+            title: 'Presentation Storylining',
+            description,
+            aliases: [],
+            availability: 'all-projects',
+            source: 'major-internal',
+            sourceKind: 'INTERNAL_DURABLE',
+            registryVersion: 14,
+            contentSha256: skillContentSha256(
+              join(bundle, 'skills', 'internal', 'presentation-storylining'),
+            ),
+            triggers: ['presentation', 'slide', 'deck', 'board', 'deck', 'strategy', 'deck'],
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
   writeFileSync(
     join(bundle, 'bundle.json'),
     `${JSON.stringify({ version: 1, sha: 'a'.repeat(64), registryVersion: 14 }, null, 2)}\n`,
@@ -90,32 +125,21 @@ function installLegacyBundle(home: string, source: string): string {
 }
 
 describe('legacy Skills Library rollback', () => {
-  it('restores a genuine older registry and fails closed for assets it never contained', () => {
+  it('rejects and quarantines an incomplete legacy rollback bundle', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-skill-rollback-home-'));
     const source = sourceCopy();
     roots.push(home);
     process.env.MAJOR_HOME = home;
-    const legacy = installLegacyBundle(home, source);
+    installLegacyBundle(home, source);
 
     const activated = syncMajorSkills({ sourceRoot: source });
     expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(activated.bundleId);
 
-    const rolledBack = rollbackMajorSkills();
-    expect(rolledBack.activeBundle).toBe(legacy);
-    expect(rolledBack.bundleId).toBe('a'.repeat(64));
-    expect(
-      resolveSkills({ task: 'Use presentation-storylining for this task.', limit: 1 }).skills[0]
-        ?.path,
-    ).toContain('/skill-bundles/current/skills/internal/presentation-storylining/SKILL.md');
-    expect(
-      resolveSkills({ task: 'Use controller-bookkeeping for this task.' }).skills.map(
-        (skill) => skill.id,
-      ),
-    ).not.toContain('controller-bookkeeping');
-    expect(retrieveReusableAssets({ task: 'project goal state template' })).toMatchObject({
-      assets: [],
-      catalog: 'unavailable-in-active-skills-bundle',
-    });
+    expect(() => rollbackMajorSkills()).toThrow(
+      /recorded immediate predecessor .* failed validation/,
+    );
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(activated.bundleId);
+    expect(existsSync(join(home, 'skill-bundles', 'legacy-v14'))).toBe(false);
     expect(existsSync(join(home, 'dsh-harness'))).toBe(false);
   });
 

@@ -14,6 +14,7 @@ import { redactText } from '../security/redact.js';
 import { getProjectPolicy } from '../supervisor/policy.js';
 import { majorHome, resolveProjectForCwd } from '../supervisor/state.js';
 import { validateSkillOptimization, type SkillOptimizationEvidence } from './optimizer-validation.js';
+import { assertCanonicalSkillSlug, containedSkillPath } from './slug.js';
 
 export const SKILL_LIFECYCLE_STATUSES = ['candidate', 'active', 'review', 'deprecated'] as const;
 export type SkillLifecycleStatus = (typeof SKILL_LIFECYCLE_STATUSES)[number];
@@ -396,6 +397,11 @@ function skillMarkdown(candidate: SkillCandidate): string {
 
 export function validateGeneratedSkill(input: { skillId: string; markdown: string }): string[] {
   const errors: string[] = [];
+  try {
+    assertCanonicalSkillSlug(input.skillId, 'generated skill id');
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
   const frontmatter = input.markdown.match(/^---\n([\s\S]*?)\n---\n/);
   if (!frontmatter) return ['SKILL.md must contain YAML frontmatter'];
   const name = frontmatter[1]?.match(/^name:\s*(.+)$/m)?.[1]?.trim();
@@ -451,7 +457,11 @@ function promoteSkillCandidateUnlocked(input: { id: string; project: string; rep
   const errors = validateGeneratedSkill({ skillId: candidate.skillId, markdown });
   if (errors.length) throw new Error(`generated skill validation failed: ${errors.join('; ')}`);
   const priorVersion = candidate.path ? candidate.version - 1 : undefined;
-  const destination = join(skillRoot(candidate.scope, candidate.project), candidate.skillId, 'SKILL.md');
+  const destination = containedSkillPath(
+    skillRoot(candidate.scope, candidate.project),
+    candidate.skillId,
+    'SKILL.md',
+  );
   mkdirSync(dirname(destination), { recursive: true, mode: 0o700 });
   if (existsSync(destination)) {
     const archive = join(dirname(destination), `SKILL.v${priorVersion ?? candidate.version}.md`);
@@ -563,7 +573,12 @@ export function loadActiveGeneratedSkills(cwd = process.cwd()): SkillCandidate[]
     if (entry.status !== 'active' || entry.project !== project || !entry.path || !entry.skillHash) {
       return false;
     }
-    const expected = join(skillRoot('project', project), entry.skillId, 'SKILL.md');
+    let expected: string;
+    try {
+      expected = containedSkillPath(skillRoot('project', project), entry.skillId, 'SKILL.md');
+    } catch {
+      return false;
+    }
     return (
       resolve(entry.path) === resolve(expected) &&
       existsSync(entry.path) &&

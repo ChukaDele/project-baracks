@@ -15,6 +15,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { desc, eq, sql } from 'drizzle-orm';
 import { redactText } from '../security/redact.js';
+import { trustedMajorHome } from '#trust-roots';
 import { openDb, type Db } from '../db/client.js';
 import { agentProviders, agentRuns, supervisorCompletionCommits, tasks } from '../db/schema.js';
 import { newId } from '../domain/ids.js';
@@ -216,7 +217,7 @@ export interface SupervisorState {
 }
 
 export function majorHome(): string {
-  return process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
+  return trustedMajorHome();
 }
 
 export function statePath(): string {

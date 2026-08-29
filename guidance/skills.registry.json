@@ -1,5 +1,5 @@
 {
-  "version": 19,
+  "version": 21,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -332,49 +332,57 @@
       "source": "github:emilkowalski/skills",
       "availability": "all-ui-projects",
       "load": "task-relevant",
-      "install": "entire-current-bundle"
+      "install": "entire-current-bundle",
+      "projectInstall": { "sourceKey": "emil", "repository": "https://github.com/emilkowalski/skills.git", "mode": "bundle", "profiles": ["web-ui", "exploratory", "full"], "members": ["animate", "animation-vocabulary", "apple-design", "emil-design-eng", "find-animation-opportunities", "improve-animations", "pick-ui-library", "prototype", "review-animations"], "skillPathPattern": "skills/{id}" }
     },
     {
       "id": "frontend-design",
       "source": "github:anthropics/skills",
       "availability": "all-ui-projects",
-      "load": "frontend-design-work"
+      "load": "frontend-design-work",
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"], "skillPath": "skills/frontend-design" }
     },
     {
       "id": "webapp-testing",
       "source": "github:anthropics/skills",
       "availability": "web-projects",
-      "load": "browser-or-webapp-qa"
+      "load": "browser-or-webapp-qa",
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"], "skillPath": "skills/webapp-testing" }
     },
     {
       "id": "mcp-builder",
       "source": "github:anthropics/skills",
       "availability": "all-projects",
-      "load": "build-or-improve-mcp-server"
+      "load": "build-or-improve-mcp-server",
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["full"], "features": ["mcp"], "skillPath": "skills/mcp-builder" }
     },
     {
       "id": "skill-creator",
       "source": "github:anthropics/skills",
       "availability": "all-projects",
-      "load": "create-evaluate-or-improve-persistent-skill"
+      "load": "create-evaluate-or-improve-persistent-skill",
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["full"], "features": ["skill-authoring"], "skillPath": "skills/skill-creator" }
     },
     {
       "id": "algorithmic-art",
       "source": "github:anthropics/skills",
       "availability": "exploratory-ui-projects",
-      "load": "generative-art-particles-flow-fields-p5"
+      "load": "generative-art-particles-flow-fields-p5",
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["exploratory", "full"], "skillPath": "skills/algorithmic-art" }
     },
     {
       "id": "playwright",
       "source": "github:openai/skills",
       "availability": "web-projects",
-      "load": "real-browser-automation-debugging-qa"
+      "load": "real-browser-automation-debugging-qa",
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"], "skillPath": "skills/playwright" }
     },
     {
       "id": "vercel-deploy",
       "source": "github:openai/skills",
       "availability": "vercel-projects",
-      "load": "preview-or-production-vercel-deployment"
+      "load": "preview-or-production-vercel-deployment",
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["vercel"], "skillPath": "skills/vercel-deploy" }
     },
     {
       "id": "vercel-optimize",
@@ -383,7 +391,7 @@
       "vendorSkill": "vercel-optimize",
       "availability": "vercel-projects",
       "load": "vercel-performance-cost-reliability-caching-functions-billing",
-      "aliases": ["Vercel Optimize", "Vercel performance", "Vercel cost", "Vercel caching"],
+      "aliases": ["vercel-optimize", "vercel-performance", "vercel-cost", "vercel-caching"],
       "disclosure": "specialist"
     },
     {
@@ -393,7 +401,7 @@
       "vendorSkill": "vercel-react-best-practices",
       "availability": "vercel-projects",
       "load": "current React Next.js performance rendering bundle server guidance",
-      "aliases": ["React best practices", "Next.js performance", "React performance"],
+      "aliases": ["react-best-practices", "nextjs-performance", "react-performance"],
       "disclosure": "specialist"
     },
     {
@@ -403,7 +411,7 @@
       "vendorSkill": "web-design-guidelines",
       "availability": "vercel-projects",
       "load": "current web design accessibility UX performance guidance",
-      "aliases": ["web design guidelines", "Vercel web design", "web accessibility guidance"],
+      "aliases": ["web-design-guidelines", "vercel-web-design", "web-accessibility-guidance"],
       "disclosure": "specialist"
     },
     {
@@ -413,7 +421,7 @@
       "vendorSkill": "writing-guidelines",
       "availability": "vercel-projects",
       "load": "current Vercel writing copy content clarity voice structure guidance",
-      "aliases": ["Vercel writing guidelines", "Vercel copy guidance"],
+      "aliases": ["vercel-writing-guidelines", "vercel-copy-guidance"],
       "disclosure": "specialist"
     },
     {
@@ -423,7 +431,7 @@
       "vendorSkill": "vercel-react-native-skills",
       "availability": "vercel-projects",
       "load": "current React Native mobile list navigation animation guidance",
-      "aliases": ["React Native guidelines", "React Native performance"],
+      "aliases": ["react-native-guidelines", "react-native-performance"],
       "disclosure": "specialist"
     },
     {
@@ -433,7 +441,7 @@
       "vendorSkill": "vercel-react-view-transitions",
       "availability": "vercel-projects",
       "load": "current React view transitions animation navigation guidance",
-      "aliases": ["React view transitions", "view transition guidance"],
+      "aliases": ["react-view-transitions", "view-transition-guidance"],
       "disclosure": "specialist"
     },
     {
@@ -443,7 +451,7 @@
       "vendorSkill": "vercel-composition-patterns",
       "availability": "vercel-projects",
       "load": "current React component composition compound components state props guidance",
-      "aliases": ["React composition patterns", "component composition"],
+      "aliases": ["react-composition-patterns", "component-composition"],
       "disclosure": "specialist"
     },
     {
@@ -453,7 +461,7 @@
       "vendorSkill": "deploy-to-vercel",
       "availability": "vercel-projects",
       "load": "current Vercel deploy deployment preview claim framework detection guidance",
-      "aliases": ["Vercel deploy claimable", "Vercel preview deployment"],
+      "aliases": ["vercel-deploy-claimable", "vercel-preview-deployment"],
       "disclosure": "specialist"
     },
     {
@@ -463,44 +471,50 @@
       "vendorSkill": "vercel-cli-with-tokens",
       "availability": "vercel-projects",
       "load": "current Vercel CLI token authentication project environment deployment configuration guidance",
-      "aliases": ["Vercel CLI with tokens", "Vercel token CLI", "Vercel environment variables"],
+      "aliases": ["vercel-cli-with-tokens", "vercel-token-cli", "vercel-environment-variables"],
       "disclosure": "specialist"
     },
     {
       "id": "figma-use",
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
-      "load": "programmatic-figma-read-write"
+      "load": "programmatic-figma-read-write",
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-use" }
     },
     {
       "id": "figma-implement-design",
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
-      "load": "implement-code-from-figma"
+      "load": "implement-code-from-figma",
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-implement-design" }
     },
     {
       "id": "figma-generate-design",
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
-      "load": "create-or-update-figma-screen"
+      "load": "create-or-update-figma-screen",
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-generate-design" }
     },
     {
       "id": "security-threat-model",
       "source": "github:openai/skills",
       "availability": "all-projects",
-      "load": "material-security-risk"
+      "load": "material-security-risk",
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["security"], "skillPath": "skills/security-threat-model" }
     },
     {
       "id": "pdf",
       "source": "github:openai/skills",
       "availability": "all-projects",
-      "load": "pdf-task"
+      "load": "pdf-task",
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["pdf"], "skillPath": "skills/pdf" }
     },
     {
       "id": "graph-engineering",
       "source": "github:codejunkie99/graph-engineering",
       "availability": "all-projects",
-      "load": "deep-graph-orchestration"
+      "load": "deep-graph-orchestration",
+      "projectInstall": { "sourceKey": "graph", "repository": "https://github.com/codejunkie99/graph-engineering.git", "mode": "selected", "profiles": ["full"], "features": ["deep-graph"], "skillPath": "skills/graph-engineering" }
     },
     {
       "id": "software-engineering",
@@ -1394,42 +1408,42 @@
       "source": "major-internal",
       "availability": "all-projects",
       "load": "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability",
-      "aliases": ["knowledge dispatcher"]
+      "aliases": ["knowledge-dispatcher"]
     },
     {
       "id": "strategic-reading",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators",
-      "aliases": ["applied reading"]
+      "aliases": ["applied-reading"]
     },
     {
       "id": "idea-lineage",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view",
-      "aliases": ["view lineage"]
+      "aliases": ["view-lineage"]
     },
     {
       "id": "concept-synthesis",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise",
-      "aliases": ["knowledge synthesis"]
+      "aliases": ["knowledge-synthesis"]
     },
     {
       "id": "research-compendium",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness",
-      "aliases": ["research dossier"]
+      "aliases": ["research-dossier"]
     },
     {
       "id": "academic-verify",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support",
-      "aliases": ["paper verification", "literature verification"]
+      "aliases": ["paper-verification", "literature-verification"]
     }
   ],
   "reconciliation": {

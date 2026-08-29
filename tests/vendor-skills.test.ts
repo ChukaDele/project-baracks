@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { testFixturePath as productionFixturePath } from '../src/security/trust-roots.js';
 import { auditSkillReachability, discloseSkills, resolveSkills } from '../src/skills/resolver.js';
 import {
   clearVendorSectionCache,
@@ -16,11 +18,16 @@ import {
 const registryPath = join(process.cwd(), 'guidance', 'skills.registry.json');
 const evalsPath = join(process.cwd(), 'evals', 'skill-resolver');
 const vendorCatalogPath = join(process.cwd(), 'guidance', 'vendor-sources.json');
+const generatedCatalogPath = join(process.cwd(), 'guidance', 'skills.catalog.json');
 const priorRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorEvals = process.env.MAJOR_SKILLS_EVALS;
 const priorVendorSources = process.env.MAJOR_VENDOR_SOURCES;
+const priorMajorHome = process.env.MAJOR_HOME;
+let testMajorHome: string;
 
 beforeEach(() => {
+  testMajorHome = mkdtempSync(join(tmpdir(), 'major-vendor-test-home-'));
+  process.env.MAJOR_HOME = testMajorHome;
   process.env.MAJOR_SKILLS_REGISTRY = registryPath;
   process.env.MAJOR_SKILLS_EVALS = evalsPath;
   delete process.env.MAJOR_VENDOR_SOURCES;
@@ -34,10 +41,27 @@ afterEach(() => {
   else process.env.MAJOR_SKILLS_EVALS = priorEvals;
   if (priorVendorSources === undefined) delete process.env.MAJOR_VENDOR_SOURCES;
   else process.env.MAJOR_VENDOR_SOURCES = priorVendorSources;
+  if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+  else process.env.MAJOR_HOME = priorMajorHome;
+  rmSync(testMajorHome, { recursive: true, force: true });
   clearVendorSectionCache();
 });
 
 describe('live vendor skill sources', () => {
+  it('does not expose the fixture metadata seam from the production trust module', () => {
+    const override = join(testMajorHome, 'untrusted-vendor-sources.json');
+    writeFileSync(override, JSON.stringify({ version: 1, sources: [] }));
+    process.env.MAJOR_VENDOR_SOURCES = override;
+    const priorNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      expect(productionFixturePath('MAJOR_VENDOR_SOURCES')).toBeUndefined();
+    } finally {
+      if (priorNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = priorNodeEnv;
+    }
+  });
+
   it('classifies internal, vendor, project-local, and dormant sources without a second registry', () => {
     expect(inferSkillSourceKind('major-internal')).toBe('INTERNAL_DURABLE');
     expect(inferSkillSourceKind('vercel-agent-skills', 'VENDOR_LIVE')).toBe('VENDOR_LIVE');
@@ -68,6 +92,43 @@ describe('live vendor skill sources', () => {
     );
   });
 
+  it('binds generated vendor entries to deterministic metadata-only source identity', () => {
+    const catalog = JSON.parse(readFileSync(generatedCatalogPath, 'utf8')) as {
+      entries: Array<{
+        id: string;
+        version: string;
+        contentSha256?: string;
+        metadataSha256?: string;
+        provenance: Record<string, unknown>;
+      }>;
+    };
+    const entry = catalog.entries.find((candidate) => candidate.id === 'vercel-optimize');
+
+    expect(entry).toMatchObject({
+      version: '1.2.0',
+      metadataSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      provenance: {
+        kind: 'vendor-metadata-reference',
+        verification: 'metadata-only',
+        sourceId: 'vercel-agent-skills',
+        sourceRevision: { type: 'branch', value: 'main', immutable: false },
+        upstreamContentIdentity: {
+          status: 'unverified',
+          type: null,
+          value: null,
+        },
+        skillId: 'vercel-optimize',
+        assertedSkillVersion: '1.2.0',
+        licenseStatus: 'DECLARED_REFERENCE_ONLY',
+        metadataIdentity: {
+          type: 'sha256',
+          value: expect.stringMatching(/^[0-9a-f]{64}$/),
+        },
+      },
+    });
+    expect(entry?.contentSha256).toBeUndefined();
+  });
+
   it('resolves a Vercel skill as a live reference without manufacturing a local body', () => {
     const now = new Date('2026-08-28T12:00:00.000Z');
     const resolved = resolveSkills({
@@ -88,7 +149,24 @@ describe('live vendor skill sources', () => {
       state: 'fresh',
       classification: 'actionable-skill',
       harvestDecision: 'USE_LIVE',
-      skillVersion: '1.2.0',
+      assertedSkillVersion: '1.2.0',
+    });
+    expect(resolved.receipt.evidence[0]?.provenance.vendor).toMatchObject({
+      sourceId: 'vercel-agent-skills',
+      revision: { type: 'branch', value: 'main', immutable: false },
+      upstreamContentIdentity: {
+        status: 'unverified',
+        type: null,
+        value: null,
+      },
+      skillId: 'vercel-optimize',
+      assertedSkillVersion: '1.2.0',
+      licenseStatus: 'DECLARED_REFERENCE_ONLY',
+      metadataSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      metadataIdentity: {
+        type: 'sha256',
+        value: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
     });
   });
 
@@ -105,6 +183,22 @@ describe('live vendor skill sources', () => {
         .filter((skill) => skill.sourceKind === 'VENDOR_LIVE')
         .map((skill) => skill.id),
     ).toEqual(['vercel-optimize']);
+  });
+
+  it('makes an available explicit vendor skill mandatory without task-relevance gating', () => {
+    const project = mkdtempSync(join(tmpdir(), 'major-explicit-vendor-'));
+    try {
+      writeFileSync(join(project, 'package.json'), '{"dependencies":{"next":"15.0.0"}}\n');
+      const resolved = resolveSkills({
+        task: 'Summarize the current Vercel project module.',
+        cwd: project,
+        skills: ['vercel-cli-with-tokens'],
+      });
+      expect(resolved.receipt.mode).toBe('explicit');
+      expect(resolved.receipt.selected).toEqual(['vercel-cli-with-tokens']);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
   });
 
   it('does not route common words to a vendor skill without Vercel framework context', () => {

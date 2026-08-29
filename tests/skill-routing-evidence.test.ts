@@ -1,0 +1,100 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { recordSkillRoutingEvidence } from '../src/skills/routing-evidence.js';
+import { resolveSkills } from '../src/skills/resolver.js';
+
+const priorMajorHome = process.env.MAJOR_HOME;
+const roots: string[] = [];
+
+afterEach(() => {
+  if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+  else process.env.MAJOR_HOME = priorMajorHome;
+  while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
+});
+
+describe('skill routing learning evidence', () => {
+  it('turns a repeated rejection into inspectable learning evidence', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-routing-evidence-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    const input = {
+      kind: 'rejection' as const,
+      task: 'Use the missing capability.',
+      requested: ['missing-capability'],
+      reason: 'unknown skill',
+    };
+    expect(recordSkillRoutingEvidence(input)).toMatchObject({
+      occurrences: 1,
+      learningCandidate: false,
+    });
+    expect(recordSkillRoutingEvidence(input)).toMatchObject({
+      occurrences: 2,
+      learningCandidate: true,
+    });
+    const path = join(home, 'learning', 'skill-routing-evidence.json');
+    expect(existsSync(path)).toBe(true);
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toContainEqual(
+      expect.objectContaining({ key: 'rejection:missing-capability', occurrences: 2 }),
+    );
+  });
+
+  it('serializes a bounded evidence store and bounds untrusted fields', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-routing-bounds-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    for (let index = 0; index < 140; index += 1) {
+      recordSkillRoutingEvidence({
+        kind: 'miss',
+        task: `unmatched task ${index}`,
+        requested: Array.from({ length: 20 }, (_, item) => `${index}-${item}-${'x'.repeat(120)}`),
+        reason: 'r'.repeat(700),
+      });
+    }
+    const rows = JSON.parse(
+      readFileSync(join(home, 'learning', 'skill-routing-evidence.json'), 'utf8'),
+    ) as Array<{ requested: string[]; lastReason: string }>;
+    expect(rows).toHaveLength(128);
+    expect(rows.every((row) => row.requested.length <= 16)).toBe(true);
+    expect(rows.every((row) => row.requested.every((value) => value.length <= 100))).toBe(true);
+    expect(rows.every((row) => row.lastReason.length <= 500)).toBe(true);
+    expect(existsSync(join(home, 'learning', 'skill-routing-evidence.json.lock'))).toBe(false);
+  });
+
+  it('captures misses and rejections from the shared resolver entrypoint', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-routing-entrypoint-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    expect(resolveSkills({ task: 'zxqv qqqzz nnnxx' }).skills).toEqual([]);
+    expect(() =>
+      resolveSkills({ task: 'Use a missing skill.', skills: ['definitely-not-installed'] }),
+    ).toThrow(/unknown skill/);
+    const rows = JSON.parse(
+      readFileSync(join(home, 'learning', 'skill-routing-evidence.json'), 'utf8'),
+    ) as Array<{ kind: string }>;
+    expect(rows.map((row) => row.kind).sort()).toEqual(['miss', 'rejection']);
+  });
+
+  it('preserves the original resolver rejection when the evidence store is unwritable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-routing-unwritable-rejection-'));
+    roots.push(root);
+    const blockedHome = join(root, 'not-a-directory');
+    writeFileSync(blockedHome, 'blocks evidence directory creation');
+    process.env.MAJOR_HOME = blockedHome;
+
+    expect(() =>
+      resolveSkills({ task: 'Use a missing skill.', skills: ['definitely-not-installed'] }),
+    ).toThrow(/unknown skill/);
+  });
+
+  it('preserves an automatic no-match when the evidence store is unwritable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-routing-unwritable-miss-'));
+    roots.push(root);
+    const blockedHome = join(root, 'not-a-directory');
+    writeFileSync(blockedHome, 'blocks evidence directory creation');
+    process.env.MAJOR_HOME = blockedHome;
+
+    expect(resolveSkills({ task: 'zxqv qqqzz nnnxx' }).skills).toEqual([]);
+  });
+});

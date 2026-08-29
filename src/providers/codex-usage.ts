@@ -9,7 +9,6 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { DEFAULT_ACCOUNT_LABEL, parseCapacityKey } from './account.js';
 import {
@@ -18,6 +17,7 @@ import {
   type CodexRateLimitWindow,
 } from './codex-app-server.js';
 import type { ProviderInfo } from './types.js';
+import { trustedMajorHome } from '#trust-roots';
 
 export interface CodexUsageAccount extends CodexAppServerSnapshot {
   accountLabel: string;
@@ -45,7 +45,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function snapshotHome(): string {
-  return process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
+  return trustedMajorHome();
 }
 
 export function codexUsageSnapshotPath(): string {

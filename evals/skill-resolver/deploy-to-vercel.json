@@ -1,0 +1,6 @@
+{
+  "skill": "deploy-to-vercel",
+  "metadataOnly": true,
+  "should_trigger": [],
+  "should_not_trigger": []
+}

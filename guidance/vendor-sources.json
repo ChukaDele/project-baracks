@@ -8,7 +8,13 @@
       "vendor": "Vercel",
       "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
       "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-      "revision": "main",
+      "revision": { "type": "branch", "value": "main", "immutable": false },
+      "contentIdentity": {
+        "status": "unverified",
+        "type": null,
+        "value": null,
+        "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+      },
       "version": null,
       "lastChecked": "2026-08-28T05:36:32.974Z",
       "freshnessTtlMs": 86400000,

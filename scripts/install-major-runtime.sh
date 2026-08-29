@@ -2,10 +2,19 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN_DIR="$HOME/.local/bin"
-MAJOR_HOME="$HOME/.major"
+ACCOUNT_HOME="$(python3 - <<'PY'
+import pwd
+import os
+print(pwd.getpwuid(os.getuid()).pw_dir)
+PY
+)"
+HOME="$ACCOUNT_HOME"
+CODEX_HOME="$ACCOUNT_HOME/.codex"
+export HOME CODEX_HOME
+BIN_DIR="$ACCOUNT_HOME/.local/bin"
+MAJOR_HOME="$ACCOUNT_HOME/.major"
 RELEASES_DIR="$MAJOR_HOME/releases"
-LEGACY_PLIST="$HOME/Library/LaunchAgents/com.chuka.major-supervisor.plist"
+LEGACY_PLIST="$ACCOUNT_HOME/Library/LaunchAgents/com.chuka.major-supervisor.plist"
 RELEASE_RECORD="$MAJOR_HOME/installed-release.json"
 LEGACY_SERVICE="gui/$UID/com.chuka.major-supervisor"
 LEGACY_WAS_LOADED=0

@@ -9,9 +9,9 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type Database from 'better-sqlite3';
+import { trustedMajorHome } from '#trust-roots';
 
 export interface RepositoryWriterFence {
   readonly repoPath: string;
@@ -23,8 +23,7 @@ export interface RepositoryWriterFence {
 
 function controlHome(): string {
   if (process.env.MAJOR_STATE_PATH) return dirname(resolve(process.env.MAJOR_STATE_PATH));
-  if (process.env.MAJOR_HOME) return resolve(process.env.MAJOR_HOME);
-  return join(homedir(), '.major');
+  return trustedMajorHome();
 }
 
 function pidAlive(pid: number): boolean {

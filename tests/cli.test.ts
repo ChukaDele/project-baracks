@@ -1,11 +1,13 @@
 import { execFileSync, spawn } from 'node:child_process';
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,7 +31,9 @@ import {
 
 const ROOT = join(import.meta.dirname, '..');
 const CLI = join(ROOT, 'dist', 'cli', 'index.js');
-const ENTRY = join(ROOT, 'dist', 'entry.js');
+const PRODUCTION_ENTRY = join(ROOT, 'dist', 'entry.js');
+let entryFixtureRoot = '';
+let entryFixture = '';
 
 interface CliResult {
   status: number;
@@ -69,7 +73,7 @@ function majorEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
 }
 
 function entryEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
-  return compiledCli(ENTRY, env, args);
+  return compiledCli(entryFixture, env, args);
 }
 
 function major(...args: string[]): CliResult {
@@ -116,7 +120,29 @@ beforeAll(() => {
     timeout: 300_000,
   });
   if (!existsSync(CLI)) throw new Error(`compiled CLI not found after build: ${CLI}`);
-  if (!existsSync(ENTRY)) throw new Error(`compiled entrypoint not found after build: ${ENTRY}`);
+  if (!existsSync(PRODUCTION_ENTRY)) {
+    throw new Error(`compiled entrypoint not found after build: ${PRODUCTION_ENTRY}`);
+  }
+
+  entryFixtureRoot = mkdtempSync(join(tmpdir(), 'major-entry-runtime-'));
+  cpSync(join(ROOT, 'dist'), join(entryFixtureRoot, 'dist'), { recursive: true });
+  cpSync(join(ROOT, 'drizzle'), join(entryFixtureRoot, 'drizzle'), { recursive: true });
+  symlinkSync(join(ROOT, 'node_modules'), join(entryFixtureRoot, 'node_modules'), 'dir');
+  writeFileSync(
+    join(entryFixtureRoot, 'package.json'),
+    JSON.stringify({ type: 'module', imports: { '#trust-roots': './trust-roots.mjs' } }),
+  );
+  writeFileSync(
+    join(entryFixtureRoot, 'trust-roots.mjs'),
+    `import { userInfo } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+export const trustedMajorHome = (env = process.env) => resolve(env.MAJOR_HOME ?? join(userInfo().homedir, '.major'));
+export const trustedAccountHome = (env = process.env) => env.MAJOR_HOME ? dirname(trustedMajorHome(env)) : resolve(env.HOME ?? userInfo().homedir);
+export const trustedCodexHome = (env = process.env) => env.MAJOR_HOME ? join(trustedAccountHome(env), '.codex') : resolve(env.CODEX_HOME ?? join(trustedAccountHome(env), '.codex'));
+export const testFixturePath = (name) => process.env[name];
+`,
+  );
+  entryFixture = join(entryFixtureRoot, 'dist', 'entry.js');
 
   const scratch = mkdtempSync(join(tmpdir(), 'major-cli-'));
   dbPath = join(scratch, 'major.db');
@@ -125,6 +151,10 @@ beforeAll(() => {
   configPath = join(scratch, 'demo.project.json');
   writeFileSync(configPath, JSON.stringify({ name: 'demo', repoPath: repoDir }));
 }, 300_000);
+
+afterAll(() => {
+  if (entryFixtureRoot) rmSync(entryFixtureRoot, { recursive: true, force: true });
+});
 
 describe('major CLI', () => {
   it('preserves every concurrent session attachment', async () => {
@@ -143,7 +173,7 @@ describe('major CLI', () => {
           const child = spawn(
             process.execPath,
             [
-              ENTRY,
+              entryFixture,
               'session',
               'attach',
               '--cwd',
@@ -636,6 +666,7 @@ describe('major CLI', () => {
     const env = {
       ...process.env,
       HOME: home,
+      MAJOR_HOME: join(home, '.major'),
       CODEX_HOME: join(home, '.codex'),
       MAJOR_STATE_PATH: join(scratch, 'supervisor-state.json'),
       MAJOR_POLICY_PATH: join(scratch, 'policies.json'),

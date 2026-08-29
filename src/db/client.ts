@@ -1,12 +1,12 @@
 import { mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import * as schema from './schema.js';
+import { trustedMajorHome } from '#trust-roots';
 
 export type Db = BetterSQLite3Database<typeof schema> & { $client: Database.Database };
 
@@ -21,10 +21,7 @@ const MIGRATIONS_FOLDER = fileURLToPath(new URL('../../drizzle', import.meta.url
 
 export function defaultDbPath(): string {
   if (process.env.MAJOR_DB_PATH) return resolve(process.env.MAJOR_DB_PATH);
-  const majorHome = process.env.MAJOR_HOME
-    ? resolve(process.env.MAJOR_HOME)
-    : join(homedir(), '.major');
-  return join(majorHome, 'major.db');
+  return join(trustedMajorHome(), 'major.db');
 }
 
 export function openDb(path: string = defaultDbPath()): { db: Db; sqlite: Database.Database } {

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { trustedAccountHome, trustedCodexHome } from '#trust-roots';
 
 export type SupportedHost = 'claude' | 'codex' | 'cursor' | 'antigravity';
 
@@ -27,7 +27,7 @@ function readSafe(path: string): string {
 }
 
 function codexHome(): string {
-  return process.env.CODEX_HOME ? resolve(process.env.CODEX_HOME) : join(homedir(), '.codex');
+  return trustedCodexHome();
 }
 
 /**
@@ -37,7 +37,7 @@ function codexHome(): string {
  * installed -- that is a separate, execution-level "installed" signal.
  */
 export function hostIntegrationStatus(host: SupportedHost): HostIntegrationStatus {
-  const home = homedir();
+  const home = trustedAccountHome();
   switch (host) {
     case 'claude': {
       const rulesFile = existsSync(join(home, '.claude', 'major-global.md'));
