@@ -26,12 +26,16 @@ const priorSkillsRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorSkillEvals = process.env.MAJOR_SKILLS_EVALS;
 const priorInjectedFailure = process.env.MAJOR_SKILL_SYNC_FAIL_AFTER;
 const priorInjectedStagedCorruption = process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED;
+const priorInjectedDestinationCorruption = process.env.MAJOR_SKILL_SYNC_CORRUPT_DESTINATION;
+const priorResolverSwitch = process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO;
 
 beforeEach(() => {
   delete process.env.MAJOR_SKILLS_REGISTRY;
   delete process.env.MAJOR_SKILLS_EVALS;
   delete process.env.MAJOR_SKILL_SYNC_FAIL_AFTER;
   delete process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED;
+  delete process.env.MAJOR_SKILL_SYNC_CORRUPT_DESTINATION;
+  delete process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO;
 });
 
 afterEach(() => {
@@ -48,6 +52,11 @@ afterEach(() => {
   if (priorInjectedStagedCorruption === undefined)
     delete process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED;
   else process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED = priorInjectedStagedCorruption;
+  if (priorInjectedDestinationCorruption === undefined)
+    delete process.env.MAJOR_SKILL_SYNC_CORRUPT_DESTINATION;
+  else process.env.MAJOR_SKILL_SYNC_CORRUPT_DESTINATION = priorInjectedDestinationCorruption;
+  if (priorResolverSwitch === undefined) delete process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO;
+  else process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO = priorResolverSwitch;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -61,6 +70,22 @@ function sourceCopy(prefix: string): string {
 }
 
 describe('Major hot skill sync', () => {
+  it('rejects a symlinked bundles authority without touching its external target', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-symlink-home-'));
+    const external = mkdtempSync(join(tmpdir(), 'major-skill-symlink-external-'));
+    roots.push(home, external);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(external, 'sentinel'), 'preserve me\n');
+    symlinkSync(external, join(home, 'skill-bundles'));
+
+    expect(() => syncMajorSkills({ sourceRoot: process.cwd() })).toThrow(/symlinked|relocated/);
+    expect(readFileSync(join(external, 'sentinel'), 'utf8')).toBe('preserve me\n');
+    expect(readdirSync(external)).toEqual(['sentinel']);
+    expect(resolveSkills({ task: 'Use skill-resolver.', limit: 1 }).skills[0]?.path).not.toContain(
+      external,
+    );
+  });
+
   it('activates all current internal skills without a runtime reinstall', async () => {
     const home = mkdtempSync(join(tmpdir(), 'major-skill-sync-home-'));
     roots.push(home);
@@ -133,6 +158,47 @@ describe('Major hot skill sync', () => {
     expect(second.bundleId).not.toBe(first.bundleId);
     expect(readFileSync(boundPath!, 'utf8')).toBe(boundBody);
     expect(boundPath).not.toContain('/skill-bundles/current/');
+  });
+
+  it('uses one authenticated bundle when current switches during resolution', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-resolution-switch-home-'));
+    const sourceA = sourceCopy('major-skill-resolution-switch-a-');
+    const sourceB = sourceCopy('major-skill-resolution-switch-b-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'bundle A adapter\n');
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B adapter\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    const second = syncMajorSkills({ sourceRoot: sourceB });
+    rollbackMajorSkills();
+    process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO = second.bundleId;
+
+    const resolved = resolveSkills({ task: 'Use skill-resolver for this task.', limit: 1 });
+
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(second.bundleId);
+    expect(resolved.skills[0]?.path).toContain(`/skill-bundles/${first.bundleId}/`);
+    expect(resolved.receipt.evidence[0]?.provenance.installedRoot).toBe(first.activeBundle);
+    expect(resolved.receipt.evidence[0]?.provenance.bundle).toBe(first.bundleId);
+  });
+
+  it('rejects post-rename corruption before activation and preserves prior artifacts', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-post-rename-home-'));
+    const sourceA = sourceCopy('major-skill-post-rename-a-');
+    const sourceB = sourceCopy('major-skill-post-rename-b-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'bundle A adapter\n');
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B adapter\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    const hostRule = join(home, '..', '.codex', 'MAJOR_SKILLS.md');
+    process.env.MAJOR_SKILL_SYNC_CORRUPT_DESTINATION = '1';
+
+    expect(() => syncMajorSkills({ sourceRoot: sourceB })).toThrow(/identity/);
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(first.bundleId);
+    expect(readFileSync(hostRule, 'utf8')).toBe('bundle A adapter\n');
+    expect(readdirSync(join(home, 'skill-bundles')).sort()).toEqual(
+      [first.bundleId, 'current'].sort(),
+    );
   });
 
   it('is idempotent when the content-addressed destination is already active', () => {

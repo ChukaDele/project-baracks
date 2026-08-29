@@ -553,6 +553,33 @@ function preflightHostSkillArtifacts(): void {
   }
 }
 
+function authenticatedBundlesRoot(create = false): string {
+  const home = resolve(majorHome());
+  const bundlesRoot = join(home, 'skill-bundles');
+  const { home: hostHome } = hostRoots();
+  assertSafeHostPath(hostHome, home, 'directory');
+  assertSafeHostPath(home, bundlesRoot, 'directory');
+  if (create) mkdirSync(bundlesRoot, { recursive: true, mode: 0o700 });
+  try {
+    if (
+      lstatSync(home).isSymbolicLink() ||
+      lstatSync(bundlesRoot).isSymbolicLink() ||
+      !lstatSync(bundlesRoot).isDirectory() ||
+      realpathSync(home) !== home ||
+      realpathSync(bundlesRoot) !== bundlesRoot ||
+      dirname(realpathSync(bundlesRoot)) !== realpathSync(home)
+    ) {
+      throw new Error('unsafe or relocated Major skill-bundles authority');
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT' && !create) {
+      throw new Error('Major skill-bundles authority is unavailable');
+    }
+    throw error;
+  }
+  return bundlesRoot;
+}
+
 function preflightHostArtifactTargets(ids: string[]): void {
   const { home, codexHome } = hostRoots();
   const files: Array<[string, string]> = [
@@ -806,10 +833,9 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   const bundleId = bundleIdentity(sourceRoot, validated);
   preflightHostSkillArtifacts();
 
-  const bundlesRoot = join(majorHome(), 'skill-bundles');
+  const bundlesRoot = authenticatedBundlesRoot(true);
   const destination = join(bundlesRoot, bundleId);
   const staged = join(bundlesRoot, `.stage-${bundleId}-${process.pid}`);
-  mkdirSync(bundlesRoot, { recursive: true, mode: 0o700 });
   const current = join(bundlesRoot, 'current');
   let previousBundle: string | undefined;
   if (existsSync(current)) {
@@ -899,6 +925,15 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
     validateCopiedBundle(staged, bundleId);
     rmSync(destination, { recursive: true, force: true });
     renameSync(staged, destination);
+    if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILL_SYNC_CORRUPT_DESTINATION) {
+      writeFileSync(join(destination, 'adapters', 'skills', 'CODEX.md'), 'injected destination corruption\n');
+    }
+    try {
+      validateRetainedBundle(destination);
+    } catch (error) {
+      rmSync(destination, { recursive: true, force: true });
+      throw error;
+    }
   } catch (error) {
     rmSync(staged, { recursive: true, force: true });
     throw error;
@@ -920,7 +955,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
 
 /** Atomically reactivate the exact predecessor recorded by the active bundle. */
 export function rollbackMajorSkills(): SkillRollbackResult {
-  const bundlesRoot = join(majorHome(), 'skill-bundles');
+  const bundlesRoot = authenticatedBundlesRoot();
   const current = join(bundlesRoot, 'current');
   if (!existsSync(current)) throw new Error('no active Major Skills Library bundle');
   const active = realpathSync(current);

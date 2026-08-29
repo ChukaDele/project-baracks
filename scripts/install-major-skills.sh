@@ -4,8 +4,24 @@ set -euo pipefail
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL_TARGET="${1:-$(pwd)}"
 [ ! -L "$INSTALL_TARGET" ] || { echo "ERROR: refusing symlinked project target: $INSTALL_TARGET" >&2; exit 2; }
-mkdir -p "$INSTALL_TARGET"
-INSTALL_TARGET="$(cd "$INSTALL_TARGET" && pwd -P)"
+INSTALL_TARGET="$(python3 - "$INSTALL_TARGET" <<'PY'
+import os
+import stat
+import sys
+target = os.path.abspath(sys.argv[1])
+cursor = os.path.sep
+for component in target.split(os.path.sep)[1:]:
+    cursor = os.path.join(cursor, component)
+    try:
+        mode = os.lstat(cursor).st_mode
+    except FileNotFoundError:
+        continue
+    if stat.S_ISLNK(mode):
+        print(f"ERROR: refusing symlinked project target ancestor: {cursor}", file=sys.stderr)
+        raise SystemExit(2)
+print(os.path.realpath(target))
+PY
+)"
 
 # Project-controlled managed roots must be real directories/files. Reject links
 # anywhere below them before copying, removing, staging, or activating content.
@@ -89,6 +105,7 @@ for (const name of lines.slice(marker + 1).filter(Boolean)) {
 JS
 fi
 
+mkdir -p "$INSTALL_TARGET"
 mkdir -p "$MAJOR_HOME"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/major-skills.XXXXXX")"
 STAGED_TARGET="$TMP/project"

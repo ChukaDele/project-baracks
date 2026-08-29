@@ -122,6 +122,30 @@ afterEach(() => {
 });
 
 describe('installed host skill commands', () => {
+  it('does not create an absent target when receipt authority preflight fails', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-absent-target-home-'));
+    const external = mkdtempSync(join(tmpdir(), 'major-absent-target-authority-'));
+    const target = join(home, 'missing-project');
+    roots.push(home, external);
+    writeFileSync(join(external, 'sentinel'), 'preserve\n');
+    symlinkSync(external, join(home, 'redirected-major-home'));
+
+    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      env: {
+        ...process.env,
+        HOME: home,
+        MAJOR_HOME: join(home, 'redirected-major-home'),
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('symlinked MAJOR_HOME');
+    expect(existsSync(target)).toBe(false);
+    expect(readFileSync(join(external, 'sentinel'), 'utf8')).toBe('preserve\n');
+  });
+
   it('rejects escaping lock entries before changing target or external state', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-lock-home-'));
     const target = mkdtempSync(join(tmpdir(), 'major-lock-target-'));

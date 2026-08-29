@@ -47,6 +47,25 @@ afterEach(() => {
 });
 
 describe('live vendor skill sources', () => {
+  it('does not let a production environment override canonical vendor metadata', () => {
+    const override = join(testMajorHome, 'untrusted-vendor-sources.json');
+    writeFileSync(override, JSON.stringify({ version: 1, sources: [] }));
+    process.env.MAJOR_VENDOR_SOURCES = override;
+    const priorNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const resolved = resolveSkills({
+        task: 'Use vercel-optimize to investigate current Vercel performance, latency, and cost.',
+        limit: 1,
+      });
+      expect(resolved.skills[0]?.id).toBe('vercel-optimize');
+      expect(resolved.skills[0]?.vendor?.sourceId).toBe('vercel-agent-skills');
+    } finally {
+      if (priorNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = priorNodeEnv;
+    }
+  });
+
   it('classifies internal, vendor, project-local, and dormant sources without a second registry', () => {
     expect(inferSkillSourceKind('major-internal')).toBe('INTERNAL_DURABLE');
     expect(inferSkillSourceKind('vercel-agent-skills', 'VENDOR_LIVE')).toBe('VENDOR_LIVE');

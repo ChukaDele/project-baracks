@@ -1,4 +1,13 @@
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  symlinkSync,
+} from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -236,8 +245,11 @@ function hotSkillBundleRoot(): string | undefined {
   const current = join(bundlesRoot, 'current');
   try {
     if (!lstatSync(current).isSymbolicLink()) return undefined;
+    if (lstatSync(bundlesRoot).isSymbolicLink()) return undefined;
+    const canonicalBundlesRoot = realpathSync(bundlesRoot);
+    if (canonicalBundlesRoot !== resolve(bundlesRoot)) return undefined;
     const root = realpathSync(current);
-    if (dirname(root) !== realpathSync(bundlesRoot)) return undefined;
+    if (dirname(root) !== canonicalBundlesRoot) return undefined;
     const validated = validateRetainedBundle(root);
     return validated.registry.version >= 1 ? root : undefined;
   } catch {
@@ -249,21 +261,20 @@ function readBundleMarkerIdentity(root: string): string {
   return bundleSchema.parse(JSON.parse(readFileSync(join(root, 'bundle.json'), 'utf8'))).sha;
 }
 
-function canonicalRegistryPath(): string {
+function canonicalRegistryPath(hotRoot?: string): string {
   if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILLS_REGISTRY)
     return resolve(process.env.MAJOR_SKILLS_REGISTRY);
-  const hot = hotSkillBundleRoot();
-  return hot
-    ? join(hot, 'guidance', 'skills.registry.json')
+  return hotRoot
+    ? join(hotRoot, 'guidance', 'skills.registry.json')
     : join(runtimeRoot(), 'guidance', 'skills.registry.json');
 }
 
-function validatedProjectRegistryPath(cwd: string): string | undefined {
+function validatedProjectRegistryPath(cwd: string, hotRoot?: string): string | undefined {
   const path = join(cwd, '.agents', 'skills.registry.json');
   const catalogPath = join(cwd, '.agents', 'skills.catalog.json');
   if (!existsSync(path) && !existsSync(catalogPath)) return undefined;
   if (!existsSync(path) || !existsSync(catalogPath)) throw new Error('project skill registry/catalogue is incomplete');
-  const canonicalPath = canonicalRegistryPath();
+  const canonicalPath = canonicalRegistryPath(hotRoot);
   const canonical = readRegistry(canonicalPath);
   type InstallContract = { sourceKey: string; repository: string; mode: 'bundle' | 'selected'; profiles: string[]; features?: string[]; members?: string[]; skillPath?: string; skillPathPattern?: string };
   const rawCanonical = JSON.parse(readFileSync(canonicalPath, 'utf8')) as { entries?: Array<{ id: string; source: string; availability: string; load: string; disclosure?: string; projectInstall?: InstallContract }> };
@@ -417,42 +428,44 @@ function validatedProjectRegistryPath(cwd: string): string | undefined {
   return path;
 }
 
-function registryPath(cwd?: string): string {
-  return cwd ? validatedProjectRegistryPath(resolve(cwd)) ?? canonicalRegistryPath() : canonicalRegistryPath();
+function registryPath(cwd?: string, hotRoot?: string): string {
+  return cwd
+    ? validatedProjectRegistryPath(resolve(cwd), hotRoot) ?? canonicalRegistryPath(hotRoot)
+    : canonicalRegistryPath(hotRoot);
 }
 
 export function installedSkillCatalogPath(cwd?: string): string {
   return join(dirname(registryPath(cwd)), 'skills.catalog.json');
 }
 
-function registryVersion(cwd?: string): number {
-  return readRegistry(registryPath(cwd)).version;
+function registryVersion(cwd?: string, hotRoot?: string): number {
+  return readRegistry(registryPath(cwd, hotRoot)).version;
 }
 
-function generatedCatalog(cwd?: string): Map<string, SkillCatalogEntry> {
-  const path = installedSkillCatalogPath(cwd);
+function generatedCatalog(cwd?: string, hotRoot?: string): Map<string, SkillCatalogEntry> {
+  const path = join(dirname(registryPath(cwd, hotRoot)), 'skills.catalog.json');
   if (!existsSync(path)) return new Map();
   const catalog = loadGeneratedSkillCatalog(path);
-  if (catalog.registryVersion !== registryVersion(cwd))
+  if (catalog.registryVersion !== registryVersion(cwd, hotRoot))
     throw new Error('generated skill catalogue registry identity mismatch');
   return new Map(catalog.entries.map((entry) => [entry.id, entry]));
 }
 
-function resolverEvalPath(): string {
+function resolverEvalPath(hotRoot?: string): string {
   if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILLS_EVALS)
     return resolve(process.env.MAJOR_SKILLS_EVALS);
-  const hot = hotSkillBundleRoot();
-  const hotPath = hot ? join(hot, 'evals', 'skill-resolver') : undefined;
+  const hotPath = hotRoot ? join(hotRoot, 'evals', 'skill-resolver') : undefined;
   return hotPath && existsSync(hotPath) ? hotPath : join(runtimeRoot(), 'evals', 'skill-resolver');
 }
 
-function vendorCatalogPath(): string {
-  if (process.env.MAJOR_VENDOR_SOURCES) return resolve(process.env.MAJOR_VENDOR_SOURCES);
-  return join(dirname(canonicalRegistryPath()), 'vendor-sources.json');
+function vendorCatalogPath(hotRoot?: string): string {
+  if (process.env.NODE_ENV === 'test' && process.env.MAJOR_VENDOR_SOURCES)
+    return resolve(process.env.MAJOR_VENDOR_SOURCES);
+  return join(dirname(canonicalRegistryPath(hotRoot)), 'vendor-sources.json');
 }
 
-function readVendorCatalog(): VendorCatalog | undefined {
-  const path = vendorCatalogPath();
+function readVendorCatalog(hotRoot?: string): VendorCatalog | undefined {
+  const path = vendorCatalogPath(hotRoot);
   return existsSync(path) ? loadVendorCatalog(path) : undefined;
 }
 
@@ -461,8 +474,8 @@ interface ResolverExamples {
   negative: string[];
 }
 
-function resolverExamples(): Map<string, ResolverExamples> {
-  const root = resolverEvalPath();
+function resolverExamples(hotRoot?: string): Map<string, ResolverExamples> {
+  const root = resolverEvalPath(hotRoot);
   const examples = new Map<string, ResolverExamples>();
   if (!existsSync(root)) return examples;
   for (const name of readdirSync(root).filter((file) => file.endsWith('.json'))) {
@@ -541,11 +554,15 @@ function vendorMatchAllowed(entry: SkillRegistryEntry, task: string): boolean {
   );
 }
 
-export function installedSkillPath(id: string, cwd: string, source: string): string | undefined {
+export function installedSkillPath(
+  id: string,
+  cwd: string,
+  source: string,
+  hotRoot = hotSkillBundleRoot(),
+): string | undefined {
   const immutable = join(runtimeRoot(), 'skills', 'internal');
   const legacyMutableGlobal = join(majorHome(), 'skills', 'internal');
-  const hot = hotSkillBundleRoot();
-  const hotInternal = hot ? join(hot, 'skills', 'internal') : undefined;
+  const hotInternal = hotRoot ? join(hotRoot, 'skills', 'internal') : undefined;
   const roots =
     source === 'major-internal'
       ? [hotInternal, immutable, legacyMutableGlobal].filter((root): root is string => Boolean(root))
@@ -568,12 +585,14 @@ function exactInstalledSkillPath(
   entry: SkillRegistryEntry,
   cwd: string,
   catalog: Map<string, SkillCatalogEntry>,
+  hotRoot?: string,
 ): string | undefined {
-  const path = installedSkillPath(entry.id, cwd, entry.source);
+  const path = installedSkillPath(entry.id, cwd, entry.source, hotRoot);
   if (!path) return undefined;
   if (entry.source !== 'major-internal' && !(entry.sourceKind === 'PROJECT_LOCAL' && entry.source !== 'gbrain-generated')) return path;
   const identity = catalog.get(entry.id);
-  if (!identity?.contentSha256 || identity.registryVersion !== registryVersion(cwd)) return undefined;
+  if (!identity?.contentSha256 || identity.registryVersion !== registryVersion(cwd, hotRoot))
+    return undefined;
   const actual = skillContentSha256(path);
   return actual === identity.contentSha256 ? path : undefined;
 }
@@ -729,16 +748,23 @@ function resolveSkillsInternal(input: {
   limit?: number;
   now?: Date;
   skills?: readonly string[];
-}): SkillResolution {
+}, hotRoot = hotSkillBundleRoot()): SkillResolution {
+  if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO) {
+    const current = join(majorHome(), 'skill-bundles', 'current');
+    const replacement = `${current}.resolver-switch-${process.pid}`;
+    symlinkSync(process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO, replacement);
+    renameSync(replacement, current);
+    delete process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO;
+  }
   const task = input.task.trim();
   if (!task) throw new Error('skill resolution task must not be empty');
   const cwd = resolve(input.cwd ?? process.cwd());
   const now = input.now ?? new Date();
-  const vendorCatalog = readVendorCatalog();
-  const catalog = generatedCatalog(cwd);
-  const examples = resolverExamples();
+  const vendorCatalog = readVendorCatalog(hotRoot);
+  const catalog = generatedCatalog(cwd, hotRoot);
+  const examples = resolverExamples(hotRoot);
   const generated = loadActiveGeneratedSkills(cwd);
-  const registry = loadSkillRegistry(cwd);
+  const registry = readRegistry(registryPath(cwd, hotRoot)).entries;
   const context = projectContext(cwd, task);
   const requested = [...new Set((input.skills ?? []).map((id) => id.trim()).filter(Boolean))];
   if (input.skills && requested.length === 0) {
@@ -873,7 +899,7 @@ function resolveSkillsInternal(input: {
       ? generatedSkillPath(match.generated)
       : match.sourceKind === 'VENDOR_LIVE'
         ? undefined
-        : exactInstalledSkillPath(match.entry, cwd, catalog);
+        : exactInstalledSkillPath(match.entry, cwd, catalog, hotRoot);
     if (!path && !match.vendor) continue;
     const reference = match.vendor?.referenceUrl ?? path;
     if (!reference) continue;
@@ -930,10 +956,10 @@ function resolveSkillsInternal(input: {
               : 'canonical registry vendor reference',
         source: skill.source,
         provenance: {
-          registryVersion: registryVersion(cwd),
-          installedRoot: hotSkillBundleRoot() ?? runtimeRoot(),
-          ...(hotSkillBundleRoot()
-            ? { bundle: readBundleMarkerIdentity(hotSkillBundleRoot()!) }
+          registryVersion: registryVersion(cwd, hotRoot),
+          installedRoot: hotRoot ?? runtimeRoot(),
+          ...(hotRoot
+            ? { bundle: readBundleMarkerIdentity(hotRoot) }
             : {}),
           ...(skill.path ? { path: skill.path } : {}),
           ...(catalog.get(skill.id)?.contentSha256
@@ -1001,17 +1027,16 @@ function recordSkillRoutingEvidenceBestEffort(
   }
 }
 
-/** Every resolver caller, including disclosure/runtime callers, records bounded failure evidence. */
-export function resolveSkills(input: {
+function resolveSkillsCaptured(input: {
   task: string;
   cwd?: string;
   limit?: number;
   now?: Date;
   skills?: readonly string[];
-}): SkillResolution {
+}, hotRoot: string | undefined): SkillResolution {
   let result: SkillResolution;
   try {
-    result = resolveSkillsInternal(input);
+    result = resolveSkillsInternal(input, hotRoot);
   } catch (error) {
     recordSkillRoutingEvidenceBestEffort({
       kind: 'rejection',
@@ -1032,6 +1057,17 @@ export function resolveSkills(input: {
   return result;
 }
 
+/** Every resolver caller, including disclosure/runtime callers, records bounded failure evidence. */
+export function resolveSkills(input: {
+  task: string;
+  cwd?: string;
+  limit?: number;
+  now?: Date;
+  skills?: readonly string[];
+}): SkillResolution {
+  return resolveSkillsCaptured(input, hotSkillBundleRoot());
+}
+
 /**
  * Produce the one bounded disclosure contract used by provider prompts and
  * routed clients. Registry metadata is cheap and canonical; bodies are read
@@ -1048,13 +1084,14 @@ export function discloseSkills(input: {
 }): SkillDisclosure {
   const cwd = resolve(input.cwd ?? process.cwd());
   const now = input.now ?? new Date();
-  const registry = loadSkillRegistry(cwd);
-  const resolution = resolveSkills({
+  const hotRoot = hotSkillBundleRoot();
+  const registry = readRegistry(registryPath(cwd, hotRoot)).entries;
+  const resolution = resolveSkillsCaptured({
     task: input.task,
     cwd,
     ...(input.limit ? { limit: input.limit } : {}),
     now,
-  });
+  }, hotRoot);
   const active = new Map(resolution.skills.map((skill) => [skill.id, skill]));
   const hot = registry.filter((entry) => entry.disclosure === 'hot');
   const ordered = [
@@ -1134,7 +1171,7 @@ export function discloseSkills(input: {
       disclosedVendorBytes += contentBytes;
       continue;
     }
-    const path = selected?.path ?? installedSkillPath(entry.id, cwd, entry.source);
+    const path = selected?.path ?? installedSkillPath(entry.id, cwd, entry.source, hotRoot);
     if (!path || disclosedBodyBytes >= bodyBudget) continue;
     const original = readFileSync(path, 'utf8');
     const allowance = Math.min(perBodyBudget, bodyBudget - disclosedBodyBytes);
@@ -1155,10 +1192,10 @@ export function discloseSkills(input: {
   const manifestDisclosedBytes = jsonBytes(manifest);
   const bodyBeforeBytes = registry.reduce((total, entry) => {
     if (inferSkillSourceKind(entry.source, entry.sourceKind) === 'VENDOR_LIVE') return total;
-    const path = installedSkillPath(entry.id, cwd, entry.source);
+    const path = installedSkillPath(entry.id, cwd, entry.source, hotRoot);
     return total + (path ? statSync(path).size : 0);
   }, 0);
-  const vendorCatalogFile = vendorCatalogPath();
+  const vendorCatalogFile = vendorCatalogPath(hotRoot);
   const vendorBeforeBytes = existsSync(vendorCatalogFile) ? statSync(vendorCatalogFile).size : 0;
   const beforeBytes = manifestBeforeBytes + bodyBeforeBytes + vendorBeforeBytes;
   const disclosedBytes = manifestDisclosedBytes + disclosedBodyBytes;
