@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -74,5 +74,27 @@ describe('skill routing learning evidence', () => {
       readFileSync(join(home, 'learning', 'skill-routing-evidence.json'), 'utf8'),
     ) as Array<{ kind: string }>;
     expect(rows.map((row) => row.kind).sort()).toEqual(['miss', 'rejection']);
+  });
+
+  it('preserves the original resolver rejection when the evidence store is unwritable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-routing-unwritable-rejection-'));
+    roots.push(root);
+    const blockedHome = join(root, 'not-a-directory');
+    writeFileSync(blockedHome, 'blocks evidence directory creation');
+    process.env.MAJOR_HOME = blockedHome;
+
+    expect(() =>
+      resolveSkills({ task: 'Use a missing skill.', skills: ['definitely-not-installed'] }),
+    ).toThrow(/unknown skill/);
+  });
+
+  it('preserves an automatic no-match when the evidence store is unwritable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-routing-unwritable-miss-'));
+    roots.push(root);
+    const blockedHome = join(root, 'not-a-directory');
+    writeFileSync(blockedHome, 'blocks evidence directory creation');
+    process.env.MAJOR_HOME = blockedHome;
+
+    expect(resolveSkills({ task: 'zxqv qqqzz nnnxx' }).skills).toEqual([]);
   });
 });

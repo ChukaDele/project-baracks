@@ -958,6 +958,16 @@ function resolveSkillsInternal(input: {
   };
 }
 
+function recordSkillRoutingEvidenceBestEffort(
+  input: Parameters<typeof recordSkillRoutingEvidence>[0],
+): void {
+  try {
+    recordSkillRoutingEvidence(input);
+  } catch {
+    // Routing outcomes must not depend on the availability of the learning store.
+  }
+}
+
 /** Every resolver caller, including disclosure/runtime callers, records bounded failure evidence. */
 export function resolveSkills(input: {
   task: string;
@@ -966,19 +976,11 @@ export function resolveSkills(input: {
   now?: Date;
   skills?: readonly string[];
 }): SkillResolution {
+  let result: SkillResolution;
   try {
-    const result = resolveSkillsInternal(input);
-    if (result.skills.length === 0) {
-      recordSkillRoutingEvidence({
-        kind: 'miss',
-        task: input.task,
-        ...(input.skills ? { requested: input.skills } : {}),
-        reason: 'no installed skill matched',
-      });
-    }
-    return result;
+    result = resolveSkillsInternal(input);
   } catch (error) {
-    recordSkillRoutingEvidence({
+    recordSkillRoutingEvidenceBestEffort({
       kind: 'rejection',
       task: input.task,
       ...(input.skills ? { requested: input.skills } : {}),
@@ -986,6 +988,15 @@ export function resolveSkills(input: {
     });
     throw error;
   }
+  if (result.skills.length === 0) {
+    recordSkillRoutingEvidenceBestEffort({
+      kind: 'miss',
+      task: input.task,
+      ...(input.skills ? { requested: input.skills } : {}),
+      reason: 'no installed skill matched',
+    });
+  }
+  return result;
 }
 
 /**
