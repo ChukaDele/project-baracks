@@ -22,7 +22,8 @@ import {
 /**
  * Integration tests against the COMPILED CLI (built in beforeAll).
  *
- * `majorEnv` targets the inner Commander surface (`dist/cli/index.js`).
+ * `majorEnv` targets the inner Commander surface (`dist/cli/index.js`) in the
+ * same ephemeral package-local runtime used by `entryEnv`.
  * Supervisor, session, and provider-lifecycle commands are reached only
  * through `dist/entry.js` — the package `bin` — so those contracts use
  * `entryEnv`. Running the compiled artifact, not `src` via tsx, is what
@@ -33,6 +34,7 @@ const ROOT = join(import.meta.dirname, '..');
 const CLI = join(ROOT, 'dist', 'cli', 'index.js');
 const PRODUCTION_ENTRY = join(ROOT, 'dist', 'entry.js');
 let entryFixtureRoot = '';
+let cliFixture = '';
 let entryFixture = '';
 
 interface CliResult {
@@ -69,7 +71,7 @@ function compiledCli(bin: string, env: NodeJS.ProcessEnv, args: string[]): CliRe
 }
 
 function majorEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
-  return compiledCli(CLI, env, args);
+  return compiledCli(cliFixture, env, args);
 }
 
 function entryEnv(env: NodeJS.ProcessEnv, ...args: string[]): CliResult {
@@ -142,6 +144,7 @@ export const trustedCodexHome = (env = process.env) => env.MAJOR_HOME ? join(tru
 export const testFixturePath = (name) => process.env[name];
 `,
   );
+  cliFixture = join(entryFixtureRoot, 'dist', 'cli', 'index.js');
   entryFixture = join(entryFixtureRoot, 'dist', 'entry.js');
 
   const scratch = mkdtempSync(join(tmpdir(), 'major-cli-'));
