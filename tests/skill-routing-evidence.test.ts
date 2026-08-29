@@ -38,4 +38,26 @@ describe('skill routing learning evidence', () => {
       expect.objectContaining({ key: 'rejection:missing-capability', occurrences: 2 }),
     );
   });
+
+  it('serializes a bounded evidence store and bounds untrusted fields', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-routing-bounds-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    for (let index = 0; index < 140; index += 1) {
+      recordSkillRoutingEvidence({
+        kind: 'miss',
+        task: `unmatched task ${index}`,
+        requested: Array.from({ length: 20 }, (_, item) => `${index}-${item}-${'x'.repeat(120)}`),
+        reason: 'r'.repeat(700),
+      });
+    }
+    const rows = JSON.parse(
+      readFileSync(join(home, 'learning', 'skill-routing-evidence.json'), 'utf8'),
+    ) as Array<{ requested: string[]; lastReason: string }>;
+    expect(rows).toHaveLength(128);
+    expect(rows.every((row) => row.requested.length <= 16)).toBe(true);
+    expect(rows.every((row) => row.requested.every((value) => value.length <= 100))).toBe(true);
+    expect(rows.every((row) => row.lastReason.length <= 500)).toBe(true);
+    expect(existsSync(join(home, 'learning', 'skill-routing-evidence.json.lock'))).toBe(false);
+  });
 });

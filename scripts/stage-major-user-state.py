@@ -234,6 +234,55 @@ def add_absent(entries: list[dict[str, str]], target: Path) -> None:
     entries.append({"type": "absent", "target": str(target)})
 
 
+def stage_skill_commands(
+    stage: Path, home: Path, codex_home: Path, catalog: dict, entries: list[dict[str, str]]
+) -> None:
+    skills = catalog.get("entries")
+    if not isinstance(skills, list):
+        raise SystemExit("invalid generated skill catalogue entries")
+    discovery = (
+        "Use Major's installed canonical catalogue. Run `major skill search --query \"$ARGUMENTS\"` "
+        "for discovery, or `major skill resolve --task \"$ARGUMENTS\" --json` for automatic routing.\n"
+    )
+    command_roots = (
+        ("claude", home / ".claude" / "commands", ".md"),
+        ("codex", codex_home / "prompts", ".md"),
+        ("cursor", home / ".cursor" / "commands", ".md"),
+    )
+    for host, target_root, suffix in command_roots:
+        add_file(entries, write_stage_file(stage, f"{host}-major{suffix}", discovery), target_root / f"major{suffix}")
+        for skill in skills:
+            skill_id = skill.get("id") if isinstance(skill, dict) else None
+            if not isinstance(skill_id, str):
+                raise SystemExit("invalid generated skill catalogue id")
+            body = f'Run `major skill resolve --task "$ARGUMENTS" --skill {skill_id} --json`; the named skill is mandatory.\n'
+            add_file(
+                entries,
+                write_stage_file(stage, f"{host}-major-{skill_id}{suffix}", body),
+                target_root / "major" / f"{skill_id}{suffix}",
+            )
+    add_file(
+        entries,
+        write_stage_file(
+            stage,
+            "gemini-major.toml",
+            'description = "Discover or automatically resolve Major skills"\nprompt = "Run `major skill search --query {{args}}` and report the installed matches."\n',
+        ),
+        home / ".gemini" / "commands" / "major.toml",
+    )
+    for skill in skills:
+        skill_id = skill["id"]
+        add_file(
+            entries,
+            write_stage_file(
+                stage,
+                f"gemini-major-{skill_id}.toml",
+                f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{args}} --skill {skill_id} --json`; the named skill is mandatory."\n',
+            ),
+            home / ".gemini" / "commands" / "major" / f"{skill_id}.toml",
+        )
+
+
 def learning_project_path(root: Path, project: str) -> Path:
     key = hashlib.sha256(project.encode()).hexdigest()[:24]
     return root / "projects" / f"{key}.json"
@@ -470,6 +519,8 @@ def main() -> None:
     add_file(entries, global_rules, home / ".major" / "global-worker-rules.md")
     catalog_stage = write_stage_file(stage, "skills.catalog.json", catalog_src.read_text())
     add_file(entries, catalog_stage, home / ".major" / "skills.catalog.json")
+    catalog = json.loads(catalog_src.read_text())
+    stage_skill_commands(stage, home, codex_home, catalog, entries)
 
     skills_stage = stage / "skills" / "internal"
     shutil.copytree(skills_src, skills_stage)

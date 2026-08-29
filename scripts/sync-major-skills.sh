@@ -46,6 +46,7 @@ VENDOR_SOURCES="$SOURCE_ROOT/guidance/vendor-sources.json"
 for required in "$REGISTRY" "$CATALOG" "$RECONCILIATION_LEDGER" "$ASSETS" "$GBRAIN_ASSETS" "$ASSET_CANDIDATES" "$CAPABILITY_MATRIX" "$SOURCE_LEDGER" "$VENDOR_SOURCES" "$INTERNAL" "$EVALS"; do
   [ -e "$required" ] || { echo "ERROR: required skill-bundle source missing: $required" >&2; exit 1; }
 done
+node "$SOURCE_ROOT/scripts/generate-skill-catalog.mjs" --check
 
 # Validate the complete knowledge bundle before mutating active Major state.
 REGISTRY_VERSION="$(python3 - "$REGISTRY" "$CATALOG" "$INTERNAL" "$EVALS" "$ASSETS" "$VENDOR_SOURCES" <<'PY'

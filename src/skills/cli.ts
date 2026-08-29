@@ -1,10 +1,9 @@
 import {
   auditSkillReachability,
-  installedSkillPath,
-  loadSkillRegistry,
+  installedSkillCatalogPath,
   resolveSkills,
 } from './resolver.js';
-import { buildSkillCatalog, searchSkillCatalog } from './catalog.js';
+import { loadGeneratedSkillCatalog, searchSkillCatalog } from './catalog.js';
 import { recordSkillRoutingEvidence } from './routing-evidence.js';
 import {
   deprecateGeneratedSkill,
@@ -100,10 +99,7 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
     return true;
   }
   if (args[1] === 'search' || args[1] === 'catalog') {
-    const cwd = flag(args, '--cwd') ?? process.cwd();
-    const catalog = buildSkillCatalog(loadSkillRegistry(), (entry) =>
-      installedSkillPath(entry.id, cwd, entry.source),
-    );
+    const catalog = loadGeneratedSkillCatalog(installedSkillCatalogPath()).entries;
     const query = flag(args, '--query');
     const result = query ? searchSkillCatalog(catalog, query) : catalog;
     if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));

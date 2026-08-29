@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { retrieveReusableAssets } from '../src/skills/assets.js';
@@ -80,6 +81,39 @@ function installLegacyBundle(home: string, source: string): string {
     join(source, 'skills', 'internal', 'presentation-storylining'),
     join(bundle, 'skills', 'internal', 'presentation-storylining'),
     { recursive: true },
+  );
+  const content = readFileSync(
+    join(bundle, 'skills', 'internal', 'presentation-storylining', 'SKILL.md'),
+  );
+  const description = content
+    .toString('utf8')
+    .match(/^---\n[\s\S]*?^description:\s*(.+)$/m)?.[1]
+    ?.trim()
+    .replace(/^['"]|['"]$/g, '');
+  writeFileSync(
+    join(bundle, 'guidance', 'skills.catalog.json'),
+    `${JSON.stringify(
+      {
+        version: 1,
+        registryVersion: 14,
+        entries: [
+          {
+            id: 'presentation-storylining',
+            title: 'Presentation Storylining',
+            description,
+            aliases: [],
+            availability: 'all-projects',
+            source: 'major-internal',
+            sourceKind: 'INTERNAL_DURABLE',
+            registryVersion: 14,
+            contentSha256: createHash('sha256').update(content).digest('hex'),
+            triggers: ['presentation', 'slide', 'deck', 'board', 'deck', 'strategy', 'deck'],
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
   );
   writeFileSync(
     join(bundle, 'bundle.json'),

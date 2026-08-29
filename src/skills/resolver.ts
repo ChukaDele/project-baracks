@@ -1,7 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import {
+  buildSkillCatalog,
+  loadGeneratedSkillCatalog,
+  type SkillCatalogEntry,
+} from './catalog.js';
 import { majorHome } from '../supervisor/state.js';
 import {
   loadActiveGeneratedSkills,
@@ -70,7 +76,27 @@ export interface SkillResolutionReceipt {
   mode: 'explicit' | 'automatic' | 'project';
   requested: string[];
   selected: string[];
-  evidence: Array<{ id: string; score: number; reason: string; source: string }>;
+  project: { cwd: string; kind: string; availableScopes: string[] };
+  evidence: Array<{
+    id: string;
+    selection: 'explicit' | 'automatic';
+    score: number;
+    confidence: number;
+    reason: string;
+    trigger: string;
+    scope: string;
+    exclusions: string[];
+    precedence: string;
+    source: string;
+    provenance: {
+      registryVersion: number;
+      installedRoot: string;
+      bundle?: string;
+      path?: string;
+      contentSha256?: string;
+    };
+  }>;
+  rejected: Array<{ id: string; reason: string; score: number }>;
 }
 
 export type SkillDisclosureState = 'HOT' | 'ACTIVE' | 'DORMANT';
@@ -173,15 +199,43 @@ function hotSkillBundleRoot(): string | undefined {
   const root = join(majorHome(), 'skill-bundles', 'current');
   const marker = join(root, 'bundle.json');
   const registry = join(root, 'guidance', 'skills.registry.json');
+  const catalog = join(root, 'guidance', 'skills.catalog.json');
   const internal = join(root, 'skills', 'internal');
-  if (!existsSync(marker) || !existsSync(registry) || !existsSync(internal)) return undefined;
+  if (!existsSync(marker) || !existsSync(registry) || !existsSync(catalog) || !existsSync(internal))
+    return undefined;
   try {
     bundleSchema.parse(JSON.parse(readFileSync(marker, 'utf8')));
     const hot = readRegistry(registry);
+    const generated = loadGeneratedSkillCatalog(catalog);
+    const expected = buildSkillCatalog(
+      hot.entries,
+      (entry) =>
+        entry.source === 'major-internal' ? join(internal, entry.id, 'SKILL.md') : undefined,
+      hot.version,
+    );
+    if (
+      generated.registryVersion !== hot.version ||
+      JSON.stringify(generated.entries) !== JSON.stringify(expected)
+    )
+      return undefined;
+    for (const entry of hot.entries.filter((candidate) => candidate.source === 'major-internal')) {
+      const identity = generated.entries.find((candidate) => candidate.id === entry.id);
+      const path = join(internal, entry.id, 'SKILL.md');
+      if (
+        !identity?.contentSha256 ||
+        !existsSync(path) ||
+        createHash('sha256').update(readFileSync(path)).digest('hex') !== identity.contentSha256
+      )
+        return undefined;
+    }
     return hot.version >= 1 ? root : undefined;
   } catch {
     return undefined;
   }
+}
+
+function readBundleMarkerIdentity(root: string): string {
+  return bundleSchema.parse(JSON.parse(readFileSync(join(root, 'bundle.json'), 'utf8'))).sha;
 }
 
 function registryPath(): string {
@@ -190,6 +244,23 @@ function registryPath(): string {
   return hot
     ? join(hot, 'guidance', 'skills.registry.json')
     : join(runtimeRoot(), 'guidance', 'skills.registry.json');
+}
+
+export function installedSkillCatalogPath(): string {
+  return join(dirname(registryPath()), 'skills.catalog.json');
+}
+
+function registryVersion(): number {
+  return readRegistry(registryPath()).version;
+}
+
+function generatedCatalog(): Map<string, SkillCatalogEntry> {
+  const path = installedSkillCatalogPath();
+  if (!existsSync(path)) return new Map();
+  const catalog = loadGeneratedSkillCatalog(path);
+  if (catalog.registryVersion !== registryVersion())
+    throw new Error('generated skill catalogue registry identity mismatch');
+  return new Map(catalog.entries.map((entry) => [entry.id, entry]));
 }
 
 function resolverEvalPath(): string {
@@ -317,6 +388,64 @@ export function installedSkillPath(id: string, cwd: string, source: string): str
   return undefined;
 }
 
+function exactInstalledSkillPath(
+  entry: SkillRegistryEntry,
+  cwd: string,
+  catalog: Map<string, SkillCatalogEntry>,
+): string | undefined {
+  const path = installedSkillPath(entry.id, cwd, entry.source);
+  if (!path) return undefined;
+  if (entry.source !== 'major-internal') return path;
+  const identity = catalog.get(entry.id);
+  if (!identity?.contentSha256 || identity.registryVersion !== registryVersion()) return undefined;
+  const actual = createHash('sha256').update(readFileSync(path)).digest('hex');
+  return actual === identity.contentSha256 ? path : undefined;
+}
+
+function projectContext(cwd: string, task: string): {
+  kind: string;
+  availableScopes: string[];
+} {
+  const isMajor =
+    existsSync(join(cwd, 'package.json')) &&
+    (() => {
+      try {
+        const value: unknown = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
+        return (
+          typeof value === 'object' &&
+          value !== null &&
+          'name' in value &&
+          value.name === 'major'
+        );
+      } catch {
+        return false;
+      }
+    })();
+  const web = ['package.json', 'vite.config.ts', 'next.config.js', 'index.html'].some((name) =>
+    existsSync(join(cwd, name)),
+  );
+  const spatial = /\b(?:3d|spatial|splat|colmap|reconstruction)\b/iu.test(task);
+  const vercel = /\b(?:vercel|next\.?(?:js)?)\b/iu.test(task);
+  const figma = /\bfigma\b/iu.test(task);
+  const ui = web || /\b(?:ui|frontend|website|design)\b/iu.test(task);
+  return {
+    kind: isMajor ? 'major-repo' : web ? 'web-project' : spatial ? 'spatial-project' : 'project',
+    availableScopes: [
+      'all-projects',
+      'all-product-projects',
+      ...(isMajor ? ['major-repo'] : []),
+      ...(web ? ['web-projects'] : []),
+      ...(ui ? ['ui-projects', 'all-ui-projects'] : []),
+      ...(ui && /\b(?:explor|prototype|creative)\b/iu.test(task)
+        ? ['exploratory-ui-projects']
+        : []),
+      ...(spatial ? ['spatial-projects'] : []),
+      ...(vercel ? ['vercel-projects'] : []),
+      ...(figma ? ['figma-enabled-projects'] : []),
+    ],
+  };
+}
+
 function generatedSkillPath(entry: SkillCandidate): string | undefined {
   return entry.path && existsSync(entry.path) ? entry.path : undefined;
 }
@@ -430,9 +559,11 @@ export function resolveSkills(input: {
   const cwd = resolve(input.cwd ?? process.cwd());
   const now = input.now ?? new Date();
   const vendorCatalog = readVendorCatalog();
+  const catalog = generatedCatalog();
   const examples = resolverExamples();
   const generated = loadActiveGeneratedSkills(cwd);
   const registry = loadSkillRegistry();
+  const context = projectContext(cwd, task);
   const requested = [...new Set((input.skills ?? []).map((id) => id.trim()).filter(Boolean))];
   if (input.skills && requested.length === 0) {
     throw new Error('explicit skill selection requires at least one --skill <id>');
@@ -460,6 +591,11 @@ export function resolveSkills(input: {
         : '';
       throw new Error(
         `deprecated skill "${entry.id}"${replacement}${entry.deprecated.message ? `: ${entry.deprecated.message}` : ''}`,
+      );
+    }
+    if (entry && !context.availableScopes.includes(entry.availability)) {
+      throw new Error(
+        `explicit skill selection unavailable: ${entry.id} requires ${entry.availability} in ${context.kind}`,
       );
     }
     const resolved = project
@@ -521,6 +657,7 @@ export function resolveSkills(input: {
     .filter(
       ({ entry, score, sourceKind, vendor }) =>
         score >= (requested.length > 0 ? 1_000 : 5) &&
+        (sourceKind === 'PROJECT_LOCAL' || context.availableScopes.includes(entry.availability)) &&
         (sourceKind !== 'VENDOR_LIVE' ||
           (vendor !== undefined && vendorMatchAllowed(entry, task))),
     )
@@ -545,7 +682,7 @@ export function resolveSkills(input: {
       ? generatedSkillPath(match.generated)
       : match.sourceKind === 'VENDOR_LIVE'
         ? undefined
-        : installedSkillPath(match.entry.id, cwd, match.entry.source);
+        : exactInstalledSkillPath(match.entry, cwd, catalog);
     if (!path && !match.vendor) continue;
     const reference = match.vendor?.referenceUrl ?? path;
     if (!reference) continue;
@@ -582,12 +719,52 @@ export function resolveSkills(input: {
       mode,
       requested,
       selected: skills.map((skill) => skill.id),
+      project: { cwd, ...context },
       evidence: skills.map((skill) => ({
         id: skill.id,
+        selection: requested.length ? 'explicit' : 'automatic',
         score: skill.score,
+        confidence: Math.min(1, skill.score / (requested.length ? 1_000 : 20)),
         reason: skill.reason,
+        trigger: registry.find((entry) => entry.id === skill.id)?.load ?? 'project-generated',
+        scope: registry.find((entry) => entry.id === skill.id)?.availability ?? 'project',
+        exclusions: examples.get(skill.id)?.negative.slice(0, 8) ?? [],
+        precedence:
+          skill.sourceKind === 'INTERNAL_DURABLE'
+            ? 'canonical active bundle before mutable global or project roots'
+            : skill.sourceKind === 'PROJECT_LOCAL'
+              ? 'project-local generated candidate'
+              : 'canonical registry vendor reference',
         source: skill.source,
+        provenance: {
+          registryVersion: registryVersion(),
+          installedRoot: hotSkillBundleRoot() ?? runtimeRoot(),
+          ...(hotSkillBundleRoot()
+            ? { bundle: readBundleMarkerIdentity(hotSkillBundleRoot()!) }
+            : {}),
+          ...(skill.path ? { path: skill.path } : {}),
+          ...(catalog.get(skill.id)?.contentSha256
+            ? { contentSha256: catalog.get(skill.id)!.contentSha256 }
+            : {}),
+        },
       })),
+      rejected: registry
+        .filter((entry) => !skills.some((skill) => skill.id === entry.id))
+        .map((entry) => {
+          const scored = scoreEntry(entry, task, examples);
+          return {
+            id: entry.id,
+            reason: context.availableScopes.includes(entry.availability)
+              ? scored.score < 5
+                ? `below routing threshold; ${scored.reason}`
+                : `lower precedence than selected candidates; ${scored.reason}`
+              : `scope unavailable: requires ${entry.availability} in ${context.kind}`,
+            score: scored.score,
+          };
+        })
+        .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
+        .slice(0, 16)
+        ,
     },
   };
 }

@@ -18,6 +18,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parseDocument } from 'yaml';
 import { majorHome } from '../supervisor/state.js';
 import { cloneGitBranch } from '../resources/tools.js';
+import { buildSkillCatalog } from './catalog.js';
 import {
   findVendorSkill,
   loadVendorCatalog,
@@ -32,8 +33,9 @@ interface RegistryEntry {
   vendorSkill?: string;
   availability: string;
   load: string;
-  aliases?: string[];
-  disclosure?: 'hot' | 'specialist';
+  aliases: string[];
+  disclosure: 'hot' | 'specialist';
+  deprecated?: { replacement?: string; message?: string };
 }
 
 interface Registry {
@@ -110,11 +112,26 @@ function assertRegistry(value: unknown): Registry {
       ...(typeof row.vendorSkill === 'string' ? { vendorSkill: row.vendorSkill } : {}),
       availability: row.availability as string,
       load: row.load as string,
-      ...(Array.isArray(row.aliases) && row.aliases.every((alias) => typeof alias === 'string')
-        ? { aliases: row.aliases }
-        : {}),
-      ...(row.disclosure === 'hot' || row.disclosure === 'specialist'
-        ? { disclosure: row.disclosure }
+      aliases:
+        Array.isArray(row.aliases) && row.aliases.every((alias) => typeof alias === 'string')
+          ? row.aliases
+          : [],
+      disclosure:
+        row.disclosure === 'hot' || row.disclosure === 'specialist'
+          ? row.disclosure
+          : 'specialist',
+      ...(row.deprecated && typeof row.deprecated === 'object'
+        ? {
+            deprecated: {
+              ...('replacement' in row.deprecated &&
+              typeof row.deprecated.replacement === 'string'
+                ? { replacement: row.deprecated.replacement }
+                : {}),
+              ...('message' in row.deprecated && typeof row.deprecated.message === 'string'
+                ? { message: row.deprecated.message }
+                : {}),
+            },
+          }
         : {}),
     };
   });
@@ -210,17 +227,18 @@ function validateSource(sourceRoot: string): {
     registryVersion?: unknown;
     entries?: Array<{ id?: unknown }>;
   };
-  const catalogIds = Array.isArray(catalog.entries)
-    ? catalog.entries
-        .map((entry) => entry.id)
-        .filter((id): id is string => typeof id === 'string')
-    : [];
-  const registryIds = registry.entries.map((entry) => entry.id).sort();
+  const expectedCatalog = buildSkillCatalog(
+    registry.entries,
+    (entry) =>
+      entry.source === 'major-internal'
+        ? join(internalRoot, entry.id, 'SKILL.md')
+        : undefined,
+    registry.version,
+  );
   if (
     catalog.version !== 1 ||
     catalog.registryVersion !== registry.version ||
-    catalogIds.length !== catalog.entries?.length ||
-    JSON.stringify([...catalogIds].sort()) !== JSON.stringify(registryIds)
+    JSON.stringify(catalog.entries) !== JSON.stringify(expectedCatalog)
   ) {
     throw new Error('generated skill catalog does not match the canonical registry');
   }

@@ -7,6 +7,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -243,6 +244,28 @@ describe('runtime skill resolver', () => {
     writeFileSync(
       join(bundle, 'skills', 'internal', 'hot-skill', 'SKILL.md'),
       '---\nname: hot-skill\ndescription: hot\n---\n\n# Hot\n',
+    );
+    const hotContent = readFileSync(join(bundle, 'skills', 'internal', 'hot-skill', 'SKILL.md'));
+    writeFileSync(
+      join(bundle, 'guidance', 'skills.catalog.json'),
+      JSON.stringify({
+        version: 1,
+        registryVersion: 999,
+        entries: [
+          {
+            id: 'hot-skill',
+            title: 'Hot Skill',
+            description: 'hot',
+            aliases: [],
+            availability: 'all-projects',
+            source: 'major-internal',
+            sourceKind: 'INTERNAL_DURABLE',
+            registryVersion: 999,
+            contentSha256: createHash('sha256').update(hotContent).digest('hex'),
+            triggers: ['hot skill immediate sync'],
+          },
+        ],
+      }),
     );
     const current = join(home, 'skill-bundles', 'current');
     symlinkSync('0123456789abcdef0123456789abcdef01234567', current);

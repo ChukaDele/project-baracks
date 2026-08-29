@@ -12,6 +12,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "d20993cae642eab3b4928d12df25a3543489314965a568e78f70ca304aa1af3b",
       "triggers": [
         "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support"
       ]
@@ -23,6 +26,8 @@
       "aliases": [],
       "availability": "exploratory-ui-projects",
       "source": "github:anthropics/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "generative",
         "art",
@@ -39,6 +44,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "14cae23803d7b17478594299eb1fd6081dfd171f0cee365953751e849f590614",
       "triggers": [
         "taleshape",
         "shaper",
@@ -59,6 +67,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "7ade11a72e1103e94a15e83ab3426eaaf0003107378d38e53f0f56035ce59552",
       "triggers": [
         "api endpoint contract integration"
       ]
@@ -72,6 +83,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "4a1d33f57fb88d54e56470a6e13ba8721a4950817edaf86bcbff0a539626f085",
       "triggers": [
         "accounts receivable payable invoice collections"
       ]
@@ -85,6 +99,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "80712509f91d981d014a0e9e27a0667084cc44f3c0d076ba5782f6080a05baad",
       "triggers": [
         "software architecture system design module boundary"
       ]
@@ -98,6 +115,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "19fcec8827d4283daa9b3f0095dc0ee962b5d72ac125ffdd2fd0f65c72108e1b",
       "triggers": [
         "authentication authorization security access"
       ]
@@ -109,6 +129,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "ac6b0c33ca8f9585766f602045c16b1a9b056d5ef94f5182d30a4741289a7d08",
       "triggers": [
         "autonomous",
         "or",
@@ -126,6 +149,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "9aa0e6912ba5d23d260b6bf271eea80485bacddf296799dbb879f0dff1549a68",
       "triggers": [
         "browser release quality assurance acceptance"
       ]
@@ -139,6 +165,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "df9024f4c3ce4eae0067d5065274bc51a40a04a0b9416b7405098fe56b84612e",
       "triggers": [
         "capability freshness version compatibility evidence"
       ]
@@ -152,6 +181,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "bba78e09cff99fbc865f7028c2ecc4a6cc91f8567441e983b00d02f55f39043f",
       "triggers": [
         "chief of staff strategic coordination executive assistant boundary"
       ]
@@ -163,6 +195,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "0a78ca0611c0a72800cbb47e33a24f8e2398cbd20271c85e72aab44585e356f4",
       "triggers": [
         "ci",
         "github",
@@ -181,6 +216,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "6d01e18d2f2979b8a06f0797659c983e02fa3ba23ae6896b0f3d964022025951",
       "triggers": [
         "codebase design module ownership boundaries"
       ]
@@ -192,6 +230,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "44536696dc1f893086629c34e02c37aff3b702c98ff596e11c35932f1db6b098",
       "triggers": [
         "project",
         "start",
@@ -210,6 +251,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "4f26c4861517055f08487429352029023cce259c3eee9be5232b5e4f7939572d",
       "triggers": [
         "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise"
       ]
@@ -223,6 +267,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "580a99bd099e272a9c12ba7c041c1eacc44e23bfab5aa2cbe110bed6be90395c",
       "triggers": [
         "concurrency race condition parallel locking"
       ]
@@ -236,6 +283,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "45e1dd8ddc63e3e2ff8edc5494f16d74bc970aeb79562969956132d846cba6ad",
       "triggers": [
         "bookkeeping ledger journal controller accounting"
       ]
@@ -247,6 +297,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "fa84d146c4673bf71074b393579d59e153915a7e790dcc3e775e6d0b8da85edd",
       "triggers": [
         "provider",
         "model",
@@ -264,6 +317,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "305aa50eefa1be40f8a48aed0a1b9115d53461d4bb35c7407aebef99a7698f24",
       "triggers": [
         "cross modal visual document evidence review"
       ]
@@ -275,6 +331,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "af26c0e78f5ac3ad750340038b11b06246ad1bd061cc26a34035a8b19e2efbac",
       "triggers": [
         "outcome",
         "data",
@@ -291,6 +350,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "455fc4351b3ccf4a80e53d2ebc14d9deeed2686136fe0781718059cffa2098c4",
       "triggers": [
         "database schema query migration"
       ]
@@ -304,6 +366,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "b99c6c84e25c179d89ffaf4bd873efe220e809f7caf55edabd9dd052f4542ef3",
       "triggers": [
         "debug investigate root cause failure"
       ]
@@ -317,6 +382,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "34fc5d0bf0e63b73575cc47ee4a2422cc2dd2d667230125d80b9e3d3e6d67d33",
       "triggers": [
         "dependency package upgrade vulnerability"
       ]
@@ -331,6 +399,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "current Vercel deploy deployment preview claim framework detection guidance"
       ]
@@ -344,6 +414,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "f2dd3d3777e21a099fea219d5f46e2b21187dd7ea8fdf74ed8f340d666d38f4b",
       "triggers": [
         "deployment release rollout rollback"
       ]
@@ -355,6 +428,9 @@
       "aliases": [],
       "availability": "ui-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "53df6d8eddc88bb1463a5788d6b94bf88fc3962ddcdd7536c738a245f5547492",
       "triggers": [
         "substantial",
         "ui",
@@ -382,6 +458,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "7001fb1fa8bb31a36318a86b68a1f094ee09eead9bdcd1a3b546ea2f461f28a4",
       "triggers": [
         "deterministic accounting arithmetic ledger balances"
       ]
@@ -393,6 +472,9 @@
       "aliases": [],
       "availability": "web-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "9d1550d90b1086ecbbba1b6fb810961db70758828b55b542ed73ab2228ca95d7",
       "triggers": [
         "explicit",
         "owner",
@@ -411,6 +493,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "d66d0377f53f6c84786791c7d550d6c0f8f33ab0ab51ce485b4ac11091ce2ba5",
       "triggers": [
         "domain model entities business rules"
       ]
@@ -422,6 +507,8 @@
       "aliases": [],
       "availability": "all-ui-projects",
       "source": "github:emilkowalski/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "task",
         "relevant"
@@ -436,6 +523,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "30dbf1617a3538422ac278ae14ca370924b0a18a0bb763d4f1e0267d36249f67",
       "triggers": [
         "engineering design doctrine maintainable modular code"
       ]
@@ -450,6 +540,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "7a7375310d429afa6435177764bc810514289674561e880420fe62e7d4f6a473",
       "triggers": [
         "pr",
         "review",
@@ -466,6 +559,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "c038be6a9d8f25ed91e75b61b8424dc1d32e1f69e69ccca83bd488c4e4f77667",
       "triggers": [
         "executive assistant calendar correspondence meeting preparation"
       ]
@@ -477,6 +573,9 @@
       "aliases": [],
       "availability": "ui-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "154a417414080ac7e92292f7c11c6b89f16b78596b92c8ce047e22ae7ebc92c5",
       "triggers": [
         "exploratory",
         "awwwards",
@@ -494,6 +593,8 @@
       "aliases": [],
       "availability": "figma-enabled-projects",
       "source": "github:openai/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "create",
         "or",
@@ -509,6 +610,8 @@
       "aliases": [],
       "availability": "figma-enabled-projects",
       "source": "github:openai/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "implement",
         "code",
@@ -523,6 +626,8 @@
       "aliases": [],
       "availability": "figma-enabled-projects",
       "source": "github:openai/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "programmatic",
         "figma",
@@ -539,6 +644,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "667637f310fd654ac8d3d7d600ee055f5895312abb44b6e505a879c446cba24b",
       "triggers": [
         "financial planning forecast extrapolation budget"
       ]
@@ -552,6 +660,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "120bef3ba9b0c27f305561119718dc909447969b9b287bf0640f0b4508f0dd11",
       "triggers": [
         "frontend ui component interface"
       ]
@@ -563,6 +674,8 @@
       "aliases": [],
       "availability": "all-ui-projects",
       "source": "github:anthropics/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "frontend",
         "design",
@@ -576,6 +689,9 @@
       "aliases": [],
       "availability": "spatial-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "3b0e27f2f125bd22451e08a488ba4660d249cdca92d4f7cf5ffd2be9ee863c83",
       "triggers": [
         "3d",
         "gaussian",
@@ -597,6 +713,8 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "github:codejunkie99/graph-engineering",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "deep",
         "graph",
@@ -610,6 +728,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "e1d7002f99f29719b4f60109ee7c4b174fcf92bd4ef9f9050d97008e1c05692d",
       "triggers": [
         "authentication",
         "oauth",
@@ -633,6 +754,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "2988a67d53f53d4435a5c3d1395dfb2bc95ee6bfdcca71ae128cdaa153e9a637",
       "triggers": [
         "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view"
       ]
@@ -646,6 +770,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "0568549dcbea1d4e0a3b5a3bc0b3a2b35a394e6b1eced2232071c1544d47e40a",
       "triggers": [
         "production incident outage recovery"
       ]
@@ -659,6 +786,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "d2f463a2c276a768865fb4ed55d0d7590ea141151dc78854f84039c9c5aa39c1",
       "triggers": [
         "third party integration adapter connector"
       ]
@@ -672,6 +802,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "ab340a4959386ece6b616aa377151a6f95e52ade8179859a96e53b8872811856",
       "triggers": [
         "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability"
       ]
@@ -683,6 +816,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "3b6a1d04c00eb1c7e06ac96b9c5018c741efc75bd3b7409b48360808576ec854",
       "triggers": [
         "research",
         "strategy",
@@ -699,6 +835,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "c607f3d12c4f846c7893efb2a1e2c91c83db9c5163eb8dc2ba81667281dc9957",
       "triggers": [
         "complex",
         "autonomous",
@@ -717,6 +856,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "ec3f2ac94a8fb1296edce4a1860a492d3837cc62a02d9fa687404c32f1b30ff7",
       "triggers": [
         "test",
         "strategy",
@@ -732,6 +874,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "4bc11e5894ad78fa52ef81c4e40d422e021e31db8160cf8c37b61519e6aff52d",
       "triggers": [
         "explicit",
         "user",
@@ -751,6 +896,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "4c7837b5cf887f6b3bf8ece504557875ff6f7e9e5e3ef0b64ad87d5b94f13bd9",
       "triggers": [
         "rename",
         "migration",
@@ -767,6 +915,9 @@
       "aliases": [],
       "availability": "major-repo",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "6235a4ecd73748c0196d2559658b38c1173b3edf7133306946c6f228e959e89f",
       "triggers": [
         "major",
         "self",
@@ -786,6 +937,8 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "github:anthropics/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "build",
         "or",
@@ -801,6 +954,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "17670d83b4b72e3411a1adc85d0ff0473a407a7c09e10ed7f5bd33ffa57a1d7c",
       "triggers": [
         "mcp",
         "connector",
@@ -824,6 +980,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "58fa6ef11ce4902bf765e5717cf2ade333507ce2e2933004f1318bb946c1e40f",
       "triggers": [
         "data schema platform migration"
       ]
@@ -835,6 +994,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "fd582e7011d284903c009207b71c381fd0af41184d2eed5b4c58d6c8656729dd",
       "triggers": [
         "always",
         "on",
@@ -852,6 +1014,9 @@
       "aliases": [],
       "availability": "all-product-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "97a7c38af7f2cef23509817aec3053e219797cbe1714090f35548b165d54cacb",
       "triggers": [
         "operator",
         "or",
@@ -868,6 +1033,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "b241c336d9c45de0c7b018711c7e187801e8cc6d2b9dc4373ab227c95a90d5d6",
       "triggers": [
         "logging metrics tracing observability"
       ]
@@ -879,6 +1047,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "9f41ced2d652a918b9f0e60dc4edfd3464489990c0ab7759155bfc616cc89dd1",
       "triggers": [
         "project",
         "start",
@@ -896,6 +1067,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "917cb961113fcb2c47a90ea1d1c752c2602eecc44961c15809944df266eccf67",
       "triggers": [
         "operations process improvement workflow efficiency"
       ]
@@ -907,6 +1081,8 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "github:openai/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "pdf",
         "task"
@@ -919,6 +1095,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "22729c31700c1700ccf3147963095db3c0d3d64083dbe38afcb3545faae8ab90",
       "triggers": [
         "generated",
         "pdf",
@@ -934,6 +1113,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "2de21119474ffd1f4aef68998a27ef886cfffa3446137a51cd6f252038964422",
       "triggers": [
         "performance latency throughput optimize"
       ]
@@ -945,6 +1127,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "0aaadd9303e8846ec5db38377635cc7f1d26c67882e1f56af68faf5b67342943",
       "triggers": [
         "measured",
         "slow",
@@ -964,6 +1149,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "c0bf260db77ff430f19e95c775045acfadbd32264d9b3cc6f895c9d83b9e1249",
       "triggers": [
         "engineering implementation planning task breakdown"
       ]
@@ -975,6 +1163,8 @@
       "aliases": [],
       "availability": "web-projects",
       "source": "github:openai/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "real",
         "browser",
@@ -990,6 +1180,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "3d3d5244065c5e15d227eefe2d9c9b24d562ed832a57a645f200a5fb4dfb185b",
       "triggers": [
         "presentation",
         "slide",
@@ -1022,6 +1215,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "d5d0ea24ac5278d0b5363d28f532b24d4d8224da0fae29479b13b48b55f60031",
       "triggers": [
         "new",
         "subsystem",
@@ -1053,6 +1249,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "c2709d9d8f250b364846bf16d0946c4316958f1f3caea5a347cc0e14589a2072",
       "triggers": [
         "product management discovery roadmap prioritisation"
       ]
@@ -1064,6 +1263,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "cc13e8ffcead955f107587c13259a6093023b4dfb3977a4c0befa2cc3f0d311d",
       "triggers": [
         "named",
         "project",
@@ -1085,6 +1287,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "e79e2ed6cc9a8962265e33469e14e2c057e451a3403c7cb5937d950171d3a47a",
       "triggers": [
         "project",
         "start"
@@ -1097,6 +1302,9 @@
       "aliases": [],
       "availability": "ui-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "5cf600aaf9521d387a1cd696391cbc56d6320f1aff53fede4db3bf5eabf59cb4",
       "triggers": [
         "multiple",
         "credible",
@@ -1113,6 +1321,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "a89703aa74bfb0df4b8e1fbd43d2a519a36817701ce1212e4cd1e66aa82fde3c",
       "triggers": [
         "account reconciliation close financial statements"
       ]
@@ -1124,6 +1335,9 @@
       "aliases": [],
       "availability": "web-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "e1ae1f3842ed364ef434a11fb6e6ff033fa644d9a2688bd0f35413eba79f0b99",
       "triggers": [
         "all",
         "web",
@@ -1146,6 +1360,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "e0bd0d38b36896b114dae8b7329c85b6e725358f8a152d086da9a5b39d712e25",
       "triggers": [
         "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness"
       ]
@@ -1157,6 +1374,9 @@
       "aliases": [],
       "availability": "web-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "2256bf091560621dbc34752872bdc39e2910098929a88e4bc8ee67a1e1c4a151",
       "triggers": [
         "gsap",
         "scrolltrigger",
@@ -1182,6 +1402,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "4086398c67fe53c857781be7b2f4b3b051a2bc750b646dc59e66a68b27a7b3eb",
       "triggers": [
         "reusable asset component template package discovery reuse"
       ]
@@ -1195,6 +1418,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "ef13dafcc32aefe943491d3f1281b49bf3781274f5c0d3c3c3422ee6ba436235",
       "triggers": [
         "code review implementation review"
       ]
@@ -1209,6 +1435,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "47deeaf5daf7115863b84889d72cafe1e2ef8097353cbb6608815bf46f2d1668",
       "triggers": [
         "bug",
         "failure",
@@ -1224,6 +1453,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "355f351d0699923ab2ca5422166a081cd234d04d35a64f953170adbdc175ee4d",
       "triggers": [
         "sales commercial pipeline customer revenue"
       ]
@@ -1237,6 +1469,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "b05e598df866b1f7373f66a6cc3c70505cff57517daa36ef7d95c482e9924c25",
       "triggers": [
         "security audit vulnerability review"
       ]
@@ -1248,6 +1483,8 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "github:openai/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "material",
         "security",
@@ -1261,6 +1498,9 @@
       "aliases": [],
       "availability": "web-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "994c5c37baa1ae2f6afa1bba419fb618107820a557e19e6b1e30628f74cae787",
       "triggers": [
         "seo",
         "search",
@@ -1306,6 +1546,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "f6b420976dc8012c6e79e71c1bd4104ee8c8c6bbfa1fb599673063a1989db27c",
       "triggers": [
         "architecture",
         "or",
@@ -1319,6 +1562,8 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "github:anthropics/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "create",
         "evaluate",
@@ -1338,6 +1583,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "69a63167e2304f3a14f3afd69dc7177b88577007bc9b5b3847e4e22d2ab4d66d",
       "triggers": [
         "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
       ]
@@ -1349,6 +1597,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "0db5398717f8e70aadfdcb859106a40f30e17539b3e3845b89d8eae47a876bd7",
       "triggers": [
         "start",
         "of",
@@ -1366,6 +1617,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "4989095eb0defeefc1acb297ab3e1543002121f93e2d032837565c0cfe38593e",
       "triggers": [
         "reusable",
         "successful",
@@ -1385,6 +1639,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "45710a15b3e6563b650d02ca7dbc1825bac5ec2ac25f122c7c8af7c146e25e97",
       "triggers": [
         "software implementation feature bug code engineering"
       ]
@@ -1396,6 +1653,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "d8b98acb021768f5a51d04f18573e6e5c4bdbef9f0c33ee245e0c996c8c82ed6",
       "triggers": [
         "api",
         "scraping",
@@ -1411,6 +1671,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "d410adc756c8ec79d1f33cd5b5d398ce8c1ae408792e65386822ecc28975a747",
       "triggers": [
         "named",
         "url",
@@ -1431,6 +1694,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "aee2c6e5e60b13a5a38666f784c9dcdddb76ac08d1948f0303dd4430e27337df",
       "triggers": [
         "quality gate staged validation release controls"
       ]
@@ -1444,6 +1710,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "e9aa9a07d2d0c32f4e5eb0330f89e649a55105f43a5a34f691d921898eb552ab",
       "triggers": [
         "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators"
       ]
@@ -1457,6 +1726,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "3b670108b24443ab00aa2b751349088bffb97a7829ce0e465021b3ce3b571dfe",
       "triggers": [
         "test driven development regression test"
       ]
@@ -1468,6 +1740,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "b05e1826293757152e4ab1f93ab99edfc5c0706433e30486fe336b83692c7ca5",
       "triggers": [
         "repeated",
         "retrieval",
@@ -1488,6 +1763,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "f40f7843eb6e0c8f6b3ad578a7a922834917a4a79095b5f3f5ddfddb1d8dc202",
       "triggers": [
         "valuation investment merger acquisition financial model"
       ]
@@ -1503,6 +1781,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "current Vercel CLI token authentication project environment deployment configuration guidance"
       ]
@@ -1517,6 +1797,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "current React component composition compound components state props guidance"
       ]
@@ -1528,6 +1810,8 @@
       "aliases": [],
       "availability": "vercel-projects",
       "source": "github:openai/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "preview",
         "or",
@@ -1548,6 +1832,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "vercel",
         "performance",
@@ -1569,6 +1855,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "current React Next.js performance rendering bundle server guidance"
       ]
@@ -1583,6 +1871,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "current React Native mobile list navigation animation guidance"
       ]
@@ -1597,6 +1887,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "current React view transitions animation navigation guidance"
       ]
@@ -1610,6 +1902,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "a3f09268517ec0617d79d415fcc66d98631530caf1d6c805cf073793205c928e",
       "triggers": [
         "verify validate acceptance evidence"
       ]
@@ -1621,6 +1916,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "725325807c66eab912d8c6336caef70bdc76aee436968a5f0ac7d89419bfc448",
       "triggers": [
         "planning",
         "or",
@@ -1638,6 +1936,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "current web design accessibility UX performance guidance"
       ]
@@ -1649,6 +1949,8 @@
       "aliases": [],
       "availability": "web-projects",
       "source": "github:anthropics/skills",
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 19,
       "triggers": [
         "browser",
         "or",
@@ -1663,6 +1965,9 @@
       "aliases": [],
       "availability": "web-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "98838f70ba6e073d991aca0744056cec32bebd6ea63f063361c4759d5042d04a",
       "triggers": [
         "website",
         "landing",
@@ -1685,6 +1990,9 @@
       "aliases": [],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "cd1a61cd2f9f376a21c475e94afd2b958f7c0fd4e258e27cfa6370f4501b3d9d",
       "triggers": [
         "project",
         "create",
@@ -1714,6 +2022,9 @@
       ],
       "availability": "all-projects",
       "source": "major-internal",
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 19,
+      "contentSha256": "737bd51b5d4e3d1e4f93621b2db3b22b8913761e4e38221352915355d74ce1f1",
       "triggers": [
         "git worktree isolated concurrent writer branch"
       ]
@@ -1728,6 +2039,8 @@
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
+      "sourceKind": "VENDOR_LIVE",
+      "registryVersion": 19,
       "triggers": [
         "current Vercel writing copy content clarity voice structure guidance"
       ]
