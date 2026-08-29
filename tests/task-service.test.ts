@@ -225,6 +225,15 @@ describe('completion proof and guarded completion transition', () => {
       }).review,
     ).toBe('independent');
 
+    const accessControl = assessSupervisorAdmissionRisk({
+      outcome: 'Fix session access control for signed-in users',
+      policy: workshopPolicy,
+    });
+    expect(accessControl).toMatchObject({
+      classification: 'high_consequence',
+      materialRiskCriteria: ['security'],
+    });
+
     const unavailable = assessSupervisorAdmissionRisk({ outcome: 'Ship it' });
     expect(unavailable.classification).toBe('unavailable');
     expect(
@@ -798,8 +807,20 @@ describe('completion proof and guarded completion transition', () => {
         db,
         { repoPath: '~/Projects/demo' },
         { status: 'done', summary: 'canonical proof passed', taskId: task.id },
+        { liveHead: candidateHead },
       ),
     ).toMatchObject({ ok: true, taskId: task.id });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/demo' },
+        { status: 'done', summary: 'stale canonical proof', taskId: task.id },
+        { liveHead: 'b'.repeat(40) },
+      ),
+    ).toMatchObject({
+      ok: false,
+      failures: ['live repository head does not match the canonical task frozen candidate head'],
+    });
     expect(
       coordinatorDonePromotionProof(
         db,

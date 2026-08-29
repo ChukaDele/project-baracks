@@ -90,6 +90,8 @@ export interface GatewayExecuteRequest {
 export interface GatewayOptions {
   /** Mandatory, non-empty for an executing gateway. Canonicalised per call. */
   allowedRoots: readonly string[];
+  /** Optional writable subset of allowedRoots for host containment. */
+  writableRoots?: readonly string[];
   /** Provider/runtime/config roots that may be read but never written. */
   readOnlyRoots?: readonly string[];
   /** Must carry a non-empty allowedExecutables list. */
@@ -459,6 +461,7 @@ export class ExecutionGateway {
         canonicalExecutable: trusted!.canonicalPath,
         args: request.args,
         allowedRoots: this.options.allowedRoots,
+        ...(this.options.writableRoots ? { writableRoots: this.options.writableRoots } : {}),
         ...(this.options.readOnlyRoots ? { readOnlyRoots: this.options.readOnlyRoots } : {}),
       });
     } catch (error) {

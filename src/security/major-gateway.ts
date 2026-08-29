@@ -84,6 +84,8 @@ export interface MajorGatewayRequest {
   args: readonly string[];
   cwd: string;
   allowedRoots: readonly string[];
+  /** Keep cwd readable but remove it from the host containment writable roots. */
+  readOnlyWorkspace?: boolean;
   timeoutMs?: number;
   parseLine?: (line: string) => ProviderEvent | null;
   detectRateLimit?: (text: string) => boolean;
@@ -441,7 +443,8 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       opened.sqlite.close();
     }
   }
-  const roots = [...new Set(request.allowedRoots.map((root) => resolve(root)))];
+  const admittedSourceRoots = new Set(request.allowedRoots.map((root) => resolve(root)));
+  const roots = [...admittedSourceRoots];
   let baseEnv: NodeJS.ProcessEnv = {};
   if (!backendEnabled) {
     const projectKey = createHash('sha256').update(resolve(request.cwd)).digest('hex').slice(0, 24);
@@ -479,6 +482,9 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
   const approvalConsumerId = `provider-action-${randomUUID()}`;
   const gateway = new ExecutionGateway({
     allowedRoots: roots,
+    ...(request.readOnlyWorkspace
+      ? { writableRoots: roots.filter((root) => !admittedSourceRoots.has(root)) }
+      : {}),
     ...(trusted
       ? {
           readOnlyRoots: [dirname(trusted.canonicalPath), ...providerReadOnlyRoots(executable)],

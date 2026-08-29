@@ -143,6 +143,16 @@ installation and installed behavior proof follow normal merge.
   work requires independent review, and missing classification fails closed at higher risk.
 - After a post-pending provider review returns, Major re-reads repository HEAD immediately before
   receipt creation/application and reopens the claim on any mismatch or unreadable head.
+- Post-pending review dispatch is read-only at both provider authority and host filesystem
+  containment boundaries. Major also freezes and rechecks the complete source-tree digest before
+  accepting the receipt, so dirty or untracked mutations cannot hide behind an unchanged HEAD.
+- Canonical task completion compares the live repository HEAD with the task's frozen candidate HEAD
+  before creating pending completion. Review evidence and task promotion therefore share one SHA.
+- Project grades cannot be created or refreshed from a historical receipt after its pending claim
+  has closed; the current claim, exact head, and one Major-owned dispatch remain causal authority.
+- Typed risk admission recognizes authentication, sessions, access control, identity, tokens,
+  privileges, privacy, and related security objectives as consequential. The independent reviewer
+  receives the frozen objective, promotion contract, and structured completion evidence.
 - No-task promotion contracts are deterministically classified from Major-owned operation facts
   before dispatch; material-risk proof uses exact structured criterion/evidence records persisted in
   pending completion rather than matching free-text prefixes.
@@ -210,6 +220,15 @@ installation and installed behavior proof follow normal merge.
   outcome/policy risk assessment with conservative legacy/unavailable migration. The affected gate
   passed 99/99 focused tests across six files plus typecheck; the full matrix remains intentionally
   unrun and the account-label IMPORTANT remains non-blocking.
+- Read-only causal-review repair: the host containment profile now admits source roots for reads but
+  reserves writes for runtime scratch roots; post-review source hashing detects same-HEAD mutations;
+  task pending completion checks the live frozen SHA; closed claims cannot replay receipts into
+  grades; and expanded typed security admission feeds a complete frozen review prompt. The affected
+  final gate passed 91/91 focused tests across four ordinary files plus typecheck, targeted source
+  lint, formatting, and diff checks. The resource-only containment file passed 6 non-Seatbelt checks;
+  its 7 sandbox-dependent checks (including the new read-only regression and six pre-existing checks)
+  could not apply nested Seatbelt in the leased sandbox and returned `sandbox_apply: Operation not
+  permitted`, so runtime containment proof remains for the parent exact-head validation boundary.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -258,6 +277,10 @@ installation and installed behavior proof follow normal merge.
 - Independent review regression: `09a1b313` checked exact HEAD only before provider dispatch and
   classified admission without typed outcome/project-policy facts. Focused regressions now protect
   the second pre-receipt HEAD read and bounded/substantive/consequential/unavailable contracts.
+- Independent review regression: `4a245e1a` left the post-claim reviewer able to mutate admitted
+  source roots, compared only HEAD rather than the source tree, did not align live task HEAD before
+  pending completion, allowed closed-claim grade replay, and under-classified common auth/session
+  objectives. Focused boundary regressions now protect each causal and read-only seam.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

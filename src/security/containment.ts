@@ -13,6 +13,8 @@ export interface ContainmentRequest {
   canonicalExecutable: string;
   args: readonly string[];
   allowedRoots: readonly string[];
+  /** Subset of allowedRoots that descendants may mutate. Defaults to all allowed roots. */
+  writableRoots?: readonly string[];
   readOnlyRoots?: readonly string[];
   allowNetworkOutbound?: boolean;
   allowCredentialServices?: boolean;
@@ -70,6 +72,7 @@ function existingCanonicalRoots(roots: readonly string[]): string[] {
  */
 function seatbeltProfile(request: ContainmentRequest): string {
   const roots = canonicalRoots(request.allowedRoots);
+  const writableRoots = canonicalRoots(request.writableRoots ?? request.allowedRoots);
   const readOnlyRoots = canonicalRoots(request.readOnlyRoots ?? []);
   const systemReadRoots = existingCanonicalRoots([
     '/Library/Apple/usr',
@@ -151,7 +154,7 @@ function seatbeltProfile(request: ContainmentRequest): string {
     ...readOnlyRoots.map((root) => fileRule('allow file-read*', root)),
     ...readOnlyRoots.map((root) => fileRule('allow file-read-data', root)),
     ...exactExecutableRoots.map((path) => `(allow file-read* (literal ${schemeString(path)}))`),
-    ...roots.map((root) => `(allow file-write* (subpath ${schemeString(root)}))`),
+    ...writableRoots.map((root) => `(allow file-write* (subpath ${schemeString(root)}))`),
     `(allow file-write* (literal ${schemeString('/dev/null')}))`,
     ...(request.allowNetworkOutbound === false ? [] : ['(allow network-outbound)']),
   ];

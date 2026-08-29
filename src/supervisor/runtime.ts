@@ -13,6 +13,7 @@ import { join, resolve } from 'node:path';
 import { openDb, type DbConn } from '../db/client.js';
 import {
   evaluateTaskPromotionProof,
+  parseCompletionCriteria,
   resolveCanonicalTaskBinding,
   type CanonicalTaskBinding,
 } from '../domain/completion.js';
@@ -89,6 +90,7 @@ import {
   recordPerformanceObservation,
 } from '../insights/performance-history.js';
 import { configuredExecutionPath, executionPathStatus } from '../execution/path.js';
+import { hashSourceWorkspaceTree } from '../execution/workspace-transfer.js';
 
 export { parseWorkerReport } from './worker-report.js';
 
@@ -96,6 +98,7 @@ export function coordinatorDonePromotionProof(
   db: DbConn,
   goal: Pick<SupervisorGoal, 'repoPath' | 'promotionContract'>,
   report: WorkerReport,
+  options: { liveHead?: string | undefined } = {},
 ) {
   if (report.status !== 'done') return undefined;
   const resolved = resolveCanonicalTaskBinding(db, goal.repoPath);
@@ -180,6 +183,20 @@ export function coordinatorDonePromotionProof(
       failures: ['done completion must cite the disclosed canonical taskId'],
       checkedAt: new Date().toISOString(),
     };
+  }
+  const progressive = parseCompletionCriteria(
+    resolved.binding.frozenCriteriaJson,
+  ).progressiveValidation;
+  if (progressive) {
+    const liveHead = options.liveHead ?? exactRepositoryHead(goal.repoPath);
+    if (liveHead !== progressive.candidateHead) {
+      return {
+        taskId: resolved.binding.taskId,
+        ok: false,
+        failures: ['live repository head does not match the canonical task frozen candidate head'],
+        checkedAt: new Date().toISOString(),
+      };
+    }
   }
   return evaluateTaskPromotionProof(db, {
     taskId: resolved.binding.taskId,
@@ -977,6 +994,7 @@ async function runPendingCompletionReview(
   }
   const reviewStartedAt = new Date().toISOString();
   const dispatchId = randomUUID();
+  const sourceTreeDigest = hashSourceWorkspaceTree(goal.repoPath);
   updateGoal(goal.id, {
     activePid: process.pid,
     lastStartedAt: reviewStartedAt,
@@ -996,10 +1014,14 @@ async function runPendingCompletionReview(
     timeoutMs: maxTimeoutMs ?? 15 * 60 * 1000,
     modelRef: selection.modelRef,
     accountLabel: selection.accountLabel,
+    readOnly: true,
     prompt:
       `Independently review the pending completion claim for project ${goal.project}.\n` +
       `Goal ID: ${goal.id}\nExact source head: ${pending.sourceHead}\n` +
-      `Claim: ${pending.summary}\n` +
+      `Frozen objective: ${goal.goal}\n` +
+      `Frozen promotion contract: ${JSON.stringify(pending.promotionContract)}\n` +
+      `Structured completion evidence: ${JSON.stringify({ taskId: pending.taskId, promotionCheckedAt: pending.promotionCheckedAt, promotionEvidence: pending.promotionEvidence })}\n` +
+      `Canonical task ID: ${pending.taskId ?? 'none'}\nClaim: ${pending.summary}\n` +
       `Use read-only exact-head checks. Do not implement, merge, install, or trust the completing worker's conclusion.\n` +
       `End with exactly one provider-owned line: MAJOR_RESULT: {"status":"active","summary":"review summary","independentReview":{"purpose":"independent_completion_review","goalId":"${goal.id}","sourceHead":"${pending.sourceHead}","verdict":"pass|fail","evidence":"specific evidence"}}`,
   });
@@ -1013,7 +1035,12 @@ async function runPendingCompletionReview(
     });
     return;
   }
-  const changedHeadPatch = postReviewHeadChangePatch(goal.repoPath, pending.sourceHead);
+  const changedHeadPatch = postReviewSourceChangePatch(
+    goal.repoPath,
+    pending.sourceHead,
+    sourceTreeDigest,
+    outcome.workspaceMutated,
+  );
   if (changedHeadPatch) {
     updateGoal(goal.id, changedHeadPatch);
     return;
@@ -1041,18 +1068,26 @@ async function runPendingCompletionReview(
 
 /** Re-read exact HEAD after the provider returns and fail closed before any
  * receipt is recorded or applied. Undefined/unreadable HEAD is also stale. */
-export function postReviewHeadChangePatch(
+export function postReviewSourceChangePatch(
   repoPath: string,
   expectedHead: string,
+  expectedSourceTreeDigest: string,
+  workspaceMutated?: boolean,
 ): Partial<SupervisorGoal> | undefined {
-  if (exactRepositoryHead(repoPath) === expectedHead) return undefined;
+  let unchanged = workspaceMutated !== true && exactRepositoryHead(repoPath) === expectedHead;
+  try {
+    unchanged = unchanged && hashSourceWorkspaceTree(repoPath) === expectedSourceTreeDigest;
+  } catch {
+    unchanged = false;
+  }
+  if (unchanged) return undefined;
   return {
     status: 'active',
     activePid: undefined,
     pendingCompletion: undefined,
     lastFinishedAt: new Date().toISOString(),
     lastSummary:
-      'Pending completion was reopened because the repository head changed during independent review.',
+      'Pending completion was reopened because the repository or source tree changed during independent review.',
     nextRunAt: new Date().toISOString(),
   };
 }
@@ -1415,7 +1450,9 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       const completionState = openDb();
       let promotionProof: ReturnType<typeof coordinatorDonePromotionProof>;
       try {
-        promotionProof = coordinatorDonePromotionProof(completionState.db, goal, report);
+        promotionProof = coordinatorDonePromotionProof(completionState.db, goal, report, {
+          liveHead: sourceHead,
+        });
       } finally {
         completionState.sqlite.close();
       }

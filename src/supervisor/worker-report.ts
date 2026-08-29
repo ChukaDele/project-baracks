@@ -64,7 +64,11 @@ export const DEFAULT_SUPERVISOR_PROMOTION_CONTRACT: SupervisorPromotionContract 
 const RISK_CRITERIA: readonly [keyof SdlcRisk, RegExp, string][] = [
   ['touchesAuthority', /authority|permission|policy|promotion|completion|review/i, 'authority'],
   ['touchesPersistence', /database|sqlite|schema|migration|persist|storage/i, 'persistence'],
-  ['touchesSecurity', /security|secret|credential|authentication|authorization/i, 'security'],
+  [
+    'touchesSecurity',
+    /security|secret|credential|\bauth\b|authentication|authorization|login|sign[- ]?in|session|access[- ]?control|identity|token|oauth|mfa|2fa|role|privilege|encryption|privacy|pii/i,
+    'security',
+  ],
   ['externalEffect', /deploy|publish|push|merge|external[_ -]?write/i, 'external effect'],
   ['irreversible', /irreversible|destructive|delete|drop/i, 'irreversibility'],
   ['broadBlastRadius', /shared|global|runtime|installer|broad/i, 'blast radius'],

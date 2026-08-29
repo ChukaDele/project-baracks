@@ -379,12 +379,13 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const provider = validHost(review.provider);
     const resultRaw = review.verdict;
     const evidence = review.evidence;
-    if (goal.pendingCompletion) {
-      applyIndependentCompletionGrade({
-        goalId,
-        receiptId: reviewReceiptId,
-      });
+    if (!goal.pendingCompletion) {
+      throw new Error('project grade requires a current pending completion claim');
     }
+    applyIndependentCompletionGrade({
+      goalId,
+      receiptId: reviewReceiptId,
+    });
     const policy = recordIndependentGrade({
       project: project.project,
       repoPath: project.repoPath,
@@ -393,7 +394,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       evidence,
       goalId,
     });
-    if (resultRaw === 'pass' && goal.pendingCompletion) {
+    if (resultRaw === 'pass') {
       applyIndependentSkillValidation({
         project: project.project,
         repoPath: project.repoPath,

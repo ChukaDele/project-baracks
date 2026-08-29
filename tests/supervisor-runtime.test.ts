@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,7 +10,7 @@ import {
   coordinatorPrompt,
   modelOutcomeForWorker,
   nonSuccessCyclePatch,
-  postReviewHeadChangePatch,
+  postReviewSourceChangePatch,
   parseWorkerReport,
   runForegroundGoal,
   routingDecisionGoalPatch,
@@ -25,6 +26,7 @@ import {
 import type { ProviderInfo } from '../src/providers/types.js';
 import type { CapabilityRecord } from '../src/capabilities/registry.js';
 import { writeCodexUsageReport } from '../src/providers/codex-usage.js';
+import { hashSourceWorkspaceTree } from '../src/execution/workspace-transfer.js';
 import { model } from './helpers.js';
 
 const roots: string[] = [];
@@ -70,12 +72,38 @@ function goal(repoPath: string): SupervisorGoal {
 
 describe('Major coordinator contract', () => {
   it('reopens post-review completion before receipt authority when exact HEAD is unavailable or changed', () => {
-    expect(postReviewHeadChangePatch('/not/a/repository', 'a'.repeat(40))).toMatchObject({
+    const patch = postReviewSourceChangePatch('/not/a/repository', 'a'.repeat(40), 'digest');
+    expect(patch).toMatchObject({
       status: 'active',
       pendingCompletion: undefined,
       activePid: undefined,
-      lastSummary: expect.stringMatching(/head changed during independent review/i),
     });
+    expect(patch?.lastSummary).toMatch(/repository or source tree changed/i);
+  });
+  it('detects source-tree mutation even when the expected digest was frozen before review', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'major-review-tree-'));
+    roots.push(repo);
+    writeFileSync(join(repo, 'proof.txt'), 'before\n');
+    const gitOptions = { cwd: repo, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } };
+    execFileSync('/usr/bin/git', ['init'], gitOptions);
+    execFileSync('/usr/bin/git', ['add', 'proof.txt'], gitOptions);
+    execFileSync(
+      '/usr/bin/git',
+      ['-c', 'user.name=Major Test', '-c', 'user.email=major@example.test', 'commit', '-m', 'base'],
+      gitOptions,
+    );
+    const head = execFileSync('/usr/bin/git', ['rev-parse', 'HEAD'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: gitOptions.env,
+    }).trim();
+    const digest = hashSourceWorkspaceTree(repo);
+    writeFileSync(join(repo, 'proof.txt'), 'after\n');
+    const patch = postReviewSourceChangePatch(repo, head, digest);
+    expect(patch).toMatchObject({
+      pendingCompletion: undefined,
+    });
+    expect(patch?.lastSummary).toMatch(/source tree changed/i);
   });
   it('builds a compact terminal receipt without inventing unavailable evidence', () => {
     const receipt = supervisorRunInsight({
