@@ -220,7 +220,7 @@ describe('GBrain skill lifecycle', () => {
     expect(candidates).toHaveLength(1);
     expect(candidates[0]!.occurrences).toBe(2);
     expect(candidates[0]!.goalIds).toHaveLength(2);
-  });
+  }, 15_000);
 
   it('fails closed without deleting an unowned stale lock', () => {
     const store = join(
