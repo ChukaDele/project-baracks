@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -354,11 +354,36 @@ function validatedProjectRegistryPath(cwd: string): string | undefined {
   const canonicalProjectPath = realpathSync(cwd);
   const projectIdentity = createHash('sha256').update(canonicalProjectPath).digest('hex');
   const receiptHome = resolve(majorHome());
-  if (receiptHome === canonicalProjectPath || receiptHome.startsWith(`${canonicalProjectPath}${sep}`))
+  let canonicalReceiptHome: string;
+  try {
+    canonicalReceiptHome = realpathSync(receiptHome);
+  } catch {
+    throw new Error('project installed skill receipt authority is unavailable');
+  }
+  if (
+    canonicalReceiptHome === canonicalProjectPath ||
+    canonicalReceiptHome.startsWith(`${canonicalProjectPath}${sep}`)
+  )
     throw new Error('project installed skill receipt authority must be outside the project tree');
-  const receiptPath = join(receiptHome, 'project-skill-receipts', `${projectIdentity}.json`);
+  const receiptDirectory = join(receiptHome, 'project-skill-receipts');
+  const receiptPath = join(receiptDirectory, `${projectIdentity}.json`);
   if (!existsSync(receiptPath))
     throw new Error(`project installed skill receipt is missing: ${receiptPath}`);
+  try {
+    const canonicalReceiptDirectory = realpathSync(receiptDirectory);
+    const canonicalReceiptPath = realpathSync(receiptPath);
+    if (
+      lstatSync(receiptDirectory).isSymbolicLink() ||
+      lstatSync(receiptPath).isSymbolicLink() ||
+      canonicalReceiptDirectory !== join(canonicalReceiptHome, 'project-skill-receipts') ||
+      dirname(canonicalReceiptPath) !== canonicalReceiptDirectory ||
+      !statSync(canonicalReceiptPath).isFile()
+    ) {
+      throw new Error('unsafe receipt storage');
+    }
+  } catch {
+    throw new Error('project installed skill receipt authority is unsafe or relocated');
+  }
   let receipt: {
     version?: number;
     project?: { canonicalPath?: string; identitySha256?: string };

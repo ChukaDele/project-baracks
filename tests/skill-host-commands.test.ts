@@ -6,6 +6,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -462,6 +463,54 @@ describe('installed host skill commands', () => {
       expect(missingReceipt.stderr).toContain('project installed skill receipt is missing');
     }
     writeFileSync(receiptPath, validReceipt);
+
+    const projectAuthority = join(target, '.project-controlled-major');
+    mkdirSync(join(projectAuthority, 'project-skill-receipts'), { recursive: true });
+    writeFileSync(
+      join(projectAuthority, 'project-skill-receipts', receiptPath.split('/').pop()!),
+      validReceipt,
+    );
+    const redirectedMajorHome = join(home, 'redirected-major-home');
+    symlinkSync(projectAuthority, redirectedMajorHome);
+    const redirected = spawnSync(
+      process.execPath,
+      [
+        resolve('dist/entry.js'),
+        'skill',
+        'resolve',
+        '--task',
+        'Animate this interface',
+        '--skill',
+        'animate',
+        '--json',
+      ],
+      { cwd: target, env: { ...env, MAJOR_HOME: redirectedMajorHome }, encoding: 'utf8' },
+    );
+    expect(redirected.status).not.toBe(0);
+    expect(redirected.stderr).toContain(
+      'project installed skill receipt authority must be outside the project tree',
+    );
+
+    const relocatedReceipt = join(home, 'relocated-receipt.json');
+    writeFileSync(relocatedReceipt, validReceipt);
+    rmSync(receiptPath);
+    symlinkSync(relocatedReceipt, receiptPath);
+    const symlinkedReceipt = cli([
+      'skill',
+      'resolve',
+      '--task',
+      'Animate this interface',
+      '--skill',
+      'animate',
+      '--json',
+    ]);
+    expect(symlinkedReceipt.status).not.toBe(0);
+    expect(symlinkedReceipt.stderr).toContain(
+      'project installed skill receipt authority is unsafe or relocated',
+    );
+    rmSync(receiptPath);
+    writeFileSync(receiptPath, validReceipt);
+
     const search = cli(['skill', 'search', '--query', 'animate']);
     expect(search.status, search.stderr).toBe(0);
     expect(search.stdout).toContain('animate');
