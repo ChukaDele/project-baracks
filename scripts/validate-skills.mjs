@@ -162,12 +162,29 @@ for (const source of vendorCatalog.sources) {
     'vendor',
     'sourceUrl',
     'repositoryUrl',
-    'revision',
     'license',
     'licenseStatus',
     'provenance',
   ]) {
     nonEmpty(row[key], `vendor source ${sourceId}.${key}`);
+  }
+  const revision = object(row.revision, `vendor source ${sourceId}.revision`);
+  if (!['branch', 'tag', 'commit', 'content-digest'].includes(revision.type))
+    fail(`vendor source ${sourceId}.revision.type is invalid`);
+  nonEmpty(revision.value, `vendor source ${sourceId}.revision.value`);
+  if (typeof revision.immutable !== 'boolean')
+    fail(`vendor source ${sourceId}.revision.immutable must be boolean`);
+  const contentIdentity = object(row.contentIdentity, `vendor source ${sourceId}.contentIdentity`);
+  if (!['verified', 'unverified'].includes(contentIdentity.status))
+    fail(`vendor source ${sourceId}.contentIdentity.status is invalid`);
+  if (contentIdentity.status === 'unverified') {
+    if (contentIdentity.type !== null || contentIdentity.value !== null)
+      fail(`vendor source ${sourceId} unverified content identity must not imply an identity`);
+    nonEmpty(contentIdentity.reason, `vendor source ${sourceId}.contentIdentity.reason`);
+  } else {
+    if (!['commit', 'content-digest'].includes(contentIdentity.type))
+      fail(`vendor source ${sourceId}.contentIdentity.type is invalid`);
+    nonEmpty(contentIdentity.value, `vendor source ${sourceId}.contentIdentity.value`);
   }
   for (const key of ['sourceUrl', 'repositoryUrl']) {
     try {

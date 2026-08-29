@@ -94,11 +94,21 @@ describe('live vendor skill sources', () => {
       metadataSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
       provenance: {
         kind: 'vendor-metadata-reference',
+        verification: 'metadata-only',
         sourceId: 'vercel-agent-skills',
-        sourceRevision: 'main',
+        sourceRevision: { type: 'branch', value: 'main', immutable: false },
+        upstreamContentIdentity: {
+          status: 'unverified',
+          type: null,
+          value: null,
+        },
         skillId: 'vercel-optimize',
-        skillVersion: '1.2.0',
+        assertedSkillVersion: '1.2.0',
         licenseStatus: 'DECLARED_REFERENCE_ONLY',
+        metadataIdentity: {
+          type: 'sha256',
+          value: expect.stringMatching(/^[0-9a-f]{64}$/),
+        },
       },
     });
     expect(entry?.contentSha256).toBeUndefined();
@@ -124,15 +134,24 @@ describe('live vendor skill sources', () => {
       state: 'fresh',
       classification: 'actionable-skill',
       harvestDecision: 'USE_LIVE',
-      skillVersion: '1.2.0',
+      assertedSkillVersion: '1.2.0',
     });
     expect(resolved.receipt.evidence[0]?.provenance.vendor).toMatchObject({
       sourceId: 'vercel-agent-skills',
-      revision: 'main',
+      revision: { type: 'branch', value: 'main', immutable: false },
+      upstreamContentIdentity: {
+        status: 'unverified',
+        type: null,
+        value: null,
+      },
       skillId: 'vercel-optimize',
-      skillVersion: '1.2.0',
+      assertedSkillVersion: '1.2.0',
       licenseStatus: 'DECLARED_REFERENCE_ONLY',
       metadataSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      metadataIdentity: {
+        type: 'sha256',
+        value: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
     });
   });
 

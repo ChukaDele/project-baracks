@@ -135,7 +135,9 @@ describe('legacy Skills Library rollback', () => {
     const activated = syncMajorSkills({ sourceRoot: source });
     expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(activated.bundleId);
 
-    expect(() => rollbackMajorSkills()).toThrow('no retained Major Skills Library rollback bundle');
+    expect(() => rollbackMajorSkills()).toThrow(
+      /recorded immediate predecessor .* failed validation/,
+    );
     expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(activated.bundleId);
     expect(existsSync(join(home, 'skill-bundles', 'legacy-v14'))).toBe(false);
     expect(existsSync(join(home, 'dsh-harness'))).toBe(false);

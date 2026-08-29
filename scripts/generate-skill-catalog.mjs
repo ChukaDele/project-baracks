@@ -94,11 +94,12 @@ const entries = registry.entries
         ? {
             sourceId: vendorSource.id,
             sourceRevision: vendorSource.revision,
+            upstreamContentIdentity: vendorSource.contentIdentity,
             sourceUrl: vendorSource.sourceUrl,
             repositoryUrl: vendorSource.repositoryUrl,
-            sourceVersion: vendorSource.version,
+            assertedSourceVersion: vendorSource.version,
             skillId: vendorSkill.id,
-            skillVersion: vendorSkill.version ?? null,
+            assertedSkillVersion: vendorSkill.version ?? null,
             skillUrl: vendorSkill.skillUrl,
             retrievalUrl: vendorSkill.retrievalUrl,
             lastChecked: vendorSource.lastChecked,
@@ -129,7 +130,12 @@ const entries = registry.entries
       applicableProjects: [entry.availability],
       source: entry.source,
       provenance: vendorMetadata
-        ? { kind: 'vendor-metadata-reference', ...vendorMetadata, metadataSha256 }
+        ? {
+            kind: 'vendor-metadata-reference',
+            verification: 'metadata-only',
+            ...vendorMetadata,
+            metadataIdentity: { type: 'sha256', value: metadataSha256 },
+          }
         : (entry.provenance ?? {
             kind: 'canonical-registry',
             registryVersion: registry.version,

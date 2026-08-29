@@ -53,7 +53,7 @@ describe('installed host skill commands', () => {
       expect(targets, target).toContain(target);
   });
 
-  it('executes the generated installed host command artifact in a temporary installation', () => {
+  it('interprets every native artifact and executes its payload through the built installation', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-command-cli-home-'));
     const stage = mkdtempSync(join(tmpdir(), 'major-command-cli-stage-'));
     roots.push(home, stage);
@@ -83,35 +83,64 @@ describe('installed host skill commands', () => {
     const major = join(bin, 'major');
     writeFileSync(
       major,
-      `#!/bin/sh\nexec "${process.execPath}" --import tsx "${resolve('src/entry.ts')}" "$@"\n`,
+      `#!/bin/sh\nexec "${process.execPath}" "${resolve('dist/entry.js')}" "$@"\n`,
     );
     chmodSync(major, 0o755);
-    const artifact = readFileSync(
-      join(home, '.codex', 'prompts', 'major', 'root-cause-qa.md'),
-      'utf8',
-    );
-    const command = artifact.match(/Run `([^`]+)`/)?.[1];
-    expect(command).toBeDefined();
-    const installedCommand = command!.replace(
-      '"$ARGUMENTS"',
-      "'Investigate and verify this regression'",
-    );
     const commandEnv = { ...installEnv, PATH: `${bin}:${process.env.PATH ?? ''}` };
-    const resolveResult = spawnSync('sh', ['-c', installedCommand], {
-      env: commandEnv,
-      encoding: 'utf8',
+    const artifacts = [
+      join(home, '.claude', 'commands', 'major', 'root-cause-qa.md'),
+      join(home, '.codex', 'prompts', 'major', 'root-cause-qa.md'),
+      join(home, '.cursor', 'commands', 'major', 'root-cause-qa.md'),
+      join(home, '.gemini', 'commands', 'major', 'root-cause-qa.toml'),
+    ];
+    const commands = artifacts.map((path) => {
+      const artifact = readFileSync(path, 'utf8');
+      const payload = artifact.match(/Run `([^`]+)`/)?.[1];
+      expect(payload, path).toBeDefined();
+      return payload!
+        .replace('"$ARGUMENTS"', "'Investigate and verify this regression'")
+        .replace('{{args}}', "'Investigate and verify this regression'");
     });
-    expect(resolveResult.status, resolveResult.stderr).toBe(0);
-    const receipt = JSON.parse(resolveResult.stdout) as { receipt: { selected: string[] } };
-    expect(receipt.receipt.selected).toContain('root-cause-qa');
+    for (const installedCommand of commands) {
+      expect(installedCommand).toContain('skill resolve');
+      expect(installedCommand).toContain('--skill root-cause-qa');
+      const resolveResult = spawnSync('sh', ['-c', installedCommand], {
+        env: commandEnv,
+        encoding: 'utf8',
+      });
+      expect(resolveResult.status, resolveResult.stderr).toBe(0);
+      const receipt = JSON.parse(resolveResult.stdout) as { receipt: { selected: string[] } };
+      expect(receipt.receipt.selected).toContain('root-cause-qa');
+    }
 
-    const failed = spawnSync('sh', ['-c', `${installedCommand} --skill missing-skill`], {
+    const discoveryArtifacts = [
+      join(home, '.claude', 'commands', 'major.md'),
+      join(home, '.codex', 'prompts', 'major.md'),
+      join(home, '.cursor', 'commands', 'major.md'),
+      join(home, '.gemini', 'commands', 'major.toml'),
+    ];
+    for (const path of discoveryArtifacts) {
+      const artifact = readFileSync(path, 'utf8');
+      const payload = artifact.match(/`(major skill search[^`]+)`/)?.[1];
+      expect(payload, path).toBeDefined();
+      const command = payload!
+        .replace('"$ARGUMENTS"', "'root cause regression'")
+        .replace('{{args}}', "'root cause regression'");
+      const searchResult = spawnSync('sh', ['-c', command], {
+        env: commandEnv,
+        encoding: 'utf8',
+      });
+      expect(searchResult.status, searchResult.stderr).toBe(0);
+      expect(searchResult.stdout).toContain('root-cause-qa');
+    }
+
+    const failed = spawnSync('sh', ['-c', `${commands[0]} --skill missing-skill`], {
       env: commandEnv,
       encoding: 'utf8',
     });
     expect(failed.status).not.toBe(0);
     expect(failed.stderr).toContain('unknown skill "missing-skill"');
-  });
+  }, 15_000);
 
   it('installs the core project profile transactionally while preserving project-owned skills', () => {
     const target = mkdtempSync(join(tmpdir(), 'major-project-skill-install-'));

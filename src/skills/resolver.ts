@@ -105,17 +105,19 @@ export interface SkillResolutionReceipt {
       contentSha256?: string;
       vendor?: {
         sourceId: string;
-        revision: string;
+        revision: VendorSkillSelection['revision'];
+        upstreamContentIdentity: VendorSkillSelection['contentIdentity'];
         sourceUrl: string;
         repositoryUrl: string;
-        sourceVersion: string | null;
+        assertedSourceVersion: string | null;
         skillId: string;
-        skillVersion?: string;
+        assertedSkillVersion?: string;
         skillUrl: string;
         retrievalUrl: string;
         lastChecked: string;
         licenseStatus: string;
         metadataSha256?: string;
+        metadataIdentity?: { type: 'sha256'; value: string };
       };
     };
   }>;
@@ -806,17 +808,26 @@ function resolveSkillsInternal(input: {
                 vendor: {
                   sourceId: skill.vendor.sourceId,
                   revision: skill.vendor.revision,
+                  upstreamContentIdentity: skill.vendor.contentIdentity,
                   sourceUrl: skill.vendor.sourceUrl,
                   repositoryUrl: skill.vendor.repositoryUrl,
-                  sourceVersion: skill.vendor.sourceVersion,
+                  assertedSourceVersion: skill.vendor.assertedSourceVersion,
                   skillId: skill.vendor.skillId,
-                  ...(skill.vendor.skillVersion ? { skillVersion: skill.vendor.skillVersion } : {}),
+                  ...(skill.vendor.assertedSkillVersion
+                    ? { assertedSkillVersion: skill.vendor.assertedSkillVersion }
+                    : {}),
                   skillUrl: skill.vendor.skillUrl,
                   retrievalUrl: skill.vendor.retrievalUrl,
                   lastChecked: skill.vendor.lastChecked,
                   licenseStatus: skill.vendor.licenseStatus,
                   ...(catalog.get(skill.id)?.metadataSha256
-                    ? { metadataSha256: catalog.get(skill.id)!.metadataSha256 }
+                    ? {
+                        metadataSha256: catalog.get(skill.id)!.metadataSha256,
+                        metadataIdentity: {
+                          type: 'sha256' as const,
+                          value: catalog.get(skill.id)!.metadataSha256!,
+                        },
+                      }
                     : {}),
                 },
               }

@@ -176,6 +176,58 @@ describe('Major hot skill sync', () => {
     expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(second.bundleId);
   });
 
+  it('fails closed when the active bundle has no recorded predecessor', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-no-predecessor-home-'));
+    const source = sourceCopy('major-skill-no-predecessor-source-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    syncMajorSkills({ sourceRoot: source });
+
+    expect(() => rollbackMajorSkills()).toThrow(/does not record an immediate predecessor/);
+  });
+
+  it('does not substitute another retained bundle for a corrupt recorded predecessor', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-corrupt-predecessor-home-'));
+    const sourceA = sourceCopy('major-skill-corrupt-predecessor-a-');
+    const sourceB = sourceCopy('major-skill-corrupt-predecessor-b-');
+    const sourceC = sourceCopy('major-skill-corrupt-predecessor-c-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B rule\n');
+    writeFileSync(join(sourceC, 'adapters', 'skills', 'CODEX.md'), 'bundle C rule\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    const second = syncMajorSkills({ sourceRoot: sourceB });
+    const third = syncMajorSkills({ sourceRoot: sourceC });
+    writeFileSync(join(second.activeBundle, 'bundle.json'), '{}\n');
+
+    expect(() => rollbackMajorSkills()).toThrow(
+      new RegExp(`recorded immediate predecessor ${second.bundleId} .* failed validation`),
+    );
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(third.bundleId);
+    expect(existsSync(first.activeBundle)).toBe(true);
+  });
+
+  it('does not substitute another retained bundle for a missing recorded predecessor', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-missing-predecessor-home-'));
+    const sourceA = sourceCopy('major-skill-missing-predecessor-a-');
+    const sourceB = sourceCopy('major-skill-missing-predecessor-b-');
+    const sourceC = sourceCopy('major-skill-missing-predecessor-c-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B rule\n');
+    writeFileSync(join(sourceC, 'adapters', 'skills', 'CODEX.md'), 'bundle C rule\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    const second = syncMajorSkills({ sourceRoot: sourceB });
+    const third = syncMajorSkills({ sourceRoot: sourceC });
+    rmSync(second.activeBundle, { recursive: true });
+
+    expect(() => rollbackMajorSkills()).toThrow(
+      new RegExp(`recorded immediate predecessor ${second.bundleId} is missing`),
+    );
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(third.bundleId);
+    expect(existsSync(first.activeBundle)).toBe(true);
+  });
+
   it('rejects a changed referenced skill resource when the catalogue identity is stale', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-skill-resource-identity-home-'));
     const source = sourceCopy('major-skill-resource-identity-source-');

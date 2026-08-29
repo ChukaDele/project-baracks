@@ -822,24 +822,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "deploy-to-vercel",
-        "skillVersion": "3.0.0",
+        "assertedSkillVersion": "3.0.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/deploy-to-vercel/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/deploy-to-vercel/SKILL.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "dca51fe57753a533dfdcef178c352b8350649bcfca8a572dbe0757a9b7af151c"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "c68d870b86cb4e7d4aa18af3a170287ec0a2980f65a53b2eaa426fb20a44918d"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "dca51fe57753a533dfdcef178c352b8350649bcfca8a572dbe0757a9b7af151c",
+      "metadataSha256": "c68d870b86cb4e7d4aa18af3a170287ec0a2980f65a53b2eaa426fb20a44918d",
       "triggers": [
         "current Vercel deploy deployment preview claim framework detection guidance"
       ]
@@ -3482,24 +3496,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "vercel-cli-with-tokens",
-        "skillVersion": "1.0.0",
+        "assertedSkillVersion": "1.0.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-cli-with-tokens/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/vercel-cli-with-tokens/SKILL.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "ee35ed0817d70244f51d3e3015373aab47d2bf722a55a740a3a633f4a90bd42d"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "d684e18ec4d72f17df0c6e9a514962718534f4fd3e5b31cd38cdd31d193b2421"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "ee35ed0817d70244f51d3e3015373aab47d2bf722a55a740a3a633f4a90bd42d",
+      "metadataSha256": "d684e18ec4d72f17df0c6e9a514962718534f4fd3e5b31cd38cdd31d193b2421",
       "triggers": [
         "current Vercel CLI token authentication project environment deployment configuration guidance"
       ]
@@ -3527,24 +3555,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "vercel-composition-patterns",
-        "skillVersion": "1.0.0",
+        "assertedSkillVersion": "1.0.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/composition-patterns/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/composition-patterns/SKILL.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "843f6755b1b3e6b6a67756c308da6b6227417d47b43251ea304dbdd0e40c130b"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "6a950d834ba8069caac0a57b03e1647093033f87fa645a82c08ffdb0c6add319"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "843f6755b1b3e6b6a67756c308da6b6227417d47b43251ea304dbdd0e40c130b",
+      "metadataSha256": "6a950d834ba8069caac0a57b03e1647093033f87fa645a82c08ffdb0c6add319",
       "triggers": [
         "current React component composition compound components state props guidance"
       ]
@@ -3607,24 +3649,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "vercel-optimize",
-        "skillVersion": "1.2.0",
+        "assertedSkillVersion": "1.2.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-optimize/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/vercel-optimize/SKILL.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "1f11e312291f81d3861eccc8eeddfe2b9ef23f23980541eae706b60edf88ba74"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "197f895fa3a4c99de3403a42c8c2663e9286f863710c8e1f8d40ac4799737b61"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "1f11e312291f81d3861eccc8eeddfe2b9ef23f23980541eae706b60edf88ba74",
+      "metadataSha256": "197f895fa3a4c99de3403a42c8c2663e9286f863710c8e1f8d40ac4799737b61",
       "triggers": [
         "vercel",
         "performance",
@@ -3659,24 +3715,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "vercel-react-best-practices",
-        "skillVersion": "1.0.0",
+        "assertedSkillVersion": "1.0.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-best-practices/SKILL.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "9756ee411c3b966a9563f7da3dd77c1132254704beedcfd8a2a6a18dadf8cafc"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "e4c5c6230b80f47f465ec72951e26fcfbcaf5c81cb1816260b374ff12c2302a8"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "9756ee411c3b966a9563f7da3dd77c1132254704beedcfd8a2a6a18dadf8cafc",
+      "metadataSha256": "e4c5c6230b80f47f465ec72951e26fcfbcaf5c81cb1816260b374ff12c2302a8",
       "triggers": [
         "current React Next.js performance rendering bundle server guidance"
       ]
@@ -3704,24 +3774,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "vercel-react-native-skills",
-        "skillVersion": "1.0.0",
+        "assertedSkillVersion": "1.0.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-native-skills/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-native-skills/SKILL.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "7f37bf8b906c7b836b9e6f4134ad12e598332b6af928d3b3f355b6639b268e05"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "4bfa3dfb14d0d9ddc48da2192cff70ee3827e6fa506bf439628882bcb5ee43de"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "7f37bf8b906c7b836b9e6f4134ad12e598332b6af928d3b3f355b6639b268e05",
+      "metadataSha256": "4bfa3dfb14d0d9ddc48da2192cff70ee3827e6fa506bf439628882bcb5ee43de",
       "triggers": [
         "current React Native mobile list navigation animation guidance"
       ]
@@ -3749,24 +3833,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "vercel-react-view-transitions",
-        "skillVersion": "1.0.0",
+        "assertedSkillVersion": "1.0.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-view-transitions/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-view-transitions/SKILL.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "cd92bfa9a0ed0efb9deb1933944c1aa3457a6298b4d65f9af4ec29d77bfce5b8"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "cf28cb585a530c884104a8dcba7f7532e0f1d41eac804fb9c9568a36cd2f22aa"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "cd92bfa9a0ed0efb9deb1933944c1aa3457a6298b4d65f9af4ec29d77bfce5b8",
+      "metadataSha256": "cf28cb585a530c884104a8dcba7f7532e0f1d41eac804fb9c9568a36cd2f22aa",
       "triggers": [
         "current React view transitions animation navigation guidance"
       ]
@@ -3862,24 +3960,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "web-design-guidelines",
-        "skillVersion": "1.0.0",
+        "assertedSkillVersion": "1.0.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/web-design-guidelines/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "0be834a2c395785ab2ce0d20d090fef8d7b66e7116d4f3e8f9953feecb96fe35"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "9728bd3d4b3823a3e80deec1c116b370323c5cc652150f6372edb421ea0750e0"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "0be834a2c395785ab2ce0d20d090fef8d7b66e7116d4f3e8f9953feecb96fe35",
+      "metadataSha256": "9728bd3d4b3823a3e80deec1c116b370323c5cc652150f6372edb421ea0750e0",
       "triggers": [
         "current web design accessibility UX performance guidance"
       ]
@@ -4061,24 +4173,38 @@
       "source": "vercel-agent-skills",
       "provenance": {
         "kind": "vendor-metadata-reference",
+        "verification": "metadata-only",
         "sourceId": "vercel-agent-skills",
-        "sourceRevision": "main",
+        "sourceRevision": {
+          "type": "branch",
+          "value": "main",
+          "immutable": false
+        },
+        "upstreamContentIdentity": {
+          "status": "unverified",
+          "type": null,
+          "value": null,
+          "reason": "The recorded upstream revision is a mutable branch and no immutable commit or content digest was verified."
+        },
         "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
         "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
-        "sourceVersion": null,
+        "assertedSourceVersion": null,
         "skillId": "writing-guidelines",
-        "skillVersion": "1.0.0",
+        "assertedSkillVersion": "1.0.0",
         "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/writing-guidelines/SKILL.md",
         "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/writing-guidelines/main/command.md",
         "lastChecked": "2026-08-28T05:36:32.974Z",
         "license": "MIT (upstream README declaration; no top-level LICENSE file)",
         "licenseStatus": "DECLARED_REFERENCE_ONLY",
-        "metadataSha256": "4a3445c773431682fce62e72ea4560d43c9e2831d036327e247c83d7aeacba82"
+        "metadataIdentity": {
+          "type": "sha256",
+          "value": "5849b0c4a6fe74fc697c81d848e0c877572386cde3de084cbbbbbb834ca0692a"
+        }
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
-      "metadataSha256": "4a3445c773431682fce62e72ea4560d43c9e2831d036327e247c83d7aeacba82",
+      "metadataSha256": "5849b0c4a6fe74fc697c81d848e0c877572386cde3de084cbbbbbb834ca0692a",
       "triggers": [
         "current Vercel writing copy content clarity voice structure guidance"
       ]

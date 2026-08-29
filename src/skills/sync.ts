@@ -759,6 +759,9 @@ export function rollbackMajorSkills(): SkillRollbackResult {
   if (!existsSync(current)) throw new Error('no active Major Skills Library bundle');
   const active = realpathSync(current);
   const activeMarker = validateRetainedBundle(active).marker;
+  if (!activeMarker.previousBundle) {
+    throw new Error('active Major Skills Library bundle does not record an immediate predecessor');
+  }
   const candidates = readdirSync(bundlesRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink() && !entry.name.startsWith('.'))
     .map((entry) => join(bundlesRoot, entry.name))
@@ -779,9 +782,14 @@ export function rollbackMajorSkills(): SkillRollbackResult {
     })
     .filter((row): row is { path: string; marker: BundleMarker; mtime: number } => Boolean(row))
     .sort((left, right) => right.mtime - left.mtime);
-  const target =
-    candidates.find((candidate) => candidate.marker.sha === activeMarker.previousBundle) ?? candidates[0];
-  if (!target) throw new Error('no retained Major Skills Library rollback bundle');
+  const target = candidates.find(
+    (candidate) => candidate.marker.sha === activeMarker.previousBundle,
+  );
+  if (!target) {
+    throw new Error(
+      `recorded immediate predecessor ${activeMarker.previousBundle} is missing or failed validation`,
+    );
+  }
   activateBundle(target.path, current, activeMarker.sha);
   return { previousBundle: active, activeBundle: target.path, bundleId: target.marker.sha };
 }
