@@ -204,7 +204,7 @@ export function canonicalGradeProvenance(
     routingReason: 'canonical policy fixture worker',
     sourceHead,
   });
-  setRunStatus(db, reviewed.id, 'succeeded');
+  setRunStatus(db, reviewed.id, 'succeeded', { sessionRef: `worker-session-${fixtureId}` });
   let reviewerProviderId = db
     .select({ id: agentProviders.id })
     .from(agentProviders)
@@ -226,7 +226,7 @@ export function canonicalGradeProvenance(
     routingReason: 'canonical policy fixture review',
     sourceHead,
   });
-  setRunStatus(db, review.id, 'succeeded');
+  setRunStatus(db, review.id, 'succeeded', { sessionRef: `review-session-${fixtureId}` });
   const goalId = input.goalId ?? `goal-${input.id}`;
   const reviewReceiptId = recordIndependentReviewExecution(db, {
     project: input.project,

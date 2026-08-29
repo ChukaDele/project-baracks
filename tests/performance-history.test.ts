@@ -67,7 +67,7 @@ describe('durable performance history', () => {
       routingReason: 'test reviewed execution',
       sourceHead: 'a'.repeat(40),
     });
-    setRunStatus(db, reviewed.id, 'succeeded');
+    setRunStatus(db, reviewed.id, 'succeeded', { sessionRef: 'worker-session' });
     const run = createRun(db, {
       taskId: task.id,
       providerId,
@@ -78,7 +78,18 @@ describe('durable performance history', () => {
       routingReason: 'test independent review',
       sourceHead: 'a'.repeat(40),
     });
-    setRunStatus(db, run.id, 'succeeded');
+    setRunStatus(db, run.id, 'succeeded', { sessionRef: 'review-session' });
+    const sessionlessReview = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelId,
+      modelRef: 'review-model',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'missing provider session evidence',
+      sourceHead: 'a'.repeat(40),
+    });
+    setRunStatus(db, sessionlessReview.id, 'succeeded');
     const review = {
       runEvidence: { runId: 'provider-run', sourceHead: 'a'.repeat(40) },
       independentReview: {
@@ -100,6 +111,25 @@ describe('durable performance history', () => {
       receipt: receipt('2026-08-27T01:00:00.000Z', { ...review, outcome: 'failed' }),
     });
     expect(db.select().from(independentReviewReceipts).all()).toEqual([]);
+    expect(() =>
+      recordIndependentReviewExecution(db, {
+        project: 'github.com/chukadele/project-baracks',
+        goalId: 'goal-1',
+        runId: sessionlessReview.id,
+        reviewedRunId: reviewed.id,
+        taskId: task.id,
+        dispatchId: 'sessionless-dispatch',
+        provider: 'codex',
+        providerId,
+        providerAccountLabel: 'default',
+        sourceHead: 'a'.repeat(40),
+        sourceTreeDigest: 'b'.repeat(64),
+        pendingClaimedAt: '2026-08-27T01:30:00.000Z',
+        reviewStartedAt: '2026-08-27T02:00:00.000Z',
+        executionStatus: 'succeeded',
+        review: review.independentReview,
+      }),
+    ).toThrow(/canonical succeeded task run/);
     expect(() =>
       recordIndependentReviewExecution(db, {
         project: 'github.com/chukadele/project-baracks',

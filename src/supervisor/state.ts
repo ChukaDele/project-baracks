@@ -634,6 +634,7 @@ export function applyIndependentCompletionGrade(input: {
                 purpose: agentRuns.purpose,
                 independenceLoss: agentRuns.independenceLoss,
                 sourceHead: agentRuns.sourceHead,
+                sessionRef: agentRuns.sessionRef,
                 status: agentRuns.status,
               })
               .from(agentRuns)
@@ -650,6 +651,8 @@ export function applyIndependentCompletionGrade(input: {
               canonicalRun.purpose !== 'review' ||
               canonicalRun.independenceLoss !== null ||
               canonicalRun.sourceHead !== receipt.sourceHead ||
+              !canonicalRun.sessionRef?.trim() ||
+              canonicalRun.sessionRef !== receipt.reviewSessionRef ||
               canonicalRun.status !== 'succeeded'
             ) {
               throw new Error(
@@ -662,6 +665,7 @@ export function applyIndependentCompletionGrade(input: {
                 providerId: agentRuns.providerId,
                 purpose: agentRuns.purpose,
                 sourceHead: agentRuns.sourceHead,
+                sessionRef: agentRuns.sessionRef,
                 status: agentRuns.status,
               })
               .from(agentRuns)
@@ -673,6 +677,8 @@ export function applyIndependentCompletionGrade(input: {
               reviewedRun.providerId !== pending.reviewedRun.providerId ||
               !['implementation', 'repair'].includes(reviewedRun.purpose) ||
               reviewedRun.sourceHead !== receipt.sourceHead ||
+              !reviewedRun.sessionRef?.trim() ||
+              reviewedRun.sessionRef !== receipt.reviewedSessionRef ||
               reviewedRun.status !== 'succeeded'
             ) {
               throw new Error(

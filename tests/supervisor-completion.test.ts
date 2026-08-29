@@ -130,7 +130,7 @@ function reviewReceiptId(
     routingReason: 'test reviewed execution',
     sourceHead,
   });
-  setRunStatus(reviewDb.db, reviewed.id, 'succeeded');
+  setRunStatus(reviewDb.db, reviewed.id, 'succeeded', { sessionRef: 'worker-session' });
   const run = createRun(reviewDb.db, {
     taskId,
     providerId: providerRow.id,
@@ -142,7 +142,7 @@ function reviewReceiptId(
     sourceHead,
     ...(independenceLoss ? { independenceLoss } : {}),
   });
-  setRunStatus(reviewDb.db, run.id, 'succeeded');
+  setRunStatus(reviewDb.db, run.id, 'succeeded', { sessionRef: 'review-session' });
   if (current?.pendingCompletion) {
     updateGoal(current.id, {
       pendingCompletion: {

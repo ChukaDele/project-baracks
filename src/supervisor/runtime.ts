@@ -1056,20 +1056,30 @@ async function runPendingCompletionReview(
       `End with exactly one provider-owned line: MAJOR_RESULT: {"status":"active","summary":"review summary","independentReview":{"purpose":"independent_completion_review","goalId":"${goal.id}","sourceHead":"${pending.sourceHead}","verdict":"pass|fail","evidence":"specific evidence"}}`,
   });
   const runStatusState = openDb();
+  const reviewSessionRef = outcome.sessionRef?.trim();
   try {
-    const providerSessionRef = outcome.runId ?? outcome.sessionRef;
     setRunStatus(
       runStatusState.db,
       canonicalReview.runId,
-      outcome.status === 'succeeded'
+      outcome.status === 'succeeded' && reviewSessionRef
         ? 'succeeded'
         : outcome.status === 'timed_out'
           ? 'timed_out'
           : 'failed',
-      providerSessionRef ? { sessionRef: providerSessionRef } : {},
+      reviewSessionRef ? { sessionRef: reviewSessionRef } : {},
     );
   } finally {
     runStatusState.sqlite.close();
+  }
+  if (outcome.status === 'succeeded' && !reviewSessionRef) {
+    updateGoal(goal.id, {
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary:
+        'Independent completion review was refused because the provider returned no durable session identity.',
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+    });
+    return;
   }
   const report = outcome.status === 'succeeded' ? parseWorkerReport(outcome.stdout) : undefined;
   if (!report?.independentReview) {
@@ -1493,25 +1503,38 @@ async function runLockedGoalCycle(
     ...(writerFence ? { writerFence } : {}),
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
+  const workerSessionRef = outcome.sessionRef?.trim();
   if (canonicalWorker) {
     const runState = openDb();
     try {
-      const providerSessionRef = outcome.runId ?? outcome.sessionRef;
       setRunStatus(
         runState.db,
         canonicalWorker.runId,
-        outcome.status === 'succeeded'
+        outcome.status === 'succeeded' && workerSessionRef
           ? 'succeeded'
           : outcome.status === 'timed_out'
             ? 'timed_out'
             : 'failed',
-        providerSessionRef ? { sessionRef: providerSessionRef } : {},
+        workerSessionRef ? { sessionRef: workerSessionRef } : {},
       );
     } finally {
       runState.sqlite.close();
     }
   }
   const workerFinishedAtMs = Date.now();
+  if (outcome.status === 'succeeded' && !workerSessionRef) {
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary:
+        'Worker result was refused because the provider returned no durable session identity.',
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      pendingCompletion: undefined,
+      retryImmediately: false,
+    });
+    return;
+  }
   const finishedSourceIdentity = readSupervisorSourceIdentity(goal.repoPath);
   const sourceHead = finishedSourceIdentity?.sourceHead;
   let terminalReport: ReturnType<typeof parseWorkerReport> = undefined;

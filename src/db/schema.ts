@@ -872,6 +872,8 @@ export const independentReviewReceipts = sqliteTable(
     goalId: text('goal_id').notNull(),
     runId: text('run_id').notNull(),
     reviewedRunId: text('reviewed_run_id').references(() => agentRuns.id),
+    reviewSessionRef: text('review_session_ref'),
+    reviewedSessionRef: text('reviewed_session_ref'),
     /** Canonical Major task/run/provider binding. Nullable only for legacy rows. */
     taskId: text('task_id').references(() => tasks.id),
     providerId: text('provider_id').references(() => agentProviders.id),
@@ -903,6 +905,10 @@ export const independentReviewReceipts = sqliteTable(
     check(
       'independent_review_receipts_distinct_runs',
       sql`reviewed_run_id IS NULL OR reviewed_run_id <> run_id`,
+    ),
+    check(
+      'independent_review_receipts_session_refs_valid',
+      sql`(review_session_ref IS NULL AND reviewed_session_ref IS NULL) OR (trim(review_session_ref) <> '' AND trim(reviewed_session_ref) <> '')`,
     ),
     check('independent_review_receipts_causal', sql`review_started_at >= pending_claimed_at`),
   ],

@@ -330,6 +330,7 @@ function storeGrade(input: {
       status: agentRuns.status,
       sourceHead: agentRuns.sourceHead,
       taskId: agentRuns.taskId,
+      sessionRef: agentRuns.sessionRef,
     })
     .from(agentRuns)
     .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
@@ -342,6 +343,7 @@ function storeGrade(input: {
       purpose: agentRuns.purpose,
       sourceHead: agentRuns.sourceHead,
       taskId: agentRuns.taskId,
+      sessionRef: agentRuns.sessionRef,
     })
     .from(agentRuns)
     .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
@@ -358,7 +360,9 @@ function storeGrade(input: {
     reviewRun.taskId !== reviewedRun.taskId ||
     reviewRun.sourceHead !== reviewedRun.sourceHead ||
     reviewRun.provider !== (input.provider === 'claude' ? 'claude-code' : input.provider) ||
-    reviewRun.accountLabel !== input.providerAccountLabel
+    reviewRun.accountLabel !== input.providerAccountLabel ||
+    !reviewRun.sessionRef?.trim() ||
+    !reviewedRun.sessionRef?.trim()
   ) {
     throw new Error(
       'independent grade requires distinct canonical succeeded reviewed and review runs at the same exact head',
@@ -378,6 +382,8 @@ function storeGrade(input: {
       receipt.goalId !== input.goalId ||
       receipt.runId !== input.reviewExecutionId ||
       receipt.reviewedRunId !== input.reviewedExecutionId ||
+      receipt.reviewSessionRef !== reviewRun.sessionRef ||
+      receipt.reviewedSessionRef !== reviewedRun.sessionRef ||
       !receipt.sourceTreeDigest ||
       receipt.executionStatus !== 'succeeded'
     ) {

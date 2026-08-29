@@ -283,7 +283,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       routingReason: 'implementation',
       sourceHead: candidateHead,
     });
-    setRunStatus(db, implementation.id, 'succeeded');
+    setRunStatus(db, implementation.id, 'succeeded', { sessionRef: 'worker-session' });
     const sameProviderAliasId = newId('aprov');
     db.insert(agentProviders)
       .values({
@@ -304,7 +304,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       sourceHead: candidateHead,
     });
     setRunStatus(db, sameProviderAlias.id, 'succeeded');
-    expect(() => forceComplete()).toThrow(/execution-bound review provenance|selected review/i);
+    expect(() => forceComplete()).toThrow(/execution review provenance|selected review/i);
     const compromised = createRun(db, {
       taskId: task.id,
       providerId,
@@ -316,7 +316,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       sourceHead: candidateHead,
     });
     setRunStatus(db, compromised.id, 'succeeded');
-    expect(() => forceComplete()).toThrow(/execution-bound review provenance|selected review/i);
+    expect(() => forceComplete()).toThrow(/execution review provenance|selected review/i);
 
     const independentProviderId = newId('aprov');
     db.insert(agentProviders)
@@ -334,7 +334,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       sourceHead: candidateHead,
     });
     setRunStatus(db, compromisedIndependent.id, 'succeeded');
-    expect(() => forceComplete()).toThrow(/execution-bound review provenance|selected review/i);
+    expect(() => forceComplete()).toThrow(/execution review provenance|selected review/i);
 
     const cleanProviderId = newId('aprov');
     db.insert(agentProviders)
@@ -350,7 +350,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       routingReason: 'execution-independent same-provider review',
       sourceHead: candidateHead,
     });
-    setRunStatus(db, independent.id, 'succeeded');
+    setRunStatus(db, independent.id, 'succeeded', { sessionRef: 'review-session' });
     recordIndependentReviewExecution(db, {
       project: 'demo',
       goalId: 'goal-progressive-direct-write',
@@ -374,6 +374,11 @@ describe('P1-3 database-enforced completion criteria', () => {
         evidence: 'Major-owned exact-head task review passed',
       },
     });
+    sqlite.prepare(`UPDATE agent_runs SET session_ref = NULL WHERE id = ?`).run(implementation.id);
+    expect(() => forceComplete()).toThrow(/session-bound/);
+    sqlite
+      .prepare(`UPDATE agent_runs SET session_ref = 'worker-session' WHERE id = ?`)
+      .run(implementation.id);
     forceComplete();
     expect(sqlite.prepare(`SELECT status FROM tasks WHERE id = ?`).get(task.id)).toMatchObject({
       status: 'completed',

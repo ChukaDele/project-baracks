@@ -229,6 +229,7 @@ export function recordIndependentReviewExecution(
       taskId: agentRuns.taskId,
       purpose: agentRuns.purpose,
       sourceHead: agentRuns.sourceHead,
+      sessionRef: agentRuns.sessionRef,
       status: agentRuns.status,
     })
     .from(agentRuns)
@@ -239,6 +240,7 @@ export function recordIndependentReviewExecution(
     reviewedRun.taskId !== input.taskId ||
     !['implementation', 'repair'].includes(reviewedRun.purpose) ||
     reviewedRun.sourceHead !== input.sourceHead ||
+    !reviewedRun.sessionRef?.trim() ||
     reviewedRun.status !== 'succeeded'
   ) {
     throw new Error(
@@ -254,6 +256,7 @@ export function recordIndependentReviewExecution(
       purpose: agentRuns.purpose,
       independenceLoss: agentRuns.independenceLoss,
       sourceHead: agentRuns.sourceHead,
+      sessionRef: agentRuns.sessionRef,
       status: agentRuns.status,
     })
     .from(agentRuns)
@@ -269,6 +272,7 @@ export function recordIndependentReviewExecution(
     canonicalRun.purpose !== 'review' ||
     canonicalRun.independenceLoss !== null ||
     canonicalRun.sourceHead !== input.sourceHead ||
+    !canonicalRun.sessionRef?.trim() ||
     canonicalRun.status !== 'succeeded'
   ) {
     throw new Error(
@@ -283,6 +287,8 @@ export function recordIndependentReviewExecution(
       goalId: input.goalId,
       runId: input.runId,
       reviewedRunId: input.reviewedRunId,
+      reviewSessionRef: canonicalRun.sessionRef.trim(),
+      reviewedSessionRef: reviewedRun.sessionRef.trim(),
       taskId: input.taskId,
       dispatchId: input.dispatchId,
       provider: input.provider.trim(),

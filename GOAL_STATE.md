@@ -60,6 +60,9 @@ Latest focused repair evidence: 145/145 affected task-completion, direct-SQL, re
 trust-policy, CLI, runtime, and skill-lifecycle tests passed with typecheck and source lint. Independent
 task completion now requires a Major-owned receipt joining distinct succeeded implementation/repair
 and clean review runs at the exact candidate head; the receipt also freezes the complete tree digest.
+The subsequent session-provenance repair retains the same focused 145/145 gate while additionally
+refusing provider success without a durable session/run reference and snapshotting both canonical run
+session identities into the append-only receipt for service and SQLite comparison.
 
 ## Critical-path dependencies
 
@@ -151,6 +154,10 @@ installation and installed behavior proof follow normal merge.
 - Caller-supplied or synthetic execution identifiers are not trust evidence: policy grading resolves
   both IDs against durable canonical runs and execution grades additionally require the matching
   append-only independent-review receipt.
+- A canonical run ID alone is insufficient provider-execution evidence. Both reviewed and review runs
+  must persist non-empty session identity returned by the provider gateway; receipts snapshot those
+  identities, and trust grading, task completion, supervisor completion, and SQLite authority compare
+  them back to the exact run rows. Same-provider independence remains valid when executions differ.
 - Progressive verification, implementation, repair, and review runs all carry the frozen candidate
   head. SQLite rejects mutation of `source_head` after insert and completion ignores other heads.
 - Unknown no-task scope freezes as substantive at admission; worker output cannot downgrade it to
