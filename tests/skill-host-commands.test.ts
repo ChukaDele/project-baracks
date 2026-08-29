@@ -177,6 +177,31 @@ describe('installed host skill commands', () => {
     expect(readFileSync(sentinel, 'utf8')).toBe('authority sentinel\n');
   });
 
+  it('rejects a production MAJOR_HOME authority override before project mutation', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-canonical-authority-home-'));
+    const target = mkdtempSync(join(tmpdir(), 'major-canonical-authority-target-'));
+    const forged = mkdtempSync(join(tmpdir(), 'major-forged-authority-'));
+    roots.push(home, target, forged);
+    writeFileSync(join(target, 'owned.txt'), 'preserve target\n');
+    const before = JSON.stringify(snapshotTree(target));
+
+    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      env: {
+        ...process.env,
+        HOME: home,
+        MAJOR_HOME: forged,
+        NODE_ENV: 'production',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('MAJOR_HOME override is fixture-only');
+    expect(JSON.stringify(snapshotTree(target))).toBe(before);
+    expect(readdirSync(forged)).toEqual([]);
+  });
+
   it('rejects a redirected receipt directory before project mutation', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-receipt-home-'));
     const target = mkdtempSync(join(tmpdir(), 'major-receipt-target-'));
@@ -571,6 +596,42 @@ describe('installed host skill commands', () => {
       expect(missingReceipt.status).not.toBe(0);
       expect(missingReceipt.stderr).toContain('project installed skill receipt is missing');
     }
+    writeFileSync(receiptPath, validReceipt);
+
+    const forgedAuthority = join(home, 'forged-major-home');
+    mkdirSync(join(forgedAuthority, 'project-skill-receipts'), { recursive: true });
+    writeFileSync(
+      join(forgedAuthority, 'project-skill-receipts', receiptPath.split('/').pop()!),
+      validReceipt,
+    );
+    rmSync(receiptPath);
+    const forgedReceipt = spawnSync(
+      process.execPath,
+      [
+        resolve('dist/entry.js'),
+        'skill',
+        'resolve',
+        '--task',
+        'Animate this interface',
+        '--skill',
+        'animate',
+        '--json',
+      ],
+      {
+        cwd: target,
+        env: {
+          ...env,
+          MAJOR_HOME: forgedAuthority,
+          NODE_ENV: 'production',
+          VITEST: '',
+          VITEST_WORKER_ID: undefined,
+        },
+        encoding: 'utf8',
+      },
+    );
+    expect(forgedReceipt.status).not.toBe(0);
+    expect(forgedReceipt.stderr).not.toContain(forgedAuthority);
+    expect(forgedReceipt.stdout).toBe('');
     writeFileSync(receiptPath, validReceipt);
 
     const projectAuthority = join(target, '.project-controlled-major');

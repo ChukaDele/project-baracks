@@ -25,11 +25,13 @@ const priorGbrainAssetIndex = process.env.MAJOR_GBRAIN_ASSET_INDEX;
 const priorSkillsRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorSkillEvals = process.env.MAJOR_SKILLS_EVALS;
 const priorInjectedFailure = process.env.MAJOR_SKILL_SYNC_FAIL_AFTER;
+const priorInjectedStagedCorruption = process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED;
 
 beforeEach(() => {
   delete process.env.MAJOR_SKILLS_REGISTRY;
   delete process.env.MAJOR_SKILLS_EVALS;
   delete process.env.MAJOR_SKILL_SYNC_FAIL_AFTER;
+  delete process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED;
 });
 
 afterEach(() => {
@@ -43,6 +45,9 @@ afterEach(() => {
   else process.env.MAJOR_SKILLS_EVALS = priorSkillEvals;
   if (priorInjectedFailure === undefined) delete process.env.MAJOR_SKILL_SYNC_FAIL_AFTER;
   else process.env.MAJOR_SKILL_SYNC_FAIL_AFTER = priorInjectedFailure;
+  if (priorInjectedStagedCorruption === undefined)
+    delete process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED;
+  else process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED = priorInjectedStagedCorruption;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -189,6 +194,64 @@ describe('Major hot skill sync', () => {
 
     expect(() => syncMajorSkills({ sourceRoot: source })).toThrow(/symbolic links are forbidden/);
     expect(existsSync(join(home, 'skill-bundles', 'current'))).toBe(false);
+  });
+
+  it.each([
+    ['guidance', 'guidance'],
+    ['skills', 'skills'],
+    ['evals', 'evals'],
+    ['adapters', 'adapters'],
+    ['package', 'package'],
+    ['asset parent', 'templates'],
+  ])('rejects a symlinked %s source path component', (_kind, relativePath) => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-parent-symlink-home-'));
+    const source = sourceCopy('major-skill-parent-symlink-source-');
+    const external = mkdtempSync(join(tmpdir(), 'major-skill-parent-symlink-external-'));
+    roots.push(home, external);
+    process.env.MAJOR_HOME = home;
+    cpSync(join(source, relativePath), join(external, relativePath), { recursive: true });
+    rmSync(join(source, relativePath), { recursive: true });
+    symlinkSync(join(external, relativePath), join(source, relativePath));
+
+    expect(() => syncMajorSkills({ sourceRoot: source })).toThrow(/symbolic links are forbidden/);
+    expect(existsSync(join(home, 'skill-bundles'))).toBe(false);
+  });
+
+  it('rejects staged copy drift before activation and preserves current host artifacts', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-copy-drift-home-'));
+    const sourceA = sourceCopy('major-skill-copy-drift-a-');
+    const sourceB = sourceCopy('major-skill-copy-drift-b-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'trusted A rule\n');
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'trusted B rule\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    const hostRule = join(home, '..', '.codex', 'MAJOR_SKILLS.md');
+    const catalogBefore = readFileSync(join(home, 'skills.catalog.json'), 'utf8');
+    process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED = '1';
+
+    expect(() => syncMajorSkills({ sourceRoot: sourceB })).toThrow(/identity changed during copy/);
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(first.bundleId);
+    expect(readFileSync(hostRule, 'utf8')).toBe('trusted A rule\n');
+    expect(readFileSync(join(home, 'skills.catalog.json'), 'utf8')).toBe(catalogBefore);
+    expect(
+      readdirSync(join(home, 'skill-bundles')).some((name) => name.startsWith('.stage-')),
+    ).toBe(false);
+  });
+
+  it('preflights a symlinked host root before bundle or external mutation', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-host-preflight-home-'));
+    const source = sourceCopy('major-skill-host-preflight-source-');
+    const external = mkdtempSync(join(tmpdir(), 'major-skill-host-preflight-external-'));
+    roots.push(home, external);
+    process.env.MAJOR_HOME = join(home, '.major');
+    writeFileSync(join(external, 'sentinel.txt'), 'external sentinel\n');
+    symlinkSync(external, join(home, '.claude'));
+
+    expect(() => syncMajorSkills({ sourceRoot: source })).toThrow(/symlinked managed host path/);
+    expect(readFileSync(join(external, 'sentinel.txt'), 'utf8')).toBe('external sentinel\n');
+    expect(readdirSync(external)).toEqual(['sentinel.txt']);
+    expect(existsSync(join(home, '.major'))).toBe(false);
   });
 
   it('requires an eval fixture for every canonical catalogue entry', () => {

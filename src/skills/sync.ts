@@ -226,6 +226,32 @@ function filesBelow(root: string): string[] {
   return files.sort();
 }
 
+function assertSourcePath(sourceRoot: string, target: string): void {
+  const root = resolve(sourceRoot);
+  const path = resolve(target);
+  const child = relative(root, path);
+  if (child === '..' || child.startsWith(`..${sep}`) || resolve(root, child) !== path) {
+    throw new Error(`Major skill bundle path escapes its source root: ${target}`);
+  }
+  const rootStat = lstatSync(root);
+  if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+    throw new Error(`Major skill bundle source root must be a real directory: ${root}`);
+  }
+  let cursor = root;
+  for (const component of child.split(sep).filter(Boolean)) {
+    cursor = join(cursor, component);
+    const stat = lstatSync(cursor);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`symbolic links are forbidden in Major skill bundle path components: ${cursor}`);
+    }
+  }
+  const canonicalRoot = realpathSync(root);
+  const canonicalTarget = realpathSync(path);
+  if (canonicalTarget !== canonicalRoot && !canonicalTarget.startsWith(`${canonicalRoot}${sep}`)) {
+    throw new Error(`Major skill bundle path escapes its source root: ${target}`);
+  }
+}
+
 function validateSource(sourceRoot: string): {
   registry: Registry;
   registryPath: string;
@@ -263,6 +289,7 @@ function validateSource(sourceRoot: string): {
     adaptersRoot,
   ]) {
     if (!existsSync(path)) throw new Error(`required skill-bundle source missing: ${path}`);
+    assertSourcePath(sourceRoot, path);
   }
   for (const path of [
     registryPath,
@@ -275,6 +302,7 @@ function validateSource(sourceRoot: string): {
     join(sourceRoot, 'guidance', 'gbrain-reusable-assets.index.json'),
     join(sourceRoot, 'guidance', 'reusable-assets.candidates.json'),
   ]) {
+    assertSourcePath(sourceRoot, path);
     const stat = lstatSync(path);
     if (stat.isSymbolicLink()) {
       throw new Error(`symbolic links are forbidden in Major skill bundles: ${path}`);
@@ -363,9 +391,7 @@ function validateSource(sourceRoot: string): {
     if (!target.startsWith(`${sourceRoot}${sep}`) || !existsSync(target)) {
       throw new Error(`reusable asset locator is unavailable or escapes source: ${asset.locator as string}`);
     }
-    if (!realpathSync(target).startsWith(`${realpathSync(sourceRoot)}${sep}`)) {
-      throw new Error(`reusable asset locator escapes source through a symlink: ${asset.locator as string}`);
-    }
+    assertSourcePath(sourceRoot, target);
   }
   const assetPaths = assetCatalog.assets.map((asset) =>
     resolve(sourceRoot, (asset as Record<string, unknown>).locator as string),
@@ -465,6 +491,90 @@ interface ArtifactReplacement {
   hadTarget: boolean;
 }
 
+function assertSafeHostPath(anchor: string, target: string, targetKind: 'file' | 'directory'): void {
+  const root = resolve(anchor);
+  const path = resolve(target);
+  const child = relative(root, path);
+  if (child === '..' || child.startsWith(`..${sep}`)) {
+    throw new Error(`managed host artifact escapes its trusted root: ${target}`);
+  }
+  let cursor = root;
+  for (const component of ['', ...child.split(sep).filter(Boolean)]) {
+    if (component) cursor = join(cursor, component);
+    let stat;
+    try {
+      stat = lstatSync(cursor);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    if (stat.isSymbolicLink()) throw new Error(`refusing symlinked managed host path: ${cursor}`);
+    const terminal = cursor === path;
+    if (!terminal && !stat.isDirectory()) {
+      throw new Error(`managed host path ancestor must be a directory: ${cursor}`);
+    }
+    if (terminal && targetKind === 'directory' && !stat.isDirectory()) {
+      throw new Error(`managed host directory must be a directory: ${cursor}`);
+    }
+    if (terminal && targetKind === 'file' && !stat.isFile()) {
+      throw new Error(`managed host file must be a regular file: ${cursor}`);
+    }
+  }
+}
+
+function hostRoots(): { home: string; codexHome: string } {
+  const home =
+    process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
+      ? dirname(majorHome())
+      : process.env.HOME;
+  if (!home) throw new Error('HOME is required to activate hot-synced skill host artifacts');
+  const codexHome =
+    process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
+      ? join(home, '.codex')
+      : (process.env.CODEX_HOME ?? join(home, '.codex'));
+  return { home: resolve(home), codexHome: resolve(codexHome) };
+}
+
+function preflightHostSkillArtifacts(): void {
+  const { home, codexHome } = hostRoots();
+  for (const [anchor, path] of [
+    [home, majorHome()],
+    [home, join(home, '.claude')],
+    [home, join(home, '.claude', 'commands')],
+    [codexHome, codexHome],
+    [codexHome, join(codexHome, 'prompts')],
+    [home, join(home, '.cursor')],
+    [home, join(home, '.cursor', 'rules', 'major-skills')],
+    [home, join(home, '.cursor', 'commands')],
+    [home, join(home, '.gemini')],
+    [home, join(home, '.gemini', 'commands')],
+  ] as const) {
+    assertSafeHostPath(anchor, path, 'directory');
+  }
+}
+
+function preflightHostArtifactTargets(ids: string[]): void {
+  const { home, codexHome } = hostRoots();
+  const files: Array<[string, string]> = [
+    [home, join(majorHome(), 'skills.catalog.json')],
+    [home, join(home, '.claude', 'MAJOR_SKILLS.md')],
+    [codexHome, join(codexHome, 'MAJOR_SKILLS.md')],
+    [home, join(home, '.gemini', 'MAJOR_SKILLS.md')],
+    [home, join(home, '.cursor', 'rules', 'major-skills', 'RULE.mdc')],
+  ];
+  for (const [anchor, root, suffix] of [
+    [home, join(home, '.claude', 'commands'), '.md'],
+    [codexHome, join(codexHome, 'prompts'), '.md'],
+    [home, join(home, '.cursor', 'commands'), '.md'],
+    [home, join(home, '.gemini', 'commands'), '.toml'],
+  ] as const) {
+    files.push([anchor, join(root, `major${suffix}`)]);
+    assertSafeHostPath(anchor, join(root, 'major'), 'directory');
+    for (const id of ids) files.push([anchor, join(root, 'major', `${id}${suffix}`)]);
+  }
+  for (const [anchor, path] of files) assertSafeHostPath(anchor, path, 'file');
+}
+
 function stageArtifact(target: string, populate: (stage: string) => void): ArtifactReplacement {
   mkdirSync(dirname(target), { recursive: true });
   const stage = `${target}.major-stage-${process.pid}`;
@@ -526,15 +636,9 @@ function hostSkillArtifactReplacements(
   const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as {
     entries: Array<{ id: string }>;
   };
-  const home =
-    process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
-      ? dirname(majorHome())
-      : process.env.HOME;
-  if (!home) throw new Error('HOME is required to activate hot-synced skill host artifacts');
-  const codexHome =
-    process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
-      ? join(home, '.codex')
-      : (process.env.CODEX_HOME ?? join(home, '.codex'));
+  preflightHostSkillArtifacts();
+  const { home, codexHome } = hostRoots();
+  preflightHostArtifactTargets(catalog.entries.map(({ id }) => id));
   const replacements: ArtifactReplacement[] = [];
   const stageFile = (target: string, content: string) => {
     replacements.push(stageArtifact(target, (stage) => writeFileSync(stage, content)));
@@ -644,6 +748,14 @@ export function validateRetainedBundle(path: string): { marker: BundleMarker; re
   return { marker, registry: validated.registry };
 }
 
+function validateCopiedBundle(path: string, expectedIdentity: string): void {
+  const marker = readBundleMarker(path);
+  const validated = validateSource(path);
+  if (marker.sha !== expectedIdentity || bundleIdentity(path, validated) !== expectedIdentity) {
+    throw new Error('staged Major Skills Library bundle identity changed during copy');
+  }
+}
+
 function quarantineRetainedBundle(path: string): string {
   const root = dirname(path);
   let quarantine = join(root, `.quarantine-${basename(path)}-${Date.now()}`);
@@ -692,6 +804,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   const sourceRoot = resolve(sourceRootInput);
   const validated = validateSource(sourceRoot);
   const bundleId = bundleIdentity(sourceRoot, validated);
+  preflightHostSkillArtifacts();
 
   const bundlesRoot = join(majorHome(), 'skill-bundles');
   const destination = join(bundlesRoot, bundleId);
@@ -779,8 +892,17 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
     )}\n`,
   );
 
-  rmSync(destination, { recursive: true, force: true });
-  renameSync(staged, destination);
+  try {
+    if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED) {
+      writeFileSync(join(staged, 'adapters', 'skills', 'CODEX.md'), 'injected staged corruption\n');
+    }
+    validateCopiedBundle(staged, bundleId);
+    rmSync(destination, { recursive: true, force: true });
+    renameSync(staged, destination);
+  } catch (error) {
+    rmSync(staged, { recursive: true, force: true });
+    throw error;
+  }
   activateBundle(destination, current, previousBundle);
   retainRollbackBundles(bundlesRoot, bundleId, previousBundle);
 
