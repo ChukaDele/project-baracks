@@ -324,6 +324,17 @@ These are independently authored Major workflow contracts, not copied donor impl
 - **Rejected alternatives:** BullMQ/Redis; a Redis-backed lease service; a second queue; an external scheduler; an unfenced time-only reclaim; a new platform, framework or runtime
 - **Evidence:** `src/supervisor/resources.ts`, `tests/resources.test.ts`, `tests/worker-resource-lifecycle.test.ts`, `src/supervisor/worker.ts`, `src/security/major-gateway.ts`, and the retained DSH performance evidence showing high infrastructure wait.
 
+## 2026-08-29 — bounded sequential independent-review failover
+
+- **Capability:** continue an exact-candidate independent review across inconclusive provider availability without weakening review provenance or adding another scheduler
+- **Date:** 2026-08-29
+- **Candidates:** Major's existing foreground continuation, repository writer fence, provider/account router, canonical agent runs and pending-completion state; parallel duplicate reviews; an external queue or retry service; treating provider failure as a code-review BLOCKER
+- **Decision:** WRAP the existing foreground continuation and routing path. Persist each inconclusive attempt on the pending claim, exclude its provider/account capacity key, clear the single dispatch before immediate continuation, and stop after at most three sequential attempts. Keep timeout, crash, missing result, missing verdict and missing session provenance as reviewer-availability evidence; only a provider-owned verdict can pass or fail the implementation.
+- **Reason:** the worker already releases its resource lease in `finally`, the foreground loop already advances authorized work synchronously, and the repository writer fence already prevents parallel integration ownership. Reusing those boundaries yields fresh canonical executions without a duplicate queue, parallel review spend or a synthetic verdict.
+- **Major-specific layer retained:** exact HEAD/tree binding, read-only containment, durable provider session identity, canonical run linkage, same-provider execution independence, provider/account routing, append-only receipt authority and explicit availability exhaustion
+- **Rejected alternatives:** parallel review fan-out; retrying the same capacity indefinitely; converting provider availability into a BLOCKER finding; accepting a result without durable session provenance; adding a queue, daemon, scheduler or external retry dependency
+- **Evidence:** `src/supervisor/runtime.ts`, `src/supervisor/state.ts`, and focused classification/three-attempt continuation cases in `tests/supervisor-runtime.test.ts`.
+
 ## 2026-08-28 — Vercel live-vendor skill source and section disclosure
 
 - **Capability:** resolve current Vercel and framework guidance without copying the vendor skill pack into Major prompts or creating a second skill/runtime authority.

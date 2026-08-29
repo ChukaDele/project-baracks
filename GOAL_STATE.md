@@ -63,6 +63,10 @@ and clean review runs at the exact candidate head; the receipt also freezes the 
 The subsequent session-provenance repair retains the same focused 145/145 gate while additionally
 refusing provider success without a durable session/run reference and snapshotting both canonical run
 session identities into the append-only receipt for service and SQLite comparison.
+Bounded review failover now reuses the single-dispatch foreground continuation: inconclusive timeout,
+crash, missing-result, missing-verdict, or missing-session attempts are durably recorded, their capacity
+key is excluded, and the next fresh review runs only after the prior lease is released. Three
+inconclusive attempts produce an availability checkpoint, never an implementation BLOCKER verdict.
 
 ## Critical-path dependencies
 
@@ -158,6 +162,10 @@ installation and installed behavior proof follow normal merge.
   must persist non-empty session identity returned by the provider gateway; receipts snapshot those
   identities, and trust grading, task completion, supervisor completion, and SQLite authority compare
   them back to the exact run rows. Same-provider independence remains valid when executions differ.
+- Exact-head independent review availability is bounded to three sequential attempts. Each
+  inconclusive attempt releases its lease, clears the sole live dispatch, records its canonical run
+  and capacity key, and excludes that capacity before synchronous continuation. Availability
+  exhaustion is reported separately from a provider-owned implementation BLOCKER finding.
 - Progressive verification, implementation, repair, and review runs all carry the frozen candidate
   head. SQLite rejects mutation of `source_head` after insert and completion ignores other heads.
 - Unknown no-task scope freezes as substantive at admission; worker output cannot downgrade it to

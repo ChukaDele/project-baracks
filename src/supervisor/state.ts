@@ -166,12 +166,25 @@ export interface SupervisorGoal {
         reviewDispatch?: {
           id: string;
           provider: WorkerHost;
+          capacityKey?: string;
           providerId?: string;
           providerAccountLabel?: string;
           taskId?: string;
           runId?: string;
           startedAt: string;
         };
+        reviewAttempts?: Array<{
+          attempt: number;
+          dispatchId: string;
+          provider: WorkerHost;
+          capacityKey: string;
+          runId: string;
+          startedAt: string;
+          finishedAt: string;
+          outcome:
+            'timeout' | 'crash' | 'missing_result' | 'no_verdict' | 'missing_session_provenance';
+          evidence: string;
+        }>;
       }
     | undefined;
 }

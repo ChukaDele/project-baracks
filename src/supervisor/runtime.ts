@@ -370,7 +370,10 @@ export function selectCoordinator(
  * headless Major path and the explicit compatibility cycle cannot diverge. */
 export function routeGoalExecution(
   goal: SupervisorGoal,
-  options: { eligibleHosts?: readonly WorkerHost[] } = {},
+  options: {
+    eligibleHosts?: readonly WorkerHost[];
+    excludedCapacityKeys?: readonly string[];
+  } = {},
 ): CoordinatorSelection {
   assertExecutionAllowed(getProjectPolicy(goal.project, goal.repoPath));
   const providerState = openDb();
@@ -378,12 +381,15 @@ export function routeGoalExecution(
   try {
     const providerInfos = loadPersistedProviderInfos(providerState.db);
     const eligibleHosts = options.eligibleHosts ? new Set(options.eligibleHosts) : undefined;
-    const eligibleProviderInfos = eligibleHosts
-      ? providerInfos.filter((provider) => {
-          const host = PROVIDER_HOSTS[parseCapacityKey(provider.name).providerName];
-          return host !== undefined && eligibleHosts.has(host);
-        })
-      : providerInfos;
+    const excludedCapacityKeys = new Set(options.excludedCapacityKeys ?? []);
+    const eligibleProviderInfos = providerInfos.filter((provider) => {
+      if (excludedCapacityKeys.has(provider.name)) return false;
+      if (eligibleHosts) {
+        const host = PROVIDER_HOSTS[parseCapacityKey(provider.name).providerName];
+        return host !== undefined && eligibleHosts.has(host);
+      }
+      return true;
+    });
     selection = selectCoordinator(goal, eligibleProviderInfos);
     if (selection.kind === 'route') {
       const routedSelection = selection;
@@ -955,10 +961,26 @@ async function runPendingCompletionReview(
     });
     return;
   }
-  const selection = routeGoalExecution(goal);
+  const recoveredPending = recoverAbandonedReviewDispatch(goal, pending);
+  if (recoveredPending) {
+    updateGoal(goal.id, recoveredPending);
+    return;
+  }
+  const priorAttempts = pending.reviewAttempts ?? [];
+  if (priorAttempts.length >= MAX_INDEPENDENT_REVIEW_ATTEMPTS) {
+    updateGoal(goal.id, reviewerAvailabilityExhaustedPatch(pending, priorAttempts));
+    return;
+  }
+  const selection = routeGoalExecution(goal, {
+    excludedCapacityKeys: priorAttempts.map((attempt) => attempt.capacityKey),
+  });
   if (selection.kind === 'checkpoint') {
     updateGoal(goal.id, {
-      lastSummary: `Independent completion review is waiting for execution capacity: ${selection.reason}`,
+      retryImmediately: false,
+      lastSummary:
+        priorAttempts.length > 0
+          ? `Independent reviewer availability is exhausted after ${priorAttempts.length} inconclusive attempt${priorAttempts.length === 1 ? '' : 's'}; no implementation BLOCKER verdict was produced. ${selection.reason}`
+          : `Independent completion review is waiting for execution capacity: ${selection.reason}`,
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
     });
     return;
@@ -1028,6 +1050,7 @@ async function runPendingCompletionReview(
       reviewDispatch: {
         id: dispatchId,
         provider: selection.host,
+        capacityKey: selection.provider,
         providerId: canonicalReview.providerId,
         providerAccountLabel: canonicalReview.providerAccountLabel,
         taskId: canonicalReview.taskId,
@@ -1071,25 +1094,27 @@ async function runPendingCompletionReview(
   } finally {
     runStatusState.sqlite.close();
   }
-  if (outcome.status === 'succeeded' && !reviewSessionRef) {
-    updateGoal(goal.id, {
-      activePid: undefined,
-      lastFinishedAt: new Date().toISOString(),
-      lastSummary:
-        'Independent completion review was refused because the provider returned no durable session identity.',
-      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
-    });
+  const report = outcome.status === 'succeeded' ? parseWorkerReport(outcome.stdout) : undefined;
+  const inconclusive = classifyInconclusiveReviewAttempt(outcome, report);
+  if (inconclusive) {
+    updateGoal(
+      goal.id,
+      recordInconclusiveReviewAttemptPatch(pending, {
+        attempt: priorAttempts.length + 1,
+        dispatchId,
+        provider: selection.host,
+        capacityKey: selection.provider,
+        runId: canonicalReview.runId,
+        startedAt: reviewStartedAt,
+        finishedAt: new Date().toISOString(),
+        outcome: inconclusive.outcome,
+        evidence: inconclusive.evidence,
+      }),
+    );
     return;
   }
-  const report = outcome.status === 'succeeded' ? parseWorkerReport(outcome.stdout) : undefined;
   if (!report?.independentReview) {
-    updateGoal(goal.id, {
-      activePid: undefined,
-      lastFinishedAt: new Date().toISOString(),
-      lastSummary: 'Independent completion review produced no authoritative provider receipt.',
-      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
-    });
-    return;
+    throw new Error('conclusive independent review unexpectedly lacked a verdict');
   }
   const changedHeadPatch = postReviewSourceChangePatch(
     goal.repoPath,
@@ -1130,6 +1155,106 @@ async function runPendingCompletionReview(
   } finally {
     receiptState.sqlite.close();
   }
+}
+
+const MAX_INDEPENDENT_REVIEW_ATTEMPTS = 3;
+type PendingCompletion = NonNullable<SupervisorGoal['pendingCompletion']>;
+type ReviewAttempt = NonNullable<PendingCompletion['reviewAttempts']>[number];
+
+export function classifyInconclusiveReviewAttempt(
+  outcome: Pick<WorkerOutcome, 'status' | 'exitCode' | 'sessionRef' | 'stdout' | 'stderr'>,
+  report: WorkerReport | undefined,
+): Pick<ReviewAttempt, 'outcome' | 'evidence'> | undefined {
+  if (outcome.status === 'timed_out') {
+    return { outcome: 'timeout', evidence: 'review provider timed out before a verdict' };
+  }
+  if (outcome.status === 'failed') {
+    return outcome.exitCode === null
+      ? { outcome: 'crash', evidence: 'review provider exited without a process result' }
+      : {
+          outcome: 'missing_result',
+          evidence: trim(
+            outcome.stderr || outcome.stdout || 'review provider failed without a result',
+          ),
+        };
+  }
+  if (!outcome.sessionRef?.trim()) {
+    return {
+      outcome: 'missing_session_provenance',
+      evidence: 'review provider returned no durable session identity',
+    };
+  }
+  if (!report) {
+    return { outcome: 'missing_result', evidence: 'review provider returned no Major result' };
+  }
+  if (!report.independentReview) {
+    return { outcome: 'no_verdict', evidence: 'review result contained no independent verdict' };
+  }
+  return undefined;
+}
+
+export function recordInconclusiveReviewAttemptPatch(
+  pending: PendingCompletion,
+  attempt: ReviewAttempt,
+): Partial<SupervisorGoal> {
+  const attempts = [...(pending.reviewAttempts ?? []), attempt];
+  if (attempts.length >= MAX_INDEPENDENT_REVIEW_ATTEMPTS) {
+    return reviewerAvailabilityExhaustedPatch(pending, attempts);
+  }
+  const pendingWithoutDispatch = { ...pending };
+  delete pendingWithoutDispatch.reviewDispatch;
+  return {
+    status: 'active',
+    activePid: undefined,
+    retryImmediately: true,
+    pendingCompletion: { ...pendingWithoutDispatch, reviewAttempts: attempts },
+    lastFinishedAt: attempt.finishedAt,
+    lastSummary: `Independent review attempt ${attempt.attempt} was inconclusive (${attempt.outcome}); its lease was released and Major will select a fresh independent execution. No implementation BLOCKER verdict was produced.`,
+    nextRunAt: new Date().toISOString(),
+  };
+}
+
+function reviewerAvailabilityExhaustedPatch(
+  pending: PendingCompletion,
+  attempts: ReviewAttempt[],
+): Partial<SupervisorGoal> {
+  const pendingWithoutDispatch = { ...pending };
+  delete pendingWithoutDispatch.reviewDispatch;
+  return {
+    status: 'active',
+    activePid: undefined,
+    retryImmediately: false,
+    pendingCompletion: { ...pendingWithoutDispatch, reviewAttempts: attempts },
+    lastFinishedAt: attempts.at(-1)?.finishedAt ?? new Date().toISOString(),
+    lastSummary: `Independent reviewer availability is exhausted after ${attempts.length} inconclusive attempts; no implementation BLOCKER verdict was produced.`,
+    nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+  };
+}
+
+function recoverAbandonedReviewDispatch(
+  goal: SupervisorGoal,
+  pending: PendingCompletion,
+): Partial<SupervisorGoal> | undefined {
+  const dispatch = pending.reviewDispatch;
+  if (!dispatch?.runId || !dispatch.capacityKey) return undefined;
+  const state = openDb();
+  try {
+    setRunStatus(state.db, dispatch.runId, 'failed');
+  } finally {
+    state.sqlite.close();
+  }
+  const finishedAt = new Date().toISOString();
+  return recordInconclusiveReviewAttemptPatch(pending, {
+    attempt: (pending.reviewAttempts?.length ?? 0) + 1,
+    dispatchId: dispatch.id,
+    provider: dispatch.provider,
+    capacityKey: dispatch.capacityKey,
+    runId: dispatch.runId,
+    startedAt: dispatch.startedAt,
+    finishedAt,
+    outcome: 'crash',
+    evidence: `Major recovered abandoned review dispatch ${dispatch.id} after acquiring the repository writer fence`,
+  });
 }
 
 /** Re-read exact HEAD after the provider returns and fail closed before any

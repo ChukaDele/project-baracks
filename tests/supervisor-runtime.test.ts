@@ -7,10 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureLearning, promoteLearning } from '../src/learning/candidates.js';
 import { configureProjectPolicy, recordShadowGrade } from '../src/supervisor/policy.js';
 import {
+  classifyInconclusiveReviewAttempt,
   coordinatorPrompt,
   modelOutcomeForWorker,
   nonSuccessCyclePatch,
   postReviewSourceChangePatch,
+  recordInconclusiveReviewAttemptPatch,
   parseWorkerReport,
   runForegroundGoal,
   routingDecisionGoalPatch,
@@ -76,6 +78,87 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('classifies review availability failures without inventing an implementation verdict', () => {
+    const base = {
+      exitCode: 0,
+      sessionRef: 'session-1',
+      stdout: '',
+      stderr: '',
+    };
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { status: 'timed_out', exitCode: null, stdout: '', stderr: '' },
+        undefined,
+      ),
+    ).toMatchObject({ outcome: 'timeout' });
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { status: 'failed', exitCode: null, stdout: '', stderr: '' },
+        undefined,
+      ),
+    ).toMatchObject({ outcome: 'crash' });
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { ...base, status: 'failed', stderr: 'gateway failed' },
+        undefined,
+      ),
+    ).toMatchObject({ outcome: 'missing_result', evidence: 'gateway failed' });
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { ...base, status: 'succeeded', sessionRef: '   ' },
+        undefined,
+      ),
+    ).toMatchObject({ outcome: 'missing_session_provenance' });
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { ...base, status: 'succeeded' },
+        { status: 'active', summary: 'review did not decide' },
+      ),
+    ).toMatchObject({ outcome: 'no_verdict' });
+  });
+
+  it('rotates sequential inconclusive reviews and checkpoints availability after three attempts', () => {
+    const pending: NonNullable<SupervisorGoal['pendingCompletion']> = {
+      summary: 'candidate claim',
+      coordinator: 'codex',
+      claimedAt: '2026-08-29T00:00:00.000Z',
+      reviewDispatch: {
+        id: 'dispatch-live',
+        provider: 'codex',
+        capacityKey: 'codex/default',
+        runId: 'run-live',
+        startedAt: '2026-08-29T00:01:00.000Z',
+      },
+    };
+    const attempt = (number: number) => ({
+      attempt: number,
+      dispatchId: `dispatch-${number}`,
+      provider: 'codex' as const,
+      capacityKey: `codex/account-${number}`,
+      runId: `run-${number}`,
+      startedAt: `2026-08-29T00:0${number}:00.000Z`,
+      finishedAt: `2026-08-29T00:0${number}:30.000Z`,
+      outcome: 'timeout' as const,
+      evidence: 'provider timed out',
+    });
+    const first = recordInconclusiveReviewAttemptPatch(pending, attempt(1));
+    expect(first).toMatchObject({ status: 'active', retryImmediately: true });
+    expect(first.pendingCompletion?.reviewDispatch).toBeUndefined();
+    expect(first.lastSummary).toMatch(/No implementation BLOCKER verdict/i);
+
+    const second = recordInconclusiveReviewAttemptPatch(first.pendingCompletion!, attempt(2));
+    expect(second).toMatchObject({ status: 'active', retryImmediately: true });
+    expect(second.pendingCompletion?.reviewAttempts).toHaveLength(2);
+
+    const third = recordInconclusiveReviewAttemptPatch(second.pendingCompletion!, attempt(3));
+    expect(third).toMatchObject({ status: 'active', retryImmediately: false });
+    expect(third.pendingCompletion?.reviewAttempts).toHaveLength(3);
+    expect(third.pendingCompletion?.reviewDispatch).toBeUndefined();
+    expect(third.lastSummary).toMatch(/availability is exhausted/i);
+    expect(third.lastSummary).toMatch(/no implementation BLOCKER verdict/i);
+    expect(third.ownerGate).toBeUndefined();
+  });
+
   it('freezes every task-resolution outcome and refuses ambiguous dispatch authority', () => {
     const source = {
       sourceHead: 'a'.repeat(40),
