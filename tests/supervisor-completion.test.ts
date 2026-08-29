@@ -26,6 +26,7 @@ import {
   RUN_INSIGHT_SCHEMA,
 } from '../src/insights/performance-history.js';
 import { readSupervisorSourceIdentity } from '../src/supervisor/source-identity.js';
+import { attemptRepositoryMutation } from '../src/supervisor/repository-writer-fence.js';
 import { addProject } from '../src/config/project-service.js';
 import { projectConfigSchema } from '../src/config/project-config.js';
 import { addTask, getTask, transitionTask } from '../src/domain/task-service.js';
@@ -370,6 +371,31 @@ describe('independent goal completion', () => {
     expect(() =>
       applyIndependentCompletionGrade({ goalId: 'goal-1', receiptId, db: reviewDb.db }),
     ).toThrow(/source identity changed during commit/i);
+    expect(reviewDb.db.select().from(supervisorCompletionCommits).all()).toEqual([]);
+    const reopened = readSupervisorState().goals[0]!;
+    expect(reopened.status).toBe('active');
+    expect(reopened.pendingCompletion).toBeUndefined();
+  });
+
+  it('fails closed on a canonical writer attempt after the final identity read but before commit', () => {
+    const receiptId = reviewReceiptId('claude', 'pass', 'reviewed the fenced source tree');
+    let mutationRan = false;
+    expect(() =>
+      applyIndependentCompletionGrade({
+        goalId: 'goal-1',
+        receiptId,
+        db: reviewDb.db,
+        onFinalIdentityReadForTest: () => {
+          expect(
+            attemptRepositoryMutation(root, () => {
+              mutationRan = true;
+              writeFileSync(join(root, 'candidate.txt'), 'late canonical mutation\n');
+            }),
+          ).toBe(false);
+        },
+      }),
+    ).toThrow(/repository writer contention occurred during completion commit/i);
+    expect(mutationRan).toBe(false);
     expect(reviewDb.db.select().from(supervisorCompletionCommits).all()).toEqual([]);
     const reopened = readSupervisorState().goals[0]!;
     expect(reopened.status).toBe('active');

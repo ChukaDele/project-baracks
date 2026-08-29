@@ -34,6 +34,10 @@ import type { ProviderApprovalAuthority } from '../security/provider-approval-po
 import type { ApprovalCategory } from '../security/provider-approval-policy.js';
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { hashSourceWorkspaceTree } from '../execution/workspace-transfer.js';
+import {
+  tryAcquireRepositoryWriterFence,
+  type RepositoryWriterFence,
+} from './repository-writer-fence.js';
 
 export function captureProviderApprovalRequest(input: {
   cwd: string;
@@ -358,8 +362,34 @@ export async function runWorker(input: {
   approvalAuthority?: ProviderApprovalAuthority;
   /** Enforce a provider execution that cannot mutate the admitted workspace. */
   readOnly?: boolean;
+  /** Existing canonical writer lease held by the integration owner. */
+  writerFence?: RepositoryWriterFence;
 }): Promise<WorkerOutcome> {
   const started = Date.now();
+  const mayMutate = allowGuestMutationForHost(input.host, input.cwd, input.readOnly);
+  let ownedWriterFence: RepositoryWriterFence | undefined;
+  if (mayMutate) {
+    if (input.writerFence) {
+      if (resolve(input.writerFence.repoPath) !== resolve(input.cwd)) {
+        throw new Error('repository writer fence belongs to a different source tree');
+      }
+      input.writerFence.assertUncontended();
+    } else {
+      ownedWriterFence = tryAcquireRepositoryWriterFence(input.cwd);
+      if (!ownedWriterFence) {
+        return {
+          host: input.host,
+          status: 'failed',
+          exitCode: null,
+          stdout: '',
+          stderr: 'Major repository writer fence refused concurrent tree mutation',
+          durationMs: Date.now() - started,
+          rateLimited: false,
+          exhausted: false,
+        };
+      }
+    }
+  }
   const leaseTtlMs = Math.max(input.timeoutMs ?? 0, 30 * 60 * 1000) + 5 * 60 * 1000;
   const request = requestResource({
     kind: 'worker',
@@ -471,6 +501,7 @@ export async function runWorker(input: {
     };
   } finally {
     if (lease) releaseResource(lease.id, lease.fencingToken);
+    ownedWriterFence?.release();
   }
 }
 

@@ -46,8 +46,8 @@ import {
   runGoalCycle,
   routeGoalExecution,
   supervisorSnapshot,
-  tryAcquireRepoCycleLock,
 } from './runtime.js';
+import { tryAcquireRepositoryWriterFence } from './repository-writer-fence.js';
 import { runGatewayCommand, runWorker } from './worker.js';
 import {
   RESOURCE_KINDS,
@@ -788,8 +788,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       }
       console.error(`Major worktree: ${runCwd} (${branch})`);
     }
-    const releaseRepoLock = worktree ? undefined : tryAcquireRepoCycleLock(project.repoPath);
-    if (!worktree && !releaseRepoLock) {
+    const writerFence = worktree ? undefined : tryAcquireRepositoryWriterFence(project.repoPath);
+    if (!worktree && !writerFence) {
       throw new Error(
         `repository ${project.repoPath} already has an active Major integration owner`,
       );
@@ -800,13 +800,14 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         cwd: runCwd,
         prompt,
         approvalAuthority,
+        ...(writerFence ? { writerFence } : {}),
         ...(modelRef ? { modelRef } : {}),
       });
       process.stdout.write(outcome.stdout);
       if (outcome.stderr) process.stderr.write(outcome.stderr);
       if (outcome.status !== 'succeeded') process.exitCode = 1;
     } finally {
-      releaseRepoLock?.();
+      writerFence?.release();
     }
     return true;
   }

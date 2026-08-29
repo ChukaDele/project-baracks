@@ -259,6 +259,12 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   unrun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
+- Canonical repository-writer-fence repair: the integration owner, direct worker CLI, mutation-capable
+  worker execution, and independent completion transition now share one repository-scoped writer
+  lease. A refused writer records contention, so an arrival after the final HEAD/tree read forces the
+  SQLite completion transaction to roll back and the goal to reopen. The affected gate passed 80/80
+  tests across four focused files plus typecheck, targeted lint, and formatting; the full matrix was
+  intentionally not run.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
 - Final ordinary gate for `7385b13`: 106/106 files and 910/910 tests passed.
 - Final resource gate for `7385b13`: 139 tests passed with 5 expected skips.
@@ -330,6 +336,11 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   run for the exact task, head, purpose, provider, and routed account. The proportional gate passed
   71/71 affected migration, receipt, runtime, and completion tests plus typecheck, targeted lint, and
   formatting; the full matrix was intentionally not run.
+- Independent review regression: `667a69e` still released repository identity from observation before
+  SQLite committed completion authority. The canonical writer lease now spans the final HEAD/tree read
+  through commit and every supervisor mutation-capable worker entry point. A focused race attempts a
+  tree write after that read, proves the writer is excluded, and proves recorded contention rolls back
+  the completion commit and reopens the goal.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

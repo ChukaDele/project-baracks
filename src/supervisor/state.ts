@@ -30,6 +30,10 @@ import {
   sourceIdentityMatches,
   type SupervisorCandidateRecord,
 } from './source-identity.js';
+import {
+  tryAcquireRepositoryWriterFence,
+  type RepositoryWriterFence,
+} from './repository-writer-fence.js';
 
 export { gitCommonDir } from './source-identity.js';
 import {
@@ -519,9 +523,27 @@ export function applyIndependentCompletionGrade(input: {
   goalId: string;
   receiptId: string;
   db?: Db;
+  writerFence?: RepositoryWriterFence;
+  /** Deterministic race seam used only by the focused writer-fence regression. */
+  onFinalIdentityReadForTest?: () => void;
 }): SupervisorGoal {
   const ownedDb = input.db ? undefined : openDb();
   const db = input.db ?? ownedDb!.db;
+  const goalSnapshot = getGoal(input.goalId);
+  if (!goalSnapshot) throw new Error(`goal not found: ${input.goalId}`);
+  let ownedWriterFence: RepositoryWriterFence | undefined;
+  const writerFence =
+    input.writerFence ??
+    (ownedWriterFence = tryAcquireRepositoryWriterFence(goalSnapshot.repoPath));
+  if (!writerFence) {
+    ownedDb?.sqlite.close();
+    throw new Error('independent completion refused concurrent repository writer');
+  }
+  if (resolve(writerFence.repoPath) !== resolve(goalSnapshot.repoPath)) {
+    ownedWriterFence?.release();
+    ownedDb?.sqlite.close();
+    throw new Error('repository writer fence belongs to a different source tree');
+  }
   let applied: { goal: SupervisorGoal; authorityRejection?: string };
   try {
     applied = withSupervisorStateLock((state) => {
@@ -732,6 +754,14 @@ export function applyIndependentCompletionGrade(input: {
                 'candidate source identity changed during commit',
               );
             }
+            input.onFinalIdentityReadForTest?.();
+            try {
+              writerFence.assertUncontended();
+            } catch {
+              throw new CompletionSourceFenceError(
+                'repository writer contention occurred during completion commit',
+              );
+            }
             return { goal };
           },
           { behavior: 'immediate' },
@@ -748,12 +778,13 @@ export function applyIndependentCompletionGrade(input: {
         goal.lastSummary =
           'Pending completion was reopened because its exact source identity changed at the durable commit boundary.';
         goal.updatedAt = new Date().toISOString();
-        result = { goal, authorityRejection: 'candidate source identity changed during commit' };
+        result = { goal, authorityRejection: error.message };
       }
       writeSupervisorState(state);
       return result;
     });
   } finally {
+    ownedWriterFence?.release();
     ownedDb?.sqlite.close();
   }
   if (applied.authorityRejection) {

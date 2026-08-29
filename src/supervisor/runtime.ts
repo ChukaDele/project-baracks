@@ -90,6 +90,10 @@ import {
   type WorkerReport,
 } from './worker-report.js';
 import {
+  tryAcquireRepositoryWriterFence,
+  type RepositoryWriterFence,
+} from './repository-writer-fence.js';
+import {
   RUN_INSIGHT_SCHEMA,
   recordIndependentReviewExecution,
   recordPerformanceObservation,
@@ -760,37 +764,8 @@ ${hop ? `\n${hop.continuityBlock}\nActive subscription account: ${hop.accountLab
  * two goals, aliases, manual invocations, or daemon cycles from concurrently
  * writing the same working tree. Delegated writers still require worktrees. */
 export function tryAcquireRepoCycleLock(repoPath: string): (() => void) | undefined {
-  const dir = join(majorHome(), 'supervisor-repo-locks');
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const key = createHash('sha256').update(resolve(repoPath)).digest('hex').slice(0, 32);
-  const path = join(dir, `${key}.pid`);
-  if (existsSync(path)) {
-    const lockText = readFileSync(path, 'utf8').trim();
-    const lockAgeMs = Date.now() - statSync(path).mtimeMs;
-    if (!lockText && lockAgeMs <= 30_000) return undefined;
-    const prior = Number.parseInt(lockText, 10);
-    if (Number.isFinite(prior) && pidAlive(prior)) return undefined;
-    if (lockAgeMs <= 30_000) return undefined;
-    unlinkSync(path);
-  }
-  let fd: number;
-  try {
-    fd = openSync(path, 'wx', 0o600);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
-    throw error;
-  }
-  writeFileSync(fd, `${process.pid}\n`);
-  closeSync(fd);
-  return () => {
-    try {
-      if (existsSync(path) && readFileSync(path, 'utf8').trim() === String(process.pid)) {
-        unlinkSync(path);
-      }
-    } catch {
-      // Best effort. A stale lock is reclaimed after this process exits.
-    }
-  };
+  const fence = tryAcquireRepositoryWriterFence(repoPath);
+  return fence ? () => fence.release() : undefined;
 }
 
 /** Whether a runGoalCycle() call actually attempted a coordinator turn.
@@ -928,26 +903,27 @@ export async function runGoalCycle(
   const goal = getGoal(goalId);
   if (!goal) throw new Error(`goal not found: ${goalId}`);
   if (goal.status === 'done' || goal.status === 'paused') return { ranCycle: false };
-  const releaseRepoLock = tryAcquireRepoCycleLock(goal.repoPath);
-  if (!releaseRepoLock) {
+  const writerFence = tryAcquireRepositoryWriterFence(goal.repoPath);
+  if (!writerFence) {
     console.error(`Repository ${goal.repoPath} already has an active Major integration owner.`);
     return { ranCycle: false };
   }
   try {
     if (goal.pendingCompletion) {
-      await runPendingCompletionReview(goal, options.maxTimeoutMs);
+      await runPendingCompletionReview(goal, options.maxTimeoutMs, writerFence);
     } else {
-      await runLockedGoalCycle(goal, options.maxTimeoutMs);
+      await runLockedGoalCycle(goal, options.maxTimeoutMs, writerFence);
     }
     return { ranCycle: true };
   } finally {
-    releaseRepoLock();
+    writerFence.release();
   }
 }
 
 async function runPendingCompletionReview(
   goal: SupervisorGoal,
   maxTimeoutMs?: number,
+  writerFence?: RepositoryWriterFence,
 ): Promise<void> {
   const pending = goal.pendingCompletion;
   if (!pending?.sourceHead || !pending.sourceTreeDigest || !pending.candidate) {
@@ -1146,7 +1122,12 @@ async function runPendingCompletionReview(
       executionStatus: 'succeeded',
       review: report.independentReview,
     });
-    applyIndependentCompletionGrade({ goalId: goal.id, receiptId, db: receiptState.db });
+    applyIndependentCompletionGrade({
+      goalId: goal.id,
+      receiptId,
+      db: receiptState.db,
+      ...(writerFence ? { writerFence } : {}),
+    });
   } finally {
     receiptState.sqlite.close();
   }
@@ -1259,7 +1240,11 @@ export async function runForegroundGoal(
   return { hops };
 }
 
-async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): Promise<void> {
+async function runLockedGoalCycle(
+  goal: SupervisorGoal,
+  maxTimeoutMs?: number,
+  writerFence?: RepositoryWriterFence,
+): Promise<void> {
   const cycleStartedAtMs = Date.now();
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const selection = routeGoalExecution(goal);
@@ -1450,6 +1435,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     timeoutMs: Math.min(Math.max(1, policy.maxRunMinutes) * 60 * 1000, maxTimeoutMs ?? Infinity),
     modelRef: routedSelection.modelRef,
     accountLabel: routedSelection.accountLabel,
+    ...(writerFence ? { writerFence } : {}),
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
   const workerFinishedAtMs = Date.now();
