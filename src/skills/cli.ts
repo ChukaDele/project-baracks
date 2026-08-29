@@ -21,7 +21,12 @@ import { fetchVendorSection } from './vendor.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
-  return index >= 0 ? args[index + 1] : undefined;
+  if (index < 0) return undefined;
+  const selected = args[index + 1];
+  if (!selected || selected.startsWith('-')) {
+    throw new Error(`missing required value for ${name}`);
+  }
+  return selected;
 }
 
 function requiredFlags(args: string[], name: string): string[] {
