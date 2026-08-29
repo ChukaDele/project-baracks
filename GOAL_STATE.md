@@ -40,6 +40,8 @@ Substantive. Risk: authority/process semantics. Review: independent.
 - Final implementation head `7385b13` was clean and received the final deterministic gates.
 - Execution-independent trust-policy repair started from clean exact candidate `ece2340` with the
   frozen complete-tree digest `3f5d01cd0b69e5ea03ee8317094e6a6062764631f6101291a99276b003535c54`.
+- Review-provenance repair started from integrated candidate `d461397` after fresh review found that
+  normal trust grading still used a synthetic reviewed-execution identifier.
 
 Delivery evidence:
 
@@ -53,6 +55,11 @@ Delivery evidence:
 - FOLLOWED: proven — canonical template/prior-art paths are extended without a new store.
 - INSTALLED: unproven — supported exact-SHA installation has not run.
 - BEHAVIORALLY PROVEN: unproven — representative installed behavior has not run.
+
+Latest focused repair evidence: 145/145 affected task-completion, direct-SQL, receipt, supervisor,
+trust-policy, CLI, runtime, and skill-lifecycle tests passed with typecheck and source lint. Independent
+task completion now requires a Major-owned receipt joining distinct succeeded implementation/repair
+and clean review runs at the exact candidate head; the receipt also freezes the complete tree digest.
 
 ## Critical-path dependencies
 
@@ -137,6 +144,13 @@ installation and installed behavior proof follow normal merge.
   project an append-only independent-review receipt, and only that receipt can grade pending work.
 - Pending completion now creates its own durable Major review-dispatch identity after the claim;
   only that successful uncompromised review execution can mint a causally fresh grade.
+- Normal worker dispatch now creates a canonical implementation/repair run before provider execution,
+  persists its actual outcome, and carries that run into pending completion. Review receipts, trust
+  grades, supervisor commits, task completion, and SQLite triggers all require that reviewed run to be
+  distinct from the succeeded Major-owned review run and bound to the same exact HEAD/tree evidence.
+- Caller-supplied or synthetic execution identifiers are not trust evidence: policy grading resolves
+  both IDs against durable canonical runs and execution grades additionally require the matching
+  append-only independent-review receipt.
 - Progressive verification, implementation, repair, and review runs all carry the frozen candidate
   head. SQLite rejects mutation of `source_head` after insert and completion ignores other heads.
 - Unknown no-task scope freezes as substantive at admission; worker output cannot downgrade it to

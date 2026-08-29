@@ -177,12 +177,14 @@ export function recordIndependentReviewExecution(
     project: string;
     goalId: string;
     runId: string;
+    reviewedRunId: string;
     taskId: string;
     dispatchId: string;
     provider: string;
     providerId: string;
     providerAccountLabel: string;
     sourceHead: string;
+    sourceTreeDigest: string;
     pendingClaimedAt: string;
     reviewStartedAt: string;
     executionStatus: 'succeeded';
@@ -193,6 +195,7 @@ export function recordIndependentReviewExecution(
     !input.project.trim() ||
     !input.goalId.trim() ||
     !input.runId.trim() ||
+    !input.reviewedRunId.trim() ||
     !input.taskId.trim() ||
     !input.dispatchId.trim() ||
     !input.provider.trim() ||
@@ -202,6 +205,12 @@ export function recordIndependentReviewExecution(
     throw new Error('independent review execution identity is incomplete');
   }
   if (!/^[0-9a-f]{40}$/.test(input.sourceHead)) throw new Error('invalid review source head');
+  if (!/^[0-9a-f]{64}$/.test(input.sourceTreeDigest)) {
+    throw new Error('invalid reviewed source-tree digest');
+  }
+  if (input.runId === input.reviewedRunId) {
+    throw new Error('independent review must be a distinct execution');
+  }
   if (input.review.goalId !== input.goalId || input.review.sourceHead !== input.sourceHead) {
     throw new Error('provider review verdict is not bound to this goal and exact head');
   }
@@ -214,6 +223,27 @@ export function recordIndependentReviewExecution(
     Date.parse(input.reviewStartedAt) < Date.parse(input.pendingClaimedAt)
   ) {
     throw new Error('independent review execution predates the pending completion claim');
+  }
+  const reviewedRun = db
+    .select({
+      taskId: agentRuns.taskId,
+      purpose: agentRuns.purpose,
+      sourceHead: agentRuns.sourceHead,
+      status: agentRuns.status,
+    })
+    .from(agentRuns)
+    .where(eq(agentRuns.id, input.reviewedRunId))
+    .get();
+  if (
+    !reviewedRun ||
+    reviewedRun.taskId !== input.taskId ||
+    !['implementation', 'repair'].includes(reviewedRun.purpose) ||
+    reviewedRun.sourceHead !== input.sourceHead ||
+    reviewedRun.status !== 'succeeded'
+  ) {
+    throw new Error(
+      'independent review authority requires a distinct canonical succeeded implementation or repair run at the exact head',
+    );
   }
   const canonicalRun = db
     .select({
@@ -252,12 +282,14 @@ export function recordIndependentReviewExecution(
       project: input.project.trim(),
       goalId: input.goalId,
       runId: input.runId,
+      reviewedRunId: input.reviewedRunId,
       taskId: input.taskId,
       dispatchId: input.dispatchId,
       provider: input.provider.trim(),
       providerId: input.providerId,
       providerAccountLabel: input.providerAccountLabel,
       sourceHead: input.sourceHead,
+      sourceTreeDigest: input.sourceTreeDigest,
       purpose: input.review.purpose,
       verdict: input.review.verdict,
       evidence: input.review.evidence.trim(),

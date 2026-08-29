@@ -871,6 +871,7 @@ export const independentReviewReceipts = sqliteTable(
     project: text('project').notNull(),
     goalId: text('goal_id').notNull(),
     runId: text('run_id').notNull(),
+    reviewedRunId: text('reviewed_run_id').references(() => agentRuns.id),
     /** Canonical Major task/run/provider binding. Nullable only for legacy rows. */
     taskId: text('task_id').references(() => tasks.id),
     providerId: text('provider_id').references(() => agentProviders.id),
@@ -878,6 +879,7 @@ export const independentReviewReceipts = sqliteTable(
     dispatchId: text('dispatch_id').notNull().unique(),
     provider: text('provider').notNull(),
     sourceHead: text('source_head').notNull(),
+    sourceTreeDigest: text('source_tree_digest'),
     purpose: text('purpose', { enum: ['independent_completion_review'] }).notNull(),
     verdict: text('verdict', { enum: ['pass', 'fail'] }).notNull(),
     evidence: text('evidence').notNull(),
@@ -894,6 +896,14 @@ export const independentReviewReceipts = sqliteTable(
     enumCheck('independent_review_receipts_verdict_valid', 'verdict', ['pass', 'fail']),
     enumCheck('independent_review_receipts_execution_valid', 'execution_status', ['succeeded']),
     check('independent_review_receipts_head_valid', sql`length(source_head) = 40`),
+    check(
+      'independent_review_receipts_tree_valid',
+      sql`source_tree_digest IS NULL OR length(source_tree_digest) = 64`,
+    ),
+    check(
+      'independent_review_receipts_distinct_runs',
+      sql`reviewed_run_id IS NULL OR reviewed_run_id <> run_id`,
+    ),
     check('independent_review_receipts_causal', sql`review_started_at >= pending_claimed_at`),
   ],
 );

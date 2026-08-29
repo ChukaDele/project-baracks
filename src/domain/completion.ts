@@ -6,6 +6,7 @@ import {
   agentRuns,
   decisionRequests,
   evidence,
+  independentReviewReceipts,
   projects,
   reviewFindings,
   tasks,
@@ -188,6 +189,7 @@ export function evaluateCompletionProof(
   db: DbConn,
   taskId: string,
   criteria: CompletionCriteria = completionCriteriaSchema.parse({}),
+  options: { requireMajorReviewProvenance?: boolean } = {},
 ): CompletionProofResult {
   const failures: string[] = [];
 
@@ -285,7 +287,7 @@ export function evaluateCompletionProof(
       failures.push('untriggered broader validation evidence is not promotable');
     }
 
-    const implementationExists = progressive.candidateHead
+    const implementationRuns = progressive.candidateHead
       ? db
           .select({ id: agentRuns.id })
           .from(agentRuns)
@@ -297,10 +299,13 @@ export function evaluateCompletionProof(
               eq(agentRuns.sourceHead, progressive.candidateHead),
             ),
           )
-          .get() !== undefined
-      : false;
+          .all()
+      : [];
+    const implementationIds = new Set(implementationRuns.map((run) => run.id));
+    const implementationExists = implementationIds.size > 0;
     const succeededReviews = db
       .select({
+        id: agentRuns.id,
         independenceLoss: agentRuns.independenceLoss,
         sourceHead: agentRuns.sourceHead,
       })
@@ -313,12 +318,34 @@ export function evaluateCompletionProof(
         ),
       )
       .all();
+    const authoritativeReviewPairs = db
+      .select({
+        reviewRunId: independentReviewReceipts.runId,
+        reviewedRunId: independentReviewReceipts.reviewedRunId,
+        sourceHead: independentReviewReceipts.sourceHead,
+        verdict: independentReviewReceipts.verdict,
+        executionStatus: independentReviewReceipts.executionStatus,
+      })
+      .from(independentReviewReceipts)
+      .where(eq(independentReviewReceipts.taskId, taskId))
+      .all();
     const reviewPassed =
       progressive.review === 'none' ||
       (succeededReviews.some(
         (review) =>
           (!progressive.candidateHead || review.sourceHead === progressive.candidateHead) &&
-          (progressive.review !== 'independent' || review.independenceLoss === null),
+          (progressive.review !== 'independent' ||
+            options.requireMajorReviewProvenance === false ||
+            (review.independenceLoss === null &&
+              authoritativeReviewPairs.some(
+                (authority) =>
+                  authority.reviewRunId === review.id &&
+                  authority.reviewedRunId !== null &&
+                  implementationIds.has(authority.reviewedRunId) &&
+                  authority.sourceHead === progressive.candidateHead &&
+                  authority.verdict === 'pass' &&
+                  authority.executionStatus === 'succeeded',
+              ))),
       ) &&
         (progressive.review !== 'independent' || implementationExists));
     const promotion = assessPromotion({
@@ -426,7 +453,9 @@ export function evaluateTaskPromotionProof(
   try {
     return {
       taskId: row.taskId,
-      ...evaluateCompletionProof(db, row.taskId, parseCompletionCriteria(row.criteria)),
+      ...evaluateCompletionProof(db, row.taskId, parseCompletionCriteria(row.criteria), {
+        requireMajorReviewProvenance: false,
+      }),
     };
   } catch (error) {
     return {

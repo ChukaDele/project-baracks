@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { testDb, canonicalGradeProvenance } from './helpers.js';
 import {
   configureProjectPolicy,
   getProjectPolicy,
@@ -11,25 +12,19 @@ import {
 
 let root = '';
 let priorPolicyPath: string | undefined;
+let db: ReturnType<typeof testDb>;
 
 function shadowProvenance(id: string) {
-  return {
-    providerAccountLabel: 'review',
-    reviewExecutionId: `review-${id}`,
-    plannerExecutionId: `plan-${id}`,
-  };
+  return canonicalGradeProvenance(db, { id, project: 'jss-tool' });
 }
 
 function executionProvenance(id: string) {
-  return {
-    providerAccountLabel: 'review',
-    reviewExecutionId: `review-${id}`,
-    reviewedExecutionId: `work-${id}`,
-  };
+  return canonicalGradeProvenance(db, { id, project: 'jss-tool' });
 }
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-policy-'));
+  db = testDb();
   priorPolicyPath = process.env.MAJOR_POLICY_PATH;
   process.env.MAJOR_POLICY_PATH = join(root, 'policies.json');
 });
@@ -130,6 +125,7 @@ describe('Major trust ramp', () => {
     });
     expect(() =>
       recordShadowGrade({
+        db,
         project: 'jss-tool',
         repoPath: root,
         planner: 'claude',
@@ -143,6 +139,7 @@ describe('Major trust ramp', () => {
     ).toThrow(/independent/);
     expect(() =>
       recordShadowGrade({
+        db,
         project: 'jss-tool',
         repoPath: root,
         planner: 'claude',
@@ -154,6 +151,20 @@ describe('Major trust ramp', () => {
         evidence: 'missing account provenance',
       }),
     ).toThrow(/account provenance/);
+    expect(() =>
+      recordShadowGrade({
+        db,
+        project: 'jss-tool',
+        repoPath: root,
+        planner: 'codex',
+        provider: 'claude',
+        providerAccountLabel: 'review',
+        reviewExecutionId: 'invented-review-run',
+        plannerExecutionId: 'invented-worker-run',
+        result: 'pass',
+        evidence: 'caller-supplied identifiers are not authority',
+      }),
+    ).toThrow(/canonical succeeded reviewed and review runs/);
 
     for (let i = 0; i < 3; i++) {
       recordShadowGrade({
@@ -189,14 +200,15 @@ describe('Major trust ramp', () => {
       ...executionProvenance('assist'),
       result: 'pass',
       evidence: 'representative assist run passed real-output review',
+      goalId: 'goal-assist',
     });
     expect(getProjectPolicy('jss-tool', root).lastGrade).toMatchObject({
       provider: 'claude',
       reviewedProvider: 'claude',
       providerAccountLabel: 'review',
-      reviewExecutionId: 'review-assist',
-      reviewedExecutionId: 'work-assist',
     });
+    expect(getProjectPolicy('jss-tool', root).lastGrade?.reviewExecutionId).toMatch(/^arun_/);
+    expect(getProjectPolicy('jss-tool', root).lastGrade?.reviewedExecutionId).toMatch(/^arun_/);
     expect(
       configureProjectPolicy({
         project: 'jss-tool',

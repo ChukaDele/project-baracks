@@ -803,7 +803,10 @@ describe('completion proof and guarded completion transition', () => {
       sourceHead: candidateHead,
     });
     setRunStatus(db, independentReviewRun.id, 'succeeded');
-    expect(evaluateCompletionProof(db, task.id, criteria).ok).toBe(true);
+    expect(evaluateCompletionProof(db, task.id, criteria)).toMatchObject({
+      ok: false,
+      failures: ['required review has not passed'],
+    });
     expect(
       coordinatorDonePromotionProof(
         db,

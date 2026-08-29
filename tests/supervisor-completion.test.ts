@@ -120,6 +120,17 @@ function reviewReceiptId(
       .get()!;
   }
   const modelId = ensureObservedModel(reviewDb.db, providerRow.id, 'review-model');
+  const reviewed = createRun(reviewDb.db, {
+    taskId,
+    providerId: providerRow.id,
+    modelId,
+    modelRef: 'review-model',
+    purpose: 'implementation',
+    billingMode: 'subscription_included',
+    routingReason: 'test reviewed execution',
+    sourceHead,
+  });
+  setRunStatus(reviewDb.db, reviewed.id, 'succeeded');
   const run = createRun(reviewDb.db, {
     taskId,
     providerId: providerRow.id,
@@ -136,6 +147,13 @@ function reviewReceiptId(
     updateGoal(current.id, {
       pendingCompletion: {
         ...current.pendingCompletion,
+        reviewedRun: {
+          taskId,
+          runId: reviewed.id,
+          provider,
+          providerId: providerRow.id,
+          providerAccountLabel: providerRow.accountLabel,
+        },
         reviewDispatch: {
           id: dispatchId,
           provider,
@@ -152,12 +170,14 @@ function reviewReceiptId(
     project: 'major',
     goalId,
     runId: run.id,
+    reviewedRunId: reviewed.id,
     taskId,
     dispatchId,
     provider,
     providerId: providerRow.id,
     providerAccountLabel: providerRow.accountLabel,
     sourceHead,
+    sourceTreeDigest: current?.pendingCompletion?.sourceTreeDigest ?? 'b'.repeat(64),
     pendingClaimedAt: '2026-08-11T00:01:00.000Z',
     reviewStartedAt: '2026-08-11T00:02:00.000Z',
     executionStatus: 'succeeded',

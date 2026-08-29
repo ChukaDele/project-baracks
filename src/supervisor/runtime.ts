@@ -925,12 +925,17 @@ async function runPendingCompletionReview(
   writerFence?: RepositoryWriterFence,
 ): Promise<void> {
   const pending = goal.pendingCompletion;
-  if (!pending?.sourceHead || !pending.sourceTreeDigest || !pending.candidate) {
+  if (
+    !pending?.sourceHead ||
+    !pending.sourceTreeDigest ||
+    !pending.candidate ||
+    !pending.reviewedRun
+  ) {
     updateGoal(goal.id, {
       status: 'active',
       pendingCompletion: undefined,
       lastSummary:
-        'Legacy pending completion lacked an exact source identity and must be revalidated.',
+        'Legacy pending completion lacked exact candidate or reviewed-execution provenance and must be revalidated.',
       nextRunAt: new Date().toISOString(),
     });
     return;
@@ -969,23 +974,7 @@ async function runPendingCompletionReview(
     providerAccountLabel: string;
   };
   try {
-    let project;
-    try {
-      project = getProjectByRepoPath(reviewState.db, goal.repoPath);
-    } catch {
-      project = addProject(
-        reviewState.db,
-        projectConfigSchema.parse({ name: goal.project, repoPath: goal.repoPath }),
-      );
-    }
-    const taskId =
-      pending.candidate.resolution === 'task'
-        ? pending.candidate.task.taskId
-        : addTask(reviewState.db, {
-            projectId: project.id,
-            title: `Independent completion review for supervisor goal ${goal.id}`,
-            description: 'Major-owned review authority task; not a promotable implementation task.',
-          }).id;
+    const taskId = pending.reviewedRun.taskId;
     const routed = parseCapacityKey(selection.provider);
     const provider = reviewState.db
       .select()
@@ -1109,12 +1098,14 @@ async function runPendingCompletionReview(
       project: goal.project,
       goalId: goal.id,
       runId: canonicalReview.runId,
+      reviewedRunId: pending.reviewedRun.runId,
       taskId: canonicalReview.taskId,
       dispatchId,
       provider: selection.host,
       providerId: canonicalReview.providerId,
       providerAccountLabel: canonicalReview.providerAccountLabel,
       sourceHead: pending.sourceHead,
+      sourceTreeDigest: pending.sourceTreeDigest,
       pendingClaimedAt: pending.claimedAt,
       reviewStartedAt,
       executionStatus: 'succeeded',
@@ -1343,6 +1334,14 @@ async function runLockedGoalCycle(
   const workerStartedAtMs = Date.now();
   let canonicalTask: CanonicalTaskBinding | undefined;
   let candidate: SupervisorCandidateRecord | undefined;
+  let canonicalWorker:
+    | {
+        taskId: string;
+        runId: string;
+        providerId: string;
+        providerAccountLabel: string;
+      }
+    | undefined;
   const taskState = openDb();
   try {
     const resolvedTask = resolveCanonicalTaskBinding(taskState.db, goal.repoPath);
@@ -1361,6 +1360,64 @@ async function runLockedGoalCycle(
     }
     candidate = freezeSupervisorCandidate(resolvedTask, sourceIdentity);
     if (resolvedTask.ok) canonicalTask = resolvedTask.binding;
+    let project;
+    try {
+      project = getProjectByRepoPath(taskState.db, goal.repoPath);
+    } catch {
+      project = addProject(
+        taskState.db,
+        projectConfigSchema.parse({ name: goal.project, repoPath: goal.repoPath }),
+      );
+    }
+    const taskId = resolvedTask.ok
+      ? resolvedTask.binding.taskId
+      : addTask(taskState.db, {
+          projectId: project.id,
+          title: `Supervisor worker execution for goal ${goal.id}`,
+          description: 'Major-owned canonical execution provenance; not a promotable task.',
+        }).id;
+    const routed = parseCapacityKey(routedSelection.provider);
+    const provider = taskState.db
+      .select()
+      .from(agentProviders)
+      .where(
+        and(
+          eq(agentProviders.name, routed.providerName),
+          eq(agentProviders.accountLabel, routed.accountLabel),
+        ),
+      )
+      .get();
+    if (!provider) throw new Error('routed worker provider account is not persisted');
+    const model = taskState.db
+      .select()
+      .from(agentModels)
+      .where(
+        and(
+          eq(agentModels.providerId, provider.id),
+          eq(agentModels.modelRef, routedSelection.modelRef),
+        ),
+      )
+      .get();
+    if (!model || model.billingMode === 'unknown') {
+      throw new Error('routed worker model has no authoritative billing state');
+    }
+    const run = createRun(taskState.db, {
+      taskId,
+      providerId: provider.id,
+      modelId: model.id,
+      modelRef: model.modelRef,
+      purpose: resolvedTask.ok ? 'repair' : 'implementation',
+      billingMode: model.billingMode,
+      routingReason: routedSelection.reason,
+      sourceHead: sourceIdentity.sourceHead,
+    });
+    setRunStatus(taskState.db, run.id, 'running');
+    canonicalWorker = {
+      taskId,
+      runId: run.id,
+      providerId: provider.id,
+      providerAccountLabel: provider.accountLabel,
+    };
   } finally {
     taskState.sqlite.close();
   }
@@ -1436,6 +1493,24 @@ async function runLockedGoalCycle(
     ...(writerFence ? { writerFence } : {}),
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
+  if (canonicalWorker) {
+    const runState = openDb();
+    try {
+      const providerSessionRef = outcome.runId ?? outcome.sessionRef;
+      setRunStatus(
+        runState.db,
+        canonicalWorker.runId,
+        outcome.status === 'succeeded'
+          ? 'succeeded'
+          : outcome.status === 'timed_out'
+            ? 'timed_out'
+            : 'failed',
+        providerSessionRef ? { sessionRef: providerSessionRef } : {},
+      );
+    } finally {
+      runState.sqlite.close();
+    }
+  }
   const workerFinishedAtMs = Date.now();
   const finishedSourceIdentity = readSupervisorSourceIdentity(goal.repoPath);
   const sourceHead = finishedSourceIdentity?.sourceHead;
@@ -1633,6 +1708,14 @@ async function runLockedGoalCycle(
             ? { sourceTreeDigest: finishedSourceIdentity.sourceTreeDigest }
             : {}),
           ...(candidate ? { candidate: structuredClone(candidate) } : {}),
+          ...(canonicalWorker
+            ? {
+                reviewedRun: {
+                  ...canonicalWorker,
+                  provider: host,
+                },
+              }
+            : {}),
           ...('promotionEvidence' in promotionProof && promotionProof.promotionEvidence
             ? { promotionEvidence: promotionProof.promotionEvidence }
             : {}),

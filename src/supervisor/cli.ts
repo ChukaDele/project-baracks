@@ -344,7 +344,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     if (!goal) {
       throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
     }
+    const gradeState = openDb();
     const policy = recordShadowGrade({
+      db: gradeState.db,
       project: project.project,
       repoPath: project.repoPath,
       planner,
@@ -356,6 +358,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       evidence: requireFlag(args, '--evidence'),
       goalId,
     });
+    gradeState.sqlite.close();
     console.log(JSON.stringify(policy, null, 2));
     return true;
   }
@@ -375,7 +378,6 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     }
     const evidenceState = openDb();
     const review = getIndependentReviewReceipt(evidenceState.db, reviewReceiptId);
-    evidenceState.sqlite.close();
     if (!review || review.project !== project.project || review.goalId !== goalId) {
       throw new Error('grade receipt is not bound to this project and goal');
     }
@@ -385,22 +387,26 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     if (!goal.pendingCompletion) {
       throw new Error('project grade requires a current pending completion claim');
     }
-    applyIndependentCompletionGrade({
-      goalId,
-      receiptId: reviewReceiptId,
-    });
+    if (!review.reviewedRunId) {
+      evidenceState.sqlite.close();
+      throw new Error('grade receipt lacks a canonical reviewed execution');
+    }
+    applyIndependentCompletionGrade({ goalId, receiptId: reviewReceiptId });
     const policy = recordIndependentGrade({
+      db: evidenceState.db,
       project: project.project,
       repoPath: project.repoPath,
       provider,
       providerAccountLabel: review.providerAccountLabel ?? 'default',
       reviewExecutionId: review.runId,
-      reviewedExecutionId: `goal:${goalId}:claim:${goal.pendingCompletion.claimedAt}`,
+      reviewedExecutionId: review.reviewedRunId,
       reviewedProvider: goal.pendingCompletion.coordinator,
       result: resultRaw,
       evidence,
       goalId,
+      reviewReceiptId,
     });
+    evidenceState.sqlite.close();
     if (resultRaw === 'pass') {
       applyIndependentSkillValidation({
         project: project.project,

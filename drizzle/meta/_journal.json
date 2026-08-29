@@ -176,6 +176,13 @@
       "when": 1788144000000,
       "tag": "0024_execution_independent_review",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1788230400000,
+      "tag": "0025_reviewed_execution_provenance",
+      "breakpoints": true
     }
   ]
 }

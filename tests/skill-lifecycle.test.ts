@@ -20,18 +20,16 @@ import {
 import { resolveSkills } from '../src/skills/resolver.js';
 import { recordIndependentGrade } from '../src/supervisor/policy.js';
 import { resolveProjectForCwd } from '../src/supervisor/state.js';
+import { canonicalGradeProvenance, testDb } from './helpers.js';
 
 let root: string;
 let repository: string;
 let project: string;
+let gradeDb: ReturnType<typeof testDb>;
 const execFileAsync = promisify(execFile);
 
 function executionProvenance(id: string) {
-  return {
-    providerAccountLabel: 'review',
-    reviewExecutionId: `review-${id}`,
-    reviewedExecutionId: `work-${id}`,
-  };
+  return canonicalGradeProvenance(gradeDb, { id, project, goalId: id });
 }
 
 function git(...args: string[]): string {
@@ -111,6 +109,7 @@ beforeEach(() => {
   git('-C', repository, 'config', 'user.name', 'Major Test');
   git('-C', repository, 'remote', 'add', 'origin', 'https://github.com/example/skill-workshop.git');
   project = resolveProjectForCwd(repository)!.project;
+  gradeDb = testDb();
   process.env.MAJOR_SKILL_LIFECYCLE_ROOT = join(root, 'skills');
   process.env.MAJOR_POLICY_PATH = join(root, 'policies.json');
   process.env.MAJOR_HOME = join(root, 'major-home');

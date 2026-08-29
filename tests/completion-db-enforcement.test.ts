@@ -7,6 +7,7 @@ import { createRun, recordVerificationRun, setRunStatus } from '../src/domain/ru
 import { evaluateCompletionProof, parseCompletionCriteria } from '../src/domain/completion.js';
 import { addEvidence, addTask, getTask, transitionTask } from '../src/domain/task-service.js';
 import { ensureObservedModel, recordQualifyingVerification, seedProject } from './helpers.js';
+import { recordIndependentReviewExecution } from '../src/insights/performance-history.js';
 
 /**
  * P1-3 reproducer: task-specific completion criteria must be enforced at the
@@ -251,7 +252,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       sqlite
         .prepare(`UPDATE tasks SET status = 'completed', version = version + 1 WHERE id = ?`)
         .run(task.id);
-    expect(() => forceComplete()).toThrow(/progressive validation/);
+    expect(() => forceComplete()).toThrow(/completion requires|progressive validation/i);
 
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'cheapest_compile_type_or_build',
@@ -265,7 +266,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       validationSubject: 'risk_specific_check:authority boundary',
       sourceHead: candidateHead,
     });
-    expect(() => forceComplete()).toThrow(/risk-specific validation/);
+    expect(() => forceComplete()).toThrow(/completion requires|risk-specific validation/i);
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'risk_specific_check:legacy compatibility',
       sourceHead: candidateHead,
@@ -303,7 +304,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       sourceHead: candidateHead,
     });
     setRunStatus(db, sameProviderAlias.id, 'succeeded');
-    expect(() => forceComplete()).toThrow(/selected review/);
+    expect(() => forceComplete()).toThrow(/execution-bound review provenance|selected review/i);
     const compromised = createRun(db, {
       taskId: task.id,
       providerId,
@@ -315,7 +316,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       sourceHead: candidateHead,
     });
     setRunStatus(db, compromised.id, 'succeeded');
-    expect(() => forceComplete()).toThrow(/selected review/);
+    expect(() => forceComplete()).toThrow(/execution-bound review provenance|selected review/i);
 
     const independentProviderId = newId('aprov');
     db.insert(agentProviders)
@@ -333,7 +334,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       sourceHead: candidateHead,
     });
     setRunStatus(db, compromisedIndependent.id, 'succeeded');
-    expect(() => forceComplete()).toThrow(/selected review/);
+    expect(() => forceComplete()).toThrow(/execution-bound review provenance|selected review/i);
 
     const cleanProviderId = newId('aprov');
     db.insert(agentProviders)
@@ -350,6 +351,29 @@ describe('P1-3 database-enforced completion criteria', () => {
       sourceHead: candidateHead,
     });
     setRunStatus(db, independent.id, 'succeeded');
+    recordIndependentReviewExecution(db, {
+      project: 'demo',
+      goalId: 'goal-progressive-direct-write',
+      runId: independent.id,
+      reviewedRunId: implementation.id,
+      taskId: task.id,
+      dispatchId: 'major-review-dispatch',
+      provider: 'implementation-provider',
+      providerId: cleanProviderId,
+      providerAccountLabel: 'review',
+      sourceHead: candidateHead,
+      sourceTreeDigest: 'b'.repeat(64),
+      pendingClaimedAt: '2026-08-27T01:00:00.000Z',
+      reviewStartedAt: '2026-08-27T02:00:00.000Z',
+      executionStatus: 'succeeded',
+      review: {
+        purpose: 'independent_completion_review',
+        goalId: 'goal-progressive-direct-write',
+        sourceHead: candidateHead,
+        verdict: 'pass',
+        evidence: 'Major-owned exact-head task review passed',
+      },
+    });
     forceComplete();
     expect(sqlite.prepare(`SELECT status FROM tasks WHERE id = ?`).get(task.id)).toMatchObject({
       status: 'completed',

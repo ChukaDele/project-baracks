@@ -7,6 +7,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { eq } from 'drizzle-orm';
+import type { DbConn } from '../db/client.js';
+import { agentProviders, agentRuns, independentReviewReceipts } from '../db/schema.js';
 import { redactText } from '../security/redact.js';
 import { GLOBAL_RESOURCE_LIMITS } from './resources.js';
 import { gitCommonDir, majorHome } from './state.js';
@@ -291,6 +294,7 @@ export function configureProjectPolicy(input: {
 }
 
 function storeGrade(input: {
+  db: DbConn;
   project: string;
   repoPath: string;
   provider: WorkerHost;
@@ -303,6 +307,7 @@ function storeGrade(input: {
   independenceLoss?: string;
   kind: 'shadow' | 'execution';
   goalId?: string;
+  reviewReceiptId?: string;
 }): ProjectPolicy {
   if (!input.reviewExecutionId.trim() || !input.reviewedExecutionId.trim()) {
     throw new Error('independent grade requires durable review and reviewed execution ids');
@@ -315,6 +320,71 @@ function storeGrade(input: {
   }
   if (input.independenceLoss?.trim()) {
     throw new Error(`independent grade execution was compromised: ${input.independenceLoss}`);
+  }
+  const reviewRun = input.db
+    .select({
+      provider: agentProviders.name,
+      accountLabel: agentProviders.accountLabel,
+      purpose: agentRuns.purpose,
+      independenceLoss: agentRuns.independenceLoss,
+      status: agentRuns.status,
+      sourceHead: agentRuns.sourceHead,
+      taskId: agentRuns.taskId,
+    })
+    .from(agentRuns)
+    .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
+    .where(eq(agentRuns.id, input.reviewExecutionId))
+    .get();
+  const reviewedRun = input.db
+    .select({
+      provider: agentProviders.name,
+      status: agentRuns.status,
+      purpose: agentRuns.purpose,
+      sourceHead: agentRuns.sourceHead,
+      taskId: agentRuns.taskId,
+    })
+    .from(agentRuns)
+    .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
+    .where(eq(agentRuns.id, input.reviewedExecutionId))
+    .get();
+  if (
+    !reviewRun ||
+    !reviewedRun ||
+    reviewRun.status !== 'succeeded' ||
+    reviewedRun.status !== 'succeeded' ||
+    reviewRun.purpose !== 'review' ||
+    !['implementation', 'repair'].includes(reviewedRun.purpose) ||
+    reviewRun.independenceLoss !== null ||
+    reviewRun.taskId !== reviewedRun.taskId ||
+    reviewRun.sourceHead !== reviewedRun.sourceHead ||
+    reviewRun.provider !== (input.provider === 'claude' ? 'claude-code' : input.provider) ||
+    reviewRun.accountLabel !== input.providerAccountLabel
+  ) {
+    throw new Error(
+      'independent grade requires distinct canonical succeeded reviewed and review runs at the same exact head',
+    );
+  }
+  if (input.kind === 'execution') {
+    const receipt = input.reviewReceiptId
+      ? input.db
+          .select()
+          .from(independentReviewReceipts)
+          .where(eq(independentReviewReceipts.id, input.reviewReceiptId))
+          .get()
+      : undefined;
+    if (
+      !receipt ||
+      receipt.project !== input.project ||
+      receipt.goalId !== input.goalId ||
+      receipt.runId !== input.reviewExecutionId ||
+      receipt.reviewedRunId !== input.reviewedExecutionId ||
+      !receipt.sourceTreeDigest ||
+      receipt.executionStatus !== 'succeeded'
+    ) {
+      throw new Error(
+        'execution grade requires a Major-owned receipt bound to both canonical runs and candidate evidence',
+      );
+    }
   }
   const store = readStore();
   const index = store.projects.findIndex((candidate) => candidate.project === input.project);
@@ -350,6 +420,7 @@ function storeGrade(input: {
 }
 
 export function recordShadowGrade(input: {
+  db: DbConn;
   project: string;
   repoPath: string;
   planner: WorkerHost;
@@ -371,6 +442,7 @@ export function recordShadowGrade(input: {
 }
 
 export function recordIndependentGrade(input: {
+  db: DbConn;
   project: string;
   repoPath: string;
   provider: WorkerHost;
@@ -382,6 +454,7 @@ export function recordIndependentGrade(input: {
   result: 'pass' | 'fail';
   evidence: string;
   goalId?: string;
+  reviewReceiptId: string;
 }): ProjectPolicy {
   return storeGrade({ ...input, kind: 'execution' });
 }

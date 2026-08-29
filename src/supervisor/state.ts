@@ -13,10 +13,10 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { redactText } from '../security/redact.js';
 import { openDb, type Db } from '../db/client.js';
-import { agentProviders, agentRuns, supervisorCompletionCommits } from '../db/schema.js';
+import { agentProviders, agentRuns, supervisorCompletionCommits, tasks } from '../db/schema.js';
 import { newId } from '../domain/ids.js';
 import { getIndependentReviewReceipt } from '../insights/performance-history.js';
 import {
@@ -155,6 +155,14 @@ export interface SupervisorGoal {
         sourceHead?: string;
         sourceTreeDigest?: string;
         candidate?: SupervisorCandidateRecord;
+        /** Canonical succeeded worker run whose exact candidate the review evaluates. */
+        reviewedRun?: {
+          taskId: string;
+          runId: string;
+          provider: WorkerHost;
+          providerId: string;
+          providerAccountLabel: string;
+        };
         reviewDispatch?: {
           id: string;
           provider: WorkerHost;
@@ -606,6 +614,17 @@ export function applyIndependentCompletionGrade(input: {
             if (!receipt.runId.trim()) {
               throw new Error('independent completion requires a durable run id');
             }
+            if (
+              !pending.reviewedRun ||
+              receipt.reviewedRunId !== pending.reviewedRun.runId ||
+              receipt.taskId !== pending.reviewedRun.taskId ||
+              receipt.sourceTreeDigest !== pending.sourceTreeDigest ||
+              receipt.runId === receipt.reviewedRunId
+            ) {
+              throw new Error(
+                'independent completion receipt is not bound to the frozen canonical reviewed execution and candidate tree',
+              );
+            }
             const canonicalRun = tx
               .select({
                 taskId: agentRuns.taskId,
@@ -635,6 +654,29 @@ export function applyIndependentCompletionGrade(input: {
             ) {
               throw new Error(
                 'independent completion requires its canonical succeeded task review run and routed provider account',
+              );
+            }
+            const reviewedRun = tx
+              .select({
+                taskId: agentRuns.taskId,
+                providerId: agentRuns.providerId,
+                purpose: agentRuns.purpose,
+                sourceHead: agentRuns.sourceHead,
+                status: agentRuns.status,
+              })
+              .from(agentRuns)
+              .where(eq(agentRuns.id, receipt.reviewedRunId))
+              .get();
+            if (
+              !reviewedRun ||
+              reviewedRun.taskId !== receipt.taskId ||
+              reviewedRun.providerId !== pending.reviewedRun.providerId ||
+              !['implementation', 'repair'].includes(reviewedRun.purpose) ||
+              reviewedRun.sourceHead !== receipt.sourceHead ||
+              reviewedRun.status !== 'succeeded'
+            ) {
+              throw new Error(
+                'independent completion requires the canonical succeeded reviewed execution at the exact head',
               );
             }
             if (!WORKER_HOSTS.includes(receipt.provider)) {
@@ -716,6 +758,13 @@ export function applyIndependentCompletionGrade(input: {
                 goal.lastSummary = `Pending completion was reopened because final candidate promotion proof failed: ${bindingFailure}`;
                 goal.updatedAt = new Date().toISOString();
                 return { goal, authorityRejection: bindingFailure };
+              }
+              const taskCandidate = pending.candidate;
+              if (taskCandidate?.resolution === 'task') {
+                tx.update(tasks)
+                  .set({ status: 'completed', version: sql`${tasks.version} + 1` })
+                  .where(eq(tasks.id, taskCandidate.task.taskId))
+                  .run();
               }
             }
             goal.pendingCompletion = undefined;
