@@ -143,6 +143,7 @@ describe('runtime skill resolver', () => {
 
   it.each([
     [['skill', 'resolve', '--task', '--skill', 'review'], '--task'],
+    [['skill', 'resolve', '--task', 'Review this task.', '--task', '--json'], '--task'],
     [['skill', 'resolve', '--task', 'Review this task.', '--cwd', '--json'], '--cwd'],
     [['skill', 'sync', '--source', '--json'], '--source'],
   ])('rejects a missing shared option value: %j', async (args, option) => {

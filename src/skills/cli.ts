@@ -20,13 +20,16 @@ import type { SkillOptimizationEvidence } from './optimizer-validation.js';
 import { fetchVendorSection } from './vendor.js';
 
 function flag(args: string[], name: string): string | undefined {
-  const index = args.indexOf(name);
-  if (index < 0) return undefined;
-  const selected = args[index + 1];
-  if (!selected || selected.startsWith('-')) {
-    throw new Error(`missing required value for ${name}`);
+  let result: string | undefined;
+  for (const [index, value] of args.entries()) {
+    if (value !== name) continue;
+    const selected = args[index + 1];
+    if (!selected || selected.startsWith('-')) {
+      throw new Error(`missing required value for ${name}`);
+    }
+    result ??= selected;
   }
-  return selected;
+  return result;
 }
 
 function requiredFlags(args: string[], name: string): string[] {
