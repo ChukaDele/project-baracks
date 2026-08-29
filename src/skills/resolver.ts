@@ -137,6 +137,7 @@ const STOP_WORDS = new Set([
   'the',
   'this',
   'use',
+  'with',
   'work',
 ]);
 
@@ -309,6 +310,57 @@ function generatedSkillPath(entry: SkillCandidate): string | undefined {
   return entry.path && existsSync(entry.path) ? entry.path : undefined;
 }
 
+function integrationDisambiguation(entryId: string, task: string): string | undefined {
+  const hasShaperAnalyticsIntent = /\b(?:taleshape|dashboard|analytics|telemetry)\b/u.test(task);
+  const hasNetworkShapingIntent =
+    /\b(?:network|packet|bandwidth|qdisc|traffic)\b.{0,24}\bshap(?:e|er|ing)\b/u.test(task) ||
+    /\bshap(?:e|er|ing)\b.{0,24}\b(?:network|packet|bandwidth|qdisc|traffic)\b/u.test(task);
+  const hasSpatialIntent = /\b(?:splat(?:ting)?|reconstruct(?:ion|ing)?|colmap|novel[ -]views?)\b/u.test(
+    task,
+  );
+  const hasNegatedSpatialIntent =
+    /\b(?:without|no|not|never|don't|do not|does not|isn't|is not)\b(?:\s+\w+){0,6}\s+\b(?:splat(?:ting)?|reconstruct(?:ion|ing)?|colmap|novel[ -]views?)\b/u.test(
+      task,
+    ) ||
+    /\b(?:splat(?:ting)?|reconstruct(?:ion)?|colmap|novel[ -]views?)\b(?:\s+\w+){0,6}\s+\b(?:unnecessary|unneeded|not needed|not necessary|not required|isn't needed|is not needed|isn't necessary|is not necessary|isn't required|is not required)\b/u.test(
+      task,
+    ) ||
+    /\bnon[- ](?:reconstruct(?:ion)?|splat(?:ting)?)\b/u.test(task);
+  const hasPositiveSpatialIntent = hasSpatialIntent && !hasNegatedSpatialIntent;
+  const hasExplicitGaussianSpatialIntent =
+    /\b(?:gaussian[ -]+splat(?:ting)?|splat(?:ting)?|colmap|novel[ -]views?)\b/u.test(task) &&
+    !hasNegatedSpatialIntent;
+  const isShapeRCapabilityRequest =
+    /\bshaper\b/u.test(task) &&
+    !hasShaperAnalyticsIntent &&
+    !hasNetworkShapingIntent &&
+    /\b(?:reconstruct(?:ion|ing)?|sculpture|object|generate|generation|create|make|build|model|asset|3d|text[ -]prompt)\b/u.test(
+      task,
+    );
+  if (
+    entryId === 'analytics-with-shaper' &&
+    (isShapeRCapabilityRequest ||
+      hasNetworkShapingIntent ||
+      (!hasShaperAnalyticsIntent &&
+        (/\bshap\s+(?:value|explain)/u.test(task) ||
+          /(?:scatter\s+plot|scatterplot)/u.test(task))))
+  ) {
+    return 'disambiguated a non-analytics Shaper meaning';
+  }
+  if (
+    entryId === 'gaussian-splatting-spatial-reconstruction' &&
+    (hasNegatedSpatialIntent ||
+      (isShapeRCapabilityRequest && !hasExplicitGaussianSpatialIntent) ||
+      (!hasPositiveSpatialIntent &&
+        (/gaussian.{0,20}(?:blur|filter|noise|distribution|kernel|process)/u.test(task) ||
+          /(?:blur|filter|noise|distribution|kernel|process).{0,20}gaussian/u.test(task) ||
+          /gaussian.{0,20}(?:scatter|chart|plot)/u.test(task))))
+  ) {
+    return 'disambiguated a non-reconstruction Gaussian meaning';
+  }
+  return undefined;
+}
+
 function scoreEntry(
   entry: SkillRegistryEntry,
   task: string,
@@ -316,6 +368,8 @@ function scoreEntry(
 ): { score: number; reason: string } {
   const normalized = task.toLowerCase();
   const fixtures = examples.get(entry.id);
+  const disambiguation = integrationDisambiguation(entry.id, normalized);
+  if (disambiguation) return { score: 0, reason: disambiguation };
   if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
     return { score: 0, reason: 'matched a negative trigger example' };
   }

@@ -312,6 +312,15 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   9.50 seconds. That cost had high expected information gain across every active consumer of the rule
   without paying for the unrelated full matrix. Typecheck, targeted lint/format, skill validation, and
   the primary Major validator passed.
+- Origin/main integration: merged the Shaper analytics and Gaussian Splatting capability batch while
+  resolving the sole textual conflict in `docs/prior-art-decisions.md` by retaining both independently
+  sourced decision records and the reviewed execution-independent `cross-modal-review` disposition.
+  The combined focused integration slice passed 36/36 tests. The frozen blast-radius gate then passed
+  170/170 tests across 14 authority, persistence, runtime, migration, trust-policy, guidance, skill,
+  resolver-adjacent, and Shaper files in 10.55 seconds; resource-config resolver validation passed
+  104/104 tests in 4.86 seconds. This roughly 16-second cost had high expected information gain because
+  origin/main changed shared skill routing, CLI registration, observability, and prior-art surfaces while
+  avoiding the unrelated full matrix. Typecheck, formatting, skill validation, and Major validation passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
 - Final ordinary gate for `7385b13`: 106/106 files and 910/910 tests passed.
 - Final resource gate for `7385b13`: 139 tests passed with 5 expected skips.
@@ -325,6 +334,10 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   and review skills but left mandatory provider inequality in the active readiness guide and pilot
   runbook, including an obsolete CLI grading example. A committed guidance test now rejects those
   phrases and requires the Major-owned review-receipt path.
+- Integration regression: `origin/main` and the SDLC branch both prepended independent records to the
+  append-only prior-art log, producing one add/add-content conflict. The merge retains both records in
+  chronological peer order; no decision or source provenance was discarded, and the lower donor table
+  retains execution-independent review semantics.
 
 - Candidate regression: `d5735a9` used outcome/acceptance and P0-P3 vocabulary. Focused tests now
   require exact intent/spec/plan/evidence headings and BLOCKER/IMPORTANT/NIT semantics, including

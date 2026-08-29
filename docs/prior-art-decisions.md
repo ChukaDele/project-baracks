@@ -14,6 +14,17 @@ Record format: Capability, Date, Candidates, Decision, Reason, Major-specific la
 - **Rejected alternatives:** a second task lifecycle; schema migration; mandatory independent review for every change; embedding project regressions in GBrain; treating installation as readiness; adopting an external workflow platform.
 - **Evidence:** `guidance/gbrain-reusable-assets.index.json` identifies the canonical goal-state template; `templates/project/GOAL_STATE.md`, `src/domain/completion.ts`, `src/supervisor/autonomy.ts`, `src/learning/candidates.ts`, and `guidance/readiness-and-independent-validation.md` already implement the retained paths. The missing delta is covered by `src/domain/sdlc.ts` and `tests/sdlc.test.ts`, including the exact intent/spec/plan/evidence contract, non-blocking nit/speculation regressions, and task-applicable delivery-evidence matrix without a new persistence path.
 
+## 2026-08-28 - Shaper analytics and Gaussian Splatting reconstruction
+
+- **Capability:** optional SQL analytics over Major telemetry and spatial reconstruction guidance
+- **Date:** 2026-08-28
+- **Candidates:** Taleshape Shaper; GraphDeco official Gaussian Splatting; a Major-native dashboard; vendored 3DGS runtime
+- **Decision:** INTEGRATE Shaper through a bounded read adapter and dashboard artifact; USE GraphDeco as a reference and HARVEST its operating constraints into a canonical skill
+- **Reason:** Shaper already supplies the replaceable SQL/dashboard layer under MPL-2.0, while Major only needs a privacy-minimized export and current-state view. GraphDeco is the authoritative 3DGS implementation, but its license limits it to non-commercial research/evaluation and its CUDA/data footprint is unjustified for Major's P0.
+- **Major-specific layer retained:** skill routing, telemetry ownership, privacy policy, maturity/promotion evidence and dependency authority
+- **Rejected alternatives:** build a dashboard runtime; add Shaper as a Major dependency; vendor or execute GraphDeco code; claim native reconstruction from documentation alone
+- **Evidence:** official repositories reviewed at Shaper `084b5ab49c42bb7881db84011311b9d521352faf` and GraphDeco `54c035f7834b564019656c3e3fcc3646292f727d` on 2026-08-28; adapter, view, export, offline and privacy tests use Major's existing SQLite schema; no upstream source is copied.
+
 ## 2026-08-24 — Skills Library and reusable implementation discovery
 
 - **Capability:** promote the reconciled Major Skills Library and retrieve a proven reusable implementation before starting a new build.

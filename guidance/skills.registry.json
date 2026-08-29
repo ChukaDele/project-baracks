@@ -1,5 +1,5 @@
 {
-  "version": 18,
+  "version": 19,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -129,6 +129,20 @@
       "source": "major-internal",
       "availability": "all-projects",
       "load": "mcp-connector-plugin-integration-authentication-tool-exposure-reconnect-permission-provider-operation"
+    },
+    {
+      "id": "analytics-with-shaper",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "taleshape-shaper-sql-dashboard-analytics-observability-telemetry-csv",
+      "disclosure": "specialist"
+    },
+    {
+      "id": "gaussian-splatting-spatial-reconstruction",
+      "source": "major-internal",
+      "availability": "spatial-projects",
+      "load": "3d-gaussian-splatting-spatial-reconstruction-radiance-field-colmap-novel-view-splat",
+      "disclosure": "specialist"
     },
     {
       "id": "source-ingestion",

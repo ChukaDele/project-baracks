@@ -1,0 +1,16 @@
+{
+  "skill": "gaussian-splatting-spatial-reconstruction",
+  "should_trigger": [
+    "Reconstruct a consented room capture with 3D Gaussian Splatting and render novel views.",
+    "Assess the official GraphDeco gaussian-splatting repository before adding a spatial reconstruction adapter.",
+    "Prepare a COLMAP scene for gaussian-splatting-spatial-reconstruction."
+  ],
+  "should_not_trigger": [
+    "Apply a Gaussian blur kernel to soften this photograph.",
+    "Fit a Gaussian distribution to the latency samples and chart it.",
+    "Build a Taleshape Shaper dashboard from provider telemetry."
+  ],
+  "conflicts": [
+    "This skill owns 3D reconstruction workflow and spatial-data gates; analytics-with-shaper owns SQL analytics; dependency owns package mechanics after adoption is authorised."
+  ]
+}
