@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { skillContentSha256 } from '../src/skills/catalog.js';
 
 const roots: string[] = [];
 const priorHome = process.env.MAJOR_HOME;
@@ -435,6 +436,7 @@ describe('installed host skill commands', () => {
     expect(readFileSync(join(target, 'MAJOR_SKILLS.lock'), 'utf8')).not.toContain(
       '\nproject-owned\n',
     );
+    expect(readdirSync(join(home, '.major', 'project-skill-receipts'))).toHaveLength(1);
     for (const id of managed) {
       expect(existsSync(join(target, '.claude', 'commands', 'major', `${id}.md`))).toBe(true);
       expect(existsSync(join(target, '.codex', 'prompts', 'major', `${id}.md`))).toBe(true);
@@ -447,6 +449,19 @@ describe('installed host skill commands', () => {
         env,
         encoding: 'utf8',
       });
+    const receiptDirectory = join(home, '.major', 'project-skill-receipts');
+    const receiptPath = join(receiptDirectory, readdirSync(receiptDirectory)[0]!);
+    const validReceipt = readFileSync(receiptPath, 'utf8');
+    rmSync(receiptPath);
+    for (const attempt of [
+      ['skill', 'resolve', '--task', 'Animate this interface', '--skill', 'animate', '--json'],
+      ['skill', 'resolve', '--task', 'Use animate for this frontend design', '--json'],
+    ]) {
+      const missingReceipt = cli(attempt);
+      expect(missingReceipt.status).not.toBe(0);
+      expect(missingReceipt.stderr).toContain('project installed skill receipt is missing');
+    }
+    writeFileSync(receiptPath, validReceipt);
     const search = cli(['skill', 'search', '--query', 'animate']);
     expect(search.status, search.stderr).toBe(0);
     expect(search.stdout).toContain('animate');
@@ -521,8 +536,52 @@ describe('installed host skill commands', () => {
       '--json',
     ]);
     expect(tampered.status).not.toBe(0);
-    expect(tampered.stderr).toContain('project installed skill content/provenance drifted');
+    expect(tampered.stderr).toContain(
+      'project installed skill receipt drifted from the project projection',
+    );
     writeFileSync(projectedRegistryPath, validProjection);
+
+    const projectedCatalogPath = join(target, '.agents', 'skills.catalog.json');
+    const replacedBody = join(target, '.agents', 'skills', 'animate', 'SKILL.md');
+    writeFileSync(
+      replacedBody,
+      `${readFileSync(replacedBody, 'utf8')}\nUnreceipted replacement body.\n`,
+    );
+    const replacementHash = skillContentSha256(dirname(replacedBody));
+    const forgedRegistry = JSON.parse(readFileSync(projectedRegistryPath, 'utf8')) as {
+      entries: Array<{
+        id: string;
+        version?: string;
+        provenance?: { contentIdentity?: { value?: string } };
+      }>;
+    };
+    const forgedRegistryEntry = forgedRegistry.entries.find((entry) => entry.id === 'animate')!;
+    forgedRegistryEntry.version = `project-content-sha256:${replacementHash}`;
+    forgedRegistryEntry.provenance!.contentIdentity!.value = replacementHash;
+    writeFileSync(projectedRegistryPath, JSON.stringify(forgedRegistry, null, 2) + '\n');
+    const forgedCatalog = JSON.parse(readFileSync(projectedCatalogPath, 'utf8')) as {
+      entries: Array<{
+        id: string;
+        version?: string;
+        contentSha256?: string;
+        provenance?: unknown;
+      }>;
+    };
+    const forgedCatalogEntry = forgedCatalog.entries.find((entry) => entry.id === 'animate')!;
+    forgedCatalogEntry.version = `project-content-sha256:${replacementHash}`;
+    forgedCatalogEntry.contentSha256 = replacementHash;
+    forgedCatalogEntry.provenance = forgedRegistryEntry.provenance;
+    writeFileSync(projectedCatalogPath, JSON.stringify(forgedCatalog, null, 2) + '\n');
+    for (const attempt of [
+      ['skill', 'resolve', '--task', 'Animate this interface', '--skill', 'animate', '--json'],
+      ['skill', 'resolve', '--task', 'Use animate for this frontend design', '--json'],
+    ]) {
+      const rejectedReplacement = cli(attempt);
+      expect(rejectedReplacement.status).not.toBe(0);
+      expect(rejectedReplacement.stderr).toContain(
+        'project installed skill receipt drifted from the project projection',
+      );
+    }
 
     const userCommand = join(target, '.claude', 'commands', 'project-owned.md');
     mkdirSync(dirname(userCommand), { recursive: true });
@@ -535,6 +594,13 @@ describe('installed host skill commands', () => {
     const coreRegistry = JSON.parse(
       readFileSync(join(target, '.agents', 'skills.registry.json'), 'utf8'),
     ) as { entries: Array<{ id: string }> };
+    const receiptNames = readdirSync(join(home, '.major', 'project-skill-receipts'));
+    expect(receiptNames).toHaveLength(1);
+    const downgradedReceipt = JSON.parse(
+      readFileSync(join(home, '.major', 'project-skill-receipts', receiptNames[0]!), 'utf8'),
+    ) as { selection: { profile: string }; external: unknown[] };
+    expect(downgradedReceipt.selection.profile).toBe('core');
+    expect(downgradedReceipt.external).toEqual([]);
     expect(coreRegistry.entries.map((entry) => entry.id)).not.toContain('animate');
     expect(existsSync(join(target, '.claude', 'commands', 'major', 'animate.md'))).toBe(false);
     expect(existsSync(join(target, '.gemini', 'commands', 'major', 'animate.toml'))).toBe(false);

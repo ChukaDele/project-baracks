@@ -3,6 +3,14 @@ set -euo pipefail
 
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL_TARGET="${1:-$(pwd)}"
+mkdir -p "$INSTALL_TARGET"
+INSTALL_TARGET="$(cd "$INSTALL_TARGET" && pwd -P)"
+MAJOR_HOME="${MAJOR_HOME:-${HOME:?HOME is required}/.major}"
+mkdir -p "$MAJOR_HOME"
+MAJOR_HOME="$(cd "$MAJOR_HOME" && pwd -P)"
+case "$MAJOR_HOME/" in
+  "$INSTALL_TARGET/"*) echo "ERROR: MAJOR_HOME must be outside the project tree for installer-owned receipts" >&2; exit 2 ;;
+esac
 PROFILE="${2:-core}"
 FEATURES="${3:-}"
 
@@ -183,12 +191,25 @@ PY
 } > "$LOCK"
 rm -f "$TARGET/.agents/managed-external.tsv"
 
+PROJECT_IDENTITY="$(printf '%s' "$INSTALL_TARGET" | shasum -a 256 | awk '{print $1}')"
+RECEIPT_DIR="$MAJOR_HOME/project-skill-receipts"
+RECEIPT="$RECEIPT_DIR/$PROJECT_IDENTITY.json"
+STAGED_RECEIPT="$TMP/project-skill-receipt.json"
+mkdir -p "$RECEIPT_DIR"
+node "$MAJOR_ROOT/scripts/materialize-project-skill-registry.mjs" receipt \
+  "$MAJOR_ROOT" "$TARGET" "$PROFILE" "$FEATURES" "$SOURCE_LOCKS" "$INSTALL_TARGET" > "$STAGED_RECEIPT"
+
 # Activate only after every source, skill, catalogue, rule and command artifact
 # has been staged and validated. Roll back all managed roots if activation fails.
 BACKUP="$TMP/backup"
 mkdir -p "$BACKUP"
 activated=""
+receipt_activated=0
 rollback_install() {
+  if [ "$receipt_activated" -eq 1 ]; then
+    rm -f "$RECEIPT"
+    [ ! -e "$BACKUP/receipt.json" ] || mv "$BACKUP/receipt.json" "$RECEIPT"
+  fi
   for managed in $activated; do
     rm -rf "$INSTALL_TARGET/$managed"
     [ ! -e "$BACKUP/$managed" ] || mv "$BACKUP/$managed" "$INSTALL_TARGET/$managed"
@@ -200,6 +221,9 @@ for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
   activated="$managed $activated"
   [ ! -e "$STAGED_TARGET/$managed" ] || mv "$STAGED_TARGET/$managed" "$INSTALL_TARGET/$managed"
 done
+[ ! -e "$RECEIPT" ] || mv "$RECEIPT" "$BACKUP/receipt.json"
+receipt_activated=1
+mv "$STAGED_RECEIPT" "$RECEIPT"
 trap - ERR INT TERM
 rm -rf "$TMP"
 echo "Major skills installed and validated into $INSTALL_TARGET"

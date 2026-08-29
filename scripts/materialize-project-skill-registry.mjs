@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const [command, rootArg, targetArg, profile, featuresArg = '', locksArg = ''] =
+const [command, rootArg, targetArg, profile, featuresArg = '', locksArg = '', projectArg = ''] =
   process.argv.slice(2);
 if (
-  !['normalize-features', 'plan', 'materialize'].includes(command) ||
+  !['normalize-features', 'plan', 'materialize', 'receipt'].includes(command) ||
   !rootArg ||
   !targetArg ||
   !profile
 )
   throw new Error(
-    'usage: materialize-project-skill-registry.mjs normalize-features|plan|materialize ROOT TARGET PROFILE [FEATURES] [LOCKS]',
+    'usage: materialize-project-skill-registry.mjs normalize-features|plan|materialize|receipt ROOT TARGET PROFILE [FEATURES] [LOCKS] [PROJECT]',
   );
 const root = resolve(rootArg);
 const target = resolve(targetArg);
@@ -75,6 +75,48 @@ for (const row of locksArg.split(';').filter(Boolean)) {
   if (!key || !repository || !/^[0-9a-f]{40}$/.test(commit ?? ''))
     throw new Error('invalid source lock');
   locks.set(key, { repository, commit });
+}
+if (command === 'receipt') {
+  if (!projectArg) throw new Error('receipt requires a canonical project path');
+  const projectPath = realpathSync(projectArg);
+  const registryPath = join(target, '.agents', 'skills.registry.json');
+  const catalogPath = join(target, '.agents', 'skills.catalog.json');
+  const projectedRegistry = JSON.parse(readFileSync(registryPath, 'utf8'));
+  const projectedCatalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
+  const external = projectedRegistry.entries
+    .filter((entry) => entry.sourceKind === 'PROJECT_LOCAL' && entry.source !== 'gbrain-generated')
+    .map((entry) => ({
+      id: entry.id,
+      contentSha256: contentHash(join(target, '.agents', 'skills', entry.id)),
+      provenance: entry.provenance,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  process.stdout.write(
+    JSON.stringify(
+      {
+        version: 1,
+        project: {
+          canonicalPath: projectPath,
+          identitySha256: createHash('sha256').update(projectPath).digest('hex'),
+        },
+        canonicalRegistryVersion: registry.version,
+        selection: { profile, features: featureValues },
+        sourceLocks: [...locks.entries()]
+          .sort()
+          .map(([sourceKey, lock]) => ({ sourceKey, ...lock })),
+        projections: {
+          registrySha256: createHash('sha256').update(readFileSync(registryPath)).digest('hex'),
+          catalogueSha256: createHash('sha256').update(readFileSync(catalogPath)).digest('hex'),
+          registryVersion: projectedRegistry.version,
+          catalogueRegistryVersion: projectedCatalog.registryVersion,
+        },
+        external,
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+  process.exit(0);
 }
 const internalEntries = registry.entries.filter((entry) => entry.source === 'major-internal');
 const managedRoot = join(target, '.agents', 'skills');

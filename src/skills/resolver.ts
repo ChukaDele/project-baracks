@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import {
@@ -350,6 +351,46 @@ function validatedProjectRegistryPath(cwd: string): string | undefined {
   const expectedSourceKeys = [...new Set(selectedContracts.map((entry) => entry.projectInstall!.sourceKey))].sort();
   if (sources.length !== expectedSourceKeys.length || sources.some((source) => !expectedSourceKeys.includes(source.sourceKey ?? '')))
     throw new Error('project skill projection source lock set drifted');
+  const canonicalProjectPath = realpathSync(cwd);
+  const projectIdentity = createHash('sha256').update(canonicalProjectPath).digest('hex');
+  const receiptHome = resolve(majorHome());
+  if (receiptHome === canonicalProjectPath || receiptHome.startsWith(`${canonicalProjectPath}${sep}`))
+    throw new Error('project installed skill receipt authority must be outside the project tree');
+  const receiptPath = join(receiptHome, 'project-skill-receipts', `${projectIdentity}.json`);
+  if (!existsSync(receiptPath))
+    throw new Error(`project installed skill receipt is missing: ${receiptPath}`);
+  let receipt: {
+    version?: number;
+    project?: { canonicalPath?: string; identitySha256?: string };
+    canonicalRegistryVersion?: number;
+    selection?: { profile?: string; features?: string[] };
+    sourceLocks?: unknown[];
+    projections?: { registrySha256?: string; catalogueSha256?: string; registryVersion?: number; catalogueRegistryVersion?: number };
+    external?: Array<{ id?: string; contentSha256?: string; provenance?: unknown }>;
+  };
+  try {
+    receipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as typeof receipt;
+  } catch {
+    throw new Error('project installed skill receipt is invalid or drifted');
+  }
+  const sha256File = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
+  if (
+    receipt.version !== 1 ||
+    receipt.project?.canonicalPath !== canonicalProjectPath ||
+    receipt.project.identitySha256 !== projectIdentity ||
+    receipt.canonicalRegistryVersion !== canonical.version ||
+    receipt.selection?.profile !== profile ||
+    JSON.stringify(receipt.selection.features) !== JSON.stringify(features) ||
+    JSON.stringify(receipt.sourceLocks) !== JSON.stringify(sources) ||
+    receipt.projections?.registrySha256 !== sha256File(path) ||
+    receipt.projections.catalogueSha256 !== sha256File(catalogPath) ||
+    receipt.projections.registryVersion !== projected.version ||
+    receipt.projections.catalogueRegistryVersion !== catalog.registryVersion
+  )
+    throw new Error('project installed skill receipt drifted from the project projection');
+  const receiptExternal = new Map((receipt.external ?? []).map((entry) => [entry.id, entry]));
+  if (receiptExternal.size !== projectedExternal.length)
+    throw new Error('project installed skill receipt external set drifted');
   for (const entry of projectedExternal) {
     const identity = catalogById.get(entry.id);
     const body = containedSkillPath(join(cwd, '.agents', 'skills'), entry.id, 'SKILL.md');
@@ -358,7 +399,10 @@ function validatedProjectRegistryPath(cwd: string): string | undefined {
     const sourceLock = sources.find((source) => source.sourceKey === expected.contract.sourceKey);
     const expectedLoad = expected.contract.mode === 'bundle' ? entry.id : expected.entry.load;
     const expectedDisclosure = expected.entry.disclosure ?? 'specialist';
+    const recorded = receiptExternal.get(entry.id);
     if (!identity?.contentSha256 || !existsSync(body) || skillContentSha256(body) !== identity.contentSha256 ||
+      recorded?.contentSha256 !== identity.contentSha256 ||
+      JSON.stringify(recorded?.provenance) !== JSON.stringify(entry.provenance) ||
       entry.sourceKind !== 'PROJECT_LOCAL' || entry.source !== expected.entry.source ||
       entry.availability !== expected.entry.availability || entry.load !== expectedLoad ||
       entry.disclosure !== expectedDisclosure || entry.aliases.length !== 0 ||
