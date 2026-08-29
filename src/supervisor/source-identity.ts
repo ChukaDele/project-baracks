@@ -1,11 +1,53 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { hashSourceWorkspaceTree } from '../execution/workspace-transfer.js';
+import type { CanonicalTaskBindingResult } from '../domain/completion.js';
 
 export interface SupervisorSourceIdentity {
   sourceHead: string;
   sourceTreeDigest: string;
   frozenAt: string;
+}
+
+export type SupervisorCandidateRecord =
+  | (SupervisorSourceIdentity & { resolution: 'no_task' })
+  | (SupervisorSourceIdentity & {
+      resolution: 'task';
+      task: {
+        taskId: string;
+        projectId: string;
+        frozenCriteriaJson: string;
+      };
+    })
+  | (SupervisorSourceIdentity & {
+      resolution: 'ambiguous' | 'invalid_project' | 'invalid_task';
+      failure: string;
+    });
+
+export function freezeSupervisorCandidate(
+  resolution: CanonicalTaskBindingResult,
+  source: SupervisorSourceIdentity,
+): SupervisorCandidateRecord {
+  if (resolution.ok) {
+    return {
+      ...source,
+      resolution: 'task',
+      task: {
+        taskId: resolution.binding.taskId,
+        projectId: resolution.binding.projectId,
+        frozenCriteriaJson: resolution.binding.frozenCriteriaJson,
+      },
+    };
+  }
+  return resolution.kind === 'no_task'
+    ? { ...source, resolution: 'no_task' }
+    : { ...source, resolution: resolution.kind, failure: resolution.failure };
+}
+
+export function candidateDispatchFailure(candidate: SupervisorCandidateRecord): string | undefined {
+  return candidate.resolution === 'task' || candidate.resolution === 'no_task'
+    ? undefined
+    : candidate.failure;
 }
 
 export function gitCommonDir(repoPath: string): string | undefined {

@@ -160,6 +160,15 @@ installation and installed behavior proof follow normal merge.
 - Independent grade application performs the final live HEAD/tree read while holding the atomic
   supervisor-state mutation boundary. A mismatch clears pending completion, reopens the goal, and
   throws before project-grade projection, closing the prior check-to-apply race.
+- Every provider cycle now freezes one discriminated candidate record before dispatch: task
+  candidates include canonical task/project/criteria binding, no-task candidates record that
+  resolution explicitly, and ambiguous/invalid resolutions persist diagnostic identity but cannot
+  dispatch or become completion authority.
+- Non-refining admission backfills typed risk from the preserved durable goal outcome inside the
+  atomic admission mutation. A newer ignored message cannot downgrade the existing goal contract.
+- Passing independent grades re-resolve the candidate binding and re-run canonical task promotion
+  proof inside the final state boundary. Task status, criteria, evidence, BLOCKER, repository, or
+  binding drift atomically reopens the goal; no-task candidates also reopen if a task appears.
 - No-task promotion contracts are deterministically classified from Major-owned operation facts
   before dispatch; material-risk proof uses exact structured criterion/evidence records persisted in
   pending completion rather than matching free-text prefixes.
@@ -242,6 +251,12 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   same-HEAD tree mutation and committed-HEAD replacement both reopen without grading. The affected
   gate passed 100/100 focused tests across five files plus typecheck, targeted lint, formatting, and
   diff checks; the full matrix remains intentionally unrun.
+- Discriminated candidate/final-task-proof repair: task, no-task, ambiguous, and invalid resolution
+  share one frozen pre-dispatch record; non-authoritative bindings stop before provider execution;
+  preserved-outcome risk backfill cannot use ignored input; and final passing grades re-resolve and
+  re-prove canonical task authority. The affected gate passed 108/108 focused tests across six files
+  plus typecheck, targeted lint, formatting, and diff checks; the full matrix remains intentionally
+  unrun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -298,6 +313,10 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   and performed its last HEAD/tree check before the grade transition, allowing candidate mutation or
   a check-to-apply race. Focused foreground and grade-boundary regressions now protect durable
   pre-dispatch identity plus atomic same-tree and changed-HEAD rejection.
+- Replacement review regression: `cdcd736` froze identity only for no-task resolution, let a
+  non-refining admission backfill risk from ignored incoming text, and did not re-resolve/re-prove a
+  canonical task at final grade application. Focused candidate, admission, successful-task, and
+  late-BLOCKER regressions now protect those seams.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

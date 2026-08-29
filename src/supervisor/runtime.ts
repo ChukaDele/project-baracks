@@ -92,9 +92,11 @@ import { configuredExecutionPath, executionPathStatus } from '../execution/path.
 import { hashSourceWorkspaceTree } from '../execution/workspace-transfer.js';
 import {
   exactRepositoryHead,
+  candidateDispatchFailure,
+  freezeSupervisorCandidate,
   readSupervisorSourceIdentity,
   sourceIdentityMatches,
-  type SupervisorSourceIdentity,
+  type SupervisorCandidateRecord,
 } from './source-identity.js';
 
 export { exactRepositoryHead } from './source-identity.js';
@@ -658,7 +660,7 @@ ${hop?.canonicalTask ? `\nQUALIFYING CANONICAL TASK:\n- task id: ${hop.canonical
 FROZEN NO-TASK PROMOTION CONTRACT:
 ${JSON.stringify(goal.promotionContract ?? deriveSupervisorPromotionContract({ admissionRiskAssessment: goal.admissionRiskAssessment, requiredOperations: goal.requiredOperations, autonomous: goal.autonomous }))}
 This contract is Major-owned and was fixed before this report; report evidence cannot redefine it.
-${goal.candidateSourceIdentity ? `FROZEN NO-TASK CANDIDATE SOURCE IDENTITY:\n${JSON.stringify(goal.candidateSourceIdentity)}\nValidate and report only this exact HEAD and source-tree digest; any mutation requires a new candidate cycle.\n` : ''}
+${goal.candidate ? `FROZEN CANDIDATE:\n${JSON.stringify(goal.candidate)}\nValidate and report only this exact candidate binding, HEAD, and source-tree digest; any mutation or binding change requires a new candidate cycle.\n` : ''}
 
 ${workspaceContract}
 
@@ -941,7 +943,7 @@ async function runPendingCompletionReview(
   maxTimeoutMs?: number,
 ): Promise<void> {
   const pending = goal.pendingCompletion;
-  if (!pending?.sourceHead || !pending.sourceTreeDigest) {
+  if (!pending?.sourceHead || !pending.sourceTreeDigest || !pending.candidate) {
     updateGoal(goal.id, {
       status: 'active',
       pendingCompletion: undefined,
@@ -1256,26 +1258,25 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
   }
   const workerStartedAtMs = Date.now();
   let canonicalTask: CanonicalTaskBinding | undefined;
-  let noTaskCandidateSourceIdentity: SupervisorSourceIdentity | undefined;
+  let candidate: SupervisorCandidateRecord | undefined;
   const taskState = openDb();
   try {
     const resolvedTask = resolveCanonicalTaskBinding(taskState.db, goal.repoPath);
-    if (resolvedTask.ok) canonicalTask = resolvedTask.binding;
-    else if (resolvedTask.kind === 'no_task') {
-      noTaskCandidateSourceIdentity = readSupervisorSourceIdentity(goal.repoPath);
-      if (!noTaskCandidateSourceIdentity) {
-        updateGoal(goal.id, {
-          status: 'active',
-          activePid: undefined,
-          lastFinishedAt: new Date().toISOString(),
-          lastSummary: 'No-task candidate source identity could not be frozen before dispatch.',
-          nextRunAt: new Date(Date.now() + 10_000).toISOString(),
-          pendingCompletion: undefined,
-          retryImmediately: false,
-        });
-        return;
-      }
+    const sourceIdentity = readSupervisorSourceIdentity(goal.repoPath);
+    if (!sourceIdentity) {
+      updateGoal(goal.id, {
+        status: 'active',
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary: 'Candidate source identity could not be frozen before dispatch.',
+        nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+        pendingCompletion: undefined,
+        retryImmediately: false,
+      });
+      return;
     }
+    candidate = freezeSupervisorCandidate(resolvedTask, sourceIdentity);
+    if (resolvedTask.ok) canonicalTask = resolvedTask.binding;
   } finally {
     taskState.sqlite.close();
   }
@@ -1291,21 +1292,41 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     // actually requires the human action.
     ownerGate: undefined,
     pendingCompletion: undefined,
-    candidateSourceIdentity: noTaskCandidateSourceIdentity,
+    candidate,
   });
-  goal.candidateSourceIdentity = noTaskCandidateSourceIdentity;
-  if (
-    noTaskCandidateSourceIdentity &&
-    !sourceIdentityMatches(
-      noTaskCandidateSourceIdentity,
-      readSupervisorSourceIdentity(goal.repoPath),
-    )
-  ) {
+  goal.candidate = candidate;
+  const dispatchFailure = candidate ? candidateDispatchFailure(candidate) : 'candidate missing';
+  let taskHeadFailure: string | undefined;
+  if (candidate?.resolution === 'task') {
+    try {
+      const progressive = parseCompletionCriteria(
+        candidate.task.frozenCriteriaJson,
+      ).progressiveValidation;
+      if (progressive && progressive.candidateHead !== candidate.sourceHead) {
+        taskHeadFailure = 'canonical task criteria target a different candidate head';
+      }
+    } catch (error) {
+      taskHeadFailure = `canonical task criteria are invalid: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+  if (dispatchFailure || taskHeadFailure) {
     updateGoal(goal.id, {
       status: 'active',
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
-      lastSummary: 'No-task candidate source identity changed before worker dispatch.',
+      lastSummary: `Canonical task resolution refused worker dispatch: ${dispatchFailure ?? taskHeadFailure}`,
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      pendingCompletion: undefined,
+      retryImmediately: false,
+    });
+    return;
+  }
+  if (candidate && !sourceIdentityMatches(candidate, readSupervisorSourceIdentity(goal.repoPath))) {
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: 'Candidate source identity changed before worker dispatch.',
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
       pendingCompletion: undefined,
       retryImmediately: false,
@@ -1466,17 +1487,14 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       return;
     }
     if (report?.status === 'done') {
-      if (
-        noTaskCandidateSourceIdentity &&
-        !sourceIdentityMatches(noTaskCandidateSourceIdentity, finishedSourceIdentity)
-      ) {
+      if (candidate && !sourceIdentityMatches(candidate, finishedSourceIdentity)) {
         updateGoal(goal.id, {
           status: 'active',
           consecutiveFailures: 0,
           activePid: undefined,
           lastFinishedAt: new Date().toISOString(),
           lastSummary:
-            'Worker done claim refused because the frozen no-task candidate source identity changed during validation.',
+            'Worker done claim refused because the frozen candidate source identity changed during validation.',
           nextRunAt: new Date(Date.now() + 10_000).toISOString(),
           pendingCompletion: undefined,
           retryImmediately: false,
@@ -1529,6 +1547,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
           ...(finishedSourceIdentity
             ? { sourceTreeDigest: finishedSourceIdentity.sourceTreeDigest }
             : {}),
+          ...(candidate ? { candidate: structuredClone(candidate) } : {}),
           ...('promotionEvidence' in promotionProof && promotionProof.promotionEvidence
             ? { promotionEvidence: promotionProof.promotionEvidence }
             : {}),

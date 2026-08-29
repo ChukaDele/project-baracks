@@ -70,6 +70,31 @@ describe('admitGoal', () => {
     expect(second.goal.goal).toBe('Ship the MVP');
   });
 
+  it('backfills risk only from the preserved durable outcome', () => {
+    const repoPath = fakeRepo();
+    const first = admitGoal({
+      project: 'jss-tool',
+      repoPath,
+      outcome: 'Repair authentication and session access control',
+      refine: false,
+    });
+    expect(first.goal.admissionRiskAssessment).toBeUndefined();
+    const resumed = admitGoal({
+      project: 'jss-tool',
+      repoPath,
+      outcome: 'ignored low-risk copy edit message',
+      admissionRiskAssessment: assessSupervisorAdmissionRisk({
+        outcome: 'ignored low-risk copy edit message',
+        policy,
+      }),
+      assessPreservedOutcome: (outcome) => assessSupervisorAdmissionRisk({ outcome, policy }),
+      refine: false,
+    });
+    expect(resumed.goal.goal).toBe('Repair authentication and session access control');
+    expect(resumed.goal.admissionRiskAssessment?.classification).toBe('high_consequence');
+    expect(resumed.goal.promotionContract?.review).toBe('independent');
+  });
+
   it('overwrites the outcome only when refine is explicitly set', () => {
     const repoPath = fakeRepo();
     admitGoal({ project: 'jss-tool', repoPath, outcome: 'Ship the MVP', refine: false });

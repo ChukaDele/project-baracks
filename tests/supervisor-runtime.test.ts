@@ -27,6 +27,10 @@ import type { ProviderInfo } from '../src/providers/types.js';
 import type { CapabilityRecord } from '../src/capabilities/registry.js';
 import { writeCodexUsageReport } from '../src/providers/codex-usage.js';
 import { hashSourceWorkspaceTree } from '../src/execution/workspace-transfer.js';
+import {
+  candidateDispatchFailure,
+  freezeSupervisorCandidate,
+} from '../src/supervisor/source-identity.js';
 import { model } from './helpers.js';
 
 const roots: string[] = [];
@@ -71,6 +75,43 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('freezes every task-resolution outcome and refuses ambiguous dispatch authority', () => {
+    const source = {
+      sourceHead: 'a'.repeat(40),
+      sourceTreeDigest: 'b'.repeat(64),
+      frozenAt: '2026-08-29T00:00:00.000Z',
+    };
+    const task = freezeSupervisorCandidate(
+      {
+        ok: true,
+        binding: {
+          taskId: 'task-1',
+          projectId: 'project-1',
+          repoPath: '/repo',
+          frozenCriteriaJson: '{}',
+        },
+      },
+      source,
+    );
+    expect(task).toMatchObject({ resolution: 'task', task: { taskId: 'task-1' }, ...source });
+    expect(candidateDispatchFailure(task)).toBeUndefined();
+    const noTask = freezeSupervisorCandidate(
+      { ok: false, kind: 'no_task', failure: 'none' },
+      source,
+    );
+    expect(noTask).toEqual({ ...source, resolution: 'no_task' });
+    const ambiguous = freezeSupervisorCandidate(
+      { ok: false, kind: 'ambiguous', failure: 'two qualifying tasks' },
+      source,
+    );
+    expect(ambiguous).toEqual({
+      ...source,
+      resolution: 'ambiguous',
+      failure: 'two qualifying tasks',
+    });
+    expect(candidateDispatchFailure(ambiguous)).toBe('two qualifying tasks');
+  });
+
   it('reopens post-review completion before receipt authority when exact HEAD is unavailable or changed', () => {
     const patch = postReviewSourceChangePatch('/not/a/repository', 'a'.repeat(40), 'digest');
     expect(patch).toMatchObject({

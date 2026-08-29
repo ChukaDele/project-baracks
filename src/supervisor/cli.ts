@@ -592,6 +592,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       repoPath: project.repoPath,
       outcome,
       admissionRiskAssessment: assessSupervisorAdmissionRisk({ outcome, policy }),
+      assessPreservedOutcome: (preservedOutcome) =>
+        assessSupervisorAdmissionRisk({ outcome: preservedOutcome, policy }),
       ...(host ? { preferredCoordinator: host } : {}),
       refine: hasFlag(args, '--refine'),
     });

@@ -17,12 +17,18 @@ import {
 import type { WorkerReport } from '../src/supervisor/worker-report.js';
 import { openDb } from '../src/db/client.js';
 import { runPerformanceObservations } from '../src/db/schema.js';
+import { reviewFindings } from '../src/db/schema.js';
 import {
   recordPerformanceObservation,
   recordIndependentReviewExecution,
   RUN_INSIGHT_SCHEMA,
 } from '../src/insights/performance-history.js';
 import { readSupervisorSourceIdentity } from '../src/supervisor/source-identity.js';
+import { addProject } from '../src/config/project-service.js';
+import { projectConfigSchema } from '../src/config/project-config.js';
+import { addTask, getTask, transitionTask } from '../src/domain/task-service.js';
+import { newId } from '../src/domain/ids.js';
+import { recordQualifyingVerification } from './helpers.js';
 
 let root: string;
 let controlRoot: string;
@@ -53,6 +59,7 @@ function pendingGoal(): SupervisorGoal {
       claimedAt: '2026-08-11T00:01:00.000Z',
       sourceHead: sourceIdentity.sourceHead,
       sourceTreeDigest: sourceIdentity.sourceTreeDigest,
+      candidate: { ...sourceIdentity, resolution: 'no_task' },
       promotionEvidence: {
         focusedTests: 'focused tests passed',
         cheapestCompileTypeOrBuild: 'typecheck passed',
@@ -109,6 +116,34 @@ function reviewReceiptId(
       evidence,
     },
   });
+}
+
+function bindPendingToCanonicalTask() {
+  const sourceIdentity = readSupervisorSourceIdentity(root)!;
+  const project = addProject(
+    reviewDb.db,
+    projectConfigSchema.parse({ name: 'major', repoPath: root }),
+  );
+  const task = addTask(reviewDb.db, { projectId: project.id, title: 'frozen candidate' });
+  transitionTask(reviewDb.db, task.id, 'ready');
+  for (const status of ['queued', 'running', 'verifying', 'reviewing', 'ready_to_merge'] as const) {
+    transitionTask(reviewDb.db, task.id, status);
+  }
+  const verification = recordQualifyingVerification(reviewDb.db, task.id);
+  const frozenCriteriaJson = getTask(reviewDb.db, task.id).completionCriteriaSnapshotJson!;
+  const current = readSupervisorState().goals[0]!;
+  updateGoal(current.id, {
+    pendingCompletion: {
+      ...current.pendingCompletion!,
+      taskId: task.id,
+      candidate: {
+        ...sourceIdentity,
+        resolution: 'task',
+        task: { taskId: task.id, projectId: project.id, frozenCriteriaJson },
+      },
+    },
+  });
+  return { task, verification };
 }
 
 beforeEach(() => {
@@ -282,6 +317,38 @@ describe('independent goal completion', () => {
     const reopened = readSupervisorState().goals[0]!;
     expect(reopened.status).toBe('active');
     expect(reopened.pendingCompletion).toBeUndefined();
+  });
+
+  it('re-runs canonical task promotion proof and reopens when a BLOCKER appears', () => {
+    const { task, verification } = bindPendingToCanonicalTask();
+    const receiptId = reviewReceiptId('claude', 'pass', 'task candidate reviewed');
+    reviewDb.db
+      .insert(reviewFindings)
+      .values({
+        id: newId('rfind'),
+        taskId: task.id,
+        agentRunId: verification.run.id,
+        severity: 'critical',
+        summary: 'late authority blocker',
+      })
+      .run();
+    expect(() =>
+      applyIndependentCompletionGrade({ goalId: 'goal-1', receiptId, db: reviewDb.db }),
+    ).toThrow(/open BLOCKER review finding/i);
+    const reopened = readSupervisorState().goals[0]!;
+    expect(reopened.status).toBe('active');
+    expect(reopened.pendingCompletion).toBeUndefined();
+  });
+
+  it('accepts a passing grade only while the frozen canonical task remains promotable', () => {
+    bindPendingToCanonicalTask();
+    const result = applyIndependentCompletionGrade({
+      goalId: 'goal-1',
+      receiptId: reviewReceiptId('claude', 'pass', 'task remains promotable'),
+      db: reviewDb.db,
+    });
+    expect(result.status).toBe('done');
+    expect(result.pendingCompletion).toBeUndefined();
   });
 
   it('reopens work when independent validation rejects the claim', () => {

@@ -141,10 +141,11 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     const goalId = (lastLog(logs) as { goalId: string }).goalId;
 
     runWorkerMock.mockImplementationOnce(async (input: { prompt: string }) => {
-      const identity = getGoal(goalId)?.candidateSourceIdentity;
+      const identity = getGoal(goalId)?.candidate;
+      expect(identity?.resolution).toBe('no_task');
       expect(identity?.sourceHead).toMatch(/^[a-f0-9]{40}$/);
       expect(identity?.sourceTreeDigest).toMatch(/^[a-f0-9]{64}$/);
-      expect(input.prompt).toContain('FROZEN NO-TASK CANDIDATE SOURCE IDENTITY');
+      expect(input.prompt).toContain('FROZEN CANDIDATE');
       return {
         host: 'codex',
         status: 'succeeded',
@@ -345,8 +346,8 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     // SECOND (non-exhausted) provider, with no further dispatch needed.
     expect(goal.pendingCompletion).toMatchObject({
       summary: 'shipped',
-      sourceHead: goal.candidateSourceIdentity?.sourceHead,
-      sourceTreeDigest: goal.candidateSourceIdentity?.sourceTreeDigest,
+      sourceHead: goal.candidate?.sourceHead,
+      sourceTreeDigest: goal.candidate?.sourceTreeDigest,
     });
     expect(goal.retryImmediately).toBe(false);
   });
