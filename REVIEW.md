@@ -21,6 +21,10 @@ Substantive ordinary work gets focused review. Authority, security, irreversible
 changes require independent exact-head review. Any code change after review invalidates the
 verdict; review the new exact head again.
 
+An `independent` task review is proven only by a succeeded review run with no recorded
+`independenceLoss`. A compromised same-provider review remains useful evidence but cannot satisfy
+the independent-review gate.
+
 A candidate is `PROMOTABLE` when its required pre-promotion evidence and selected review pass
 with no `BLOCKER` findings. `PROMOTABLE` permits the merge/install path; it does not claim
 installation or READY. IMPORTANT findings remain recorded triage and do not automatically block.

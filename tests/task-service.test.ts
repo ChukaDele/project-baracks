@@ -39,6 +39,7 @@ import {
   SuggestionApprovalUnavailableError,
   transitionTask,
 } from '../src/domain/task-service.js';
+import { coordinatorDonePromotionProof } from '../src/supervisor/runtime.js';
 import {
   completeTaskProperly,
   ensureObservedModel,
@@ -323,7 +324,7 @@ describe('completion proof and guarded completion transition', () => {
       projectId: project.id,
       title: 'progressively validated candidate',
       completionCriteriaJson: JSON.stringify({
-        progressiveValidation: { review: 'focused' },
+        progressiveValidation: { review: 'independent' },
       }),
     });
     transitionTask(db, task.id, 'ready');
@@ -353,6 +354,7 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'focused review',
+      independenceLoss: 'same-provider review',
     });
     setRunStatus(db, reviewRun.id, 'succeeded');
     const criteria = parseCompletionCriteria(getTask(db, task.id).completionCriteriaSnapshotJson);
@@ -366,7 +368,30 @@ describe('completion proof and guarded completion transition', () => {
         summary: 'valuable follow-up that does not prevent a safe MVP',
       })
       .run();
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'required review has not passed',
+    );
+
+    const independentReviewRun = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelRef: 'codex',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'independent review',
+    });
+    setRunStatus(db, independentReviewRun.id, 'succeeded');
     expect(evaluateCompletionProof(db, task.id, criteria).ok).toBe(true);
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { project: 'demo' },
+        { status: 'done', summary: 'canonical proof passed', taskId: task.id },
+      ),
+    ).toMatchObject({ ok: true, taskId: task.id });
+    expect(
+      coordinatorDonePromotionProof(db, { project: 'demo' }, { status: 'done', summary: 'claim' }),
+    ).toMatchObject({ ok: false, failures: ['done completion requires a canonical taskId'] });
 
     db.insert(reviewFindings)
       .values({
@@ -380,6 +405,32 @@ describe('completion proof and guarded completion transition', () => {
     const blocked = evaluateCompletionProof(db, task.id, criteria);
     expect(blocked.ok).toBe(false);
     expect(blocked.failures).toContain('BLOCKER findings remain');
+  });
+
+  it('records cost and expected information gain when broad validation is required', () => {
+    expect(() =>
+      parseCompletionCriteria(
+        JSON.stringify({
+          progressiveValidation: { broaderValidationTriggers: ['promotion_policy'] },
+        }),
+      ),
+    ).toThrow(/cost and expected information gain/);
+    expect(
+      parseCompletionCriteria(
+        JSON.stringify({
+          progressiveValidation: {
+            broaderValidationTriggers: ['promotion_policy'],
+            broadValidationJustification: {
+              cost: 'about two deterministic test minutes',
+              expectedInformationGain: 'detect migration and completion-trigger drift',
+            },
+          },
+        }),
+      ).progressiveValidation?.broadValidationJustification,
+    ).toEqual({
+      cost: 'about two deterministic test minutes',
+      expectedInformationGain: 'detect migration and completion-trigger drift',
+    });
   });
 
   it('enforces task-specific criteria (artifact and required decisions)', () => {

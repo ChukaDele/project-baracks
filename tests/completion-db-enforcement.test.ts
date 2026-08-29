@@ -71,6 +71,36 @@ function harness() {
 }
 
 describe('P1-3 database-enforced completion criteria', () => {
+  it('matches the strict service schema for progressive criteria', () => {
+    const { db, sqlite } = openDb(':memory:');
+    const project = seedProject(db);
+    const task = addTask(db, { projectId: project.id, title: 'strict progressive shape' });
+    const updateCriteria = (criteria: object) =>
+      sqlite
+        .prepare(`UPDATE tasks SET completion_criteria_json = ? WHERE id = ?`)
+        .run(JSON.stringify(criteria), task.id);
+
+    expect(() => updateCriteria({ progressiveValidation: { unexpectedField: true } })).toThrow(
+      /invalid task completion criteria/,
+    );
+    expect(() =>
+      updateCriteria({
+        progressiveValidation: { broaderValidationTriggers: ['promotion_policy'] },
+      }),
+    ).toThrow(/invalid task completion criteria/);
+    expect(() =>
+      updateCriteria({
+        progressiveValidation: {
+          broaderValidationTriggers: ['promotion_policy'],
+          broadValidationJustification: {
+            cost: 'two minutes',
+            expectedInformationGain: 'detect trigger drift',
+          },
+        },
+      }),
+    ).not.toThrow();
+  });
+
   it('captures the exact criteria at dispatch and refuses later weakening', () => {
     const { sqlite, task } = harness();
     const row = sqlite
@@ -148,7 +178,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       projectId: project.id,
       title: 'progressive direct-write gate',
       completionCriteriaJson: JSON.stringify({
-        progressiveValidation: { review: 'none' },
+        progressiveValidation: { review: 'independent' },
       }),
     });
     for (const status of [
@@ -174,6 +204,30 @@ describe('P1-3 database-enforced completion criteria', () => {
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'critical_path_behavior',
     });
+    const providerId = newId('aprov');
+    db.insert(agentProviders).values({ id: providerId, name: 'review-provider' }).run();
+    ensureObservedModel(db, providerId, 'review-model');
+    const compromised = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelRef: 'review-model',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'same-provider review',
+      independenceLoss: 'same-provider review',
+    });
+    setRunStatus(db, compromised.id, 'succeeded');
+    expect(() => forceComplete()).toThrow(/selected review/);
+
+    const independent = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelRef: 'review-model',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'independent review',
+    });
+    setRunStatus(db, independent.id, 'succeeded');
     forceComplete();
     expect(sqlite.prepare(`SELECT status FROM tasks WHERE id = ?`).get(task.id)).toMatchObject({
       status: 'completed',

@@ -23,6 +23,9 @@ Substantive. Risk: authority/process semantics. Review: independent.
 
 - Connect the progressive-validation plan and non-circular PROMOTABLE assessment to the existing
   coordinator, frozen completion-criteria, verification/evidence, and SQLite trigger paths.
+- Bind coordinator `done` to the canonical task and reject compromised review as independent proof.
+- Keep the strict service and SQLite criteria schemas aligned, including persisted validation cost
+  versus expected information gain.
 - Preserve compact state, review semantics, delivery evidence, and READY behavioral proof.
 - Run focused/risk-specific checks plus the cheapest relevant type check; do not run the full matrix.
 
@@ -93,6 +96,10 @@ installation and installed behavior proof follow normal merge.
   `minor`, NIT writes `info`, and legacy `major` remains a safe BLOCKER alias.
 - Canonical delivery evidence uses `BEHAVIORALLY PROVEN`; the prior British spelling remains an
   accepted read alias so existing records are not discarded.
+- Coordinator `done` claims require a canonical task ID whose frozen evidence is PROMOTABLE;
+  installation remains later proof and old pending-completion records remain readable.
+- Independent review requires a succeeded review run without `independenceLoss`; same-provider
+  review evidence cannot silently satisfy that gate.
 
 ## Completed evidence
 
@@ -116,6 +123,10 @@ installation and installed behavior proof follow normal merge.
   PROMOTABLE assessment, and enforce the same rules in SQLite. The proportional gate passed 89/89
   focused tests across policy, coordinator prompt, service completion, and direct-SQL enforcement;
   the full matrix was not rerun.
+- Fresh-review repair: coordinator completion is task-bound, independent review excludes compromised
+  runs, SQLite validates the strict progressive schema, and broad validation freezes cost and
+  expected information gain. The proportional gate passed 98/98 focused tests across five affected
+  files; the full matrix remains intentionally unrun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -142,6 +153,9 @@ installation and installed behavior proof follow normal merge.
 - Independent review regression: `b6433f8` left the new helpers disconnected from durable
   completion and lacked an explicit canonical-to-storage severity mapping. Focused service and
   direct-SQL regressions now prove IMPORTANT remains non-blocking and BLOCKER blocks.
+- Independent review regression: `14c2f4c` allowed coordinator completion outside canonical task
+  proof, counted compromised review as independent, accepted looser SQLite criteria, and described
+  rather than persisted validation economics. Focused boundary regressions now protect each seam.
 - Repository exception: the final resource gate has one pre-existing skill-reachability failure
   covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
   skips. The durable record does not recast that exception as candidate success.

@@ -10,7 +10,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { openDb } from '../db/client.js';
+import { openDb, type DbConn } from '../db/client.js';
+import { evaluateTaskPromotionProof } from '../domain/completion.js';
 import { getProjectByRepoPath } from '../config/project-service.js';
 import {
   listCapabilities,
@@ -67,7 +68,7 @@ import { computeProviderReadiness } from '../doctor/readiness.js';
 import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integration.js';
 import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
-import { completedWorkflow, parseWorkerReport } from './worker-report.js';
+import { completedWorkflow, parseWorkerReport, type WorkerReport } from './worker-report.js';
 import {
   RUN_INSIGHT_SCHEMA,
   recordPerformanceObservation,
@@ -75,6 +76,23 @@ import {
 import { configuredExecutionPath, executionPathStatus } from '../execution/path.js';
 
 export { parseWorkerReport } from './worker-report.js';
+
+export function coordinatorDonePromotionProof(
+  db: DbConn,
+  goal: Pick<SupervisorGoal, 'project'>,
+  report: WorkerReport,
+) {
+  if (report.status !== 'done') return undefined;
+  if (!report.taskId) {
+    return {
+      taskId: '',
+      ok: false,
+      failures: ['done completion requires a canonical taskId'],
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  return evaluateTaskPromotionProof(db, { taskId: report.taskId, project: goal.project });
+}
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
@@ -585,7 +603,7 @@ DURABLE CONTROL:
 You cannot access or mutate Major's global control state. Before ending, emit exactly one final
 single-line result for the parent coordinator to validate and apply:
   MAJOR_RESULT: {"status":"active","summary":"what now works and next critical path","assetCandidate":{"id":"reusable-id","kind":"module","summary":"what it implements","locator":"relative/path","tags":["tag"],"scope":"shared"}}
-  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence"}
+  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence","taskId":"canonical-task-id"}
   MAJOR_RESULT: {"status":"blocked","summary":"what is complete","ownerGate":"exact owner action"}
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
 
@@ -1112,6 +1130,30 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       return;
     }
     if (report?.status === 'done') {
+      const completionState = openDb();
+      let promotionProof: ReturnType<typeof coordinatorDonePromotionProof>;
+      try {
+        promotionProof = coordinatorDonePromotionProof(completionState.db, goal, report);
+      } finally {
+        completionState.sqlite.close();
+      }
+      if (!promotionProof?.ok) {
+        updateGoal(goal.id, {
+          status: 'active',
+          consecutiveFailures: 0,
+          activePid: undefined,
+          lastFinishedAt: new Date().toISOString(),
+          lastSummary:
+            `Worker done claim refused by canonical promotion proof: ` +
+            `${promotionProof?.failures.join('; ') ?? 'proof unavailable'}${learningWarning}`,
+          nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+          pendingCompletion: undefined,
+          retryImmediately: false,
+          ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
+        });
+        recordTerminalObservation();
+        return;
+      }
       const claimedAt = new Date().toISOString();
       updateGoal(goal.id, {
         status: 'active',
@@ -1120,7 +1162,13 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         lastFinishedAt: claimedAt,
         lastSummary: `Worker completion claim awaiting independent validation: ${report.summary}${learningWarning}`,
         nextRunAt: undefined,
-        pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
+        pendingCompletion: {
+          summary: report.summary,
+          coordinator: host,
+          claimedAt,
+          taskId: promotionProof.taskId,
+          promotionCheckedAt: promotionProof.checkedAt,
+        },
         retryImmediately: false,
         ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
       });

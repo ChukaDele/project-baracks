@@ -10,6 +10,8 @@ export const AMBIGUOUS_WORKER_REPORT_ENVELOPE = JSON.stringify({
 export interface WorkerReport {
   status: 'active' | 'blocked' | 'done';
   summary: string;
+  /** Canonical task whose durable evidence supports a done claim. */
+  taskId?: string;
   ownerGate?: string;
   learning?: {
     source: 'user-correction' | 'recurring-failure' | 'successful-procedure' | 'manual';
@@ -115,6 +117,8 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
     if (!['active', 'blocked', 'done'].includes(String(value.status))) return undefined;
     if (typeof value.summary !== 'string' || value.summary.trim().length === 0) return undefined;
     const summary = redactText(value.summary.trim()).slice(0, 12_000);
+    const taskId = typeof value.taskId === 'string' ? value.taskId.trim() : '';
+    if (value.taskId !== undefined && !/^[a-z][a-z0-9_-]{2,127}$/.test(taskId)) return undefined;
     const ownerGate =
       typeof value.ownerGate === 'string' ? redactText(value.ownerGate.trim()).slice(0, 4_000) : '';
     if (value.status === 'blocked' && !ownerGate) return undefined;
@@ -243,6 +247,7 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
     return {
       status: value.status as WorkerReport['status'],
       summary,
+      ...(taskId ? { taskId } : {}),
       ...(ownerGate ? { ownerGate } : {}),
       ...(learning ? { learning } : {}),
       ...(workflow ? { workflow } : {}),

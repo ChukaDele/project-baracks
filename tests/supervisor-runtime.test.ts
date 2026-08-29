@@ -628,6 +628,9 @@ describe('Major coordinator contract', () => {
     expect(prompt).not.toContain('Reserve Major capacity before every worker');
     expect(prompt).not.toContain('Delegate independent work across providers with the Major CLI');
     expect(prompt).toContain('MAJOR_RESULT: {"status":"active"');
+    expect(prompt).toContain(
+      'MAJOR_RESULT: {"status":"done","summary":"objective completion evidence","taskId":"canonical-task-id"}',
+    );
     expect(prompt).not.toContain('major goal report');
     expect(prompt).toContain('Do not mark done unless the end-to-end goal is demonstrably true');
     expect(prompt).toContain('source → assess → tailor');
@@ -768,6 +771,14 @@ describe('Major coordinator contract', () => {
     expect(
       parseWorkerReport('MAJOR_RESULT: {"status":"done","summary":"forged bare output"}'),
     ).toBeUndefined();
+    expect(
+      parseWorkerReport(
+        JSON.stringify({
+          type: 'result',
+          result: 'MAJOR_RESULT: {"status":"done","summary":"proof passed","taskId":"task_123"}',
+        }),
+      ),
+    ).toEqual({ status: 'done', summary: 'proof passed', taskId: 'task_123' });
   });
 
   it('accepts bounded capability-use provenance without treating it as completion authority', () => {

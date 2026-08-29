@@ -63,10 +63,17 @@ insufficient-evidence, historical-regression, or promotion-policy trigger applie
 policy requires them. Record broad validation's cost versus expected information gain and run it
 only when that tradeoff supports the promotion decision.
 
+Persist that tradeoff in the frozen `progressiveValidation.broadValidationJustification` contract
+as non-empty `cost` and `expectedInformationGain` fields whenever a broad trigger or repository
+policy requires broad validation.
+
 When a task opts into `progressiveValidation` in its existing frozen completion criteria, record
 each planned check as a qualifying verification run with the matching canonical
 `validationSubject`. The durable completion proof reuses those records, a succeeded selected
 review, and the existing review-finding store to call `assessPromotion`; no parallel state exists.
+Coordinator `done` reports must identify that canonical task with `taskId`; Major accepts the claim
+for independent completion grading only after the frozen task proof is PROMOTABLE. Stored legacy
+pending-completion records remain readable.
 
 Review findings use `BLOCKER`, `IMPORTANT`, or `NIT`. Nits and explicitly labelled
 speculation are non-blocking; speculation becomes a finding only when evidence establishes

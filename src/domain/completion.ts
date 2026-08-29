@@ -1,11 +1,13 @@
-import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbConn } from '../db/client.js';
 import {
   agentRuns,
   decisionRequests,
   evidence,
+  projects,
   reviewFindings,
+  tasks,
   verificationRuns,
 } from '../db/schema.js';
 import type { CompletionProof } from './lifecycle.js';
@@ -45,8 +47,27 @@ export const completionCriteriaSchema = z
         broaderValidationTriggers: z.enum(BROADER_VALIDATION_TRIGGERS).array().default([]),
         repositoryPolicyRequiresBroadValidation: z.boolean().default(false),
         review: z.enum(REVIEW_LEVELS).default('focused'),
+        broadValidationJustification: z
+          .object({
+            cost: z.string().trim().min(1),
+            expectedInformationGain: z.string().trim().min(1),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
+      .superRefine((value, context) => {
+        const broadRequired =
+          value.broaderValidationTriggers.length > 0 ||
+          value.repositoryPolicyRequiresBroadValidation;
+        if (broadRequired && !value.broadValidationJustification) {
+          context.addIssue({
+            code: 'custom',
+            path: ['broadValidationJustification'],
+            message: 'broad validation requires recorded cost and expected information gain',
+          });
+        }
+      })
       .optional(),
   })
   .strict();
@@ -60,6 +81,10 @@ export function parseCompletionCriteria(json: string | null | undefined): Comple
 export interface CompletionProofResult extends CompletionProof {
   failures: string[];
   checkedAt: string;
+}
+
+export interface TaskPromotionProofResult extends CompletionProofResult {
+  taskId: string;
 }
 
 export const REVIEW_SEVERITY_STORAGE = {
@@ -173,6 +198,7 @@ export function evaluateCompletionProof(
             eq(agentRuns.taskId, taskId),
             eq(agentRuns.purpose, 'review'),
             eq(agentRuns.status, 'succeeded'),
+            ...(progressive.review === 'independent' ? [isNull(agentRuns.independenceLoss)] : []),
           ),
         )
         .get()?.n ?? 0) > 0;
@@ -231,4 +257,55 @@ export function evaluateCompletionProof(
   }
 
   return { ok: failures.length === 0, failures, checkedAt: new Date().toISOString() };
+}
+
+/** Resolve a coordinator completion claim through the canonical task row and
+ * its immutable dispatch criteria. This is PROMOTABLE proof only: it neither
+ * installs the candidate nor claims READY. */
+export function evaluateTaskPromotionProof(
+  db: DbConn,
+  input: { taskId: string; project: string },
+): TaskPromotionProofResult {
+  const row = db
+    .select({
+      taskId: tasks.id,
+      status: tasks.status,
+      criteria: tasks.completionCriteriaSnapshotJson,
+      project: projects.name,
+    })
+    .from(tasks)
+    .innerJoin(projects, eq(tasks.projectId, projects.id))
+    .where(eq(tasks.id, input.taskId))
+    .get();
+  const checkedAt = new Date().toISOString();
+  if (!row) {
+    return {
+      taskId: input.taskId,
+      ok: false,
+      failures: ['canonical task does not exist'],
+      checkedAt,
+    };
+  }
+  const failures: string[] = [];
+  if (row.project !== input.project) failures.push('canonical task belongs to another project');
+  if (row.status !== 'ready_to_merge') {
+    failures.push(`canonical task is ${row.status}, not ready_to_merge`);
+  }
+  if (row.criteria === null) failures.push('canonical task has no frozen completion criteria');
+  if (failures.length > 0) return { taskId: row.taskId, ok: false, failures, checkedAt };
+  try {
+    return {
+      taskId: row.taskId,
+      ...evaluateCompletionProof(db, row.taskId, parseCompletionCriteria(row.criteria)),
+    };
+  } catch (error) {
+    return {
+      taskId: row.taskId,
+      ok: false,
+      failures: [
+        `canonical task completion criteria are invalid: ${error instanceof Error ? error.message : String(error)}`,
+      ],
+      checkedAt,
+    };
+  }
 }

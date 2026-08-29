@@ -113,6 +113,9 @@ export interface SupervisorGoal {
         summary: string;
         coordinator: WorkerHost;
         claimedAt: string;
+        /** Canonical task whose frozen proof made the claim PROMOTABLE. */
+        taskId?: string;
+        promotionCheckedAt?: string;
       }
     | undefined;
 }
