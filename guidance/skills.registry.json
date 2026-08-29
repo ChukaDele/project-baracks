@@ -383,7 +383,7 @@
       "vendorSkill": "vercel-optimize",
       "availability": "vercel-projects",
       "load": "vercel-performance-cost-reliability-caching-functions-billing",
-      "aliases": ["Vercel Optimize", "Vercel performance", "Vercel cost", "Vercel caching"],
+      "aliases": ["vercel-optimize", "vercel-performance", "vercel-cost", "vercel-caching"],
       "disclosure": "specialist"
     },
     {
@@ -393,7 +393,7 @@
       "vendorSkill": "vercel-react-best-practices",
       "availability": "vercel-projects",
       "load": "current React Next.js performance rendering bundle server guidance",
-      "aliases": ["React best practices", "Next.js performance", "React performance"],
+      "aliases": ["react-best-practices", "nextjs-performance", "react-performance"],
       "disclosure": "specialist"
     },
     {
@@ -403,7 +403,7 @@
       "vendorSkill": "web-design-guidelines",
       "availability": "vercel-projects",
       "load": "current web design accessibility UX performance guidance",
-      "aliases": ["web design guidelines", "Vercel web design", "web accessibility guidance"],
+      "aliases": ["web-design-guidelines", "vercel-web-design", "web-accessibility-guidance"],
       "disclosure": "specialist"
     },
     {
@@ -413,7 +413,7 @@
       "vendorSkill": "writing-guidelines",
       "availability": "vercel-projects",
       "load": "current Vercel writing copy content clarity voice structure guidance",
-      "aliases": ["Vercel writing guidelines", "Vercel copy guidance"],
+      "aliases": ["vercel-writing-guidelines", "vercel-copy-guidance"],
       "disclosure": "specialist"
     },
     {
@@ -423,7 +423,7 @@
       "vendorSkill": "vercel-react-native-skills",
       "availability": "vercel-projects",
       "load": "current React Native mobile list navigation animation guidance",
-      "aliases": ["React Native guidelines", "React Native performance"],
+      "aliases": ["react-native-guidelines", "react-native-performance"],
       "disclosure": "specialist"
     },
     {
@@ -433,7 +433,7 @@
       "vendorSkill": "vercel-react-view-transitions",
       "availability": "vercel-projects",
       "load": "current React view transitions animation navigation guidance",
-      "aliases": ["React view transitions", "view transition guidance"],
+      "aliases": ["react-view-transitions", "view-transition-guidance"],
       "disclosure": "specialist"
     },
     {
@@ -443,7 +443,7 @@
       "vendorSkill": "vercel-composition-patterns",
       "availability": "vercel-projects",
       "load": "current React component composition compound components state props guidance",
-      "aliases": ["React composition patterns", "component composition"],
+      "aliases": ["react-composition-patterns", "component-composition"],
       "disclosure": "specialist"
     },
     {
@@ -453,7 +453,7 @@
       "vendorSkill": "deploy-to-vercel",
       "availability": "vercel-projects",
       "load": "current Vercel deploy deployment preview claim framework detection guidance",
-      "aliases": ["Vercel deploy claimable", "Vercel preview deployment"],
+      "aliases": ["vercel-deploy-claimable", "vercel-preview-deployment"],
       "disclosure": "specialist"
     },
     {
@@ -463,7 +463,7 @@
       "vendorSkill": "vercel-cli-with-tokens",
       "availability": "vercel-projects",
       "load": "current Vercel CLI token authentication project environment deployment configuration guidance",
-      "aliases": ["Vercel CLI with tokens", "Vercel token CLI", "Vercel environment variables"],
+      "aliases": ["vercel-cli-with-tokens", "vercel-token-cli", "vercel-environment-variables"],
       "disclosure": "specialist"
     },
     {
@@ -1394,42 +1394,42 @@
       "source": "major-internal",
       "availability": "all-projects",
       "load": "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability",
-      "aliases": ["knowledge dispatcher"]
+      "aliases": ["knowledge-dispatcher"]
     },
     {
       "id": "strategic-reading",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators",
-      "aliases": ["applied reading"]
+      "aliases": ["applied-reading"]
     },
     {
       "id": "idea-lineage",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view",
-      "aliases": ["view lineage"]
+      "aliases": ["view-lineage"]
     },
     {
       "id": "concept-synthesis",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise",
-      "aliases": ["knowledge synthesis"]
+      "aliases": ["knowledge-synthesis"]
     },
     {
       "id": "research-compendium",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness",
-      "aliases": ["research dossier"]
+      "aliases": ["research-dossier"]
     },
     {
       "id": "academic-verify",
       "source": "major-internal",
       "availability": "all-projects",
       "load": "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support",
-      "aliases": ["paper verification", "literature verification"]
+      "aliases": ["paper-verification", "literature-verification"]
     }
   ],
   "reconciliation": {

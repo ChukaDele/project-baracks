@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { auditSkillReachability, discloseSkills, resolveSkills } from '../src/skills/resolver.js';
@@ -19,8 +20,12 @@ const vendorCatalogPath = join(process.cwd(), 'guidance', 'vendor-sources.json')
 const priorRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorEvals = process.env.MAJOR_SKILLS_EVALS;
 const priorVendorSources = process.env.MAJOR_VENDOR_SOURCES;
+const priorMajorHome = process.env.MAJOR_HOME;
+let testMajorHome: string;
 
 beforeEach(() => {
+  testMajorHome = mkdtempSync(join(tmpdir(), 'major-vendor-test-home-'));
+  process.env.MAJOR_HOME = testMajorHome;
   process.env.MAJOR_SKILLS_REGISTRY = registryPath;
   process.env.MAJOR_SKILLS_EVALS = evalsPath;
   delete process.env.MAJOR_VENDOR_SOURCES;
@@ -34,6 +39,9 @@ afterEach(() => {
   else process.env.MAJOR_SKILLS_EVALS = priorEvals;
   if (priorVendorSources === undefined) delete process.env.MAJOR_VENDOR_SOURCES;
   else process.env.MAJOR_VENDOR_SOURCES = priorVendorSources;
+  if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+  else process.env.MAJOR_HOME = priorMajorHome;
+  rmSync(testMajorHome, { recursive: true, force: true });
   clearVendorSectionCache();
 });
 
@@ -105,6 +113,22 @@ describe('live vendor skill sources', () => {
         .filter((skill) => skill.sourceKind === 'VENDOR_LIVE')
         .map((skill) => skill.id),
     ).toEqual(['vercel-optimize']);
+  });
+
+  it('makes an available explicit vendor skill mandatory without task-relevance gating', () => {
+    const project = mkdtempSync(join(tmpdir(), 'major-explicit-vendor-'));
+    try {
+      writeFileSync(join(project, 'package.json'), '{"dependencies":{"next":"15.0.0"}}\n');
+      const resolved = resolveSkills({
+        task: 'Summarize the current Vercel project module.',
+        cwd: project,
+        skills: ['vercel-cli-with-tokens'],
+      });
+      expect(resolved.receipt.mode).toBe('explicit');
+      expect(resolved.receipt.selected).toEqual(['vercel-cli-with-tokens']);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
   });
 
   it('does not route common words to a vendor skill without Vercel framework context', () => {

@@ -30,14 +30,16 @@ import {
   type VendorSourceState,
 } from './vendor.js';
 
+const canonicalSkillSlug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a safe canonical slug');
+
 const registryEntrySchema = z.object({
-  id: z.string(),
+  id: canonicalSkillSlug,
   source: z.string(),
   sourceKind: z.enum(SKILL_SOURCE_KINDS).optional(),
   vendorSkill: z.string().optional(),
   availability: z.string(),
   load: z.string(),
-  aliases: z.array(z.string().min(1)).default([]),
+  aliases: z.array(canonicalSkillSlug).default([]),
   disclosure: z.enum(['hot', 'specialist']).default('specialist'),
   deprecated: z
     .object({ replacement: z.string().min(1).optional(), message: z.string().min(1).optional() })
@@ -675,7 +677,7 @@ function resolveSkillsInternal(input: {
         score >= (requested.length > 0 ? 1_000 : 5) &&
         (sourceKind === 'PROJECT_LOCAL' || context.availableScopes.includes(entry.availability)) &&
         (sourceKind !== 'VENDOR_LIVE' ||
-          (vendor !== undefined && vendorMatchAllowed(entry, task))),
+          (vendor !== undefined && (requested.length > 0 || vendorMatchAllowed(entry, task)))),
     )
     .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id));
 

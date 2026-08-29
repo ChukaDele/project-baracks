@@ -49,6 +49,14 @@ interface BundleMarker {
   previousBundle?: string;
 }
 
+const CANONICAL_SKILL_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function assertCanonicalSkillSlug(value: string, label: string): void {
+  if (!CANONICAL_SKILL_SLUG.test(value)) {
+    throw new Error(`${label} must be a safe canonical slug: ${JSON.stringify(value)}`);
+  }
+}
+
 export interface SkillSyncResult {
   sourceRoot: string;
   bundleId: string;
@@ -92,6 +100,10 @@ function assertRegistry(value: unknown): Registry {
       (!Array.isArray(row.aliases) || !row.aliases.every((alias) => typeof alias === 'string'))
     ) {
       throw new Error(`skill registry entry ${index} has invalid aliases`);
+    }
+    assertCanonicalSkillSlug(row.id as string, `skill registry entry ${index} id`);
+    for (const alias of row.aliases ?? []) {
+      assertCanonicalSkillSlug(alias, `skill registry entry ${index} alias`);
     }
     if (
       row.sourceKind !== undefined &&
@@ -368,17 +380,64 @@ function validateSource(sourceRoot: string): {
   };
 }
 
-function writeAtomicFile(path: string, content: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const staged = `${path}.${process.pid}.tmp`;
-  writeFileSync(staged, content);
-  renameSync(staged, path);
+interface ArtifactReplacement {
+  target: string;
+  stage: string;
+  backup: string;
+  hadTarget: boolean;
 }
 
-function activateHostSkillArtifacts(
+function stageArtifact(target: string, populate: (stage: string) => void): ArtifactReplacement {
+  mkdirSync(dirname(target), { recursive: true });
+  const stage = `${target}.major-stage-${process.pid}`;
+  const backup = `${target}.major-backup-${process.pid}`;
+  rmSync(stage, { recursive: true, force: true });
+  rmSync(backup, { recursive: true, force: true });
+  populate(stage);
+  return { target, stage, backup, hadTarget: existsSync(target) };
+}
+
+function commitArtifactTransaction(replacements: ArtifactReplacement[]): void {
+  const committed: ArtifactReplacement[] = [];
+  try {
+    for (const replacement of replacements) {
+      if (replacement.hadTarget) renameSync(replacement.target, replacement.backup);
+      try {
+        renameSync(replacement.stage, replacement.target);
+      } catch (error) {
+        if (replacement.hadTarget && existsSync(replacement.backup)) {
+          renameSync(replacement.backup, replacement.target);
+        }
+        throw error;
+      }
+      committed.push(replacement);
+      if (
+        process.env.NODE_ENV === 'test' &&
+        Number(process.env.MAJOR_SKILL_SYNC_FAIL_AFTER) === committed.length
+      ) {
+        throw new Error(`injected skill activation failure after ${committed.length} artifacts`);
+      }
+    }
+  } catch (error) {
+    for (const replacement of committed.reverse()) {
+      rmSync(replacement.target, { recursive: true, force: true });
+      if (replacement.hadTarget && existsSync(replacement.backup)) {
+        renameSync(replacement.backup, replacement.target);
+      }
+    }
+    throw error;
+  } finally {
+    for (const replacement of replacements) {
+      rmSync(replacement.stage, { recursive: true, force: true });
+      rmSync(replacement.backup, { recursive: true, force: true });
+    }
+  }
+}
+
+function hostSkillArtifactReplacements(
   catalogPath: string,
   adaptersRoot: string,
-): void {
+): ArtifactReplacement[] {
   const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as {
     entries: Array<{ id: string }>;
   };
@@ -391,13 +450,17 @@ function activateHostSkillArtifacts(
     process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
       ? join(home, '.codex')
       : (process.env.CODEX_HOME ?? join(home, '.codex'));
-  writeAtomicFile(join(majorHome(), 'skills.catalog.json'), readFileSync(catalogPath, 'utf8'));
+  const replacements: ArtifactReplacement[] = [];
+  const stageFile = (target: string, content: string) => {
+    replacements.push(stageArtifact(target, (stage) => writeFileSync(stage, content)));
+  };
+  stageFile(join(majorHome(), 'skills.catalog.json'), readFileSync(catalogPath, 'utf8'));
   for (const [source, target] of [
     ['CLAUDE.md', join(home, '.claude', 'MAJOR_SKILLS.md')],
     ['CODEX.md', join(codexHome, 'MAJOR_SKILLS.md')],
     ['GEMINI.md', join(home, '.gemini', 'MAJOR_SKILLS.md')],
     ['RULE.mdc', join(home, '.cursor', 'rules', 'major-skills', 'RULE.mdc')],
-  ] as const) writeAtomicFile(target, readFileSync(join(adaptersRoot, source), 'utf8'));
+  ] as const) stageFile(target, readFileSync(join(adaptersRoot, source), 'utf8'));
 
   const markdownRoots = [
     join(home, '.claude', 'commands'),
@@ -406,28 +469,42 @@ function activateHostSkillArtifacts(
   ];
   const discovery = 'Use the installed Major catalogue. Run `major skill search --query "$ARGUMENTS"` or `major skill resolve --task "$ARGUMENTS" --json`.\n';
   for (const root of markdownRoots) {
-    writeAtomicFile(join(root, 'major.md'), discovery);
-    const staged = join(root, `.major-${process.pid}`);
-    rmSync(staged, { recursive: true, force: true });
-    mkdirSync(staged, { recursive: true });
-    for (const { id } of catalog.entries) {
-      writeFileSync(join(staged, `${id}.md`), `Run \`major skill resolve --task "$ARGUMENTS" --skill ${id} --json\`; the named skill is mandatory.\n`);
-    }
-    const target = join(root, 'major');
-    rmSync(target, { recursive: true, force: true });
-    renameSync(staged, target);
+    stageFile(join(root, 'major.md'), discovery);
+    replacements.push(stageArtifact(join(root, 'major'), (stage) => {
+      mkdirSync(stage, { recursive: true });
+      for (const { id } of catalog.entries) {
+        writeFileSync(join(stage, `${id}.md`), `Run \`major skill resolve --task "$ARGUMENTS" --skill ${id} --json\`; the named skill is mandatory.\n`);
+      }
+    }));
   }
   const geminiRoot = join(home, '.gemini', 'commands');
-  writeAtomicFile(join(geminiRoot, 'major.toml'), 'description = "Discover Major skills"\nprompt = "Run `major skill search --query {{args}}`."\n');
-  const geminiStage = join(geminiRoot, `.major-${process.pid}`);
-  rmSync(geminiStage, { recursive: true, force: true });
-  mkdirSync(geminiStage, { recursive: true });
-  for (const { id } of catalog.entries) {
-    writeFileSync(join(geminiStage, `${id}.toml`), `description = "Invoke Major skill ${id}"\nprompt = "Run \`major skill resolve --task {{args}} --skill ${id} --json\`."\n`);
-  }
-  const geminiTarget = join(geminiRoot, 'major');
-  rmSync(geminiTarget, { recursive: true, force: true });
-  renameSync(geminiStage, geminiTarget);
+  stageFile(join(geminiRoot, 'major.toml'), 'description = "Discover Major skills"\nprompt = "Run `major skill search --query {{args}}`."\n');
+  replacements.push(stageArtifact(join(geminiRoot, 'major'), (stage) => {
+    mkdirSync(stage, { recursive: true });
+    for (const { id } of catalog.entries) {
+      writeFileSync(join(stage, `${id}.toml`), `description = "Invoke Major skill ${id}"\nprompt = "Run \`major skill resolve --task {{args}} --skill ${id} --json\`."\n`);
+    }
+  }));
+  return replacements;
+}
+
+function activateBundle(bundle: string, current: string): void {
+  const bundledAdapters = join(bundle, 'adapters', 'skills');
+  const activeAdapters = existsSync(current)
+    ? join(realpathSync(current), 'adapters', 'skills')
+    : undefined;
+  const adapters = existsSync(bundledAdapters)
+    ? bundledAdapters
+    : activeAdapters && existsSync(activeAdapters)
+      ? activeAdapters
+      : undefined;
+  if (!adapters) throw new Error('skill bundle has no host rule adapters');
+  const replacements = hostSkillArtifactReplacements(
+    join(bundle, 'guidance', 'skills.catalog.json'),
+    adapters,
+  );
+  replacements.push(stageArtifact(current, (stage) => symlinkSync(basename(bundle), stage)));
+  commitArtifactTransaction(replacements);
 }
 
 function bundleHash(sourceRoot: string, roots: string[]): string {
@@ -555,14 +632,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
 
   rmSync(destination, { recursive: true, force: true });
   renameSync(staged, destination);
-  const next = join(bundlesRoot, `.current-${process.pid}`);
-  rmSync(next, { force: true });
-  symlinkSync(basename(destination), next);
-  renameSync(next, join(bundlesRoot, 'current'));
-  activateHostSkillArtifacts(
-    join(destination, 'guidance', 'skills.catalog.json'),
-    join(destination, 'adapters', 'skills'),
-  );
+  activateBundle(destination, current);
   retainRollbackBundles(bundlesRoot, bundleId, previousBundle);
 
   return {
@@ -606,10 +676,7 @@ export function rollbackMajorSkills(): SkillRollbackResult {
   const target =
     candidates.find((candidate) => candidate.marker.sha === activeMarker.previousBundle) ?? candidates[0];
   if (!target) throw new Error('no retained Major Skills Library rollback bundle');
-  const next = join(bundlesRoot, `.current-rollback-${process.pid}`);
-  rmSync(next, { force: true });
-  symlinkSync(basename(target.path), next);
-  renameSync(next, current);
+  activateBundle(target.path, current);
   return { previousBundle: active, activeBundle: target.path, bundleId: target.marker.sha };
 }
 

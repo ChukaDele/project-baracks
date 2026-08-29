@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -14,17 +15,19 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { retrieveReusableAssets } from '../src/skills/assets.js';
 import { runSkillCli } from '../src/skills/cli.js';
 import { resolveSkills } from '../src/skills/resolver.js';
-import { syncMajorSkills } from '../src/skills/sync.js';
+import { rollbackMajorSkills, syncMajorSkills } from '../src/skills/sync.js';
 
 const roots: string[] = [];
 const priorMajorHome = process.env.MAJOR_HOME;
 const priorGbrainAssetIndex = process.env.MAJOR_GBRAIN_ASSET_INDEX;
 const priorSkillsRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorSkillEvals = process.env.MAJOR_SKILLS_EVALS;
+const priorInjectedFailure = process.env.MAJOR_SKILL_SYNC_FAIL_AFTER;
 
 beforeEach(() => {
   delete process.env.MAJOR_SKILLS_REGISTRY;
   delete process.env.MAJOR_SKILLS_EVALS;
+  delete process.env.MAJOR_SKILL_SYNC_FAIL_AFTER;
 });
 
 afterEach(() => {
@@ -36,6 +39,8 @@ afterEach(() => {
   else process.env.MAJOR_SKILLS_REGISTRY = priorSkillsRegistry;
   if (priorSkillEvals === undefined) delete process.env.MAJOR_SKILLS_EVALS;
   else process.env.MAJOR_SKILLS_EVALS = priorSkillEvals;
+  if (priorInjectedFailure === undefined) delete process.env.MAJOR_SKILL_SYNC_FAIL_AFTER;
+  else process.env.MAJOR_SKILL_SYNC_FAIL_AFTER = priorInjectedFailure;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -115,6 +120,84 @@ describe('Major hot skill sync', () => {
       /generated skill catalog does not match the canonical registry/,
     );
     expect(existsSync(join(home, 'skill-bundles', 'current'))).toBe(false);
+  });
+
+  it.each([
+    ['id', '../escape'],
+    ['alias', '../../escape'],
+    ['id', 'nested/escape'],
+  ])('rejects an unsafe registry %s before host path interpolation', (field, unsafe) => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-slug-home-'));
+    const source = sourceCopy('major-skill-slug-source-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    const registryPath = join(source, 'guidance', 'skills.registry.json');
+    const registry = JSON.parse(readFileSync(registryPath, 'utf8')) as {
+      entries: Array<{ id: string; aliases?: string[] }>;
+    };
+    if (field === 'id') registry.entries[0]!.id = unsafe;
+    else registry.entries[0]!.aliases = [unsafe];
+    writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
+
+    expect(() => syncMajorSkills({ sourceRoot: source })).toThrow(/safe canonical slug/);
+    expect(existsSync(join(home, 'skill-bundles'))).toBe(false);
+    expect(existsSync(join(home, '..', 'escape.md'))).toBe(false);
+  });
+
+  it('restores the prior bundle and every host artifact after an injected activation failure', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-atomic-home-'));
+    const sourceA = sourceCopy('major-skill-atomic-source-a-');
+    const sourceB = sourceCopy('major-skill-atomic-source-b-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'bundle A rule\n');
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B rule\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    const hostRoot = join(home, '..');
+    const catalogBefore = readFileSync(join(home, 'skills.catalog.json'), 'utf8');
+    process.env.MAJOR_SKILL_SYNC_FAIL_AFTER = '4';
+
+    expect(() => syncMajorSkills({ sourceRoot: sourceB })).toThrow(
+      /injected skill activation failure/,
+    );
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(first.bundleId);
+    expect(readFileSync(join(home, 'skills.catalog.json'), 'utf8')).toBe(catalogBefore);
+    expect(readFileSync(join(hostRoot, '.codex', 'MAJOR_SKILLS.md'), 'utf8')).toBe(
+      'bundle A rule\n',
+    );
+    expect(
+      readdirSync(join(hostRoot, '.codex', 'prompts', 'major')).every((name) =>
+        name.endsWith('.md'),
+      ),
+    ).toBe(true);
+  });
+
+  it('rebuilds matching host rules, catalogue, and namespaced commands on rollback', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-rollback-artifacts-home-'));
+    const sourceA = sourceCopy('major-skill-rollback-artifacts-a-');
+    const sourceB = sourceCopy('major-skill-rollback-artifacts-b-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'bundle A rule\n');
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B rule\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    syncMajorSkills({ sourceRoot: sourceB });
+
+    const rolledBack = rollbackMajorSkills();
+    const hostRoot = join(home, '..');
+    expect(rolledBack.bundleId).toBe(first.bundleId);
+    expect(readFileSync(join(hostRoot, '.codex', 'MAJOR_SKILLS.md'), 'utf8')).toBe(
+      'bundle A rule\n',
+    );
+    expect(readFileSync(join(home, 'skills.catalog.json'), 'utf8')).toBe(
+      readFileSync(join(rolledBack.activeBundle, 'guidance', 'skills.catalog.json'), 'utf8'),
+    );
+    const ids = JSON.parse(readFileSync(join(home, 'skills.catalog.json'), 'utf8')) as {
+      entries: Array<{ id: string }>;
+    };
+    expect(readdirSync(join(hostRoot, '.codex', 'prompts', 'major')).sort()).toEqual(
+      ids.entries.map(({ id }) => `${id}.md`).sort(),
+    );
   });
 
   it('returns a project-local asset before the metadata index', () => {

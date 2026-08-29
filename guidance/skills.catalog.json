@@ -7,8 +7,8 @@
       "title": "Academic Verify",
       "description": "Use when a consequential scholarly or scientific claim warrants provider-neutral verification from claim to paper, methodology, result, limitations and replication or contradiction.",
       "aliases": [
-        "paper verification",
-        "literature verification"
+        "paper-verification",
+        "literature-verification"
       ],
       "availability": "all-projects",
       "source": "major-internal",
@@ -247,7 +247,7 @@
       "title": "Concept Synthesis",
       "description": "Use on demand to reduce retrieval noise across existing knowledge by distinguishing duplicates, related concepts and contradictions while preserving provenance, backlinks, minority and abandoned branches.",
       "aliases": [
-        "knowledge synthesis"
+        "knowledge-synthesis"
       ],
       "availability": "all-projects",
       "source": "major-internal",
@@ -394,8 +394,8 @@
       "title": "Deploy To Vercel",
       "description": "current Vercel deploy deployment preview claim framework detection guidance",
       "aliases": [
-        "Vercel deploy claimable",
-        "Vercel preview deployment"
+        "vercel-deploy-claimable",
+        "vercel-preview-deployment"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
@@ -750,7 +750,7 @@
       "title": "Idea Lineage",
       "description": "Use to reconstruct the evidence-qualified history of an idea or view from existing provenance and temporal facts, including first appearance, changes, causes, superseded versions, conflicts, abandoned branches and the current canonical view.",
       "aliases": [
-        "view lineage"
+        "view-lineage"
       ],
       "availability": "all-projects",
       "source": "major-internal",
@@ -798,7 +798,7 @@
       "title": "Knowledge Ingest",
       "description": "Use to dispatch notes, pasted text, documents, transcripts, URLs, research or repositories into existing Major and GBrain knowledge interfaces with provenance, identity resolution, dedupe and notability filtering.",
       "aliases": [
-        "knowledge dispatcher"
+        "knowledge-dispatcher"
       ],
       "availability": "all-projects",
       "source": "major-internal",
@@ -1356,7 +1356,7 @@
       "title": "Research Compendium",
       "description": "Use to create or update a reusable structured research asset containing question, scope, source index, claim map, findings, contradictions, uncertainty, gaps, synthesis, implications, freshness and project or entity links.",
       "aliases": [
-        "research dossier"
+        "research-dossier"
       ],
       "availability": "all-projects",
       "source": "major-internal",
@@ -1706,7 +1706,7 @@
       "title": "Strategic Reading",
       "description": "Use when reading substantive material to apply it to a real problem by extracting mechanisms, causes, limits, counterexamples, contradictions, implications, actions, risks and indicators rather than merely summarizing.",
       "aliases": [
-        "applied reading"
+        "applied-reading"
       ],
       "availability": "all-projects",
       "source": "major-internal",
@@ -1775,9 +1775,9 @@
       "title": "Vercel Cli With Tokens",
       "description": "current Vercel CLI token authentication project environment deployment configuration guidance",
       "aliases": [
-        "Vercel CLI with tokens",
-        "Vercel token CLI",
-        "Vercel environment variables"
+        "vercel-cli-with-tokens",
+        "vercel-token-cli",
+        "vercel-environment-variables"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
@@ -1792,8 +1792,8 @@
       "title": "Vercel Composition Patterns",
       "description": "current React component composition compound components state props guidance",
       "aliases": [
-        "React composition patterns",
-        "component composition"
+        "react-composition-patterns",
+        "component-composition"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
@@ -1825,10 +1825,10 @@
       "title": "Vercel Optimize",
       "description": "vercel performance cost reliability caching functions billing",
       "aliases": [
-        "Vercel Optimize",
-        "Vercel performance",
-        "Vercel cost",
-        "Vercel caching"
+        "vercel-optimize",
+        "vercel-performance",
+        "vercel-cost",
+        "vercel-caching"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
@@ -1849,9 +1849,9 @@
       "title": "Vercel React Best Practices",
       "description": "current React Next.js performance rendering bundle server guidance",
       "aliases": [
-        "React best practices",
-        "Next.js performance",
-        "React performance"
+        "react-best-practices",
+        "nextjs-performance",
+        "react-performance"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
@@ -1866,8 +1866,8 @@
       "title": "Vercel React Native Skills",
       "description": "current React Native mobile list navigation animation guidance",
       "aliases": [
-        "React Native guidelines",
-        "React Native performance"
+        "react-native-guidelines",
+        "react-native-performance"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
@@ -1882,8 +1882,8 @@
       "title": "Vercel React View Transitions",
       "description": "current React view transitions animation navigation guidance",
       "aliases": [
-        "React view transitions",
-        "view transition guidance"
+        "react-view-transitions",
+        "view-transition-guidance"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
@@ -1930,9 +1930,9 @@
       "title": "Web Design Guidelines",
       "description": "current web design accessibility UX performance guidance",
       "aliases": [
-        "web design guidelines",
-        "Vercel web design",
-        "web accessibility guidance"
+        "web-design-guidelines",
+        "vercel-web-design",
+        "web-accessibility-guidance"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
@@ -2034,8 +2034,8 @@
       "title": "Writing Guidelines",
       "description": "current Vercel writing copy content clarity voice structure guidance",
       "aliases": [
-        "Vercel writing guidelines",
-        "Vercel copy guidance"
+        "vercel-writing-guidelines",
+        "vercel-copy-guidance"
       ],
       "availability": "vercel-projects",
       "source": "vercel-agent-skills",
