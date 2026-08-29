@@ -16,6 +16,45 @@ const roots: string[] = [];
 const priorHome = process.env.MAJOR_HOME;
 const priorRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 
+type CommandAdapter = {
+  discovery: string;
+  explicit: string;
+};
+
+function markdownAdapter(discovery: string, explicit: string): CommandAdapter {
+  const parse = (artifact: string, path: string): string[] => {
+    const lines = artifact.trimEnd().split('\n');
+    expect(lines, path).toHaveLength(1);
+    const commands = [...lines[0]!.matchAll(/`([^`\n]+)`/g)].map((match) => match[1]!);
+    expect(commands.length, path).toBeGreaterThan(0);
+    return commands;
+  };
+  return {
+    discovery: parse(readFileSync(discovery, 'utf8'), discovery)[0]!,
+    explicit: parse(readFileSync(explicit, 'utf8'), explicit)[0]!,
+  };
+}
+
+function geminiTomlAdapter(discovery: string, explicit: string): CommandAdapter {
+  const parse = (artifact: string, path: string): string => {
+    const fields = new Map<string, string>();
+    for (const line of artifact.trimEnd().split('\n')) {
+      const match = line.match(/^([a-z]+) = ("(?:[^"\\]|\\.)*")$/);
+      expect(match, `${path}: ${line}`).not.toBeNull();
+      fields.set(match![1]!, JSON.parse(match![2]!) as string);
+    }
+    expect([...fields.keys()], path).toEqual(['description', 'prompt']);
+    const prompt = fields.get('prompt')!;
+    const command = prompt.match(/`([^`\n]+)`/)?.[1];
+    expect(command, path).toBeDefined();
+    return command!;
+  };
+  return {
+    discovery: parse(readFileSync(discovery, 'utf8'), discovery),
+    explicit: parse(readFileSync(explicit, 'utf8'), explicit),
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   if (priorHome === undefined) delete process.env.MAJOR_HOME;
@@ -40,20 +79,26 @@ describe('installed host skill commands', () => {
       entries: Array<{ target: string; source?: string }>;
     };
     const targets = manifest.entries.map((entry) => entry.target);
-    for (const target of [
-      join(home, '.claude/commands/major.md'),
-      join(home, '.codex/prompts/major.md'),
-      join(home, '.cursor/commands/major.md'),
-      join(home, '.gemini/commands/major.toml'),
-      join(home, '.claude/commands/major/root-cause-qa.md'),
-      join(home, '.codex/prompts/major/root-cause-qa.md'),
-      join(home, '.cursor/commands/major/root-cause-qa.md'),
-      join(home, '.gemini/commands/major/root-cause-qa.toml'),
-    ])
-      expect(targets, target).toContain(target);
+    const catalog = JSON.parse(readFileSync('guidance/skills.catalog.json', 'utf8')) as {
+      entries: Array<{ id: string }>;
+    };
+    for (const [root, suffix] of [
+      [join(home, '.claude/commands'), '.md'],
+      [join(home, '.codex/prompts'), '.md'],
+      [join(home, '.cursor/commands'), '.md'],
+      [join(home, '.gemini/commands'), '.toml'],
+    ] as const) {
+      expect(targets).toContain(join(root, `major${suffix}`));
+      expect(
+        targets
+          .filter((target) => dirname(target) === join(root, 'major'))
+          .map((target) => target.slice(join(root, 'major').length + 1, -suffix.length))
+          .sort(),
+      ).toEqual(catalog.entries.map((entry) => entry.id).sort());
+    }
   });
 
-  it('interprets every native artifact and executes its payload through the built installation', () => {
+  it('validates installed host adapter formats and executes their payloads through built Major', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-command-cli-home-'));
     const stage = mkdtempSync(join(tmpdir(), 'major-command-cli-stage-'));
     roots.push(home, stage);
@@ -65,9 +110,26 @@ describe('installed host skill commands', () => {
       CODEX_HOME: join(home, '.codex'),
       NODE_ENV: 'test',
     };
+    const bin = join(home, 'bin');
+    mkdirSync(bin, { recursive: true });
+    const major = join(bin, 'major');
+    writeFileSync(
+      major,
+      `#!/bin/sh\nexec "${process.execPath}" "${resolve('dist/entry.js')}" "$@"\n`,
+    );
+    chmodSync(major, 0o755);
+
     const staged = spawnSync(
       'python3',
-      ['scripts/stage-major-user-state.py', '--root', resolve('.'), '--stage', stage],
+      [
+        'scripts/stage-major-user-state.py',
+        '--root',
+        resolve('.'),
+        '--stage',
+        stage,
+        '--major-bin',
+        major,
+      ],
       { env: installEnv, encoding: 'utf8' },
     );
     expect(staged.status, staged.stderr).toBe(0);
@@ -78,68 +140,82 @@ describe('installed host skill commands', () => {
     );
     expect(activated.status, activated.stderr).toBe(0);
 
-    const bin = join(home, 'bin');
-    mkdirSync(bin, { recursive: true });
-    const major = join(bin, 'major');
-    writeFileSync(
-      major,
-      `#!/bin/sh\nexec "${process.execPath}" "${resolve('dist/entry.js')}" "$@"\n`,
-    );
-    chmodSync(major, 0o755);
     const commandEnv = { ...installEnv, PATH: `${bin}:${process.env.PATH ?? ''}` };
-    const artifacts = [
-      join(home, '.claude', 'commands', 'major', 'root-cause-qa.md'),
-      join(home, '.codex', 'prompts', 'major', 'root-cause-qa.md'),
-      join(home, '.cursor', 'commands', 'major', 'root-cause-qa.md'),
-      join(home, '.gemini', 'commands', 'major', 'root-cause-qa.toml'),
+    const adapters = [
+      markdownAdapter(
+        join(home, '.claude', 'commands', 'major.md'),
+        join(home, '.claude', 'commands', 'major', 'root-cause-qa.md'),
+      ),
+      markdownAdapter(
+        join(home, '.codex', 'prompts', 'major.md'),
+        join(home, '.codex', 'prompts', 'major', 'root-cause-qa.md'),
+      ),
+      markdownAdapter(
+        join(home, '.cursor', 'commands', 'major.md'),
+        join(home, '.cursor', 'commands', 'major', 'root-cause-qa.md'),
+      ),
+      geminiTomlAdapter(
+        join(home, '.gemini', 'commands', 'major.toml'),
+        join(home, '.gemini', 'commands', 'major', 'root-cause-qa.toml'),
+      ),
     ];
-    const commands = artifacts.map((path) => {
-      const artifact = readFileSync(path, 'utf8');
-      const payload = artifact.match(/Run `([^`]+)`/)?.[1];
-      expect(payload, path).toBeDefined();
-      return payload!
+    for (const adapter of adapters) {
+      expect(adapter.discovery.replace('{{args}}', '"$ARGUMENTS"')).toBe(
+        'major skill search --query "$ARGUMENTS"',
+      );
+      expect(adapter.explicit.replace('{{args}}', '"$ARGUMENTS"')).toBe(
+        'major skill resolve --task "$ARGUMENTS" --skill root-cause-qa --json',
+      );
+      const explicit = adapter.explicit
         .replace('"$ARGUMENTS"', "'Investigate and verify this regression'")
         .replace('{{args}}', "'Investigate and verify this regression'");
-    });
-    for (const installedCommand of commands) {
-      expect(installedCommand).toContain('skill resolve');
-      expect(installedCommand).toContain('--skill root-cause-qa');
-      const resolveResult = spawnSync('sh', ['-c', installedCommand], {
+      const resolveResult = spawnSync('sh', ['-c', explicit], {
         env: commandEnv,
         encoding: 'utf8',
       });
       expect(resolveResult.status, resolveResult.stderr).toBe(0);
       const receipt = JSON.parse(resolveResult.stdout) as { receipt: { selected: string[] } };
       expect(receipt.receipt.selected).toContain('root-cause-qa');
-    }
-
-    const discoveryArtifacts = [
-      join(home, '.claude', 'commands', 'major.md'),
-      join(home, '.codex', 'prompts', 'major.md'),
-      join(home, '.cursor', 'commands', 'major.md'),
-      join(home, '.gemini', 'commands', 'major.toml'),
-    ];
-    for (const path of discoveryArtifacts) {
-      const artifact = readFileSync(path, 'utf8');
-      const payload = artifact.match(/`(major skill search[^`]+)`/)?.[1];
-      expect(payload, path).toBeDefined();
-      const command = payload!
+      const discovery = adapter.discovery
         .replace('"$ARGUMENTS"', "'root cause regression'")
         .replace('{{args}}', "'root cause regression'");
-      const searchResult = spawnSync('sh', ['-c', command], {
+      const searchResult = spawnSync('sh', ['-c', discovery], {
         env: commandEnv,
         encoding: 'utf8',
       });
       expect(searchResult.status, searchResult.stderr).toBe(0);
       expect(searchResult.stdout).toContain('root-cause-qa');
+
+      const unknown = explicit.replace('--skill root-cause-qa', '--skill missing-skill');
+      const failed = spawnSync('sh', ['-c', unknown], { env: commandEnv, encoding: 'utf8' });
+      expect(failed.status).not.toBe(0);
+      expect(failed.stderr).toContain('unknown skill "missing-skill"');
     }
 
-    const failed = spawnSync('sh', ['-c', `${commands[0]} --skill missing-skill`], {
-      env: commandEnv,
-      encoding: 'utf8',
+    const plugin = JSON.parse(
+      readFileSync(join(home, '.major', 'gemini-plugin', 'plugin.json'), 'utf8'),
+    ) as { name: string };
+    expect(plugin).toEqual({ name: 'major-global' });
+    const hooks = JSON.parse(
+      readFileSync(join(home, '.major', 'gemini-plugin', 'hooks.json'), 'utf8'),
+    ) as {
+      'major-attach': {
+        PreInvocation: Array<{ type: string; command: string; timeout: number }>;
+      };
+    };
+    expect(hooks['major-attach'].PreInvocation).toEqual([
+      {
+        type: 'command',
+        command: `"${major}" session hook --host antigravity --envelope antigravity-pre-invocation`,
+        timeout: 10,
+      },
+    ]);
+    const pluginRegistry = JSON.parse(
+      readFileSync(join(home, '.gemini', 'config', 'plugins.json'), 'utf8'),
+    ) as { entries: Array<{ path: string }> };
+    expect(pluginRegistry.entries).toContainEqual({
+      path: join(home, '.major', 'gemini-plugin'),
     });
-    expect(failed.status).not.toBe(0);
-    expect(failed.stderr).toContain('unknown skill "missing-skill"');
   }, 15_000);
 
   it('installs the core project profile transactionally while preserving project-owned skills', () => {

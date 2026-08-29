@@ -307,7 +307,7 @@ def stage_skill_commands(
             write_stage_file(
                 stage,
                 f"gemini-major-{skill_id}.toml",
-                f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{args}} --skill {skill_id} --json`; the named skill is mandatory."\n',
+                f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{{{args}}}} --skill {skill_id} --json`; the named skill is mandatory."\n',
             ),
             contained_command_path(home / ".gemini" / "commands", skill_id, ".toml"),
         )
