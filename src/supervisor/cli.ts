@@ -62,6 +62,7 @@ import {
 import { assertRemotePreviewUrl } from '../web/remote-preview.js';
 import { redactText } from '../security/redact.js';
 import { openDb } from '../db/client.js';
+import { getPerformanceObservation } from '../insights/performance-history.js';
 import { createDecisionRequest, resolveDecision } from '../domain/decision-service.js';
 import {
   decideProviderAction,
@@ -357,7 +358,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
 
   if (command === 'project' && args[1] === 'grade') {
     const project = resolveProject(args[2] ?? 'current');
-    const provider = validHost(requireFlag(args, '--provider'));
+    const evidenceRunId = requireFlag(args, '--run-evidence-id');
     const resultRaw = requireFlag(args, '--result');
     if (resultRaw !== 'pass' && resultRaw !== 'fail') {
       throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
@@ -372,11 +373,12 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         `goal ${goalId} has no recorded builder/coordinator yet; it cannot be independently graded`,
       );
     }
-    if (goal.lastCoordinator === provider) {
-      throw new Error(
-        `independent grade refused: ${provider} was the last coordinator for goal ${goalId}`,
-      );
-    }
+    const evidenceState = openDb();
+    const runReceipt = getPerformanceObservation(evidenceState.db, evidenceRunId);
+    evidenceState.sqlite.close();
+    const provider = validHost(String(runReceipt?.worker?.coordinator ?? ''));
+    const durableRun = runReceipt?.runEvidence;
+    if (!durableRun) throw new Error('grade requires durable exact-head run evidence');
     const evidence = requireFlag(args, '--evidence');
     const policy = recordIndependentGrade({
       project: project.project,
@@ -389,7 +391,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     if (goal.pendingCompletion) {
       applyIndependentCompletionGrade({
         goalId,
-        provider,
+        runEvidence: { provider, runId: durableRun.runId, sourceHead: durableRun.sourceHead },
         result: resultRaw,
         evidence,
       });

@@ -17,6 +17,7 @@ type Receipt = Record<string, unknown> & {
   goalId: string;
   outcome?: RunInsightOutcome;
   worker?: { coordinator?: string | null; provider?: string | null; model?: string | null };
+  runEvidence?: { runId: string; sourceHead: string };
   timing?: {
     durationMs?: number | null;
     productiveWorkMs?: number | null;
@@ -166,6 +167,15 @@ export function listPerformanceObservations(
     )
     .all()
     .map((row) => validateRunInsight(JSON.parse(row.receiptJson)));
+}
+
+export function getPerformanceObservation(db: DbConn, id: string): Receipt | undefined {
+  const row = db
+    .select({ receiptJson: runPerformanceObservations.receiptJson })
+    .from(runPerformanceObservations)
+    .where(eq(runPerformanceObservations.id, id))
+    .get();
+  return row ? validateRunInsight(JSON.parse(row.receiptJson)) : undefined;
 }
 
 function workerKey(receipt: Receipt): string | undefined {

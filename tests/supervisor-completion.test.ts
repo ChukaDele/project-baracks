@@ -38,6 +38,7 @@ function pendingGoal(): SupervisorGoal {
       summary: 'all checks pass',
       coordinator: 'codex',
       claimedAt: '2026-08-11T00:01:00.000Z',
+      sourceHead: 'a'.repeat(40),
       promotionEvidence: {
         focusedTests: 'focused tests passed',
         cheapestCompileTypeOrBuild: 'typecheck passed',
@@ -139,7 +140,7 @@ describe('independent goal completion', () => {
     });
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',
-      provider: 'claude',
+      runEvidence: { provider: 'claude', runId: 'run-review', sourceHead: 'a'.repeat(40) },
       result: 'pass',
       evidence: 'exact-head tests and representative behavior passed',
     });
@@ -152,7 +153,7 @@ describe('independent goal completion', () => {
   it('reopens work when independent validation rejects the claim', () => {
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',
-      provider: 'claude',
+      runEvidence: { provider: 'claude', runId: 'run-review', sourceHead: 'a'.repeat(40) },
       result: 'fail',
       evidence: 'runtime behavior does not match the completion claim',
     });
@@ -161,11 +162,22 @@ describe('independent goal completion', () => {
     expect(result.nextRunAt).toBeTruthy();
   });
 
+  it('rejects durable review evidence for a different exact head', () => {
+    expect(() =>
+      applyIndependentCompletionGrade({
+        goalId: 'goal-1',
+        runEvidence: { provider: 'claude', runId: 'run-review', sourceHead: 'b'.repeat(40) },
+        result: 'pass',
+        evidence: 'wrong head',
+      }),
+    ).toThrow(/different exact head/);
+  });
+
   it('refuses self-grading and goals without a pending completion claim', () => {
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        provider: 'codex',
+        runEvidence: { provider: 'codex', runId: 'run-review', sourceHead: 'a'.repeat(40) },
         result: 'pass',
         evidence: 'self grade',
       }),
@@ -177,7 +189,7 @@ describe('independent goal completion', () => {
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        provider: 'claude',
+        runEvidence: { provider: 'claude', runId: 'run-review', sourceHead: 'a'.repeat(40) },
         result: 'pass',
         evidence: 'no claim',
       }),

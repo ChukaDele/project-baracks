@@ -95,7 +95,9 @@ describe('Major coordinator contract', () => {
         rateLimited: false,
         exhausted: false,
         workspaceMutated: true,
+        runId: 'provider-run-1',
       },
+      sourceHead: 'a'.repeat(40),
       report: {
         status: 'blocked',
         summary: 'Worker completed; owner approval remains.',
@@ -119,6 +121,7 @@ describe('Major coordinator contract', () => {
       status: 'blocked',
       runtime: 'major',
       worker: { coordinator: 'codex', provider: 'codex#default', model: 'gpt-5-codex' },
+      runEvidence: { runId: 'provider-run-1', sourceHead: 'a'.repeat(40) },
       skills: ['tdd'],
       timing: {
         durationMs: 100,
@@ -629,6 +632,7 @@ describe('Major coordinator contract', () => {
     expect(prompt).not.toContain('Delegate independent work across providers with the Major CLI');
     expect(prompt).toContain('MAJOR_RESULT: {"status":"active"');
     expect(prompt).toContain('"promotionEvidence":{"focusedTests"');
+    expect(prompt).not.toContain('QUALIFYING CANONICAL TASK');
     expect(prompt).not.toContain('major goal report');
     expect(prompt).toContain('Do not mark done unless the end-to-end goal is demonstrably true');
     expect(prompt).toContain('source → assess → tailor');
@@ -740,11 +744,20 @@ describe('Major coordinator contract', () => {
       accountLabel: 'work-b',
       continuityBlock:
         'CONTEXT CONTINUITY:\nPrevious account default is no longer the active subscription.\nPrior cycle summary:\nimplemented the quota router',
+      canonicalTask: {
+        taskId: 'task_existing',
+        projectId: 'proj_existing',
+        repoPath: '/tmp/project',
+        frozenCriteriaJson: '{"minPassedVerificationRuns":2}',
+      },
     });
     expect(prompt).toContain('implemented the quota router');
     expect(prompt).toContain('Active subscription account: work-b');
     expect(prompt).toContain('CONTEXT CONTINUITY:');
     expect(prompt).toContain('structured pre-promotion evidence');
+    expect(prompt).toContain('QUALIFYING CANONICAL TASK');
+    expect(prompt).toContain('task id: task_existing');
+    expect(prompt).toContain('frozen completion criteria: {"minPassedVerificationRuns":2}');
   });
 
   it('accepts only a bounded final worker report and requires an owner gate when blocked', () => {

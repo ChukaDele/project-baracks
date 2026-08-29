@@ -118,6 +118,7 @@ export interface SupervisorGoal {
         taskId?: string;
         promotionCheckedAt?: string;
         promotionEvidence?: PrePromotionEvidence;
+        sourceHead?: string;
       }
     | undefined;
 }
@@ -420,7 +421,7 @@ export function updateGoal(id: string, patch: Partial<Omit<SupervisorGoal, 'id'>
  * claim. A worker claim alone can never mark a goal done. */
 export function applyIndependentCompletionGrade(input: {
   goalId: string;
-  provider: WorkerHost;
+  runEvidence: { provider: WorkerHost; runId: string; sourceHead: string };
   result: 'pass' | 'fail';
   evidence: string;
 }): SupervisorGoal {
@@ -429,9 +430,20 @@ export function applyIndependentCompletionGrade(input: {
     if (!goal) throw new Error(`goal not found: ${input.goalId}`);
     const pending = goal.pendingCompletion;
     if (!pending) throw new Error(`goal ${input.goalId} has no pending completion claim`);
-    if (pending.coordinator === input.provider) {
+    if (!pending.sourceHead) {
       throw new Error(
-        `independent completion grade refused: ${input.provider} made the completion claim`,
+        'pending completion has no exact-head binding; legacy claim requires revalidation',
+      );
+    }
+    if (pending.sourceHead !== input.runEvidence.sourceHead) {
+      throw new Error('independent completion run evidence is for a different exact head');
+    }
+    if (!input.runEvidence.runId.trim()) {
+      throw new Error('independent completion requires a durable run id');
+    }
+    if (pending.coordinator === input.runEvidence.provider) {
+      throw new Error(
+        `independent completion grade refused: ${input.runEvidence.provider} made the completion claim`,
       );
     }
     const evidence = input.evidence.trim();

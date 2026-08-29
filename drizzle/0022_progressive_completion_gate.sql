@@ -172,15 +172,17 @@ BEGIN
     ) THEN RAISE(ABORT, 'completion missing required progressive validation')
   END;
   SELECT CASE WHEN json_type(NEW.completion_criteria_snapshot_json, '$.progressiveValidation') = 'object'
-    AND json_array_length(COALESCE(json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.riskSpecificChecks'), '[]')) > 0
-    AND NOT EXISTS (
-      SELECT 1 FROM verification_runs v
-      JOIN agent_runs r ON r.id = v.agent_run_id AND r.task_id = v.task_id
-      JOIN evidence e ON e.ref = v.id AND e.kind = 'verification_run' AND e.task_id = v.task_id
-      WHERE v.task_id = NEW.id AND v.validation_subject = 'risk_specific_checks'
-        AND v.status = 'passed' AND v.exit_code = 0
-        AND v.started_at IS NOT NULL AND v.ended_at IS NOT NULL
-        AND r.status = 'succeeded'
+    AND EXISTS (
+      SELECT 1 FROM json_each(COALESCE(json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.riskSpecificChecks'), '[]')) risk
+      WHERE NOT EXISTS (
+        SELECT 1 FROM verification_runs v
+        JOIN agent_runs r ON r.id = v.agent_run_id AND r.task_id = v.task_id
+        JOIN evidence e ON e.ref = v.id AND e.kind = 'verification_run' AND e.task_id = v.task_id
+        WHERE v.task_id = NEW.id AND v.validation_subject = 'risk_specific_check:' || risk.value
+          AND v.status = 'passed' AND v.exit_code = 0
+          AND v.started_at IS NOT NULL AND v.ended_at IS NOT NULL
+          AND r.status = 'succeeded'
+      )
     ) THEN RAISE(ABORT, 'completion missing required risk-specific validation')
   END;
   SELECT CASE WHEN json_type(NEW.completion_criteria_snapshot_json, '$.progressiveValidation') = 'object'
@@ -209,16 +211,19 @@ BEGIN
             r.independence_loss IS NULL
             AND EXISTS (
               SELECT 1 FROM agent_runs implementation
+              JOIN agent_providers implementation_provider ON implementation_provider.id = implementation.provider_id
               WHERE implementation.task_id = NEW.id
                 AND implementation.purpose IN ('implementation', 'repair')
                 AND implementation.status = 'succeeded'
             )
             AND NOT EXISTS (
               SELECT 1 FROM agent_runs implementation
+              JOIN agent_providers implementation_provider ON implementation_provider.id = implementation.provider_id
+              JOIN agent_providers review_provider ON review_provider.id = r.provider_id
               WHERE implementation.task_id = NEW.id
                 AND implementation.purpose IN ('implementation', 'repair')
                 AND implementation.status = 'succeeded'
-                AND implementation.provider_id = r.provider_id
+                AND implementation_provider.name = review_provider.name
             )
           )
         )

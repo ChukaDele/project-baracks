@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import type { DbConn } from '../db/client.js';
 import {
   agentRuns,
+  agentProviders,
   decisionRequests,
   evidence,
   projects,
@@ -236,15 +237,24 @@ export function evaluateCompletionProof(
         .map((verification) => verification.validationSubject)
         .filter((subject): subject is string => subject !== null),
     );
-    const missingChecks = plan.requiredChecks.filter((check) => !provenSubjects.has(check));
+    const missingChecks = plan.requiredChecks
+      .filter((check) => check !== 'risk_specific_checks')
+      .filter((check) => !provenSubjects.has(check));
+    const missingRiskChecks = progressive.riskSpecificChecks.filter(
+      (check) => !provenSubjects.has(`risk_specific_check:${check}`),
+    );
+    if (missingRiskChecks.length > 0) {
+      failures.push(`missing risk-specific verification: ${missingRiskChecks.join(', ')}`);
+    }
     if (missingChecks.length > 0) {
       failures.push(`missing required progressive validation: ${missingChecks.join(', ')}`);
     }
 
     const implementationProviders = new Set(
       db
-        .select({ providerId: agentRuns.providerId })
+        .select({ providerName: agentProviders.name })
         .from(agentRuns)
+        .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
         .where(
           and(
             eq(agentRuns.taskId, taskId),
@@ -253,11 +263,12 @@ export function evaluateCompletionProof(
           ),
         )
         .all()
-        .map((run) => run.providerId),
+        .map((run) => run.providerName),
     );
     const succeededReviews = db
-      .select({ providerId: agentRuns.providerId, independenceLoss: agentRuns.independenceLoss })
+      .select({ providerName: agentProviders.name, independenceLoss: agentRuns.independenceLoss })
       .from(agentRuns)
+      .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
       .where(
         and(
           eq(agentRuns.taskId, taskId),
@@ -273,11 +284,13 @@ export function evaluateCompletionProof(
           progressive.review !== 'independent' ||
           (review.independenceLoss === null &&
             implementationProviders.size > 0 &&
-            !implementationProviders.has(review.providerId)),
+            !implementationProviders.has(review.providerName)),
       );
     const promotion = assessPromotion({
       prePromotionEvidencePassed:
-        passedVerifications >= criteria.minPassedVerificationRuns && missingChecks.length === 0,
+        passedVerifications >= criteria.minPassedVerificationRuns &&
+        missingChecks.length === 0 &&
+        missingRiskChecks.length === 0,
       review: progressive.review,
       reviewPassed,
       blockerFindings: openBlockingFindings,

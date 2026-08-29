@@ -110,6 +110,12 @@ installation and installed behavior proof follow normal merge.
   `pendingCompletion`; they do not require a task row that the supervisor lifecycle does not create.
 - Explicit task workflows retain repository-resolved frozen criteria and SQLite completion proof;
   summary-only supervisor done claims cannot enter pending independent validation.
+- A qualifying canonical task is disclosed only when repository resolution finds one; normal goals
+  remain on structured report evidence without treating task absence as a blocker.
+- Independent supervisor grading consumes durable provider-run identity bound to the pending exact
+  head; task review compares canonical provider names, not account-specific provider row IDs.
+- Every material-risk criterion owns a distinct verification subject in service and SQLite. Broad
+  validation must be triggered, and any performed broad run records cost, information gain, and proof.
 
 ## Completed evidence
 
@@ -148,6 +154,11 @@ installation and installed behavior proof follow normal merge.
   repository/SQLite path. The proportional gate passed 100/100 focused tests across five affected
   files plus typecheck, targeted lint/format, Major validation, and stability validation; the full
   matrix remains intentionally unrun.
+- Exact-head evidence repair: optional task disclosure preserves normal supervisor flow; durable run
+  receipts bind independent grading to provider and exact head; provider aliases cannot manufacture
+  task-review independence; and each risk criterion plus broad-validation economics is enforced in
+  service and SQLite. The proportional gate passed 101/101 focused tests across five affected files;
+  the full matrix remains intentionally unrun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -185,6 +196,10 @@ installation and installed behavior proof follow normal merge.
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,
   broad-validation economics, BLOCKER handling, and legacy pending-completion readability.
+- Independent review regression: `617f3cbd` omitted conditional task disclosure, trusted caller
+  provider labels during completion grading, compared task providers by row ID, collapsed all risks
+  into one proof, and allowed untriggered broad validation. Focused parity regressions now protect
+  provider/head provenance and each evidence boundary.
 - Repository exception: the final resource gate has one pre-existing skill-reachability failure
   covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
   skips. The durable record does not recast that exception as candidate success.

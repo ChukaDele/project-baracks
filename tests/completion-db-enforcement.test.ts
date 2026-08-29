@@ -184,7 +184,10 @@ describe('P1-3 database-enforced completion criteria', () => {
       projectId: project.id,
       title: 'progressive direct-write gate',
       completionCriteriaJson: JSON.stringify({
-        progressiveValidation: { review: 'independent' },
+        progressiveValidation: {
+          review: 'independent',
+          riskSpecificChecks: ['authority boundary', 'legacy compatibility'],
+        },
       }),
     });
     for (const status of [
@@ -210,6 +213,13 @@ describe('P1-3 database-enforced completion criteria', () => {
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'critical_path_behavior',
     });
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'risk_specific_check:authority boundary',
+    });
+    expect(() => forceComplete()).toThrow(/risk-specific validation/);
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'risk_specific_check:legacy compatibility',
+    });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'implementation-provider' }).run();
     ensureObservedModel(db, providerId, 'review-model');
@@ -222,6 +232,25 @@ describe('P1-3 database-enforced completion criteria', () => {
       routingReason: 'implementation',
     });
     setRunStatus(db, implementation.id, 'succeeded');
+    const sameProviderAliasId = newId('aprov');
+    db.insert(agentProviders)
+      .values({
+        id: sameProviderAliasId,
+        name: 'implementation-provider',
+        accountLabel: 'secondary',
+      })
+      .run();
+    ensureObservedModel(db, sameProviderAliasId, 'review-model');
+    const sameProviderAlias = createRun(db, {
+      taskId: task.id,
+      providerId: sameProviderAliasId,
+      modelRef: 'review-model',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'same canonical provider through another account',
+    });
+    setRunStatus(db, sameProviderAlias.id, 'succeeded');
+    expect(() => forceComplete()).toThrow(/selected review/);
     const compromised = createRun(db, {
       taskId: task.id,
       providerId,

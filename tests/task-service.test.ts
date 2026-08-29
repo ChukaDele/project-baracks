@@ -236,6 +236,27 @@ describe('completion proof and guarded completion transition', () => {
         },
       ),
     ).toMatchObject({ ok: false, failures: ['BLOCKER findings remain'] });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository' },
+        {
+          status: 'done',
+          summary: 'untriggered broad proof',
+          promotionEvidence: {
+            ...promotionEvidence,
+            broaderValidation: {
+              triggers: [],
+              repositoryPolicyRequires: false,
+              performed: true,
+              cost: 'one minute',
+              expectedInformationGain: 'none expected',
+              evidence: 'broad suite passed',
+            },
+          },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: ['required pre-promotion evidence is missing'] });
   });
 
   function taskAtReadyToMerge(db: ReturnType<typeof testDb>) {
@@ -387,7 +408,10 @@ describe('completion proof and guarded completion transition', () => {
       projectId: project.id,
       title: 'progressively validated candidate',
       completionCriteriaJson: JSON.stringify({
-        progressiveValidation: { review: 'independent' },
+        progressiveValidation: {
+          review: 'independent',
+          riskSpecificChecks: ['authority boundary', 'legacy compatibility'],
+        },
       }),
     });
     transitionTask(db, task.id, 'ready');
@@ -407,6 +431,9 @@ describe('completion proof and guarded completion transition', () => {
     ]) {
       recordQualifyingVerification(db, task.id, { validationSubject });
     }
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'risk_specific_check:authority boundary',
+    });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'builder' }).run();
     ensureObservedModel(db, providerId, 'codex');
@@ -429,6 +456,12 @@ describe('completion proof and guarded completion transition', () => {
     });
     setRunStatus(db, reviewRun.id, 'succeeded');
     const criteria = parseCompletionCriteria(getTask(db, task.id).completionCriteriaSnapshotJson);
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'missing risk-specific verification: legacy compatibility',
+    );
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'risk_specific_check:legacy compatibility',
+    });
 
     db.insert(reviewFindings)
       .values({
@@ -439,6 +472,23 @@ describe('completion proof and guarded completion transition', () => {
         summary: 'valuable follow-up that does not prevent a safe MVP',
       })
       .run();
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'required review has not passed',
+    );
+    const sameProviderAliasId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: sameProviderAliasId, name: 'builder', accountLabel: 'secondary' })
+      .run();
+    ensureObservedModel(db, sameProviderAliasId, 'codex');
+    const sameProviderAliasReview = createRun(db, {
+      taskId: task.id,
+      providerId: sameProviderAliasId,
+      modelRef: 'codex',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'same canonical provider through another account',
+    });
+    setRunStatus(db, sameProviderAliasReview.id, 'succeeded');
     expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
       'required review has not passed',
     );

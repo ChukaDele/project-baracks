@@ -11,7 +11,11 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { openDb, type DbConn } from '../db/client.js';
-import { evaluateTaskPromotionProof, resolveCanonicalTaskBinding } from '../domain/completion.js';
+import {
+  evaluateTaskPromotionProof,
+  resolveCanonicalTaskBinding,
+  type CanonicalTaskBinding,
+} from '../domain/completion.js';
 import { assessPromotion, planProgressiveValidation } from '../domain/sdlc.js';
 import { getProjectByRepoPath } from '../config/project-service.js';
 import {
@@ -57,6 +61,7 @@ import {
 import {
   activeGoals,
   getGoal,
+  gitCommonDir,
   isLiveWorkerFresh,
   majorHome,
   readSupervisorState,
@@ -102,11 +107,11 @@ export function coordinatorDonePromotionProof(
       repositoryPolicyRequiresBroadValidation: evidence.broaderValidation.repositoryPolicyRequires,
     });
     const broadPassed =
-      !plan.broaderValidationRequired ||
-      (evidence.broaderValidation.performed &&
-        Boolean(evidence.broaderValidation.cost?.trim()) &&
-        Boolean(evidence.broaderValidation.expectedInformationGain?.trim()) &&
-        Boolean(evidence.broaderValidation.evidence?.trim()));
+      evidence.broaderValidation.performed === plan.broaderValidationRequired &&
+      (!evidence.broaderValidation.performed ||
+        (Boolean(evidence.broaderValidation.cost?.trim()) &&
+          Boolean(evidence.broaderValidation.expectedInformationGain?.trim()) &&
+          Boolean(evidence.broaderValidation.evidence?.trim())));
     const promotion = assessPromotion({
       prePromotionEvidencePassed:
         Boolean(evidence.focusedTests.trim()) &&
@@ -150,6 +155,37 @@ export function coordinatorDonePromotionProof(
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
+}
+
+function exactRepositoryHead(repoPath: string): string | undefined {
+  try {
+    const marker = join(repoPath, '.git');
+    const gitDir = statSync(marker).isDirectory()
+      ? marker
+      : resolve(repoPath, /^gitdir:\s*(.+)$/i.exec(readFileSync(marker, 'utf8').trim())?.[1] ?? '');
+    const head = readFileSync(join(gitDir, 'HEAD'), 'utf8').trim();
+    if (/^[a-f0-9]{40}$/.test(head)) return head;
+    const ref = /^ref:\s*(.+)$/.exec(head)?.[1];
+    if (!ref) return undefined;
+    const commonDir = gitCommonDir(repoPath);
+    const looseRef = [join(gitDir, ref), ...(commonDir ? [join(commonDir, ref)] : [])].find(
+      existsSync,
+    );
+    if (looseRef) {
+      const sha = readFileSync(looseRef, 'utf8').trim();
+      if (/^[a-f0-9]{40}$/.test(sha)) return sha;
+    }
+    const packed = commonDir ? join(commonDir, 'packed-refs') : undefined;
+    const sha =
+      packed && existsSync(packed)
+        ? new RegExp(`^([a-f0-9]{40}) ${ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').exec(
+            readFileSync(packed, 'utf8'),
+          )?.[1]
+        : undefined;
+    return sha;
+  } catch {
+    return undefined;
+  }
 }
 
 function readProjectContext(repoPath: string): string {
@@ -527,6 +563,7 @@ export function coordinatorPrompt(
   hop?: {
     accountLabel: string;
     continuityBlock: string;
+    canonicalTask?: CanonicalTaskBinding;
   },
 ): string {
   const context = readProjectContext(goal.repoPath);
@@ -590,6 +627,7 @@ ${goal.goal}
 CANONICAL TARGET:
 - project: ${goal.project}
 - repository path: ${goal.repoPath}
+${hop?.canonicalTask ? `\nQUALIFYING CANONICAL TASK:\n- task id: ${hop.canonicalTask.taskId}\n- frozen completion criteria: ${hop.canonicalTask.frozenCriteriaJson}\nTask workflows may cite this task ID; Major re-resolves it by repository identity.\n` : ''}
 
 ${workspaceContract}
 
@@ -738,6 +776,7 @@ export function supervisorRunInsight(input: {
     majorPreparationMs?: number;
     majorFinalizationMs?: number;
   };
+  sourceHead?: string;
 }) {
   const workerDurationMs = Number.isFinite(
     input.outcome.providerExecutionMs ?? input.outcome.durationMs,
@@ -789,6 +828,9 @@ export function supervisorRunInsight(input: {
       provider: input.selection.provider,
       model: input.selection.modelRef,
     },
+    ...(input.outcome.runId && input.sourceHead
+      ? { runEvidence: { runId: input.outcome.runId, sourceHead: input.sourceHead } }
+      : {}),
     skills: input.skills,
     timing: {
       durationMs: input.totalDurationMs,
@@ -1038,6 +1080,14 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
   });
   const workerStartedAtMs = Date.now();
+  let canonicalTask: CanonicalTaskBinding | undefined;
+  const taskState = openDb();
+  try {
+    const resolvedTask = resolveCanonicalTaskBinding(taskState.db, goal.repoPath);
+    if (resolvedTask.ok) canonicalTask = resolvedTask.binding;
+  } finally {
+    taskState.sqlite.close();
+  }
   const outcome = await runWorker({
     host,
     taskId: goal.id,
@@ -1045,6 +1095,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
       accountLabel: routedSelection.accountLabel,
       continuityBlock: continuity.promptBlock,
+      ...(canonicalTask ? { canonicalTask } : {}),
     }),
     cwd: goal.repoPath,
     // Clamped to whatever foreground continuation budget remains, so a
@@ -1056,6 +1107,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
   const workerFinishedAtMs = Date.now();
+  const sourceHead = exactRepositoryHead(goal.repoPath);
   let terminalReport: ReturnType<typeof parseWorkerReport> = undefined;
   const recordTerminalObservation = () => {
     const settled = getGoal(goal.id);
@@ -1077,6 +1129,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
               majorPreparationMs: Math.max(0, workerStartedAtMs - cycleStartedAtMs),
               majorFinalizationMs: Math.max(0, Date.now() - workerFinishedAtMs),
             },
+            ...(sourceHead ? { sourceHead } : {}),
           }),
         });
       } finally {
@@ -1226,6 +1279,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
           claimedAt,
           ...(promotionProof.taskId ? { taskId: promotionProof.taskId } : {}),
           promotionCheckedAt: promotionProof.checkedAt,
+          ...(sourceHead ? { sourceHead } : {}),
           ...('promotionEvidence' in promotionProof && promotionProof.promotionEvidence
             ? { promotionEvidence: promotionProof.promotionEvidence }
             : {}),
