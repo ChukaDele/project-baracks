@@ -317,6 +317,11 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   non-refining admission backfill risk from ignored incoming text, and did not re-resolve/re-prove a
   canonical task at final grade application. Focused candidate, admission, successful-task, and
   late-BLOCKER regressions now protect those seams.
+- Independent review regression: `5870e3a` retained the prior objective's pending claim, frozen
+  candidate, and review dispatch across explicit refinement, and final task proof was not fenced from
+  concurrent SQLite authority changes through the supervisor done transition. Refinement now revokes
+  the old authority epoch first, while an immediate transaction serializes final binding/proof and
+  state transition; 73/73 affected tests plus typecheck, targeted lint, and formatting passed.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyIndependentCompletionGrade,
   readSupervisorState,
@@ -335,6 +335,36 @@ describe('independent goal completion', () => {
     expect(() =>
       applyIndependentCompletionGrade({ goalId: 'goal-1', receiptId, db: reviewDb.db }),
     ).toThrow(/open BLOCKER review finding/i);
+    const reopened = readSupervisorState().goals[0]!;
+    expect(reopened.status).toBe('active');
+    expect(reopened.pendingCompletion).toBeUndefined();
+  });
+
+  it('serializes a task evidence race before the final done transition', () => {
+    const { task, verification } = bindPendingToCanonicalTask();
+    const receiptId = reviewReceiptId('claude', 'pass', 'task candidate reviewed');
+    const originalTransaction = reviewDb.db.transaction.bind(reviewDb.db);
+    const transaction = vi
+      .spyOn(reviewDb.db, 'transaction')
+      .mockImplementation((callback, config) =>
+        originalTransaction((tx) => {
+          tx.insert(reviewFindings)
+            .values({
+              id: newId('rfind'),
+              taskId: task.id,
+              agentRunId: verification.run.id,
+              severity: 'critical',
+              summary: 'concurrent authority blocker serialized before final proof',
+            })
+            .run();
+          return callback(tx);
+        }, config),
+      );
+
+    expect(() =>
+      applyIndependentCompletionGrade({ goalId: 'goal-1', receiptId, db: reviewDb.db }),
+    ).toThrow(/open BLOCKER review finding/i);
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), { behavior: 'immediate' });
     const reopened = readSupervisorState().goals[0]!;
     expect(reopened.status).toBe('active');
     expect(reopened.pendingCompletion).toBeUndefined();

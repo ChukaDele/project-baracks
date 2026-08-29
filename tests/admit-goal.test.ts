@@ -97,7 +97,36 @@ describe('admitGoal', () => {
 
   it('overwrites the outcome only when refine is explicitly set', () => {
     const repoPath = fakeRepo();
-    admitGoal({ project: 'jss-tool', repoPath, outcome: 'Ship the MVP', refine: false });
+    const admitted = admitGoal({
+      project: 'jss-tool',
+      repoPath,
+      outcome: 'Ship the MVP',
+      refine: false,
+    });
+    updateGoal(admitted.goal.id, {
+      status: 'blocked',
+      ownerGate: 'gate from prior objective',
+      retryImmediately: true,
+      activePid: 42,
+      candidate: {
+        resolution: 'no_task',
+        sourceHead: 'a'.repeat(40),
+        sourceTreeDigest: 'b'.repeat(64),
+        frozenAt: '2026-08-29T00:00:00.000Z',
+      },
+      pendingCompletion: {
+        summary: 'old objective complete',
+        coordinator: 'codex',
+        claimedAt: '2026-08-29T00:00:00.000Z',
+        sourceHead: 'a'.repeat(40),
+        sourceTreeDigest: 'b'.repeat(64),
+        reviewDispatch: {
+          id: 'old-objective-review',
+          provider: 'claude',
+          startedAt: '2026-08-29T00:01:00.000Z',
+        },
+      },
+    });
     const refined = admitGoal({
       project: 'jss-tool',
       repoPath,
@@ -111,6 +140,13 @@ describe('admitGoal', () => {
     expect(refined.goal.goal).toBe('Redesign the onboarding flow instead');
     expect(refined.goal.admissionRiskAssessment?.classification).toBe('substantive');
     expect(refined.goal.promotionContract?.review).toBe('focused');
+    expect(refined.goal.pendingCompletion).toBeUndefined();
+    expect(refined.goal.candidate).toBeUndefined();
+    expect(refined.goal.activePid).toBeUndefined();
+    expect(refined.goal.status).toBe('active');
+    expect(refined.goal.ownerGate).toBeUndefined();
+    expect(refined.goal.retryImmediately).toBe(false);
+    expect(refined.goal.nextRunAt).toBeTruthy();
   });
 
   it('never resets status, ownerGate, pendingCompletion, or retryImmediately on reuse', () => {
