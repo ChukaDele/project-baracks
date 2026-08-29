@@ -135,6 +135,19 @@ for (const entry of registryEntries) {
       )
     )
       fail(`skill registry entry ${entry.id} has an invalid project repository`);
+    const members = contract.mode === 'bundle' ? contract.members : [entry.id];
+    if (!Array.isArray(members) || members.length === 0)
+      fail(`skill registry entry ${entry.id} has no project install members`);
+    for (const id of members) {
+      if (typeof id !== 'string' || !canonicalSkillSlug.test(id))
+        fail(`skill registry entry ${entry.id} has an unsafe project member`);
+      const skillPath =
+        contract.mode === 'bundle'
+          ? contract.skillPathPattern?.replace('{id}', id)
+          : contract.skillPath;
+      if (skillPath !== `skills/${id}`)
+        fail(`skill registry entry ${entry.id} has an invalid project skill path`);
+    }
   }
   if (entry.sourceKind === 'VENDOR_LIVE')
     nonEmpty(entry.vendorSkill, `skill registry entry ${entry.id}.vendorSkill`);

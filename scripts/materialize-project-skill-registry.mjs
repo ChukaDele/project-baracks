@@ -31,9 +31,18 @@ if (command === 'plan') {
       if (!slug.test(value)) throw new Error(`unsafe project install slug: ${value}`);
     if (!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/.test(contract.repository))
       throw new Error(`invalid project install repository: ${entry.id}`);
-    process.stdout.write(
-      [contract.sourceKey, contract.repository, contract.mode, entry.id].join('\t') + '\n',
-    );
+    const members = contract.mode === 'bundle' ? contract.members : [entry.id];
+    for (const id of members) {
+      const skillPath =
+        contract.mode === 'bundle'
+          ? contract.skillPathPattern.replace('{id}', id)
+          : contract.skillPath;
+      if (!slug.test(id) || skillPath !== `skills/${id}`)
+        throw new Error(`invalid project install member/path: ${id}`);
+      process.stdout.write(
+        [contract.sourceKey, contract.repository, id, skillPath].join('\t') + '\n',
+      );
+    }
   }
   process.exit(0);
 }
@@ -52,7 +61,10 @@ const managedSources = new Map(
     .trim()
     .split('\n')
     .filter(Boolean)
-    .map((row) => row.split('\t')),
+    .map((row) => {
+      const [id, sourceKey, skillPath] = row.split('\t');
+      return [id, { sourceKey, skillPath }];
+    }),
 );
 const installed = new Map();
 for (const entry of readdirSync(managedRoot, { withFileTypes: true })) {
@@ -60,36 +72,55 @@ for (const entry of readdirSync(managedRoot, { withFileTypes: true })) {
   if (internalEntries.some((candidate) => candidate.id === entry.name)) continue;
   installed.set(entry.name, join(managedRoot, entry.name));
 }
+const expectedManagedIds = new Set(
+  contracts.flatMap((entry) =>
+    entry.projectInstall.mode === 'bundle' ? entry.projectInstall.members : [entry.id],
+  ),
+);
+if (
+  managedSources.size !== expectedManagedIds.size ||
+  [...managedSources].some(([id]) => !expectedManagedIds.has(id))
+)
+  throw new Error('installed managed skill set is not bound to the canonical registry');
 const externalEntries = [];
 for (const contractEntry of contracts) {
   const contract = contractEntry.projectInstall;
   const lock = locks.get(contract.sourceKey);
   if (!lock || lock.repository !== contract.repository)
     throw new Error(`missing truthful source lock: ${contractEntry.id}`);
-  const ids =
-    contract.mode === 'bundle'
-      ? [...managedSources]
-          .filter(([, sourceKey]) => sourceKey === contract.sourceKey)
-          .map(([id]) => id)
-      : [contractEntry.id];
+  const ids = contract.mode === 'bundle' ? contract.members : [contractEntry.id];
   for (const id of ids) {
-    if (!slug.test(id) || !installed.has(id))
+    const skillPath =
+      contract.mode === 'bundle'
+        ? contract.skillPathPattern.replace('{id}', id)
+        : contract.skillPath;
+    const managed = managedSources.get(id);
+    if (
+      !slug.test(id) ||
+      !installed.has(id) ||
+      managed?.sourceKey !== contract.sourceKey ||
+      managed.skillPath !== skillPath
+    )
       throw new Error(`missing or unsafe installed managed skill: ${id}`);
     const canonical = contract.mode === 'bundle' ? contractEntry : contractEntry;
+    const contentSha256 = contentHash(installed.get(id));
     externalEntries.push({
       id,
       source: canonical.source,
-      sourceKind: 'PROJECT_INSTALLED',
+      sourceKind: 'PROJECT_LOCAL',
       availability: canonical.availability,
       load: contract.mode === 'bundle' ? id : canonical.load,
       aliases: [],
       disclosure: canonical.disclosure ?? 'specialist',
-      version: lock.commit,
+      version: `project-content-sha256:${contentSha256}`,
       provenance: {
-        kind: 'project-installed-source-lock',
+        kind: 'project-installed-local-content',
+        verification: 'metadata-only',
         repository: lock.repository,
-        commit: lock.commit,
+        assertedCheckoutCommit: lock.commit,
         bundle: contractEntry.id,
+        skillPath,
+        contentIdentity: { type: 'sha256', value: contentSha256, scope: 'project-installed' },
       },
     });
   }

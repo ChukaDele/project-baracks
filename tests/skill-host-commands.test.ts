@@ -343,6 +343,7 @@ describe('installed host skill commands', () => {
       'pick-ui-library',
       'prototype',
       'review-animations',
+      'forged-project-member',
     ]);
     fixtureRepository(fixtures, 'anthropic', [
       'frontend-design',
@@ -389,6 +390,7 @@ describe('installed host skill commands', () => {
     const managed = registry.entries.map((entry) => entry.id).sort();
     expect(catalog.entries.map((entry) => entry.id).sort()).toEqual(managed);
     expect(managed).toContain('animate');
+    expect(managed).not.toContain('forged-project-member');
     expect(managed).not.toContain('project-owned');
     expect(readFileSync(join(target, 'MAJOR_SKILLS.lock'), 'utf8')).not.toContain(
       '\nproject-owned\n',
@@ -443,5 +445,46 @@ describe('installed host skill commands', () => {
     ]);
     expect(unknown.status).not.toBe(0);
     expect(unknown.stderr).toContain('unknown skill "not-installed"');
+
+    const projectedRegistryPath = join(target, '.agents', 'skills.registry.json');
+    const validProjection = readFileSync(projectedRegistryPath, 'utf8');
+    const tamperedProjection = JSON.parse(validProjection) as {
+      entries: Array<{ id: string; provenance?: { skillPath?: string } }>;
+    };
+    tamperedProjection.entries.find((entry) => entry.id === 'animate')!.provenance!.skillPath =
+      'skills/forged-project-member';
+    writeFileSync(projectedRegistryPath, JSON.stringify(tamperedProjection, null, 2) + '\n');
+    const tampered = cli([
+      'skill',
+      'resolve',
+      '--task',
+      'Animate this interface',
+      '--skill',
+      'animate',
+      '--json',
+    ]);
+    expect(tampered.status).not.toBe(0);
+    expect(tampered.stderr).toContain('project installed skill content/provenance drifted');
+    writeFileSync(projectedRegistryPath, validProjection);
+
+    const userCommand = join(target, '.claude', 'commands', 'project-owned.md');
+    mkdirSync(dirname(userCommand), { recursive: true });
+    writeFileSync(userCommand, '# preserved project command\n');
+    const downgraded = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      env,
+      encoding: 'utf8',
+    });
+    expect(downgraded.status, downgraded.stderr).toBe(0);
+    const coreRegistry = JSON.parse(
+      readFileSync(join(target, '.agents', 'skills.registry.json'), 'utf8'),
+    ) as { entries: Array<{ id: string }> };
+    expect(coreRegistry.entries.map((entry) => entry.id)).not.toContain('animate');
+    expect(existsSync(join(target, '.claude', 'commands', 'major', 'animate.md'))).toBe(false);
+    expect(existsSync(join(target, '.gemini', 'commands', 'major', 'animate.toml'))).toBe(false);
+    expect(readFileSync(custom, 'utf8')).toBe('# preserved project body\n');
+    expect(readFileSync(userCommand, 'utf8')).toBe('# preserved project command\n');
+    expect(readFileSync(join(target, '.gemini', 'commands', 'major.toml'), 'utf8')).toContain(
+      '{{args}}',
+    );
   }, 30_000);
 });

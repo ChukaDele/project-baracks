@@ -296,15 +296,47 @@ function validatedProjectRegistryPath(cwd: string): string | undefined {
   if (!existsSync(path) || !existsSync(catalogPath)) throw new Error('project skill registry/catalogue is incomplete');
   const canonicalPath = canonicalRegistryPath();
   const canonical = readRegistry(canonicalPath);
-  const rawCanonical = JSON.parse(readFileSync(canonicalPath, 'utf8')) as { entries?: Array<{ id?: string; source?: string; projectInstall?: { repository?: string; mode?: string } }> };
-  const raw = JSON.parse(readFileSync(path, 'utf8')) as { projectProjection?: { canonicalRegistryVersion?: number; sources?: Array<{ repository?: string; commit?: string }> } };
+  type InstallContract = { sourceKey: string; repository: string; mode: 'bundle' | 'selected'; profiles: string[]; features?: string[]; members?: string[]; skillPath?: string; skillPathPattern?: string };
+  const rawCanonical = JSON.parse(readFileSync(canonicalPath, 'utf8')) as { entries?: Array<{ id: string; source: string; availability: string; load: string; disclosure?: string; projectInstall?: InstallContract }> };
+  const raw = JSON.parse(readFileSync(path, 'utf8')) as { projectProjection?: { profile?: string; features?: string[]; canonicalRegistryVersion?: number; sources?: Array<{ sourceKey?: string; repository?: string; commit?: string }> } };
   const projected = readRegistry(path);
   const catalog = loadGeneratedSkillCatalog(catalogPath);
   if (raw.projectProjection?.canonicalRegistryVersion !== canonical.version || projected.version !== canonical.version || catalog.registryVersion !== projected.version)
     throw new Error('project skill registry/catalogue canonical identity mismatch');
+  const profile = raw.projectProjection?.profile;
+  const features = raw.projectProjection?.features;
+  const knownFeatures = new Set(
+    (rawCanonical.entries ?? []).flatMap((entry) => entry.projectInstall?.features ?? []),
+  );
+  if (
+    typeof profile !== 'string' ||
+    !['core', 'knowledge', 'web-ui', 'exploratory', 'full'].includes(profile) ||
+    !Array.isArray(features) ||
+    features.some((feature) => typeof feature !== 'string' || !knownFeatures.has(feature)) ||
+    JSON.stringify(features) !== JSON.stringify([...new Set(features)].sort())
+  )
+    throw new Error('project skill projection selection is invalid');
+  const selectedContracts = (rawCanonical.entries ?? []).filter((entry) => {
+    const contract = entry.projectInstall;
+    return Boolean(contract && (contract.profiles.includes(profile) || (contract.features ?? []).some((feature) => features.includes(feature))));
+  });
+  const expectedExternal = new Map<string, { entry: (typeof selectedContracts)[number]; contract: InstallContract; skillPath: string }>();
+  for (const entry of selectedContracts) {
+    const contract = entry.projectInstall!;
+    const ids = contract.mode === 'bundle' ? contract.members ?? [] : [entry.id];
+    for (const id of ids) {
+      const skillPath = contract.mode === 'bundle' ? contract.skillPathPattern?.replace('{id}', id) : contract.skillPath;
+      if (!skillPath || skillPath !== `skills/${id}` || expectedExternal.has(id))
+        throw new Error(`canonical project install contract is invalid: ${id}`);
+      expectedExternal.set(id, { entry, contract, skillPath });
+    }
+  }
   const canonicalInternal = canonical.entries.filter((entry) => entry.source === 'major-internal').map((entry) => entry.id).sort();
   const projectedInternal = projected.entries.filter((entry) => entry.source === 'major-internal').map((entry) => entry.id).sort();
   if (JSON.stringify(canonicalInternal) !== JSON.stringify(projectedInternal)) throw new Error('project skill registry canonical entries drifted');
+  const projectedExternal = projected.entries.filter((entry) => entry.source !== 'major-internal');
+  if (projectedExternal.length !== expectedExternal.size || projectedExternal.some((entry) => !expectedExternal.has(entry.id)))
+    throw new Error('project skill registry contains unknown or unbound members');
   const catalogById = new Map(catalog.entries.map((entry) => [entry.id, entry]));
   if (catalog.entries.length !== projected.entries.length || projected.entries.some((entry) => !catalogById.has(entry.id)))
     throw new Error('project skill registry/catalogue entries drifted');
@@ -315,17 +347,34 @@ function validatedProjectRegistryPath(cwd: string): string | undefined {
       throw new Error(`project skill catalogue canonical entry drifted: ${id}`);
   }
   const sources = raw.projectProjection?.sources ?? [];
-  for (const entry of projected.entries.filter((candidate) => candidate.sourceKind === 'PROJECT_INSTALLED')) {
+  const expectedSourceKeys = [...new Set(selectedContracts.map((entry) => entry.projectInstall!.sourceKey))].sort();
+  if (sources.length !== expectedSourceKeys.length || sources.some((source) => !expectedSourceKeys.includes(source.sourceKey ?? '')))
+    throw new Error('project skill projection source lock set drifted');
+  for (const entry of projectedExternal) {
     const identity = catalogById.get(entry.id);
     const body = containedSkillPath(join(cwd, '.agents', 'skills'), entry.id, 'SKILL.md');
-    const provenance = entry.provenance as { repository?: unknown; commit?: unknown; bundle?: unknown } | undefined;
-    const contract = rawCanonical.entries?.find((candidate) => candidate.id === provenance?.bundle);
+    const provenance = entry.provenance as { kind?: unknown; verification?: unknown; repository?: unknown; assertedCheckoutCommit?: unknown; bundle?: unknown; skillPath?: unknown; contentIdentity?: { type?: unknown; value?: unknown; scope?: unknown } } | undefined;
+    const expected = expectedExternal.get(entry.id)!;
+    const sourceLock = sources.find((source) => source.sourceKey === expected.contract.sourceKey);
+    const expectedLoad = expected.contract.mode === 'bundle' ? entry.id : expected.entry.load;
+    const expectedDisclosure = expected.entry.disclosure ?? 'specialist';
     if (!identity?.contentSha256 || !existsSync(body) || skillContentSha256(body) !== identity.contentSha256 ||
-      typeof provenance?.repository !== 'string' || typeof provenance.commit !== 'string' ||
-      !sources.some((source) => source.repository === provenance.repository && source.commit === provenance.commit) ||
-      !contract?.projectInstall || contract.projectInstall.repository !== provenance.repository ||
-      contract.source !== entry.source || (contract.projectInstall.mode !== 'bundle' && contract.id !== entry.id) ||
-      identity.source !== entry.source || identity.version !== provenance.commit)
+      entry.sourceKind !== 'PROJECT_LOCAL' || entry.source !== expected.entry.source ||
+      entry.availability !== expected.entry.availability || entry.load !== expectedLoad ||
+      entry.disclosure !== expectedDisclosure || entry.aliases.length !== 0 ||
+      provenance?.kind !== 'project-installed-local-content' || provenance.verification !== 'metadata-only' ||
+      provenance.repository !== expected.contract.repository || provenance.bundle !== expected.entry.id ||
+      provenance.skillPath !== expected.skillPath || provenance.assertedCheckoutCommit !== sourceLock?.commit ||
+      sourceLock?.repository !== expected.contract.repository || !/^[0-9a-f]{40}$/.test(sourceLock.commit ?? '') ||
+      provenance.contentIdentity?.type !== 'sha256' || provenance.contentIdentity.scope !== 'project-installed' ||
+      provenance.contentIdentity.value !== identity.contentSha256 ||
+      identity.source !== entry.source || identity.sourceKind !== 'PROJECT_LOCAL' ||
+      identity.availability !== entry.availability || identity.aliases.length !== 0 ||
+      JSON.stringify(identity.triggerConditions) !== JSON.stringify([expectedLoad]) ||
+      JSON.stringify(identity.triggers) !== JSON.stringify(expectedLoad.split('-').filter(Boolean)) ||
+      identity.version !== `project-content-sha256:${identity.contentSha256}` ||
+      entry.version !== identity.version ||
+      JSON.stringify(identity.provenance) !== JSON.stringify(provenance))
       throw new Error(`project installed skill content/provenance drifted: ${entry.id}`);
   }
   return path;
@@ -485,7 +534,7 @@ function exactInstalledSkillPath(
 ): string | undefined {
   const path = installedSkillPath(entry.id, cwd, entry.source);
   if (!path) return undefined;
-  if (entry.source !== 'major-internal' && entry.sourceKind !== 'PROJECT_INSTALLED') return path;
+  if (entry.source !== 'major-internal' && !(entry.sourceKind === 'PROJECT_LOCAL' && entry.source !== 'gbrain-generated')) return path;
   const identity = catalog.get(entry.id);
   if (!identity?.contentSha256 || identity.registryVersion !== registryVersion(cwd)) return undefined;
   const actual = skillContentSha256(path);
@@ -712,7 +761,13 @@ function resolveSkillsInternal(input: {
   }> = [
     ...(requested.length > 0
       ? explicitEntries
-      : registry.filter((entry) => !entry.deprecated).map((entry) => ({ entry, generated: undefined }))),
+      : registry
+          .filter(
+            (entry) =>
+              !entry.deprecated &&
+              !(entry.sourceKind === 'PROJECT_LOCAL' && entry.source !== 'gbrain-generated'),
+          )
+          .map((entry) => ({ entry, generated: undefined }))),
     ...(requested.length > 0 ? [] : generated)
       .filter(
         (candidate) =>
@@ -836,7 +891,9 @@ function resolveSkillsInternal(input: {
           skill.sourceKind === 'INTERNAL_DURABLE'
             ? 'canonical active bundle before mutable global or project roots'
             : skill.sourceKind === 'PROJECT_LOCAL'
-              ? 'project-local generated candidate'
+              ? skill.source === 'gbrain-generated'
+                ? 'project-local generated candidate'
+                : 'explicit project-installed local content'
               : 'canonical registry vendor reference',
         source: skill.source,
         provenance: {

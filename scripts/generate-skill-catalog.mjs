@@ -63,6 +63,17 @@ for (const entry of registry.entries) {
       throw new Error(`missing project install profiles for ${entry.id}`);
     if (!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/.test(contract.repository))
       throw new Error(`invalid project install repository for ${entry.id}`);
+    const members = contract.mode === 'bundle' ? contract.members : [entry.id];
+    if (!Array.isArray(members) || members.length === 0)
+      throw new Error(`missing project install members for ${entry.id}`);
+    for (const id of members) {
+      assertSlug(id, `skill registry ${entry.id} project member`);
+      const skillPath =
+        contract.mode === 'bundle'
+          ? contract.skillPathPattern?.replace('{id}', id)
+          : contract.skillPath;
+      if (skillPath !== `skills/${id}`) throw new Error(`invalid project install path for ${id}`);
+    }
     for (const feature of contract.features ?? [])
       assertSlug(feature, `skill registry ${entry.id} project feature`);
   }

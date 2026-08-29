@@ -28,6 +28,14 @@ for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
 done
 mkdir -p "$AGENT_SKILLS" "$CLAUDE_SKILLS" "$CODEX_SKILLS"
 
+# Rebuild only Major-owned projections and command namespaces. Preserve all
+# project-owned commands, prompts, skills, and host instructions.
+rm -f "$TARGET/.agents/skills.registry.json" "$TARGET/.agents/skills.catalog.json"
+rm -rf "$TARGET/.claude/commands/major" "$TARGET/.codex/prompts/major" \
+  "$TARGET/.cursor/commands/major" "$TARGET/.gemini/commands/major"
+rm -f "$TARGET/.claude/commands/major.md" "$TARGET/.codex/prompts/major.md" \
+  "$TARGET/.cursor/commands/major.md" "$TARGET/.gemini/commands/major.toml"
+
 # Remove only skills previously installed by Major. Preserve project-owned/custom skills.
 if [ -f "$LOCK" ]; then
   awk 'found && NF {print} /^\[skills\]$/ {found=1}' "$LOCK" | while IFS= read -r name; do
@@ -37,13 +45,13 @@ if [ -f "$LOCK" ]; then
 fi
 
 copy_skill_dir() {
-  local src="$1" source_key="${2:-}" name
+  local src="$1" source_key="${2:-}" skill_path="${3:-}" name
   name="$(basename "$src")"
   rm -rf "$AGENT_SKILLS/$name" "$CLAUDE_SKILLS/$name" "$CODEX_SKILLS/$name"
   cp -R "$src" "$AGENT_SKILLS/$name"
   cp -R "$src" "$CLAUDE_SKILLS/$name"
   cp -R "$src" "$CODEX_SKILLS/$name"
-  [ -z "$source_key" ] || printf '%s\t%s\n' "$name" "$source_key" >> "$TARGET/.agents/managed-external.tsv"
+  [ -z "$source_key" ] || printf '%s\t%s\t%s\n' "$name" "$source_key" "$skill_path" >> "$TARGET/.agents/managed-external.tsv"
 }
 
 # All Major internal skills are available in every managed project; bodies remain trigger-loaded.
@@ -60,17 +68,18 @@ clone_repo() {
   git clone --depth 1 "$source" "$destination"
 }
 copy_named() {
-  local root="$1" name="$2" source_key="$3" found
-  found="$(find "$root" -type f -name SKILL.md -path "*/$name/SKILL.md" -print -quit || true)"
-  if [ -z "$found" ]; then
+  local root="$1" name="$2" source_key="$3" skill_path="$4" found
+  found="$root/$skill_path"
+  if [ ! -f "$found/SKILL.md" ]; then
     echo "ERROR: required selected skill missing upstream: $name" >&2
     return 1
   fi
-  copy_skill_dir "$(dirname "$found")" "$source_key"
+  [ "$(basename "$found")" = "$name" ] || { echo "ERROR: source path/id mismatch: $name" >&2; return 1; }
+  copy_skill_dir "$found" "$source_key" "$skill_path"
 }
 SOURCES=""
 SOURCE_LOCKS=""
-while IFS=$'\t' read -r source_key repository mode skill_id; do
+while IFS=$'\t' read -r source_key repository skill_id skill_path; do
   [ -n "$source_key" ] || continue
   source_dir="$TMP/source-$source_key"
   if [ ! -d "$source_dir/.git" ]; then
@@ -79,11 +88,7 @@ while IFS=$'\t' read -r source_key repository mode skill_id; do
     commit="$(git -C "$source_dir" rev-parse HEAD)"
     SOURCE_LOCKS="${SOURCE_LOCKS}${source_key}|${repository}|${commit};"
   fi
-  if [ "$mode" = "bundle" ]; then
-    while IFS= read -r skill; do copy_skill_dir "$(dirname "$skill")" "$source_key"; done < <(find "$source_dir" -type f -name SKILL.md | sort)
-  else
-    copy_named "$source_dir" "$skill_id" "$source_key"
-  fi
+  copy_named "$source_dir" "$skill_id" "$source_key" "$skill_path"
 done < "$PLAN"
 
 missing=0
@@ -92,7 +97,7 @@ for dir in "$INTERNAL"/*; do
   name="$(basename "$dir")"
   [ -f "$AGENT_SKILLS/$name/SKILL.md" ] || { echo "ERROR: missing internal skill: $name" >&2; missing=1; }
 done
-while IFS=$'\t' read -r name source_key; do
+while IFS=$'\t' read -r name source_key skill_path; do
   [ -f "$AGENT_SKILLS/$name/SKILL.md" ] || { echo "ERROR: missing selected external skill: $name" >&2; missing=1; }
 done < "$TARGET/.agents/managed-external.tsv"
 [ "$missing" -eq 0 ] || { echo "Major skill installation incomplete; refusing success." >&2; exit 1; }

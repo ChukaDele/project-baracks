@@ -1,5 +1,5 @@
 {
-  "version": 20,
+  "version": 21,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -333,56 +333,56 @@
       "availability": "all-ui-projects",
       "load": "task-relevant",
       "install": "entire-current-bundle",
-      "projectInstall": { "sourceKey": "emil", "repository": "https://github.com/emilkowalski/skills.git", "mode": "bundle", "profiles": ["web-ui", "exploratory", "full"] }
+      "projectInstall": { "sourceKey": "emil", "repository": "https://github.com/emilkowalski/skills.git", "mode": "bundle", "profiles": ["web-ui", "exploratory", "full"], "members": ["animate", "animation-vocabulary", "apple-design", "emil-design-eng", "find-animation-opportunities", "improve-animations", "pick-ui-library", "prototype", "review-animations"], "skillPathPattern": "skills/{id}" }
     },
     {
       "id": "frontend-design",
       "source": "github:anthropics/skills",
       "availability": "all-ui-projects",
       "load": "frontend-design-work",
-      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"] }
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"], "skillPath": "skills/frontend-design" }
     },
     {
       "id": "webapp-testing",
       "source": "github:anthropics/skills",
       "availability": "web-projects",
       "load": "browser-or-webapp-qa",
-      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"] }
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"], "skillPath": "skills/webapp-testing" }
     },
     {
       "id": "mcp-builder",
       "source": "github:anthropics/skills",
       "availability": "all-projects",
       "load": "build-or-improve-mcp-server",
-      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["full"], "features": ["mcp"] }
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["full"], "features": ["mcp"], "skillPath": "skills/mcp-builder" }
     },
     {
       "id": "skill-creator",
       "source": "github:anthropics/skills",
       "availability": "all-projects",
       "load": "create-evaluate-or-improve-persistent-skill",
-      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["full"], "features": ["skill-authoring"] }
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["full"], "features": ["skill-authoring"], "skillPath": "skills/skill-creator" }
     },
     {
       "id": "algorithmic-art",
       "source": "github:anthropics/skills",
       "availability": "exploratory-ui-projects",
       "load": "generative-art-particles-flow-fields-p5",
-      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["exploratory", "full"] }
+      "projectInstall": { "sourceKey": "anthropic", "repository": "https://github.com/anthropics/skills.git", "mode": "selected", "profiles": ["exploratory", "full"], "skillPath": "skills/algorithmic-art" }
     },
     {
       "id": "playwright",
       "source": "github:openai/skills",
       "availability": "web-projects",
       "load": "real-browser-automation-debugging-qa",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"] }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"], "skillPath": "skills/playwright" }
     },
     {
       "id": "vercel-deploy",
       "source": "github:openai/skills",
       "availability": "vercel-projects",
       "load": "preview-or-production-vercel-deployment",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["vercel"] }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["vercel"], "skillPath": "skills/vercel-deploy" }
     },
     {
       "id": "vercel-optimize",
@@ -479,42 +479,42 @@
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
       "load": "programmatic-figma-read-write",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"] }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-use" }
     },
     {
       "id": "figma-implement-design",
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
       "load": "implement-code-from-figma",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"] }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-implement-design" }
     },
     {
       "id": "figma-generate-design",
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
       "load": "create-or-update-figma-screen",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"] }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-generate-design" }
     },
     {
       "id": "security-threat-model",
       "source": "github:openai/skills",
       "availability": "all-projects",
       "load": "material-security-risk",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["security"] }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["security"], "skillPath": "skills/security-threat-model" }
     },
     {
       "id": "pdf",
       "source": "github:openai/skills",
       "availability": "all-projects",
       "load": "pdf-task",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["pdf"] }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["pdf"], "skillPath": "skills/pdf" }
     },
     {
       "id": "graph-engineering",
       "source": "github:codejunkie99/graph-engineering",
       "availability": "all-projects",
       "load": "deep-graph-orchestration",
-      "projectInstall": { "sourceKey": "graph", "repository": "https://github.com/codejunkie99/graph-engineering.git", "mode": "selected", "profiles": ["full"], "features": ["deep-graph"] }
+      "projectInstall": { "sourceKey": "graph", "repository": "https://github.com/codejunkie99/graph-engineering.git", "mode": "selected", "profiles": ["full"], "features": ["deep-graph"], "skillPath": "skills/graph-engineering" }
     },
     {
       "id": "software-engineering",
