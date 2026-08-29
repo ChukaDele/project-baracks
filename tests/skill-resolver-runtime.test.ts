@@ -279,7 +279,7 @@ describe('runtime skill resolver', () => {
     expect(resolved.skills[0]?.path).toContain('/skills/internal/skill-resolver/SKILL.md');
   });
 
-  it('prefers a complete newer validated hot bundle over the immutable release', () => {
+  it('ignores a valid-looking partial hot bundle without a complete content identity', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-hot-skills-'));
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -345,10 +345,7 @@ describe('runtime skill resolver', () => {
     symlinkSync('0123456789abcdef0123456789abcdef01234567', current);
 
     const resolved = resolveSkills({ task: 'Use hot-skill for this task.', limit: 1 });
-    expect(resolved.skills[0]?.id).toBe('hot-skill');
-    expect(resolved.skills[0]?.path).toBe(
-      join(current, 'skills', 'internal', 'hot-skill', 'SKILL.md'),
-    );
+    expect(resolved.skills.map((skill) => skill.id)).not.toContain('hot-skill');
   });
 
   it('ignores a malformed hot bundle even when it declares an older registry version', () => {

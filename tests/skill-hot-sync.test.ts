@@ -7,6 +7,8 @@ import {
   readlinkSync,
   readdirSync,
   rmSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -133,25 +135,78 @@ describe('Major hot skill sync', () => {
     writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'trusted B rule\n');
     const first = syncMajorSkills({ sourceRoot: sourceA });
     syncMajorSkills({ sourceRoot: sourceB });
-    const corruptedSkill = join(
-      first.activeBundle,
-      'skills',
-      'internal',
-      'skill-resolver',
-      'SKILL.md',
-    );
-    writeFileSync(corruptedSkill, 'corrupt retained body\n');
+    const corruptedEval = join(first.activeBundle, 'evals', 'skill-resolver', 'api.json');
+    writeFileSync(corruptedEval, '{"skill":"api","should_trigger":[],"should_not_trigger":[]}\n');
 
     const reactivated = syncMajorSkills({ sourceRoot: sourceA });
 
     expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(first.bundleId);
-    expect(readFileSync(corruptedSkill, 'utf8')).not.toBe('corrupt retained body\n');
+    expect(readFileSync(corruptedEval, 'utf8')).toBe(
+      readFileSync(join(sourceA, 'evals', 'skill-resolver', 'api.json'), 'utf8'),
+    );
     expect(
       readdirSync(join(home, 'skill-bundles')).some((name) =>
         name.startsWith(`.quarantine-${first.bundleId}-`),
       ),
     ).toBe(true);
     expect(reactivated.bundleId).toBe(first.bundleId);
+  });
+
+  it.each([
+    ['adapter', 'adapters/skills/CODEX.md'],
+    ['eval', 'evals/skill-resolver/api.json'],
+    ['skill', 'skills/internal/api/SKILL.md'],
+  ])('rejects a symlinked %s anywhere in authenticated bundle content', (_kind, relativePath) => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-symlink-home-'));
+    const source = sourceCopy('major-skill-symlink-source-');
+    const external = join(home, 'external-artifact');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(external, 'external\n');
+    const artifact = join(source, relativePath);
+    unlinkSync(artifact);
+    symlinkSync(external, artifact);
+
+    expect(() => syncMajorSkills({ sourceRoot: source })).toThrow(/symbolic links are forbidden/);
+    expect(existsSync(join(home, 'skill-bundles', 'current'))).toBe(false);
+  });
+
+  it('requires an eval fixture for every canonical catalogue entry', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-eval-coverage-home-'));
+    const source = sourceCopy('major-skill-eval-coverage-source-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    unlinkSync(join(source, 'evals', 'skill-resolver', 'vercel-react-best-practices.json'));
+
+    expect(() => syncMajorSkills({ sourceRoot: source })).toThrow(
+      /resolver eval coverage missing canonical skills: vercel-react-best-practices/,
+    );
+  });
+
+  it('ignores active bundle artifact drift and a current link relocated outside skill-bundles', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-resolver-integrity-home-'));
+    const source = sourceCopy('major-skill-resolver-integrity-source-');
+    const external = mkdtempSync(join(tmpdir(), 'major-skill-relocated-bundle-'));
+    roots.push(home, external);
+    process.env.MAJOR_HOME = home;
+    const synced = syncMajorSkills({ sourceRoot: source });
+    const current = join(home, 'skill-bundles', 'current');
+
+    writeFileSync(join(synced.activeBundle, 'adapters', 'skills', 'CODEX.md'), 'drifted\n');
+    expect(
+      resolveSkills({ task: 'Use skill-resolver for this task.', limit: 1 }).skills[0]?.path,
+    ).not.toContain('/skill-bundles/current/');
+
+    rmSync(current);
+    cpSync(source, join(external, synced.bundleId), { recursive: true });
+    cpSync(
+      join(synced.activeBundle, 'bundle.json'),
+      join(external, synced.bundleId, 'bundle.json'),
+    );
+    symlinkSync(join(external, synced.bundleId), current);
+    expect(
+      resolveSkills({ task: 'Use skill-resolver for this task.', limit: 1 }).skills[0]?.path,
+    ).not.toContain('/skill-bundles/current/');
   });
 
   it('records the immediately active predecessor when reactivating, then rolls back to it', () => {

@@ -3,8 +3,20 @@ set -euo pipefail
 
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL_TARGET="${1:-$(pwd)}"
+[ ! -L "$INSTALL_TARGET" ] || { echo "ERROR: refusing symlinked project target: $INSTALL_TARGET" >&2; exit 2; }
 mkdir -p "$INSTALL_TARGET"
 INSTALL_TARGET="$(cd "$INSTALL_TARGET" && pwd -P)"
+
+# Project-controlled managed roots must be real directories/files. Reject links
+# anywhere below them before copying, removing, staging, or activating content.
+for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
+  candidate="$INSTALL_TARGET/$managed"
+  [ ! -L "$candidate" ] || { echo "ERROR: refusing symlinked managed project path: $candidate" >&2; exit 2; }
+  if [ -d "$candidate" ]; then
+    unsafe_link="$(find -P "$candidate" -type l -print -quit)"
+    [ -z "$unsafe_link" ] || { echo "ERROR: refusing symlink below managed project path: $unsafe_link" >&2; exit 2; }
+  fi
+done
 MAJOR_HOME="${MAJOR_HOME:-${HOME:?HOME is required}/.major}"
 mkdir -p "$MAJOR_HOME"
 MAJOR_HOME="$(cd "$MAJOR_HOME" && pwd -P)"

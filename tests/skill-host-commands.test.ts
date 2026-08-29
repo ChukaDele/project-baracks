@@ -122,6 +122,36 @@ afterEach(() => {
 });
 
 describe('installed host skill commands', () => {
+  it('fails atomically before following a symlink below a managed project root', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-symlink-install-home-'));
+    const target = mkdtempSync(join(tmpdir(), 'major-symlink-install-target-'));
+    const external = mkdtempSync(join(tmpdir(), 'major-symlink-install-external-'));
+    roots.push(home, target, external);
+    const owned = join(target, '.agents', 'project-owned.txt');
+    const sentinel = join(external, 'sentinel.txt');
+    mkdirSync(join(target, '.agents'), { recursive: true });
+    mkdirSync(join(target, '.codex'), { recursive: true });
+    writeFileSync(owned, 'preserve project state\n');
+    writeFileSync(sentinel, 'external sentinel\n');
+    symlinkSync(external, join(target, '.codex', 'prompts'));
+
+    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      env: {
+        ...process.env,
+        HOME: home,
+        MAJOR_HOME: join(home, '.major'),
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('refusing symlink below managed project path');
+    expect(readFileSync(owned, 'utf8')).toBe('preserve project state\n');
+    expect(readFileSync(sentinel, 'utf8')).toBe('external sentinel\n');
+    expect(readdirSync(external)).toEqual(['sentinel.txt']);
+  });
+
   it.each([
     ['unknown', 'not-canonical', 'unknown installer feature'],
     ['duplicate', 'figma,figma', 'duplicate installer feature input'],

@@ -209,10 +209,19 @@ function filesBelow(root: string): string[] {
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`symbolic links are forbidden in Major skill bundles: ${path}`);
+      }
       if (entry.isDirectory()) walk(path);
       else if (entry.isFile()) files.push(path);
+      else throw new Error(`special files are forbidden in Major skill bundles: ${path}`);
     }
   };
+  const rootStat = lstatSync(root);
+  if (rootStat.isSymbolicLink()) {
+    throw new Error(`symbolic links are forbidden in Major skill bundles: ${root}`);
+  }
+  if (!rootStat.isDirectory()) throw new Error(`expected Major skill bundle directory: ${root}`);
   walk(root);
   return files.sort();
 }
@@ -255,6 +264,24 @@ function validateSource(sourceRoot: string): {
   ]) {
     if (!existsSync(path)) throw new Error(`required skill-bundle source missing: ${path}`);
   }
+  for (const path of [
+    registryPath,
+    catalogPath,
+    reconciliationLedgerPath,
+    sourceLedgerPath,
+    capabilityMatrixPath,
+    vendorSourcePath,
+    assetRegistryPath,
+    join(sourceRoot, 'guidance', 'gbrain-reusable-assets.index.json'),
+    join(sourceRoot, 'guidance', 'reusable-assets.candidates.json'),
+  ]) {
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`symbolic links are forbidden in Major skill bundles: ${path}`);
+    }
+    if (!stat.isFile()) throw new Error(`expected Major skill bundle file: ${path}`);
+  }
+  for (const root of [internalRoot, evalRoot, adaptersRoot]) filesBelow(root);
 
   const sourceLedger = JSON.parse(readFileSync(sourceLedgerPath, 'utf8')) as {
     schemaVersion?: unknown;
@@ -384,6 +411,7 @@ function validateSource(sourceRoot: string): {
   }
 
   const known = new Set(registry.entries.map((entry) => entry.id));
+  const evaluated = new Set<string>();
   for (const file of readdirSync(evalRoot).filter((name) => name.endsWith('.json'))) {
     const parsed = JSON.parse(readFileSync(join(evalRoot, file), 'utf8')) as {
       skill?: unknown;
@@ -395,6 +423,22 @@ function validateSource(sourceRoot: string): {
     }
     if (!Array.isArray(parsed.should_trigger) || !Array.isArray(parsed.should_not_trigger)) {
       throw new Error(`malformed resolver eval: ${file}`);
+    }
+    if (evaluated.has(parsed.skill)) throw new Error(`duplicate resolver eval coverage: ${parsed.skill}`);
+    evaluated.add(parsed.skill);
+  }
+  const missingEvals = [...known].filter((id) => !evaluated.has(id)).sort();
+  if (missingEvals.length) {
+    throw new Error(`resolver eval coverage missing canonical skills: ${missingEvals.join(',')}`);
+  }
+
+  // Validate every copied/authenticated tree before hashing or cpSync can follow it.
+  for (const root of [internalRoot, evalRoot, adaptersRoot, ...assetPaths]) {
+    if (lstatSync(root).isDirectory()) filesBelow(root);
+    else if (lstatSync(root).isSymbolicLink()) {
+      throw new Error(`symbolic links are forbidden in Major skill bundles: ${root}`);
+    } else if (!lstatSync(root).isFile()) {
+      throw new Error(`special files are forbidden in Major skill bundles: ${root}`);
     }
   }
 
@@ -590,7 +634,7 @@ function bundleIdentity(sourceRoot: string, validated: ReturnType<typeof validat
   ]);
 }
 
-function validateRetainedBundle(path: string): { marker: BundleMarker; registry: Registry } {
+export function validateRetainedBundle(path: string): { marker: BundleMarker; registry: Registry } {
   const marker = readBundleMarker(path);
   const validated = validateSource(path);
   const identity = bundleIdentity(path, validated);

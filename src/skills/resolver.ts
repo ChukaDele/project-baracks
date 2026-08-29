@@ -4,7 +4,6 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import {
-  buildSkillCatalog,
   loadGeneratedSkillCatalog,
   skillContentSha256,
   type SkillCatalogEntry,
@@ -31,6 +30,7 @@ import {
   type VendorSourceState,
 } from './vendor.js';
 import { CANONICAL_SKILL_SLUG, containedSkillPath } from './slug.js';
+import { validateRetainedBundle } from './sync.js';
 
 const canonicalSkillSlug = z.string().regex(CANONICAL_SKILL_SLUG, 'must be a safe canonical slug');
 
@@ -232,46 +232,14 @@ function readRegistry(path: string): z.infer<typeof registrySchema> {
  * ignored fail-closed.
  */
 function hotSkillBundleRoot(): string | undefined {
-  const root = join(majorHome(), 'skill-bundles', 'current');
-  const marker = join(root, 'bundle.json');
-  const registry = join(root, 'guidance', 'skills.registry.json');
-  const catalog = join(root, 'guidance', 'skills.catalog.json');
-  const internal = join(root, 'skills', 'internal');
-  if (!existsSync(marker) || !existsSync(registry) || !existsSync(catalog) || !existsSync(internal))
-    return undefined;
+  const bundlesRoot = join(majorHome(), 'skill-bundles');
+  const current = join(bundlesRoot, 'current');
   try {
-    bundleSchema.parse(JSON.parse(readFileSync(marker, 'utf8')));
-    const hot = readRegistry(registry);
-    const generated = loadGeneratedSkillCatalog(catalog);
-    const vendorPath = join(root, 'guidance', 'vendor-sources.json');
-    const hasVendorEntries = hot.entries.some(
-      (entry) => inferSkillSourceKind(entry.source, entry.sourceKind) === 'VENDOR_LIVE',
-    );
-    const vendor = existsSync(vendorPath) ? loadVendorCatalog(vendorPath) : undefined;
-    if (hasVendorEntries && !vendor) return undefined;
-    const expected = buildSkillCatalog(
-      hot.entries,
-      (entry) =>
-        entry.source === 'major-internal' ? join(internal, entry.id, 'SKILL.md') : undefined,
-      hot.version,
-      vendor,
-    );
-    if (
-      generated.registryVersion !== hot.version ||
-      JSON.stringify(generated.entries) !== JSON.stringify(expected)
-    )
-      return undefined;
-    for (const entry of hot.entries.filter((candidate) => candidate.source === 'major-internal')) {
-      const identity = generated.entries.find((candidate) => candidate.id === entry.id);
-      const path = join(internal, entry.id, 'SKILL.md');
-      if (
-        !identity?.contentSha256 ||
-        !existsSync(path) ||
-        skillContentSha256(path) !== identity.contentSha256
-      )
-        return undefined;
-    }
-    return hot.version >= 1 ? root : undefined;
+    if (!lstatSync(current).isSymbolicLink()) return undefined;
+    const root = realpathSync(current);
+    if (dirname(root) !== realpathSync(bundlesRoot)) return undefined;
+    const validated = validateRetainedBundle(root);
+    return validated.registry.version >= 1 ? current : undefined;
   } catch {
     return undefined;
   }

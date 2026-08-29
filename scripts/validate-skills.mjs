@@ -422,11 +422,16 @@ for (const fixture of readdirSync(evalRoot).filter((name) => name.endsWith('.jso
   if (registered.includes(skill)) fixtureIds.add(skill);
   const positive = list(value.should_trigger, `resolver fixture ${fixture}.should_trigger`);
   const negative = list(value.should_not_trigger, `resolver fixture ${fixture}.should_not_trigger`);
-  if (positive.length === 0 || negative.length === 0)
+  const metadataOnly = value.metadataOnly === true;
+  if (metadataOnly && (positive.length !== 0 || negative.length !== 0))
+    fail(`metadata-only resolver fixture ${fixture} must not contain routing cases`);
+  if (!metadataOnly && (positive.length === 0 || negative.length === 0))
     fail(`resolver fixture ${fixture} requires positive and negative cases`);
+  if (registered.includes(skill) && metadataOnly)
+    fail(`internal resolver fixture ${fixture} must contain positive and negative cases`);
 }
-for (const id of registered) {
-  if (!fixtureIds.has(id)) fail(`internal skill ${id} has no resolver fixture`);
+for (const id of allRegistered) {
+  if (!allFixtureIds.has(id)) fail(`canonical skill ${id} has no resolver fixture`);
 }
 
 const reconciliation = object(
