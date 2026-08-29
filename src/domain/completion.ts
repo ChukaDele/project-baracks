@@ -1,5 +1,6 @@
-import { and, count, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
+import { resolve } from 'node:path';
 import type { DbConn } from '../db/client.js';
 import {
   agentRuns,
@@ -38,12 +39,12 @@ export const completionCriteriaSchema = z
     /** Require at least one 'artifact' evidence (commit/branch/PR ref). */
     requireArtifact: z.boolean().default(false),
     /** DecisionRequest categories that must each have an approved decision. */
-    requiredDecisionCategories: z.array(z.string().min(1)).default([]),
+    requiredDecisionCategories: z.array(z.string().trim().min(1)).default([]),
     /** Opt-in progressive proof contract. Absent on legacy tasks, which retain
      * their existing minimum-verification completion semantics. */
     progressiveValidation: z
       .object({
-        riskSpecificChecks: z.array(z.string().min(1)).default([]),
+        riskSpecificChecks: z.array(z.string().trim().min(1)).default([]),
         broaderValidationTriggers: z.enum(BROADER_VALIDATION_TRIGGERS).array().default([]),
         repositoryPolicyRequiresBroadValidation: z.boolean().default(false),
         review: z.enum(REVIEW_LEVELS).default('focused'),
@@ -85,6 +86,58 @@ export interface CompletionProofResult extends CompletionProof {
 
 export interface TaskPromotionProofResult extends CompletionProofResult {
   taskId: string;
+}
+
+export interface CanonicalTaskBinding {
+  taskId: string;
+  projectId: string;
+  repoPath: string;
+  frozenCriteriaJson: string;
+}
+
+export type CanonicalTaskBindingResult =
+  { ok: true; binding: CanonicalTaskBinding } | { ok: false; failure: string };
+
+/** Resolve the one promotable task through the existing project/task store.
+ * Repository identity is canonical; project display names and worker-supplied
+ * task IDs are not authority. */
+export function resolveCanonicalTaskBinding(
+  db: DbConn,
+  repoPath: string,
+): CanonicalTaskBindingResult {
+  const normalizedRepo = resolve(repoPath);
+  const project = db
+    .select({ id: projects.id, repoPath: projects.repoPath })
+    .from(projects)
+    .all()
+    .find((candidate) => resolve(candidate.repoPath) === normalizedRepo);
+  if (!project)
+    return { ok: false, failure: `project not found for repository: ${normalizedRepo}` };
+  const candidates = db
+    .select({ taskId: tasks.id, criteria: tasks.completionCriteriaSnapshotJson })
+    .from(tasks)
+    .where(and(eq(tasks.projectId, project.id), eq(tasks.status, 'ready_to_merge')))
+    .all()
+    .filter(
+      (candidate): candidate is { taskId: string; criteria: string } => candidate.criteria !== null,
+    );
+  if (candidates.length !== 1) {
+    return {
+      ok: false,
+      failure: `repository has ${candidates.length} ready_to_merge task(s) with frozen criteria; expected exactly one`,
+    };
+  }
+  const candidate = candidates[0];
+  if (!candidate) return { ok: false, failure: 'canonical task resolution failed' };
+  return {
+    ok: true,
+    binding: {
+      taskId: candidate.taskId,
+      projectId: project.id,
+      repoPath: project.repoPath,
+      frozenCriteriaJson: candidate.criteria,
+    },
+  };
 }
 
 export const REVIEW_SEVERITY_STORAGE = {
@@ -188,20 +241,40 @@ export function evaluateCompletionProof(
       failures.push(`missing required progressive validation: ${missingChecks.join(', ')}`);
     }
 
-    const reviewPassed =
-      progressive.review === 'none' ||
-      (db
-        .select({ n: count() })
+    const implementationProviders = new Set(
+      db
+        .select({ providerId: agentRuns.providerId })
         .from(agentRuns)
         .where(
           and(
             eq(agentRuns.taskId, taskId),
-            eq(agentRuns.purpose, 'review'),
+            inArray(agentRuns.purpose, ['implementation', 'repair']),
             eq(agentRuns.status, 'succeeded'),
-            ...(progressive.review === 'independent' ? [isNull(agentRuns.independenceLoss)] : []),
           ),
         )
-        .get()?.n ?? 0) > 0;
+        .all()
+        .map((run) => run.providerId),
+    );
+    const succeededReviews = db
+      .select({ providerId: agentRuns.providerId, independenceLoss: agentRuns.independenceLoss })
+      .from(agentRuns)
+      .where(
+        and(
+          eq(agentRuns.taskId, taskId),
+          eq(agentRuns.purpose, 'review'),
+          eq(agentRuns.status, 'succeeded'),
+        ),
+      )
+      .all();
+    const reviewPassed =
+      progressive.review === 'none' ||
+      succeededReviews.some(
+        (review) =>
+          progressive.review !== 'independent' ||
+          (review.independenceLoss === null &&
+            implementationProviders.size > 0 &&
+            !implementationProviders.has(review.providerId)),
+      );
     const promotion = assessPromotion({
       prePromotionEvidencePassed:
         passedVerifications >= criteria.minPassedVerificationRuns && missingChecks.length === 0,
@@ -240,6 +313,12 @@ export function evaluateCompletionProof(
     if (!artifact) failures.push('requires an artifact evidence record with a repository ref');
   }
 
+  const taskProjectId = db
+    .select({ projectId: tasks.projectId })
+    .from(tasks)
+    .where(eq(tasks.id, taskId))
+    .get()?.projectId;
+
   for (const category of criteria.requiredDecisionCategories) {
     const approved =
       db
@@ -248,6 +327,7 @@ export function evaluateCompletionProof(
         .where(
           and(
             eq(decisionRequests.taskId, taskId),
+            eq(decisionRequests.projectId, taskProjectId ?? ''),
             eq(decisionRequests.category, category),
             eq(decisionRequests.status, 'approved'),
           ),
@@ -264,14 +344,14 @@ export function evaluateCompletionProof(
  * installs the candidate nor claims READY. */
 export function evaluateTaskPromotionProof(
   db: DbConn,
-  input: { taskId: string; project: string },
+  input: { taskId: string; repoPath: string },
 ): TaskPromotionProofResult {
   const row = db
     .select({
       taskId: tasks.id,
       status: tasks.status,
       criteria: tasks.completionCriteriaSnapshotJson,
-      project: projects.name,
+      repoPath: projects.repoPath,
     })
     .from(tasks)
     .innerJoin(projects, eq(tasks.projectId, projects.id))
@@ -287,7 +367,9 @@ export function evaluateTaskPromotionProof(
     };
   }
   const failures: string[] = [];
-  if (row.project !== input.project) failures.push('canonical task belongs to another project');
+  if (resolve(row.repoPath) !== resolve(input.repoPath)) {
+    failures.push('canonical task belongs to another repository');
+  }
   if (row.status !== 'ready_to_merge') {
     failures.push(`canonical task is ${row.status}, not ready_to_merge`);
   }

@@ -733,16 +733,31 @@ describe('Major coordinator contract', () => {
   });
 
   it('injects prior cycle history into the prompt for account handoff', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-prompt-policy-'));
+    roots.push(root);
+    process.env.MAJOR_POLICY_PATH = join(root, 'project-policies.json');
     const current = goal('/tmp/project');
     current.lastSummary = 'implemented the quota router';
     const prompt = coordinatorPrompt(current, [], {
       accountLabel: 'work-b',
       continuityBlock:
         'CONTEXT CONTINUITY:\nPrevious account default is no longer the active subscription.\nPrior cycle summary:\nimplemented the quota router',
+      canonicalTask: {
+        ok: true,
+        binding: {
+          taskId: 'task_existing',
+          projectId: 'proj_existing',
+          repoPath: '/tmp/project',
+          frozenCriteriaJson: '{"minPassedVerificationRuns":2}',
+        },
+      },
     });
     expect(prompt).toContain('implemented the quota router');
     expect(prompt).toContain('Active subscription account: work-b');
     expect(prompt).toContain('CONTEXT CONTINUITY:');
+    expect(prompt).toContain('task id: task_existing');
+    expect(prompt).toContain('frozen completion criteria: {"minPassedVerificationRuns":2}');
+    expect(prompt).toContain('must cite exactly this existing task id');
   });
 
   it('accepts only a bounded final worker report and requires an owner gate when blocked', () => {

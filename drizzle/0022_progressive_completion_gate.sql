@@ -205,7 +205,22 @@ BEGIN
       WHERE r.task_id = NEW.id AND r.purpose = 'review' AND r.status = 'succeeded'
         AND (
           COALESCE(json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.review'), 'focused') <> 'independent'
-          OR r.independence_loss IS NULL
+          OR (
+            r.independence_loss IS NULL
+            AND EXISTS (
+              SELECT 1 FROM agent_runs implementation
+              WHERE implementation.task_id = NEW.id
+                AND implementation.purpose IN ('implementation', 'repair')
+                AND implementation.status = 'succeeded'
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM agent_runs implementation
+              WHERE implementation.task_id = NEW.id
+                AND implementation.purpose IN ('implementation', 'repair')
+                AND implementation.status = 'succeeded'
+                AND implementation.provider_id = r.provider_id
+            )
+          )
         )
     ) THEN RAISE(ABORT, 'completion requires the selected review')
   END;

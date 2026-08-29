@@ -83,6 +83,12 @@ describe('P1-3 database-enforced completion criteria', () => {
     expect(() => updateCriteria({ progressiveValidation: { unexpectedField: true } })).toThrow(
       /invalid task completion criteria/,
     );
+    expect(() => updateCriteria({ requiredDecisionCategories: ['   '] })).toThrow(
+      /invalid task completion criteria/,
+    );
+    expect(() =>
+      updateCriteria({ progressiveValidation: { riskSpecificChecks: ['   '] } }),
+    ).toThrow(/invalid task completion criteria/);
     expect(() =>
       updateCriteria({
         progressiveValidation: { broaderValidationTriggers: ['promotion_policy'] },
@@ -205,8 +211,17 @@ describe('P1-3 database-enforced completion criteria', () => {
       validationSubject: 'critical_path_behavior',
     });
     const providerId = newId('aprov');
-    db.insert(agentProviders).values({ id: providerId, name: 'review-provider' }).run();
+    db.insert(agentProviders).values({ id: providerId, name: 'implementation-provider' }).run();
     ensureObservedModel(db, providerId, 'review-model');
+    const implementation = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelRef: 'review-model',
+      purpose: 'implementation',
+      billingMode: 'subscription_included',
+      routingReason: 'implementation',
+    });
+    setRunStatus(db, implementation.id, 'succeeded');
     const compromised = createRun(db, {
       taskId: task.id,
       providerId,
@@ -214,14 +229,33 @@ describe('P1-3 database-enforced completion criteria', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'same-provider review',
-      independenceLoss: 'same-provider review',
     });
     setRunStatus(db, compromised.id, 'succeeded');
     expect(() => forceComplete()).toThrow(/selected review/);
 
+    const independentProviderId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: independentProviderId, name: 'compromised-review-provider' })
+      .run();
+    ensureObservedModel(db, independentProviderId, 'review-model');
+    const compromisedIndependent = createRun(db, {
+      taskId: task.id,
+      providerId: independentProviderId,
+      modelRef: 'review-model',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'compromised review',
+      independenceLoss: 'provider separation could not be established',
+    });
+    setRunStatus(db, compromisedIndependent.id, 'succeeded');
+    expect(() => forceComplete()).toThrow(/selected review/);
+
+    const cleanProviderId = newId('aprov');
+    db.insert(agentProviders).values({ id: cleanProviderId, name: 'clean-review-provider' }).run();
+    ensureObservedModel(db, cleanProviderId, 'review-model');
     const independent = createRun(db, {
       taskId: task.id,
-      providerId,
+      providerId: cleanProviderId,
       modelRef: 'review-model',
       purpose: 'review',
       billingMode: 'subscription_included',

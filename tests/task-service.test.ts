@@ -345,8 +345,17 @@ describe('completion proof and guarded completion transition', () => {
       recordQualifyingVerification(db, task.id, { validationSubject });
     }
     const providerId = newId('aprov');
-    db.insert(agentProviders).values({ id: providerId, name: 'focused-reviewer' }).run();
+    db.insert(agentProviders).values({ id: providerId, name: 'builder' }).run();
     ensureObservedModel(db, providerId, 'codex');
+    const implementationRun = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelRef: 'codex',
+      purpose: 'implementation',
+      billingMode: 'subscription_included',
+      routingReason: 'implementation',
+    });
+    setRunStatus(db, implementationRun.id, 'succeeded');
     const reviewRun = createRun(db, {
       taskId: task.id,
       providerId,
@@ -354,7 +363,6 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'focused review',
-      independenceLoss: 'same-provider review',
     });
     setRunStatus(db, reviewRun.id, 'succeeded');
     const criteria = parseCompletionCriteria(getTask(db, task.id).completionCriteriaSnapshotJson);
@@ -372,9 +380,35 @@ describe('completion proof and guarded completion transition', () => {
       'required review has not passed',
     );
 
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'required review has not passed',
+    );
+    const compromisedProviderId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: compromisedProviderId, name: 'compromised-reviewer' })
+      .run();
+    ensureObservedModel(db, compromisedProviderId, 'codex');
+    const compromisedReviewRun = createRun(db, {
+      taskId: task.id,
+      providerId: compromisedProviderId,
+      modelRef: 'codex',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'compromised review',
+      independenceLoss: 'provider separation could not be established',
+    });
+    setRunStatus(db, compromisedReviewRun.id, 'succeeded');
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'required review has not passed',
+    );
+    const independentProviderId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: independentProviderId, name: 'independent-reviewer' })
+      .run();
+    ensureObservedModel(db, independentProviderId, 'codex');
     const independentReviewRun = createRun(db, {
       taskId: task.id,
-      providerId,
+      providerId: independentProviderId,
       modelRef: 'codex',
       purpose: 'review',
       billingMode: 'subscription_included',
@@ -385,13 +419,27 @@ describe('completion proof and guarded completion transition', () => {
     expect(
       coordinatorDonePromotionProof(
         db,
-        { project: 'demo' },
+        { repoPath: '~/Projects/demo' },
         { status: 'done', summary: 'canonical proof passed', taskId: task.id },
       ),
     ).toMatchObject({ ok: true, taskId: task.id });
     expect(
-      coordinatorDonePromotionProof(db, { project: 'demo' }, { status: 'done', summary: 'claim' }),
-    ).toMatchObject({ ok: false, failures: ['done completion requires a canonical taskId'] });
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/demo' },
+        { status: 'done', summary: 'claim' },
+      ),
+    ).toMatchObject({
+      ok: false,
+      failures: ['done completion must cite the disclosed canonical taskId'],
+    });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/not-demo' },
+        { status: 'done', summary: 'wrong repository', taskId: task.id },
+      ),
+    ).toMatchObject({ ok: false });
 
     db.insert(reviewFindings)
       .values({
@@ -433,6 +481,17 @@ describe('completion proof and guarded completion transition', () => {
     });
   });
 
+  it('rejects whitespace-only criteria exactly as the SQLite boundary does', () => {
+    expect(() =>
+      parseCompletionCriteria(JSON.stringify({ requiredDecisionCategories: ['   '] })),
+    ).toThrow();
+    expect(() =>
+      parseCompletionCriteria(
+        JSON.stringify({ progressiveValidation: { riskSpecificChecks: ['   '] } }),
+      ),
+    ).toThrow();
+  });
+
   it('enforces task-specific criteria (artifact and required decisions)', () => {
     const db = testDb();
     const project = seedProject(db);
@@ -466,6 +525,18 @@ describe('completion proof and guarded completion transition', () => {
       ref: 'https://github.com/x/y/pull/1',
       summary: 'PR opened',
     });
+    expect(evaluateCompletionProof(db, task.id, criteria()).failures.join('; ')).toMatch(
+      /'merge' DecisionRequest/,
+    );
+
+    const otherProject = seedProject(db, 'other');
+    const wrongProjectDecision = createDecisionRequest(db, {
+      taskId: task.id,
+      projectId: otherProject.id,
+      category: 'merge',
+      question: 'wrong project approval?',
+    });
+    resolveDecision(db, wrongProjectDecision.id, 'approved', 'not authoritative');
     expect(evaluateCompletionProof(db, task.id, criteria()).failures.join('; ')).toMatch(
       /'merge' DecisionRequest/,
     );

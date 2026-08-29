@@ -100,6 +100,12 @@ installation and installed behavior proof follow normal merge.
   installation remains later proof and old pending-completion records remain readable.
 - Independent review requires a succeeded review run without `independenceLoss`; same-provider
   review evidence cannot silently satisfy that gate.
+- The live coordinator resolves exactly one existing `ready_to_merge` task from repository identity,
+  discloses its frozen criteria, and re-resolves it before accepting the cited task ID.
+- Independent review requires durable provider separation from every succeeded implementation or
+  repair run; a missing/compromised marker alone cannot manufacture independence.
+- Required decisions are owned by both the canonical task and its project in service and SQLite;
+  whitespace-only decision/risk criteria are rejected at both boundaries.
 
 ## Completed evidence
 
@@ -127,6 +133,11 @@ installation and installed behavior proof follow normal merge.
   runs, SQLite validates the strict progressive schema, and broad validation freezes cost and
   expected information gain. The proportional gate passed 98/98 focused tests across five affected
   files; the full matrix remains intentionally unrun.
+- Repository-binding parity repair: the coordinator now derives and discloses the real canonical task
+  and frozen criteria from the repository, rejects arbitrary task IDs, requires durable review-provider
+  separation, and aligns service/SQLite decision ownership and whitespace validation. The proportional
+  gate passed 99/99 focused tests across five affected files plus typecheck, targeted lint, and format;
+  the full matrix remains intentionally unrun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -156,6 +167,10 @@ installation and installed behavior proof follow normal merge.
 - Independent review regression: `14c2f4c` allowed coordinator completion outside canonical task
   proof, counted compromised review as independent, accepted looser SQLite criteria, and described
   rather than persisted validation economics. Focused boundary regressions now protect each seam.
+- Independent review regression: `3e70b04` still accepted a worker-invented task ID, matched project
+  display names instead of repository identity, treated an unmarked same-provider review as independent,
+  and differed between service/SQLite on decision ownership and whitespace. Focused parity tests now
+  protect those exact boundaries.
 - Repository exception: the final resource gate has one pre-existing skill-reachability failure
   covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
   skips. The durable record does not recast that exception as candidate success.

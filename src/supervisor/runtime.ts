@@ -11,7 +11,11 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { openDb, type DbConn } from '../db/client.js';
-import { evaluateTaskPromotionProof } from '../domain/completion.js';
+import {
+  evaluateTaskPromotionProof,
+  resolveCanonicalTaskBinding,
+  type CanonicalTaskBindingResult,
+} from '../domain/completion.js';
 import { getProjectByRepoPath } from '../config/project-service.js';
 import {
   listCapabilities,
@@ -79,19 +83,31 @@ export { parseWorkerReport } from './worker-report.js';
 
 export function coordinatorDonePromotionProof(
   db: DbConn,
-  goal: Pick<SupervisorGoal, 'project'>,
+  goal: Pick<SupervisorGoal, 'repoPath'>,
   report: WorkerReport,
 ) {
   if (report.status !== 'done') return undefined;
-  if (!report.taskId) {
+  const resolved = resolveCanonicalTaskBinding(db, goal.repoPath);
+  if (!resolved.ok) {
     return {
       taskId: '',
       ok: false,
-      failures: ['done completion requires a canonical taskId'],
+      failures: [resolved.failure],
       checkedAt: new Date().toISOString(),
     };
   }
-  return evaluateTaskPromotionProof(db, { taskId: report.taskId, project: goal.project });
+  if (report.taskId !== resolved.binding.taskId) {
+    return {
+      taskId: resolved.binding.taskId,
+      ok: false,
+      failures: ['done completion must cite the disclosed canonical taskId'],
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  return evaluateTaskPromotionProof(db, {
+    taskId: resolved.binding.taskId,
+    repoPath: goal.repoPath,
+  });
 }
 
 function trim(text: string, max = 12_000): string {
@@ -470,7 +486,11 @@ function trustContract(policy: ProjectPolicy): string {
 export function coordinatorPrompt(
   goal: SupervisorGoal,
   capabilities: readonly CapabilityRecord[] = [],
-  hop?: { accountLabel: string; continuityBlock: string },
+  hop?: {
+    accountLabel: string;
+    continuityBlock: string;
+    canonicalTask?: CanonicalTaskBindingResult;
+  },
 ): string {
   const context = readProjectContext(goal.repoPath);
   const learningContext = readLearningContext(goal.project, goal.repoPath);
@@ -533,6 +553,13 @@ ${goal.goal}
 CANONICAL TARGET:
 - project: ${goal.project}
 - repository path: ${goal.repoPath}
+
+CANONICAL TASK BINDING:
+${
+  hop?.canonicalTask?.ok
+    ? `- task id: ${hop.canonicalTask.binding.taskId}\n- repository identity: ${hop.canonicalTask.binding.repoPath}\n- frozen completion criteria: ${hop.canonicalTask.binding.frozenCriteriaJson}\nA done claim must cite exactly this existing task id; Major re-resolves it from the repository before accepting the claim.`
+    : `- unavailable: ${hop?.canonicalTask && !hop.canonicalTask.ok ? hop.canonicalTask.failure : 'not resolved'}\nDo not claim done until Major can resolve one existing ready_to_merge task with frozen criteria for this repository.`
+}
 
 ${workspaceContract}
 
@@ -980,6 +1007,13 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
   });
   const workerStartedAtMs = Date.now();
+  const taskState = openDb();
+  let canonicalTask: CanonicalTaskBindingResult;
+  try {
+    canonicalTask = resolveCanonicalTaskBinding(taskState.db, goal.repoPath);
+  } finally {
+    taskState.sqlite.close();
+  }
   const outcome = await runWorker({
     host,
     taskId: goal.id,
@@ -987,6 +1021,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
       accountLabel: routedSelection.accountLabel,
       continuityBlock: continuity.promptBlock,
+      canonicalTask,
     }),
     cwd: goal.repoPath,
     // Clamped to whatever foreground continuation budget remains, so a
