@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
 import type { SkillRegistryEntry } from './resolver.js';
+import type { VendorCatalog } from './vendor.js';
 
 export interface SkillCatalogEntry {
   id: string;
@@ -22,6 +23,7 @@ export interface SkillCatalogEntry {
   sourceKind: string;
   registryVersion: number;
   contentSha256?: string;
+  metadataSha256?: string;
   triggers: string[];
   deprecated?: { replacement?: string | undefined; message?: string | undefined };
 }
@@ -64,24 +66,42 @@ export function buildSkillCatalog(
   entries: readonly SkillRegistryEntry[],
   locate: (entry: SkillRegistryEntry) => string | undefined,
   registryVersion = 1,
+  vendorCatalog?: VendorCatalog,
 ): SkillCatalogEntry[] {
-  const knownIds = new Set(entries.map((entry) => entry.id));
   return entries
     .map((entry) => {
       const path = locate(entry);
       const description = frontmatterDescription(path) ?? entry.load.replaceAll('-', ' ');
-      const sourceText = path ? readFileSync(lstatSync(path).isDirectory() ? join(path, 'SKILL.md') : path, 'utf8') : '';
       const lifecycle: SkillCatalogEntry['lifecycle'] = entry.deprecated
         ? 'deprecated'
         : entry.experimental
           ? 'experimental'
           : 'active';
-      const dependencies = [
-        ...(entry.dependencies ?? []),
-        ...[...knownIds].filter(
-          (id) => id !== entry.id && sourceText.includes(id),
-        ),
-      ].filter((id, index, all) => all.indexOf(id) === index);
+      const dependencies = [...new Set(entry.dependencies ?? [])].sort();
+      const vendorSource = vendorCatalog?.sources.find((source) => source.id === entry.source);
+      const vendorSkill = vendorSource?.skills.find(
+        (skill) => skill.id === (entry.vendorSkill ?? entry.id),
+      );
+      const vendorMetadata =
+        vendorSource && vendorSkill
+          ? {
+              sourceId: vendorSource.id,
+              sourceRevision: vendorSource.revision,
+              sourceUrl: vendorSource.sourceUrl,
+              repositoryUrl: vendorSource.repositoryUrl,
+              sourceVersion: vendorSource.version,
+              skillId: vendorSkill.id,
+              skillVersion: vendorSkill.version ?? null,
+              skillUrl: vendorSkill.skillUrl,
+              retrievalUrl: vendorSkill.retrievalUrl,
+              lastChecked: vendorSource.lastChecked,
+              license: vendorSource.license,
+              licenseStatus: vendorSource.licenseStatus,
+            }
+          : undefined;
+      const metadataSha256 = vendorMetadata
+        ? createHash('sha256').update(JSON.stringify(vendorMetadata)).digest('hex')
+        : undefined;
       return {
       id: entry.id,
       name: entry.id,
@@ -94,12 +114,14 @@ export function buildSkillCatalog(
       aliases: entry.aliases,
       triggerConditions: [entry.load],
       category: entry.category ?? 'uncategorized',
-      version: String(entry.version ?? registryVersion),
+      version: String(vendorSkill?.version ?? vendorSource?.version ?? entry.version ?? registryVersion),
       lifecycle,
       availability: entry.availability,
       applicableProjects: [entry.availability],
       source: entry.source,
-      provenance: entry.provenance ?? { kind: 'canonical-registry', registryVersion },
+      provenance: vendorMetadata
+        ? { kind: 'vendor-metadata-reference', ...vendorMetadata, metadataSha256 }
+        : (entry.provenance ?? { kind: 'canonical-registry', registryVersion }),
       dependencies,
       sourceKind:
         entry.sourceKind ??
@@ -112,6 +134,7 @@ export function buildSkillCatalog(
       ...(path
         ? { contentSha256: skillContentSha256(path) }
         : {}),
+      ...(metadataSha256 ? { metadataSha256 } : {}),
       triggers: entry.load.split('-').filter(Boolean),
       ...(entry.deprecated ? { deprecated: entry.deprecated } : {}),
       };

@@ -162,6 +162,7 @@ function assertRegistry(value: unknown): Registry {
   });
   const ids = entries.map((entry) => entry.id);
   if (new Set(ids).size !== ids.length) throw new Error('duplicate Major skill ids in registry');
+  const knownIds = new Set(ids);
   const owners = new Map<string, string>();
   for (const entry of entries) {
     for (const slug of [entry.id, ...entry.aliases]) {
@@ -170,8 +171,16 @@ function assertRegistry(value: unknown): Registry {
         throw new Error(`duplicate skill id or alias ${JSON.stringify(slug)}`);
       owners.set(slug, entry.id);
     }
-    for (const dependency of entry.dependencies ?? [])
+    if (new Set(entry.dependencies ?? []).size !== (entry.dependencies ?? []).length) {
+      throw new Error(`duplicate dependency in skill registry entry ${entry.id}`);
+    }
+    for (const dependency of entry.dependencies ?? []) {
       assertCanonicalSkillSlug(dependency, `skill registry entry ${entry.id} dependency`);
+      if (dependency === entry.id) throw new Error(`skill registry entry ${entry.id} depends on itself`);
+      if (!knownIds.has(dependency)) {
+        throw new Error(`skill registry entry ${entry.id} has unknown dependency ${dependency}`);
+      }
+    }
   }
   return { version: Number(record.version), entries };
 }
@@ -266,6 +275,7 @@ function validateSource(sourceRoot: string): {
     registryVersion?: unknown;
     entries?: Array<{ id?: unknown }>;
   };
+  const vendorCatalog = loadVendorCatalog(vendorSourcePath);
   const expectedCatalog = buildSkillCatalog(
     registry.entries,
     (entry) =>
@@ -273,6 +283,7 @@ function validateSource(sourceRoot: string): {
         ? containedSkillPath(internalRoot, entry.id, 'SKILL.md')
         : undefined,
     registry.version,
+    vendorCatalog,
   );
   if (
     catalog.version !== 1 ||
@@ -281,7 +292,6 @@ function validateSource(sourceRoot: string): {
   ) {
     throw new Error('generated skill catalog does not match the canonical registry');
   }
-  const vendorCatalog = loadVendorCatalog(vendorSourcePath);
   for (const entry of registry.entries.filter((candidate) => candidate.sourceKind === 'VENDOR_LIVE')) {
     const source = vendorCatalog.sources.find((candidate) => candidate.id === entry.source);
     const skill = source ? findVendorSkill(source, entry.vendorSkill ?? entry.id) : undefined;
@@ -418,7 +428,14 @@ function stageArtifact(target: string, populate: (stage: string) => void): Artif
   rmSync(stage, { recursive: true, force: true });
   rmSync(backup, { recursive: true, force: true });
   populate(stage);
-  return { target, stage, backup, hadTarget: existsSync(target) };
+  let hadTarget = false;
+  try {
+    lstatSync(target);
+    hadTarget = true;
+  } catch {
+    // Missing targets have no prior artifact to restore.
+  }
+  return { target, stage, backup, hadTarget };
 }
 
 function commitArtifactTransaction(replacements: ArtifactReplacement[]): void {
@@ -512,7 +529,7 @@ function hostSkillArtifactReplacements(
   return replacements;
 }
 
-function activateBundle(bundle: string, current: string): void {
+function activateBundle(bundle: string, current: string, predecessor?: string): void {
   const bundledAdapters = join(bundle, 'adapters', 'skills');
   const activeAdapters = existsSync(current)
     ? join(realpathSync(current), 'adapters', 'skills')
@@ -527,6 +544,16 @@ function activateBundle(bundle: string, current: string): void {
     join(bundle, 'guidance', 'skills.catalog.json'),
     adapters,
   );
+  const active = existsSync(current) ? realpathSync(current) : undefined;
+  const markerPath = join(bundle, 'bundle.json');
+  const marker = JSON.parse(readFileSync(markerPath, 'utf8')) as Record<string, unknown>;
+  if (predecessor && predecessor !== marker.sha && active !== bundle) {
+    replacements.push(
+      stageArtifact(markerPath, (stage) =>
+        writeFileSync(stage, `${JSON.stringify({ ...marker, previousBundle: predecessor }, null, 2)}\n`),
+      ),
+    );
+  }
   replacements.push(stageArtifact(current, (stage) => symlinkSync(basename(bundle), stage)));
   commitArtifactTransaction(replacements);
 }
@@ -545,6 +572,44 @@ function bundleHash(sourceRoot: string, roots: string[]): string {
   return hash.digest('hex');
 }
 
+function bundleIdentity(sourceRoot: string, validated: ReturnType<typeof validateSource>): string {
+  return bundleHash(sourceRoot, [
+    validated.registryPath,
+    validated.catalogPath,
+    validated.reconciliationLedgerPath,
+    validated.capabilityMatrixPath,
+    validated.vendorSourcePath,
+    join(sourceRoot, 'guidance', 'reusable-assets.registry.json'),
+    join(sourceRoot, 'guidance', 'gbrain-reusable-assets.index.json'),
+    join(sourceRoot, 'guidance', 'reusable-assets.candidates.json'),
+    validated.sourceLedgerPath,
+    validated.internalRoot,
+    validated.evalRoot,
+    validated.adaptersRoot,
+    ...validated.assetPaths,
+  ]);
+}
+
+function validateRetainedBundle(path: string): { marker: BundleMarker; registry: Registry } {
+  const marker = readBundleMarker(path);
+  const validated = validateSource(path);
+  const identity = bundleIdentity(path, validated);
+  if (identity !== marker.sha || basename(path) !== marker.sha) {
+    throw new Error('retained Major Skills Library bundle identity does not match its marker');
+  }
+  return { marker, registry: validated.registry };
+}
+
+function quarantineRetainedBundle(path: string): string {
+  const root = dirname(path);
+  let quarantine = join(root, `.quarantine-${basename(path)}-${Date.now()}`);
+  for (let suffix = 1; existsSync(quarantine); suffix += 1) {
+    quarantine = join(root, `.quarantine-${basename(path)}-${Date.now()}-${suffix}`);
+  }
+  renameSync(path, quarantine);
+  return quarantine;
+}
+
 function retainRollbackBundles(
   bundlesRoot: string,
   activeId: string,
@@ -561,8 +626,9 @@ function retainRollbackBundles(
     .map((entry) => {
       const path = join(bundlesRoot, entry.name);
       try {
-        return { path, marker: readBundleMarker(path), mtime: lstatSync(path).mtimeMs };
+        return { path, marker: validateRetainedBundle(path).marker, mtime: lstatSync(path).mtimeMs };
       } catch {
+        quarantineRetainedBundle(path);
         return undefined;
       }
     })
@@ -581,14 +647,7 @@ function retainRollbackBundles(
 function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyncResult {
   const sourceRoot = resolve(sourceRootInput);
   const validated = validateSource(sourceRoot);
-  const bundleId = bundleHash(sourceRoot, [
-    join(sourceRoot, 'guidance'),
-    validated.sourceLedgerPath,
-    validated.internalRoot,
-    validated.evalRoot,
-    validated.adaptersRoot,
-    ...validated.assetPaths,
-  ]);
+  const bundleId = bundleIdentity(sourceRoot, validated);
 
   const bundlesRoot = join(majorHome(), 'skill-bundles');
   const destination = join(bundlesRoot, bundleId);
@@ -605,9 +664,9 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   }
   if (existsSync(destination)) {
     try {
-      const existing = readBundleMarker(destination);
-      if (existing.sha === bundleId) {
-        activateBundle(destination, current);
+      const existing = validateRetainedBundle(destination);
+      if (existing.marker.sha === bundleId) {
+        activateBundle(destination, current, previousBundle);
         retainRollbackBundles(bundlesRoot, bundleId, previousBundle);
         return {
           sourceRoot: sourceLabel ?? sourceRoot,
@@ -621,7 +680,8 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
         };
       }
     } catch {
-      // A corrupt path with this content address is replaced by the validated source below.
+      // Preserve corrupt retained state for diagnosis, but never reactivate it.
+      quarantineRetainedBundle(destination);
     }
   }
   rmSync(staged, { recursive: true, force: true });
@@ -677,7 +737,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
 
   rmSync(destination, { recursive: true, force: true });
   renameSync(staged, destination);
-  activateBundle(destination, current);
+  activateBundle(destination, current, previousBundle);
   retainRollbackBundles(bundlesRoot, bundleId, previousBundle);
 
   return {
@@ -698,7 +758,7 @@ export function rollbackMajorSkills(): SkillRollbackResult {
   const current = join(bundlesRoot, 'current');
   if (!existsSync(current)) throw new Error('no active Major Skills Library bundle');
   const active = realpathSync(current);
-  const activeMarker = readBundleMarker(active);
+  const activeMarker = validateRetainedBundle(active).marker;
   const candidates = readdirSync(bundlesRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink() && !entry.name.startsWith('.'))
     .map((entry) => join(bundlesRoot, entry.name))
@@ -711,8 +771,9 @@ export function rollbackMajorSkills(): SkillRollbackResult {
         return undefined;
       }
       try {
-        return { path, marker: readBundleMarker(path), mtime: lstatSync(path).mtimeMs };
+        return { path, marker: validateRetainedBundle(path).marker, mtime: lstatSync(path).mtimeMs };
       } catch {
+        quarantineRetainedBundle(path);
         return undefined;
       }
     })
@@ -721,7 +782,7 @@ export function rollbackMajorSkills(): SkillRollbackResult {
   const target =
     candidates.find((candidate) => candidate.marker.sha === activeMarker.previousBundle) ?? candidates[0];
   if (!target) throw new Error('no retained Major Skills Library rollback bundle');
-  activateBundle(target.path, current);
+  activateBundle(target.path, current, activeMarker.sha);
   return { previousBundle: active, activeBundle: target.path, bundleId: target.marker.sha };
 }
 

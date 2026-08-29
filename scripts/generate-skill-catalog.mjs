@@ -55,7 +55,20 @@ for (const entry of registry.entries) {
     owners.set(slug, entry.id);
   }
 }
+const vendorCatalog = JSON.parse(readFileSync(join(root, 'guidance/vendor-sources.json'), 'utf8'));
 const knownIds = new Set(registry.entries.map((entry) => entry.id));
+for (const entry of registry.entries) {
+  if (!Array.isArray(entry.dependencies ?? []))
+    throw new Error(`invalid dependencies for ${entry.id}`);
+  if (new Set(entry.dependencies ?? []).size !== (entry.dependencies ?? []).length)
+    throw new Error(`duplicate dependency for ${entry.id}`);
+  for (const dependency of entry.dependencies ?? []) {
+    assertSlug(dependency, `skill registry ${entry.id} dependency`);
+    if (dependency === entry.id) throw new Error(`${entry.id} cannot depend on itself`);
+    if (!knownIds.has(dependency))
+      throw new Error(`unknown dependency ${dependency} for ${entry.id}`);
+  }
+}
 const entries = registry.entries
   .map((entry) => {
     let description = entry.load.replaceAll('-', ' ');
@@ -71,14 +84,31 @@ const entries = registry.entries
       entry.source === 'major-internal'
         ? skillContentSha256(containedSkillRoot(entry.id))
         : undefined;
-    const sourceText =
-      entry.source === 'major-internal'
-        ? readFileSync(join(containedSkillRoot(entry.id), 'SKILL.md'), 'utf8')
-        : '';
-    const dependencies = [
-      ...(entry.dependencies ?? []),
-      ...[...knownIds].filter((id) => id !== entry.id && sourceText.includes(id)),
-    ].filter((id, index, all) => all.indexOf(id) === index);
+    const dependencies = [...new Set(entry.dependencies ?? [])].sort();
+    const vendorSource = vendorCatalog.sources.find((source) => source.id === entry.source);
+    const vendorSkill = vendorSource?.skills.find(
+      (skill) => skill.id === (entry.vendorSkill ?? entry.id),
+    );
+    const vendorMetadata =
+      vendorSource && vendorSkill
+        ? {
+            sourceId: vendorSource.id,
+            sourceRevision: vendorSource.revision,
+            sourceUrl: vendorSource.sourceUrl,
+            repositoryUrl: vendorSource.repositoryUrl,
+            sourceVersion: vendorSource.version,
+            skillId: vendorSkill.id,
+            skillVersion: vendorSkill.version ?? null,
+            skillUrl: vendorSkill.skillUrl,
+            retrievalUrl: vendorSkill.retrievalUrl,
+            lastChecked: vendorSource.lastChecked,
+            license: vendorSource.license,
+            licenseStatus: vendorSource.licenseStatus,
+          }
+        : undefined;
+    const metadataSha256 = vendorMetadata
+      ? createHash('sha256').update(JSON.stringify(vendorMetadata)).digest('hex')
+      : undefined;
     return {
       id: entry.id,
       name: entry.id,
@@ -91,15 +121,19 @@ const entries = registry.entries
       aliases: entry.aliases ?? [],
       triggerConditions: [entry.load],
       category: entry.category ?? 'uncategorized',
-      version: String(entry.version ?? registry.version),
+      version: String(
+        vendorSkill?.version ?? vendorSource?.version ?? entry.version ?? registry.version,
+      ),
       lifecycle: entry.deprecated ? 'deprecated' : entry.experimental ? 'experimental' : 'active',
       availability: entry.availability,
       applicableProjects: [entry.availability],
       source: entry.source,
-      provenance: entry.provenance ?? {
-        kind: 'canonical-registry',
-        registryVersion: registry.version,
-      },
+      provenance: vendorMetadata
+        ? { kind: 'vendor-metadata-reference', ...vendorMetadata, metadataSha256 }
+        : (entry.provenance ?? {
+            kind: 'canonical-registry',
+            registryVersion: registry.version,
+          }),
       dependencies,
       sourceKind:
         entry.sourceKind ??
@@ -110,6 +144,7 @@ const entries = registry.entries
             : 'DORMANT_REFERENCE'),
       registryVersion: registry.version,
       ...(contentSha256 ? { contentSha256 } : {}),
+      ...(metadataSha256 ? { metadataSha256 } : {}),
       triggers: entry.load.split('-').filter(Boolean),
       ...(entry.deprecated ? { deprecated: entry.deprecated } : {}),
     };

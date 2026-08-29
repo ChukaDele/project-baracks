@@ -125,32 +125,19 @@ function installLegacyBundle(home: string, source: string): string {
 }
 
 describe('legacy Skills Library rollback', () => {
-  it('restores a genuine older registry and fails closed for assets it never contained', () => {
+  it('rejects and quarantines an incomplete legacy rollback bundle', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-skill-rollback-home-'));
     const source = sourceCopy();
     roots.push(home);
     process.env.MAJOR_HOME = home;
-    const legacy = installLegacyBundle(home, source);
+    installLegacyBundle(home, source);
 
     const activated = syncMajorSkills({ sourceRoot: source });
     expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(activated.bundleId);
 
-    const rolledBack = rollbackMajorSkills();
-    expect(rolledBack.activeBundle).toBe(legacy);
-    expect(rolledBack.bundleId).toBe('a'.repeat(64));
-    expect(
-      resolveSkills({ task: 'Use presentation-storylining for this task.', limit: 1 }).skills[0]
-        ?.path,
-    ).toContain('/skill-bundles/current/skills/internal/presentation-storylining/SKILL.md');
-    expect(
-      resolveSkills({ task: 'Use controller-bookkeeping for this task.' }).skills.map(
-        (skill) => skill.id,
-      ),
-    ).not.toContain('controller-bookkeeping');
-    expect(retrieveReusableAssets({ task: 'project goal state template' })).toMatchObject({
-      assets: [],
-      catalog: 'unavailable-in-active-skills-bundle',
-    });
+    expect(() => rollbackMajorSkills()).toThrow('no retained Major Skills Library rollback bundle');
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(activated.bundleId);
+    expect(existsSync(join(home, 'skill-bundles', 'legacy-v14'))).toBe(false);
     expect(existsSync(join(home, 'dsh-harness'))).toBe(false);
   });
 

@@ -27,10 +27,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "review",
-        "verification"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "99e915b35c946da66c05bb5f3b6ba501096bed346fbc89216c648b2f9ecfe98b",
@@ -94,14 +91,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "debugging",
-        "review",
-        "dependency",
-        "deployment",
-        "api",
-        "database"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4fc41b18312d7f03fb9b9b5e387704df985d9468ece058d9f718505e18c8e193",
@@ -387,9 +377,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "executive-assistant"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "13a45f3fe3b7d9ad6fa1f84bf58424bb654ce8e2d4881bfa13348b9cbfe681a8",
@@ -419,10 +407,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "review",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c2d79aea6453c8d299fa6439b0b1e31cd3d9200ec985713973576dccaa21bf48",
@@ -462,12 +447,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "planning",
-        "debugging",
-        "architecture",
-        "engineering-design-doctrine"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "8a1420cba0d0865e578c0578ae07d0788110c846fc7eda8fdad1ead9c8d504ee",
@@ -497,9 +477,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "ead6f57d152c5170a4542e17b3c366348e4db8ce670eda0bb3c392dd2b02aa87",
@@ -606,9 +584,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "75446c6d410a8258fbabee1dddbbf99b3ae67b22a5a33f8a3c81eced07c5ba9d",
@@ -677,9 +653,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "3bd2ffacea2ab9525c90affa0e99592d7610d978ff5bbae3b0563ffcaa27aa76",
@@ -839,7 +813,7 @@
         "current Vercel deploy deployment preview claim framework detection guidance"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "3.0.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -847,12 +821,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "deploy-to-vercel",
+        "skillVersion": "3.0.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/deploy-to-vercel/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/deploy-to-vercel/SKILL.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "dca51fe57753a533dfdcef178c352b8350649bcfca8a572dbe0757a9b7af151c"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "dca51fe57753a533dfdcef178c352b8350649bcfca8a572dbe0757a9b7af151c",
       "triggers": [
         "current Vercel deploy deployment preview claim framework detection guidance"
       ]
@@ -914,20 +901,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "remote-first-web-development",
-        "website-design-qa",
-        "responsive-motion-systems",
-        "competitive-product-audit",
-        "nontechnical-ux",
-        "root-cause-qa",
-        "frontend-design",
-        "review",
-        "incident",
-        "architecture",
-        "frontend",
-        "performance"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "3b1cd1f5c8d978fe3fe14ff30cb36d2a9c924612cdc2cc681c23ea953f309a45",
@@ -1006,10 +980,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "remote-first-web-development",
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "bf89604a352477741ca16c436d6674930d6c10dee5b2447244fc06f2a6c536fc",
@@ -1150,10 +1121,7 @@
         "sourceHashPolicy": "localized-independent-content; historical hashes do not block this capability",
         "disposition": "MERGE"
       },
-      "dependencies": [
-        "review",
-        "migration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "50bfd8ccbfaaad6a883b406f9252f7c97e0de18b1b29a7e78a3bb94c8a948558",
@@ -1191,9 +1159,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "chief-of-staff-boundary"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "44bf8ee0d7fd29e661c0d8535cbfa8486710e72519b2fffdc46af01b7f2c2d16",
@@ -1223,16 +1189,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "design-direction-and-taste",
-        "website-design-qa",
-        "responsive-motion-systems",
-        "competitive-product-audit",
-        "review",
-        "verification",
-        "frontend",
-        "performance"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "0aae7785b0567d43e88a8d1dd152f168d59bf33f417946ba321c2e315c1ff5fb",
@@ -1466,11 +1423,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "review",
-        "dependency",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "3ee26a2b29bd7766bd6c50326ca05f52be3e1596245adf3b35aa4671eab8ce55",
@@ -1541,11 +1494,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "review",
-        "dependency",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4f84c39863bb4f4cdfdb672097698413951f20bc14e373ba91e51697131f11d8",
@@ -1689,9 +1638,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "source-ingestion"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "2d6897d9767ef81560a869c1b496ec21579ccc6d30f4f76fae48c095cc5954b8",
@@ -1721,11 +1668,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "source-ingestion",
-        "review",
-        "verification"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "ae8a0f1a5daf6757e778a6f698ae79cf95708daf5e961bee41ae1ccf38132038",
@@ -1760,10 +1703,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "graph-engineering",
-        "verification"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4ab2a81c53c998a60b672fc8d48f44665c484dadf4f7152a78f49335c2b9a2df",
@@ -1803,12 +1743,7 @@
         "sourceHashPolicy": "localized-independent-content; historical hashes do not block this capability",
         "disposition": "MERGE"
       },
-      "dependencies": [
-        "planning",
-        "review",
-        "verification",
-        "migration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "22b698eb349f7ef10cc7e0f19c0928a73f9416c99fe1e9d2d9d3e0c9178e8811",
@@ -1842,16 +1777,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "project-context-integrity",
-        "skillify",
-        "website-design-qa",
-        "mcp-integration-ops",
-        "data-learning-loop",
-        "review",
-        "verification",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "e10bcda8ccbd9e3b5696a3877caa0c73f3268c130f579acd232ed9d6d35fbea5",
@@ -1889,10 +1815,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "architecture",
-        "migration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "55cea083641968cdde74a1c3016245043c26557c851d8cf9cbc0d3f4c3ca618e",
@@ -1927,11 +1850,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "simple-modular-code",
-        "worktree",
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "eac7daff75f5973230148e4b0ef1ed063ee48cc4a7717308782c5e3711b77c74",
@@ -2002,14 +1921,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "legacy-cleanup",
-        "human-blocker-orchestration",
-        "source-ingestion",
-        "mcp-builder",
-        "api",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "06bab0e3f1d24fa4aefb518f8cdaacccb5d22abbe9febf0e1fd12727d3748dff",
@@ -2188,9 +2100,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "architecture"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "d2c5db532ed2cec1041e280a593e0693eeae3b4b35d6a21803875cb656150784",
@@ -2229,11 +2139,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "planning",
-        "review",
-        "incident"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "e9596e7931a1420cfb011a74f3ca22dc46f3373f1a6f4dc809172cf9bb4f93fb",
@@ -2293,10 +2199,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "pdf",
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "14f4b23a56ee0179fe078dab6870fc4ae742f7bba4e3cbf36aac2b5b4f80be0e",
@@ -2363,12 +2266,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "architecture",
-        "database",
-        "performance",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "ad07ddcd2a2569bed4e5886f843cc1cd74d061c0bfda358471e63c9ae3b77d0e",
@@ -2472,17 +2370,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "learning-capture",
-        "skillify",
-        "design-direction-and-taste",
-        "source-ingestion",
-        "knowledge-work",
-        "pdf-reporting-qa",
-        "pdf",
-        "planning",
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "4a5f476c91e1abaa3f2f3192c434d20d1c39b70712eed87bfd097eb7c0f8c61c",
@@ -2533,13 +2421,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "open-source-leverage",
-        "dependency",
-        "deployment",
-        "migration",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "0aad51fd5528ec867a0d452978ccad188d82a8b0ad529768e5da51ed0b2893de",
@@ -2622,11 +2504,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "deployment",
-        "architecture",
-        "migration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "93df50e5ae6dbb205bcd3b8564fb62264ddb11878f34a57356364a7b60145e66",
@@ -2666,10 +2544,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "project-context-integrity",
-        "workspace-lifecycle-management"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "b471181bbc7e479f22dd7493bf5e32a1d0d4d00a6c6db32b0fce33b27fe3f2f5",
@@ -2700,9 +2575,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "api"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c30a39d7464a9e78a764fd755235aefc73c63d15ac6229e88d81862ca4f4fc40",
@@ -2770,11 +2643,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "dev-server-management",
-        "review",
-        "deployment"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "44d6b983aa08e6a49117cbadfafa1f7bedd4024116851edfcc5025201e731e1c",
@@ -2845,15 +2714,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "website-design-qa",
-        "debugging",
-        "review",
-        "deployment",
-        "incident",
-        "architecture",
-        "frontend"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "c86cf077b78ee5b32a92ebc114dd1014908d68789de48c9ab4d5150894bfccce",
@@ -2900,9 +2761,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "582f47594b1b4e1ba33f8b9f166a70b0b9795e4aebcc6de708547f57590f9863",
@@ -2937,9 +2796,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "exact-head-pr-review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "a0b47b99d0337c6d95cbe9df58e1e42f1adbfd8b2b50def820f9082c7ad18e2c",
@@ -3012,9 +2869,7 @@
         "sourceHashPolicy": "independently-authored-or-localized; historical hashes do not block this capability",
         "disposition": "UPDATE_CANONICAL"
       },
-      "dependencies": [
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "f2ab6231938a9c1c316ff27f6c27183affed667cfd9d7626cd15c830e7b116e2",
@@ -3110,26 +2965,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "website-design-qa",
-        "mcp-integration-ops",
-        "source-ingestion",
-        "knowledge-work",
-        "open-source-leverage",
-        "prior-art-discovery",
-        "root-cause-qa",
-        "data-learning-loop",
-        "source-adapter-engineering",
-        "cost-control",
-        "review",
-        "verification",
-        "dependency",
-        "deployment",
-        "architecture",
-        "performance",
-        "migration",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "b20e0b0355bd512440f116611e8c7bf06ac6409035a967569a526d8b16def230",
@@ -3193,10 +3029,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "architecture",
-        "database"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "2796b79bb9217078da14648f6007fc97393fdde80356d633fe9f64d71eb07f05",
@@ -3265,9 +3098,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "skillify"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "0beaaada6bf7cd167871ae16cfbfdfbcdaf5e485425724b7bac410c2cf246fa0",
@@ -3297,10 +3128,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "skillify",
-        "review"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "5c751f66e011b59f7c872cd91fb7dc1ddd69cdcf398b04cab9fb2cd177495dae",
@@ -3336,10 +3164,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "review",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "5d2c0f7e2a7d2d19b779788fc741e7e9e54e41e90d5c8483506a4cea1458c831",
@@ -3518,9 +3343,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "academic-verify"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "f4f9d6ed4549a19f40da77ab777d457d42085edf41b23de4b0ad3bdf910ab496",
@@ -3585,9 +3408,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "skillify"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "5b85fd0fcb033b91d56e6580afc3036e9217f04d2817a52b4891b399b828adf4",
@@ -3652,7 +3473,7 @@
         "current Vercel CLI token authentication project environment deployment configuration guidance"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "1.0.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -3660,12 +3481,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "vercel-cli-with-tokens",
+        "skillVersion": "1.0.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-cli-with-tokens/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/vercel-cli-with-tokens/SKILL.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "ee35ed0817d70244f51d3e3015373aab47d2bf722a55a740a3a633f4a90bd42d"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "ee35ed0817d70244f51d3e3015373aab47d2bf722a55a740a3a633f4a90bd42d",
       "triggers": [
         "current Vercel CLI token authentication project environment deployment configuration guidance"
       ]
@@ -3684,7 +3518,7 @@
         "current React component composition compound components state props guidance"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "1.0.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -3692,12 +3526,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "vercel-composition-patterns",
+        "skillVersion": "1.0.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/composition-patterns/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/composition-patterns/SKILL.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "843f6755b1b3e6b6a67756c308da6b6227417d47b43251ea304dbdd0e40c130b"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "843f6755b1b3e6b6a67756c308da6b6227417d47b43251ea304dbdd0e40c130b",
       "triggers": [
         "current React component composition compound components state props guidance"
       ]
@@ -3751,7 +3598,7 @@
         "vercel-performance-cost-reliability-caching-functions-billing"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "1.2.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -3759,12 +3606,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "vercel-optimize",
+        "skillVersion": "1.2.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/vercel-optimize/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/vercel-optimize/SKILL.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "1f11e312291f81d3861eccc8eeddfe2b9ef23f23980541eae706b60edf88ba74"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "1f11e312291f81d3861eccc8eeddfe2b9ef23f23980541eae706b60edf88ba74",
       "triggers": [
         "vercel",
         "performance",
@@ -3790,7 +3650,7 @@
         "current React Next.js performance rendering bundle server guidance"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "1.0.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -3798,12 +3658,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "vercel-react-best-practices",
+        "skillVersion": "1.0.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-best-practices/SKILL.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "9756ee411c3b966a9563f7da3dd77c1132254704beedcfd8a2a6a18dadf8cafc"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "9756ee411c3b966a9563f7da3dd77c1132254704beedcfd8a2a6a18dadf8cafc",
       "triggers": [
         "current React Next.js performance rendering bundle server guidance"
       ]
@@ -3822,7 +3695,7 @@
         "current React Native mobile list navigation animation guidance"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "1.0.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -3830,12 +3703,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "vercel-react-native-skills",
+        "skillVersion": "1.0.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-native-skills/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-native-skills/SKILL.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "7f37bf8b906c7b836b9e6f4134ad12e598332b6af928d3b3f355b6639b268e05"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "7f37bf8b906c7b836b9e6f4134ad12e598332b6af928d3b3f355b6639b268e05",
       "triggers": [
         "current React Native mobile list navigation animation guidance"
       ]
@@ -3854,7 +3740,7 @@
         "current React view transitions animation navigation guidance"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "1.0.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -3862,12 +3748,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "vercel-react-view-transitions",
+        "skillVersion": "1.0.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/react-view-transitions/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/agent-skills/main/skills/react-view-transitions/SKILL.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "cd92bfa9a0ed0efb9deb1933944c1aa3457a6298b4d65f9af4ec29d77bfce5b8"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "cd92bfa9a0ed0efb9deb1933944c1aa3457a6298b4d65f9af4ec29d77bfce5b8",
       "triggers": [
         "current React view transitions animation navigation guidance"
       ]
@@ -3929,9 +3828,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "73fb1fe80ccdbabea16805024fccf5f7183b2a6e9c4b12fbe8d4e8bfed00fa2b",
@@ -3956,7 +3853,7 @@
         "current web design accessibility UX performance guidance"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "1.0.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -3964,12 +3861,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "web-design-guidelines",
+        "skillVersion": "1.0.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/web-design-guidelines/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "0be834a2c395785ab2ce0d20d090fef8d7b66e7116d4f3e8f9953feecb96fe35"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "0be834a2c395785ab2ce0d20d090fef8d7b66e7116d4f3e8f9953feecb96fe35",
       "triggers": [
         "current web design accessibility UX performance guidance"
       ]
@@ -4028,14 +3938,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "responsive-motion-systems",
-        "debugging",
-        "review",
-        "architecture",
-        "frontend",
-        "performance"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "08457f8b070e37ee8c47a8c625e43ff0c25920eecf4b664fe06ae77208f3cb45",
@@ -4076,19 +3979,7 @@
         "kind": "canonical-registry",
         "registryVersion": 19
       },
-      "dependencies": [
-        "project-context-integrity",
-        "legacy-cleanup",
-        "remote-first-web-development",
-        "cost-control",
-        "worktree",
-        "review",
-        "verification",
-        "dependency",
-        "deployment",
-        "migration",
-        "integration"
-      ],
+      "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
       "contentSha256": "b2b658b50129821f884be057401c8fa1469dbd20fc8c095c0c83117c5f5c8a23",
@@ -4161,7 +4052,7 @@
         "current Vercel writing copy content clarity voice structure guidance"
       ],
       "category": "uncategorized",
-      "version": "19",
+      "version": "1.0.0",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -4169,12 +4060,25 @@
       ],
       "source": "vercel-agent-skills",
       "provenance": {
-        "kind": "canonical-registry",
-        "registryVersion": 19
+        "kind": "vendor-metadata-reference",
+        "sourceId": "vercel-agent-skills",
+        "sourceRevision": "main",
+        "sourceUrl": "https://vercel.com/docs/agent-resources/skills",
+        "repositoryUrl": "https://github.com/vercel-labs/agent-skills",
+        "sourceVersion": null,
+        "skillId": "writing-guidelines",
+        "skillVersion": "1.0.0",
+        "skillUrl": "https://github.com/vercel-labs/agent-skills/blob/main/skills/writing-guidelines/SKILL.md",
+        "retrievalUrl": "https://raw.githubusercontent.com/vercel-labs/writing-guidelines/main/command.md",
+        "lastChecked": "2026-08-28T05:36:32.974Z",
+        "license": "MIT (upstream README declaration; no top-level LICENSE file)",
+        "licenseStatus": "DECLARED_REFERENCE_ONLY",
+        "metadataSha256": "4a3445c773431682fce62e72ea4560d43c9e2831d036327e247c83d7aeacba82"
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
       "registryVersion": 19,
+      "metadataSha256": "4a3445c773431682fce62e72ea4560d43c9e2831d036327e247c83d7aeacba82",
       "triggers": [
         "current Vercel writing copy content clarity voice structure guidance"
       ]

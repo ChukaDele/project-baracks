@@ -103,6 +103,20 @@ export interface SkillResolutionReceipt {
       bundle?: string;
       path?: string;
       contentSha256?: string;
+      vendor?: {
+        sourceId: string;
+        revision: string;
+        sourceUrl: string;
+        repositoryUrl: string;
+        sourceVersion: string | null;
+        skillId: string;
+        skillVersion?: string;
+        skillUrl: string;
+        retrievalUrl: string;
+        lastChecked: string;
+        licenseStatus: string;
+        metadataSha256?: string;
+      };
     };
   }>;
   rejected: Array<{ id: string; reason: string; score: number }>;
@@ -226,11 +240,18 @@ function hotSkillBundleRoot(): string | undefined {
     bundleSchema.parse(JSON.parse(readFileSync(marker, 'utf8')));
     const hot = readRegistry(registry);
     const generated = loadGeneratedSkillCatalog(catalog);
+    const vendorPath = join(root, 'guidance', 'vendor-sources.json');
+    const hasVendorEntries = hot.entries.some(
+      (entry) => inferSkillSourceKind(entry.source, entry.sourceKind) === 'VENDOR_LIVE',
+    );
+    const vendor = existsSync(vendorPath) ? loadVendorCatalog(vendorPath) : undefined;
+    if (hasVendorEntries && !vendor) return undefined;
     const expected = buildSkillCatalog(
       hot.entries,
       (entry) =>
         entry.source === 'major-internal' ? join(internal, entry.id, 'SKILL.md') : undefined,
       hot.version,
+      vendor,
     );
     if (
       generated.registryVersion !== hot.version ||
@@ -779,6 +800,26 @@ function resolveSkillsInternal(input: {
           ...(skill.path ? { path: skill.path } : {}),
           ...(catalog.get(skill.id)?.contentSha256
             ? { contentSha256: catalog.get(skill.id)!.contentSha256 }
+            : {}),
+          ...(skill.vendor
+            ? {
+                vendor: {
+                  sourceId: skill.vendor.sourceId,
+                  revision: skill.vendor.revision,
+                  sourceUrl: skill.vendor.sourceUrl,
+                  repositoryUrl: skill.vendor.repositoryUrl,
+                  sourceVersion: skill.vendor.sourceVersion,
+                  skillId: skill.vendor.skillId,
+                  ...(skill.vendor.skillVersion ? { skillVersion: skill.vendor.skillVersion } : {}),
+                  skillUrl: skill.vendor.skillUrl,
+                  retrievalUrl: skill.vendor.retrievalUrl,
+                  lastChecked: skill.vendor.lastChecked,
+                  licenseStatus: skill.vendor.licenseStatus,
+                  ...(catalog.get(skill.id)?.metadataSha256
+                    ? { metadataSha256: catalog.get(skill.id)!.metadataSha256 }
+                    : {}),
+                },
+              }
             : {}),
         },
       })),

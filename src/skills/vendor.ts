@@ -88,6 +88,7 @@ export interface VendorSkillSelection {
   classification: VendorSkill['classification'];
   harvestDecision: VendorSkill['harvestDecision'];
   title: string;
+  skillUrl: string;
   sectionId: string;
   sectionTitle: string;
   referenceUrl: string;
@@ -200,6 +201,7 @@ export function selectVendorSkill(input: {
     classification: input.skill.classification,
     harvestDecision: input.skill.harvestDecision,
     title: input.skill.title,
+    skillUrl: input.skill.skillUrl,
     sectionId: section.id,
     sectionTitle: section.title,
     referenceUrl: section.referenceUrl,

@@ -123,6 +123,59 @@ describe('Major hot skill sync', () => {
     expect(readFileSync(join(first.activeBundle, 'bundle.json'), 'utf8')).toBe(markerBefore);
   });
 
+  it('quarantines and rebuilds a corrupt retained bundle instead of activating it', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-corrupt-retained-home-'));
+    const sourceA = sourceCopy('major-skill-corrupt-retained-a-');
+    const sourceB = sourceCopy('major-skill-corrupt-retained-b-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'trusted A rule\n');
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'trusted B rule\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    syncMajorSkills({ sourceRoot: sourceB });
+    const corruptedSkill = join(
+      first.activeBundle,
+      'skills',
+      'internal',
+      'skill-resolver',
+      'SKILL.md',
+    );
+    writeFileSync(corruptedSkill, 'corrupt retained body\n');
+
+    const reactivated = syncMajorSkills({ sourceRoot: sourceA });
+
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(first.bundleId);
+    expect(readFileSync(corruptedSkill, 'utf8')).not.toBe('corrupt retained body\n');
+    expect(
+      readdirSync(join(home, 'skill-bundles')).some((name) =>
+        name.startsWith(`.quarantine-${first.bundleId}-`),
+      ),
+    ).toBe(true);
+    expect(reactivated.bundleId).toBe(first.bundleId);
+  });
+
+  it('records the immediately active predecessor when reactivating, then rolls back to it', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-reactivation-rollback-home-'));
+    const sourceA = sourceCopy('major-skill-reactivation-rollback-a-');
+    const sourceB = sourceCopy('major-skill-reactivation-rollback-b-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'bundle A rule\n');
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B rule\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    const second = syncMajorSkills({ sourceRoot: sourceB });
+
+    syncMajorSkills({ sourceRoot: sourceA });
+    const marker = JSON.parse(readFileSync(join(first.activeBundle, 'bundle.json'), 'utf8')) as {
+      previousBundle?: string;
+    };
+    expect(marker.previousBundle).toBe(second.bundleId);
+
+    const rolledBack = rollbackMajorSkills();
+    expect(rolledBack.bundleId).toBe(second.bundleId);
+    expect(readlinkSync(join(home, 'skill-bundles', 'current'))).toBe(second.bundleId);
+  });
+
   it('rejects a changed referenced skill resource when the catalogue identity is stale', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-skill-resource-identity-home-'));
     const source = sourceCopy('major-skill-resource-identity-source-');

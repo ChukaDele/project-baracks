@@ -17,6 +17,7 @@ import {
 const registryPath = join(process.cwd(), 'guidance', 'skills.registry.json');
 const evalsPath = join(process.cwd(), 'evals', 'skill-resolver');
 const vendorCatalogPath = join(process.cwd(), 'guidance', 'vendor-sources.json');
+const generatedCatalogPath = join(process.cwd(), 'guidance', 'skills.catalog.json');
 const priorRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorEvals = process.env.MAJOR_SKILLS_EVALS;
 const priorVendorSources = process.env.MAJOR_VENDOR_SOURCES;
@@ -76,6 +77,33 @@ describe('live vendor skill sources', () => {
     );
   });
 
+  it('binds generated vendor entries to deterministic metadata-only source identity', () => {
+    const catalog = JSON.parse(readFileSync(generatedCatalogPath, 'utf8')) as {
+      entries: Array<{
+        id: string;
+        version: string;
+        contentSha256?: string;
+        metadataSha256?: string;
+        provenance: Record<string, unknown>;
+      }>;
+    };
+    const entry = catalog.entries.find((candidate) => candidate.id === 'vercel-optimize');
+
+    expect(entry).toMatchObject({
+      version: '1.2.0',
+      metadataSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      provenance: {
+        kind: 'vendor-metadata-reference',
+        sourceId: 'vercel-agent-skills',
+        sourceRevision: 'main',
+        skillId: 'vercel-optimize',
+        skillVersion: '1.2.0',
+        licenseStatus: 'DECLARED_REFERENCE_ONLY',
+      },
+    });
+    expect(entry?.contentSha256).toBeUndefined();
+  });
+
   it('resolves a Vercel skill as a live reference without manufacturing a local body', () => {
     const now = new Date('2026-08-28T12:00:00.000Z');
     const resolved = resolveSkills({
@@ -97,6 +125,14 @@ describe('live vendor skill sources', () => {
       classification: 'actionable-skill',
       harvestDecision: 'USE_LIVE',
       skillVersion: '1.2.0',
+    });
+    expect(resolved.receipt.evidence[0]?.provenance.vendor).toMatchObject({
+      sourceId: 'vercel-agent-skills',
+      revision: 'main',
+      skillId: 'vercel-optimize',
+      skillVersion: '1.2.0',
+      licenseStatus: 'DECLARED_REFERENCE_ONLY',
+      metadataSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
   });
 

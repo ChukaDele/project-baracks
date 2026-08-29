@@ -115,6 +115,18 @@ for (const entry of registryEntries) {
     fail(`skill registry entry ${entry.id}.sourceKind is invalid`);
   if (entry.sourceKind === 'VENDOR_LIVE')
     nonEmpty(entry.vendorSkill, `skill registry entry ${entry.id}.vendorSkill`);
+  const dependencies = entry.dependencies ?? [];
+  if (!Array.isArray(dependencies))
+    fail(`skill registry entry ${entry.id}.dependencies is invalid`);
+  if (new Set(dependencies).size !== dependencies.length)
+    fail(`skill registry entry ${entry.id} has duplicate dependencies`);
+  for (const dependency of dependencies) {
+    if (typeof dependency !== 'string' || !canonicalSkillSlug.test(dependency))
+      fail(`skill registry entry ${entry.id} has an unsafe dependency`);
+    if (dependency === entry.id) fail(`skill registry entry ${entry.id} depends on itself`);
+    if (!allRegistered.includes(dependency))
+      fail(`skill registry entry ${entry.id} has unknown dependency ${dependency}`);
+  }
 }
 if (new Set(allRegistered).size !== allRegistered.length) fail('skills registry has duplicate ids');
 if (new Set(registered).size !== registered.length)

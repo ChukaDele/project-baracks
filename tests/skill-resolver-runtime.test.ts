@@ -208,6 +208,21 @@ describe('runtime skill resolver', () => {
     });
   });
 
+  it('does not infer dependencies from arbitrary SKILL.md text', () => {
+    const entries = loadSkillRegistry();
+    const catalog = buildSkillCatalog(entries, (entry) =>
+      installedSkillPath(entry.id, process.cwd(), entry.source),
+    );
+    const entry = catalog.find((candidate) => candidate.id === 'analytics-with-shaper');
+    const body = readFileSync(
+      installedSkillPath('analytics-with-shaper', process.cwd(), 'major-internal')!,
+      'utf8',
+    );
+
+    expect(body).toContain('review');
+    expect(entry?.dependencies).toEqual([]);
+  });
+
   it('classifies hot, active specialist, and dormant skills deterministically', () => {
     const disclosure = discloseSkills({
       task: 'Perform a root cause analysis for this regression.',
