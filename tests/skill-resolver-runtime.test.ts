@@ -93,6 +93,15 @@ describe('runtime skill resolver', () => {
     ).toContain('root-cause-qa');
   });
 
+  it('matches automatic skill ids only at token or phrase boundaries', () => {
+    const selected = resolveSkills({
+      task: 'Use rapid-ui-prototype for this task.',
+    }).skills.map((skill) => skill.id);
+
+    expect(selected).toContain('rapid-ui-prototype');
+    expect(selected).not.toContain('api');
+  });
+
   it('composes mandatory explicit skills and emits inspectable evidence', () => {
     const result = resolveSkills({
       task: 'Review this regression efficiently.',
@@ -123,6 +132,13 @@ describe('runtime skill resolver', () => {
     expect(() =>
       resolveSkills({ task: 'Do the work.', skills: ['lean-quality', 'not-installed'] }),
     ).toThrow(/unknown skill "not-installed".*major skill search/);
+  });
+
+  it.each([
+    ['skill', 'resolve', '--task', 'Resolve this task.', '--skill'],
+    ['skill', 'resolve', '--task', 'Resolve this task.', '--skill', '--json'],
+  ])('rejects malformed explicit skill invocation: %j', async (...args) => {
+    await expect(runSkillCli(args)).rejects.toThrow(/missing required value for --skill/);
   });
 
   it('fails clearly when an explicitly selected registry skill is deprecated', () => {

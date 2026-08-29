@@ -24,10 +24,15 @@ function flag(args: string[], name: string): string | undefined {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
-function flags(args: string[], name: string): string[] {
-  return args.flatMap((value, index) =>
-    value === name && args[index + 1] ? [args[index + 1]!] : [],
-  );
+function requiredFlags(args: string[], name: string): string[] {
+  return args.flatMap((value, index) => {
+    if (value !== name) return [];
+    const selected = args[index + 1];
+    if (!selected || selected.startsWith('-')) {
+      throw new Error(`missing required value for ${name}`);
+    }
+    return [selected];
+  });
 }
 
 export async function runSkillCli(args: string[]): Promise<boolean> {
@@ -67,7 +72,7 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
   if (args[1] === 'resolve') {
     const task = flag(args, '--task');
     if (!task) throw new Error('missing required --task');
-    const selected = flags(args, '--skill');
+    const selected = requiredFlags(args, '--skill');
     const result = resolveSkills({
       task,
       cwd: flag(args, '--cwd') ?? process.cwd(),

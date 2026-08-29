@@ -709,7 +709,9 @@ function scoreEntry(
   if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
     return { score: 0, reason: 'matched a negative trigger example' };
   }
-  const explicitTerm = [entry.id, ...entry.aliases].find((term) => normalized.includes(term.toLowerCase()));
+  const explicitTerm = [entry.id, ...entry.aliases].find((term) =>
+    includesPhrase(normalizedText(task), term),
+  );
   if (explicitTerm) {
     // A short id can be a substring of a more specific explicit id, such as
     // `integration` in `mcp-integration-ops`. Prefer the longer named skill.
