@@ -27,9 +27,7 @@ PY
   fi
 fi
 
-if [ -n "${MAJOR_SYNC_EXECUTABLE:-}" ]; then
-  SYNC_COMMAND=("$MAJOR_SYNC_EXECUTABLE")
-elif [ -f "$SCRIPT_ROOT/dist/entry.js" ]; then
+if [ -f "$SCRIPT_ROOT/dist/entry.js" ]; then
   SYNC_COMMAND=(node "$SCRIPT_ROOT/dist/entry.js")
 elif command -v major >/dev/null 2>&1; then
   SYNC_COMMAND=(major)

@@ -61,4 +61,15 @@ describe('installed production trust boundaries', () => {
     expect(sync).not.toContain('MAJOR_SKILLS_REPO_URL');
     expect(sync).toContain('https://github.com/ChukaDele/project-baracks.git');
   });
+
+  it('ships no environment-selected installer source or compatibility runtime', () => {
+    const installer = readFileSync(resolve('scripts/install-major-skills.sh'), 'utf8');
+    const compatibility = readFileSync(resolve('scripts/sync-major-skills.sh'), 'utf8');
+
+    expect(installer).not.toContain('MAJOR_SKILL_FIXTURE_ROOT');
+    expect(installer).not.toContain('NODE_ENV');
+    expect(compatibility).not.toContain('MAJOR_SYNC_EXECUTABLE');
+    expect(compatibility).not.toContain('NODE_ENV');
+    expect(compatibility).toContain('skill sync --source "$SOURCE_ROOT"');
+  });
 });

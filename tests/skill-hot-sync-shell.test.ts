@@ -2,6 +2,7 @@ import {
   chmodSync,
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readlinkSync,
@@ -49,7 +50,7 @@ function cleanSource(prefix: string): string {
   return source;
 }
 
-function fixtureExecutable(home: string): string {
+function fixtureRuntime(home: string): string {
   const runtime = mkdtempSync(join(tmpdir(), 'major-shell-runtime-fixture-'));
   roots.push(runtime);
   cpSync(join(process.cwd(), 'dist'), join(runtime, 'dist'), { recursive: true });
@@ -70,13 +71,16 @@ export const trustedCodexHome = (env = process.env) => resolve(env.CODEX_HOME ??
 export const testFixturePath = (name) => process.env[name];
 `,
   );
-  const executable = join(runtime, 'major');
-  writeFileSync(
-    executable,
-    `#!/bin/sh\nexec "${process.execPath}" "${join(runtime, 'dist', 'entry.js')}" "$@"\n`,
+  const scripts = join(runtime, 'scripts');
+  mkdirSync(scripts);
+  cpSync(
+    join(process.cwd(), 'scripts', 'sync-major-skills.sh'),
+    join(scripts, 'sync-major-skills.sh'),
+    {
+      recursive: true,
+    },
   );
-  chmodSync(executable, 0o755);
-  return executable;
+  return join(scripts, 'sync-major-skills.sh');
 }
 
 describe('shipped Major skill sync compatibility path', () => {
@@ -85,15 +89,15 @@ describe('shipped Major skill sync compatibility path', () => {
     const source = cleanSource('major-shell-sync-source-');
     roots.push(homeRoot);
     const majorHome = join(homeRoot, '.major');
+    const syncScript = fixtureRuntime(homeRoot);
     const env = {
       ...process.env,
       MAJOR_HOME: majorHome,
       NODE_ENV: 'test',
-      MAJOR_SYNC_EXECUTABLE: fixtureExecutable(homeRoot),
       GIT_CONFIG_GLOBAL: '/dev/null',
     };
     const run = () =>
-      spawnSync('bash', ['scripts/sync-major-skills.sh', source], {
+      spawnSync('bash', [syncScript, source], {
         cwd: process.cwd(),
         env,
         encoding: 'utf8',

@@ -153,9 +153,8 @@ PLAN="$TMP/project-install.tsv"
 node "$MAJOR_ROOT/scripts/materialize-project-skill-registry.mjs" plan "$MAJOR_ROOT" "$TARGET" "$PROFILE" "$FEATURES" > "$PLAN"
 : > "$TARGET/.agents/managed-external.tsv"
 clone_repo() {
-  local source_key="$1" repository="$2" destination="$3" source="$repository"
-  if [ -n "${MAJOR_SKILL_FIXTURE_ROOT:-}" ]; then source="$MAJOR_SKILL_FIXTURE_ROOT/$source_key"; fi
-  git clone --depth 1 "$source" "$destination"
+  local source_key="$1" repository="$2" destination="$3"
+  git clone --depth 1 "$repository" "$destination"
 }
 copy_named() {
   local root="$1" name="$2" source_key="$3" skill_path="$4" found

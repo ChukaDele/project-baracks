@@ -75,6 +75,43 @@ function fixtureRepository(root: string, name: string, ids: string[]): void {
   }
 }
 
+function fixtureGit(root: string, fixtures: string): string {
+  const bin = mkdtempSync(join(tmpdir(), 'major-installer-git-fixture-'));
+  roots.push(bin);
+  const executable = join(bin, 'git');
+  const repositories: Record<string, string> = {
+    'https://github.com/emilkowalski/skills.git': 'emil',
+    'https://github.com/anthropics/skills.git': 'anthropic',
+    'https://github.com/openai/skills.git': 'openai',
+    'https://github.com/codejunkie99/graph-engineering.git': 'graph',
+  };
+  writeFileSync(
+    executable,
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [ "\${1:-}" = clone ]; then
+  repository="\${4:-}"
+  destination="\${5:-}"
+  case "$repository" in
+${Object.entries(repositories)
+  .map(
+    ([repository, fixture]) =>
+      `    ${JSON.stringify(repository)}) source=${JSON.stringify(join(fixtures, fixture))} ;;`,
+  )
+  .join('\n')}
+    *) echo "unexpected clone repository: $repository" >&2; exit 2 ;;
+  esac
+  ${JSON.stringify(root)} clone --depth 1 "$source" "$destination"
+  ${JSON.stringify(root)} -C "$destination" remote set-url origin "$repository"
+  exit
+fi
+exec ${JSON.stringify(root)} "$@"
+`,
+  );
+  chmodSync(executable, 0o755);
+  return bin;
+}
+
 function markdownAdapter(discovery: string, explicit: string): CommandAdapter {
   const parse = (artifact: string, path: string): string[] => {
     const lines = artifact.trimEnd().split('\n');
@@ -623,10 +660,10 @@ describe('installed host skill commands', () => {
       ...process.env,
       HOME: home,
       MAJOR_HOME: join(home, '.major'),
-      MAJOR_SKILL_FIXTURE_ROOT: fixtures,
       NODE_ENV: 'test',
       MAJOR_SKILLS_REGISTRY: resolve('guidance/skills.registry.json'),
       GIT_CONFIG_GLOBAL: '/dev/null',
+      PATH: `${fixtureGit('/usr/bin/git', fixtures)}:${process.env.PATH ?? ''}`,
     };
     const fixtureEntry = fixtureRuntime(home);
     const installed = spawnSync('bash', [fixtureInstaller(home), target, 'full'], {
