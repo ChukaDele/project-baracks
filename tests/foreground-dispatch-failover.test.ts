@@ -155,6 +155,7 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
         durationMs: 5,
         rateLimited: false,
         exhausted: false,
+        sessionRef: 'codex-session-progress-1',
       };
     });
 
@@ -331,6 +332,7 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
         durationMs: 5,
         rateLimited: false,
         exhausted: false,
+        sessionRef: 'reviewer-session-success-2',
       }));
 
     // The literal acceptance test: one dispatch call, no second command
