@@ -1,10 +1,32 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
+function skillContentSha256(skillRoot) {
+  const files = [];
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.isFile()) files.push(path);
+      else throw new Error(`unsupported skill content entry: ${relative(skillRoot, path)}`);
+    }
+  };
+  walk(skillRoot);
+  const hash = createHash('sha256');
+  for (const file of files) {
+    hash.update(relative(skillRoot, file));
+    hash.update('\0');
+    hash.update(readFileSync(file));
+    hash.update('\0');
+  }
+  return hash.digest('hex');
+}
 const registry = JSON.parse(readFileSync(join(root, 'guidance/skills.registry.json'), 'utf8'));
 const entries = registry.entries
   .map((entry) => {
@@ -19,9 +41,7 @@ const entries = registry.entries
     }
     const contentSha256 =
       entry.source === 'major-internal'
-        ? createHash('sha256')
-            .update(readFileSync(join(root, 'skills/internal', entry.id, 'SKILL.md')))
-            .digest('hex')
+        ? skillContentSha256(join(root, 'skills/internal', entry.id))
         : undefined;
     return {
       id: entry.id,

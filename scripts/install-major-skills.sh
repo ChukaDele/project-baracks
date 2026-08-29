@@ -2,25 +2,31 @@
 set -euo pipefail
 
 MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET="${1:-$(pwd)}"
+INSTALL_TARGET="${1:-$(pwd)}"
 PROFILE="${2:-core}"
 FEATURES="${3:-}"
 INTERNAL="$MAJOR_ROOT/skills/internal"
+CATALOG="$MAJOR_ROOT/guidance/skills.catalog.json"
+ADAPTERS="$MAJOR_ROOT/adapters/skills"
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/major-skills.XXXXXX")"
+STAGED_TARGET="$TMP/project"
+TARGET="$STAGED_TARGET"
 AGENT_SKILLS="$TARGET/.agents/skills"
 CLAUDE_SKILLS="$TARGET/.claude/skills"
 CODEX_SKILLS="$TARGET/.codex/skills"
-CATALOG="$MAJOR_ROOT/guidance/skills.catalog.json"
-ADAPTERS="$MAJOR_ROOT/adapters/skills"
 LOCK="$TARGET/MAJOR_SKILLS.lock"
-TMP="${TMPDIR:-/tmp}/major-skills-$$"
 
 case "$PROFILE" in
   core|knowledge|web-ui|exploratory|full) ;;
   *) echo "ERROR: profile must be core, knowledge, web-ui, exploratory, or full" >&2; exit 2 ;;
 esac
 
-mkdir -p "$AGENT_SKILLS" "$CLAUDE_SKILLS" "$CODEX_SKILLS" "$TMP"
 node "$MAJOR_ROOT/scripts/generate-skill-catalog.mjs" --check
+mkdir -p "$STAGED_TARGET" "$INSTALL_TARGET"
+for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
+  [ ! -e "$INSTALL_TARGET/$managed" ] || cp -R "$INSTALL_TARGET/$managed" "$STAGED_TARGET/$managed"
+done
+mkdir -p "$AGENT_SKILLS" "$CLAUDE_SKILLS" "$CODEX_SKILLS"
 
 # Remove only skills previously installed by Major. Preserve project-owned/custom skills.
 if [ -f "$LOCK" ]; then
@@ -212,8 +218,26 @@ PY
   find "$AGENT_SKILLS" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 } > "$LOCK"
 
+# Activate only after every source, skill, catalogue, rule and command artifact
+# has been staged and validated. Roll back all managed roots if activation fails.
+BACKUP="$TMP/backup"
+mkdir -p "$BACKUP"
+activated=""
+rollback_install() {
+  for managed in $activated; do
+    rm -rf "$INSTALL_TARGET/$managed"
+    [ ! -e "$BACKUP/$managed" ] || mv "$BACKUP/$managed" "$INSTALL_TARGET/$managed"
+  done
+}
+trap 'rollback_install' ERR INT TERM
+for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
+  [ ! -e "$INSTALL_TARGET/$managed" ] || mv "$INSTALL_TARGET/$managed" "$BACKUP/$managed"
+  activated="$managed $activated"
+  [ ! -e "$STAGED_TARGET/$managed" ] || mv "$STAGED_TARGET/$managed" "$INSTALL_TARGET/$managed"
+done
+trap - ERR INT TERM
 rm -rf "$TMP"
-echo "Major skills installed and validated into $TARGET"
+echo "Major skills installed and validated into $INSTALL_TARGET"
 echo "Profile: $PROFILE"
 echo "Features: ${FEATURES:-none}"
 echo "Registry: $LOCK"

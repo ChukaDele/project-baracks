@@ -4,7 +4,6 @@ import {
   resolveSkills,
 } from './resolver.js';
 import { loadGeneratedSkillCatalog, searchSkillCatalog } from './catalog.js';
-import { recordSkillRoutingEvidence } from './routing-evidence.js';
 import {
   deprecateGeneratedSkill,
   listSkillCandidates,
@@ -69,25 +68,11 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
     const task = flag(args, '--task');
     if (!task) throw new Error('missing required --task');
     const selected = flags(args, '--skill');
-    let result;
-    try {
-      result = resolveSkills({
-        task,
-        cwd: flag(args, '--cwd') ?? process.cwd(),
-        ...(selected.length ? { skills: selected } : {}),
-      });
-    } catch (error) {
-      recordSkillRoutingEvidence({
-        kind: 'rejection',
-        task,
-        requested: selected,
-        reason: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-    if (result.skills.length === 0) {
-      recordSkillRoutingEvidence({ kind: 'miss', task, reason: 'no installed skill matched' });
-    }
+    const result = resolveSkills({
+      task,
+      cwd: flag(args, '--cwd') ?? process.cwd(),
+      ...(selected.length ? { skills: selected } : {}),
+    });
     if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
     else if (result.skills.length === 0) console.log('No installed Major skill matched this task.');
     else {

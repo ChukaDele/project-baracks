@@ -1,9 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { runSkillCli } from '../src/skills/cli.js';
 
 const roots: string[] = [];
 const priorHome = process.env.MAJOR_HOME;
@@ -46,18 +45,24 @@ describe('installed host skill commands', () => {
       expect(targets, target).toContain(target);
   });
 
-  it('executes catalogue discovery and namespaced explicit composition at the command boundary', async () => {
+  it('executes installed catalogue and namespaced command behavior through the supported entrypoint', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-command-cli-'));
     roots.push(home);
     process.env.MAJOR_HOME = home;
     process.env.MAJOR_SKILLS_REGISTRY = resolve('guidance/skills.registry.json');
-    const output: string[] = [];
-    vi.spyOn(console, 'log').mockImplementation((value) => output.push(String(value)));
-    await expect(runSkillCli(['skill', 'search', '--query', 'root cause'])).resolves.toBe(true);
-    expect(output.join('\n')).toContain('root-cause-qa');
-    output.length = 0;
-    await expect(
-      runSkillCli([
+    const search = spawnSync(
+      process.execPath,
+      ['--import', 'tsx', 'src/entry.ts', 'skill', 'search', '--query', 'root cause'],
+      { env: { ...process.env, NODE_ENV: 'test' }, encoding: 'utf8' },
+    );
+    expect(search.status, search.stderr).toBe(0);
+    expect(search.stdout).toContain('root-cause-qa');
+    const resolveResult = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        'src/entry.ts',
         'skill',
         'resolve',
         '--task',
@@ -67,9 +72,27 @@ describe('installed host skill commands', () => {
         '--skill',
         'lean-quality',
         '--json',
-      ]),
-    ).resolves.toBe(true);
-    const receipt = JSON.parse(output.join('\n')) as { receipt: { selected: string[] } };
+      ],
+      { env: { ...process.env, NODE_ENV: 'test' }, encoding: 'utf8' },
+    );
+    expect(resolveResult.status, resolveResult.stderr).toBe(0);
+    const receipt = JSON.parse(resolveResult.stdout) as { receipt: { selected: string[] } };
     expect(receipt.receipt.selected).toEqual(['lean-quality', 'root-cause-qa']);
+  });
+
+  it('installs the core project profile transactionally while preserving project-owned skills', () => {
+    const target = mkdtempSync(join(tmpdir(), 'major-project-skill-install-'));
+    roots.push(target);
+    const custom = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
+    mkdirSync(dirname(custom), { recursive: true });
+    writeFileSync(custom, '# project owned\n');
+    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      encoding: 'utf8',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(readFileSync(custom, 'utf8')).toBe('# project owned\n');
+    expect(existsSync(join(target, '.agents', 'skills.catalog.json'))).toBe(true);
+    expect(existsSync(join(target, '.codex', 'prompts', 'major', 'root-cause-qa.md'))).toBe(true);
+    expect(readFileSync(join(target, 'MAJOR_SKILLS.lock'), 'utf8')).toContain('[skills]');
   });
 });

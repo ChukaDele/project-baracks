@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync } from 'node:fs';
+import { basename, dirname, join, relative } from 'node:path';
 import type { SkillRegistryEntry } from './resolver.js';
 
 export interface SkillCatalogEntry {
@@ -18,8 +19,36 @@ export interface SkillCatalogEntry {
 
 function frontmatterDescription(path: string | undefined): string | undefined {
   if (!path) return undefined;
-  const match = readFileSync(path, 'utf8').match(/^---\n[\s\S]*?^description:\s*(.+)$/m);
+  const skillFile = lstatSync(path).isDirectory() ? join(path, 'SKILL.md') : path;
+  const match = readFileSync(skillFile, 'utf8').match(/^---\n[\s\S]*?^description:\s*(.+)$/m);
   return match?.[1]?.trim().replace(/^['"]|['"]$/g, '');
+}
+
+/** Stable identity for every regular file shipped by a skill, not just its entrypoint. */
+export function skillContentSha256(path: string): string {
+  const root = lstatSync(path).isDirectory() ? path : dirname(path);
+  const files: string[] = [];
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
+      const child = join(directory, entry.name);
+      if (entry.isDirectory()) walk(child);
+      else if (entry.isFile()) files.push(child);
+      else throw new Error(`unsupported skill content entry: ${relative(root, child)}`);
+    }
+  };
+  walk(root);
+  const hash = createHash('sha256');
+  for (const file of files) {
+    hash.update(relative(root, file));
+    hash.update('\0');
+    hash.update(readFileSync(file));
+    hash.update('\0');
+  }
+  if (!files.some((file) => basename(file) === 'SKILL.md'))
+    throw new Error(`skill directory missing SKILL.md: ${root}`);
+  return hash.digest('hex');
 }
 
 export function buildSkillCatalog(
@@ -49,7 +78,7 @@ export function buildSkillCatalog(
             : 'DORMANT_REFERENCE'),
       registryVersion,
       ...(path
-        ? { contentSha256: createHash('sha256').update(readFileSync(path)).digest('hex') }
+        ? { contentSha256: skillContentSha256(path) }
         : {}),
       triggers: entry.load.split('-').filter(Boolean),
       ...(entry.deprecated ? { deprecated: entry.deprecated } : {}),

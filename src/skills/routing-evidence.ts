@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { majorHome } from '../supervisor/state.js';
 
@@ -54,7 +55,12 @@ export function recordSkillRoutingEvidence(input: {
     .digest('hex')
     .slice(0, 16);
   const key = `${input.kind}:${requested.join(',') || taskDigest}`;
-  const path = join(majorHome(), 'learning', 'skill-routing-evidence.json');
+  const configuredHome = majorHome();
+  const evidenceHome =
+    process.env.VITEST && !configuredHome.startsWith(tmpdir())
+      ? join(tmpdir(), `major-routing-evidence-${process.pid}`)
+      : configuredHome;
+  const path = join(evidenceHome, 'learning', 'skill-routing-evidence.json');
   mkdirSync(dirname(path), { recursive: true });
   const lock = `${path}.lock`;
   let descriptor: number | undefined;

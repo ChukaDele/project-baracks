@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { recordSkillRoutingEvidence } from '../src/skills/routing-evidence.js';
+import { resolveSkills } from '../src/skills/resolver.js';
 
 const priorMajorHome = process.env.MAJOR_HOME;
 const roots: string[] = [];
@@ -59,5 +60,19 @@ describe('skill routing learning evidence', () => {
     expect(rows.every((row) => row.requested.every((value) => value.length <= 100))).toBe(true);
     expect(rows.every((row) => row.lastReason.length <= 500)).toBe(true);
     expect(existsSync(join(home, 'learning', 'skill-routing-evidence.json.lock'))).toBe(false);
+  });
+
+  it('captures misses and rejections from the shared resolver entrypoint', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-routing-entrypoint-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    expect(resolveSkills({ task: 'zxqv qqqzz nnnxx' }).skills).toEqual([]);
+    expect(() =>
+      resolveSkills({ task: 'Use a missing skill.', skills: ['definitely-not-installed'] }),
+    ).toThrow(/unknown skill/);
+    const rows = JSON.parse(
+      readFileSync(join(home, 'learning', 'skill-routing-evidence.json'), 'utf8'),
+    ) as Array<{ kind: string }>;
+    expect(rows.map((row) => row.kind).sort()).toEqual(['miss', 'rejection']);
   });
 });

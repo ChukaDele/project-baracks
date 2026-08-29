@@ -182,6 +182,7 @@ function validateSource(sourceRoot: string): {
   vendorSourcePath: string;
   internalRoot: string;
   evalRoot: string;
+  adaptersRoot: string;
   internalIds: string[];
   assetPaths: string[];
 } {
@@ -193,6 +194,7 @@ function validateSource(sourceRoot: string): {
   const vendorSourcePath = join(sourceRoot, 'guidance', 'vendor-sources.json');
   const internalRoot = join(sourceRoot, 'skills', 'internal');
   const evalRoot = join(sourceRoot, 'evals', 'skill-resolver');
+  const adaptersRoot = join(sourceRoot, 'adapters', 'skills');
   const assetRegistryPath = join(sourceRoot, 'guidance', 'reusable-assets.registry.json');
   for (const path of [
     registryPath,
@@ -204,6 +206,7 @@ function validateSource(sourceRoot: string): {
     assetRegistryPath,
     internalRoot,
     evalRoot,
+    adaptersRoot,
   ]) {
     if (!existsSync(path)) throw new Error(`required skill-bundle source missing: ${path}`);
   }
@@ -359,9 +362,72 @@ function validateSource(sourceRoot: string): {
     vendorSourcePath,
     internalRoot,
     evalRoot,
+    adaptersRoot,
     internalIds: installed,
     assetPaths,
   };
+}
+
+function writeAtomicFile(path: string, content: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const staged = `${path}.${process.pid}.tmp`;
+  writeFileSync(staged, content);
+  renameSync(staged, path);
+}
+
+function activateHostSkillArtifacts(
+  catalogPath: string,
+  adaptersRoot: string,
+): void {
+  const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as {
+    entries: Array<{ id: string }>;
+  };
+  const home =
+    process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
+      ? dirname(majorHome())
+      : process.env.HOME;
+  if (!home) throw new Error('HOME is required to activate hot-synced skill host artifacts');
+  const codexHome =
+    process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
+      ? join(home, '.codex')
+      : (process.env.CODEX_HOME ?? join(home, '.codex'));
+  writeAtomicFile(join(majorHome(), 'skills.catalog.json'), readFileSync(catalogPath, 'utf8'));
+  for (const [source, target] of [
+    ['CLAUDE.md', join(home, '.claude', 'MAJOR_SKILLS.md')],
+    ['CODEX.md', join(codexHome, 'MAJOR_SKILLS.md')],
+    ['GEMINI.md', join(home, '.gemini', 'MAJOR_SKILLS.md')],
+    ['RULE.mdc', join(home, '.cursor', 'rules', 'major-skills', 'RULE.mdc')],
+  ] as const) writeAtomicFile(target, readFileSync(join(adaptersRoot, source), 'utf8'));
+
+  const markdownRoots = [
+    join(home, '.claude', 'commands'),
+    join(codexHome, 'prompts'),
+    join(home, '.cursor', 'commands'),
+  ];
+  const discovery = 'Use the installed Major catalogue. Run `major skill search --query "$ARGUMENTS"` or `major skill resolve --task "$ARGUMENTS" --json`.\n';
+  for (const root of markdownRoots) {
+    writeAtomicFile(join(root, 'major.md'), discovery);
+    const staged = join(root, `.major-${process.pid}`);
+    rmSync(staged, { recursive: true, force: true });
+    mkdirSync(staged, { recursive: true });
+    for (const { id } of catalog.entries) {
+      writeFileSync(join(staged, `${id}.md`), `Run \`major skill resolve --task "$ARGUMENTS" --skill ${id} --json\`; the named skill is mandatory.\n`);
+    }
+    const target = join(root, 'major');
+    rmSync(target, { recursive: true, force: true });
+    renameSync(staged, target);
+  }
+  const geminiRoot = join(home, '.gemini', 'commands');
+  writeAtomicFile(join(geminiRoot, 'major.toml'), 'description = "Discover Major skills"\nprompt = "Run `major skill search --query {{args}}`."\n');
+  const geminiStage = join(geminiRoot, `.major-${process.pid}`);
+  rmSync(geminiStage, { recursive: true, force: true });
+  mkdirSync(geminiStage, { recursive: true });
+  for (const { id } of catalog.entries) {
+    writeFileSync(join(geminiStage, `${id}.toml`), `description = "Invoke Major skill ${id}"\nprompt = "Run \`major skill resolve --task {{args}} --skill ${id} --json\`."\n`);
+  }
+  const geminiTarget = join(geminiRoot, 'major');
+  rmSync(geminiTarget, { recursive: true, force: true });
+  renameSync(geminiStage, geminiTarget);
 }
 
 function bundleHash(sourceRoot: string, roots: string[]): string {
@@ -419,6 +485,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
     validated.sourceLedgerPath,
     validated.internalRoot,
     validated.evalRoot,
+    validated.adaptersRoot,
     ...validated.assetPaths,
   ]);
 
@@ -440,6 +507,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   mkdirSync(join(staged, 'package'), { recursive: true });
   mkdirSync(join(staged, 'skills'), { recursive: true });
   mkdirSync(join(staged, 'evals'), { recursive: true });
+  mkdirSync(join(staged, 'adapters'), { recursive: true });
   cpSync(validated.registryPath, join(staged, 'guidance', 'skills.registry.json'));
   cpSync(validated.catalogPath, join(staged, 'guidance', 'skills.catalog.json'));
   cpSync(
@@ -468,6 +536,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   }
   cpSync(validated.internalRoot, join(staged, 'skills', 'internal'), { recursive: true });
   cpSync(validated.evalRoot, join(staged, 'evals', 'skill-resolver'), { recursive: true });
+  cpSync(validated.adaptersRoot, join(staged, 'adapters', 'skills'), { recursive: true });
   writeFileSync(
     join(staged, 'bundle.json'),
     `${JSON.stringify(
@@ -490,6 +559,10 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   rmSync(next, { force: true });
   symlinkSync(basename(destination), next);
   renameSync(next, join(bundlesRoot, 'current'));
+  activateHostSkillArtifacts(
+    join(destination, 'guidance', 'skills.catalog.json'),
+    join(destination, 'adapters', 'skills'),
+  );
   retainRollbackBundles(bundlesRoot, bundleId, previousBundle);
 
   return {

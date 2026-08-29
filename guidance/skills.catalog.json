@@ -14,7 +14,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "d20993cae642eab3b4928d12df25a3543489314965a568e78f70ca304aa1af3b",
+      "contentSha256": "99e915b35c946da66c05bb5f3b6ba501096bed346fbc89216c648b2f9ecfe98b",
       "triggers": [
         "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support"
       ]
@@ -46,7 +46,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "14cae23803d7b17478594299eb1fd6081dfd171f0cee365953751e849f590614",
+      "contentSha256": "4fc41b18312d7f03fb9b9b5e387704df985d9468ece058d9f718505e18c8e193",
       "triggers": [
         "taleshape",
         "shaper",
@@ -69,7 +69,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "7ade11a72e1103e94a15e83ab3426eaaf0003107378d38e53f0f56035ce59552",
+      "contentSha256": "c43fd443763e3d71f9d26b20cd40d2626ff4377bcd24f495f88cb771a69594b0",
       "triggers": [
         "api endpoint contract integration"
       ]
@@ -85,7 +85,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "4a1d33f57fb88d54e56470a6e13ba8721a4950817edaf86bcbff0a539626f085",
+      "contentSha256": "73f38ae00f3a53f64e822c971d3cd59f78b0dec5420e9623a7686733030a91fc",
       "triggers": [
         "accounts receivable payable invoice collections"
       ]
@@ -101,7 +101,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "80712509f91d981d014a0e9e27a0667084cc44f3c0d076ba5782f6080a05baad",
+      "contentSha256": "938ff4bb9af35f58830ebe21cebd3760ed8d6a664d033bd5bf091fb7cd7bf3eb",
       "triggers": [
         "software architecture system design module boundary"
       ]
@@ -117,7 +117,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "19fcec8827d4283daa9b3f0095dc0ee962b5d72ac125ffdd2fd0f65c72108e1b",
+      "contentSha256": "6793ab8ca4caea86d7dc81f264559e5016d9d24696a9d23f959840f7b53202d2",
       "triggers": [
         "authentication authorization security access"
       ]
@@ -131,7 +131,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "ac6b0c33ca8f9585766f602045c16b1a9b056d5ef94f5182d30a4741289a7d08",
+      "contentSha256": "195b9c192a84630c0bec7ca94e28580da60ecbd8e1898f20de82a8ccc0e39ac3",
       "triggers": [
         "autonomous",
         "or",
@@ -151,7 +151,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "9aa0e6912ba5d23d260b6bf271eea80485bacddf296799dbb879f0dff1549a68",
+      "contentSha256": "91cb5a2b88e1558c4542c678fa207b973dc3681bd1af7300c27dcee251459b09",
       "triggers": [
         "browser release quality assurance acceptance"
       ]
@@ -167,7 +167,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "df9024f4c3ce4eae0067d5065274bc51a40a04a0b9416b7405098fe56b84612e",
+      "contentSha256": "d1613aea2540a1dfd49c8b0589ebb66047f6c71f31b208210287ebf744dc7ec3",
       "triggers": [
         "capability freshness version compatibility evidence"
       ]
@@ -183,7 +183,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "bba78e09cff99fbc865f7028c2ecc4a6cc91f8567441e983b00d02f55f39043f",
+      "contentSha256": "13a45f3fe3b7d9ad6fa1f84bf58424bb654ce8e2d4881bfa13348b9cbfe681a8",
       "triggers": [
         "chief of staff strategic coordination executive assistant boundary"
       ]
@@ -197,7 +197,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "0a78ca0611c0a72800cbb47e33a24f8e2398cbd20271c85e72aab44585e356f4",
+      "contentSha256": "c2d79aea6453c8d299fa6439b0b1e31cd3d9200ec985713973576dccaa21bf48",
       "triggers": [
         "ci",
         "github",
@@ -218,7 +218,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "6d01e18d2f2979b8a06f0797659c983e02fa3ba23ae6896b0f3d964022025951",
+      "contentSha256": "8a1420cba0d0865e578c0578ae07d0788110c846fc7eda8fdad1ead9c8d504ee",
       "triggers": [
         "codebase design module ownership boundaries"
       ]
@@ -232,7 +232,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "44536696dc1f893086629c34e02c37aff3b702c98ff596e11c35932f1db6b098",
+      "contentSha256": "ead6f57d152c5170a4542e17b3c366348e4db8ce670eda0bb3c392dd2b02aa87",
       "triggers": [
         "project",
         "start",
@@ -253,7 +253,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "4f26c4861517055f08487429352029023cce259c3eee9be5232b5e4f7939572d",
+      "contentSha256": "5a4bdfb5d3b1c580334981f95ba61f5915d441ee033a5c55ea094c22b9f9e285",
       "triggers": [
         "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise"
       ]
@@ -269,7 +269,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "580a99bd099e272a9c12ba7c041c1eacc44e23bfab5aa2cbe110bed6be90395c",
+      "contentSha256": "a8658aa189a6f1cae53dce54768e2f586b965edc1c2077bf30b8c32ada5fb38b",
       "triggers": [
         "concurrency race condition parallel locking"
       ]
@@ -285,7 +285,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "45e1dd8ddc63e3e2ff8edc5494f16d74bc970aeb79562969956132d846cba6ad",
+      "contentSha256": "75446c6d410a8258fbabee1dddbbf99b3ae67b22a5a33f8a3c81eced07c5ba9d",
       "triggers": [
         "bookkeeping ledger journal controller accounting"
       ]
@@ -299,7 +299,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "fa84d146c4673bf71074b393579d59e153915a7e790dcc3e775e6d0b8da85edd",
+      "contentSha256": "d3ac07d364b178bbf15179e35c919a9ffecb06a140f0bc29eef26614eb2d07cb",
       "triggers": [
         "provider",
         "model",
@@ -319,7 +319,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "305aa50eefa1be40f8a48aed0a1b9115d53461d4bb35c7407aebef99a7698f24",
+      "contentSha256": "3bd2ffacea2ab9525c90affa0e99592d7610d978ff5bbae3b0563ffcaa27aa76",
       "triggers": [
         "cross modal visual document evidence review"
       ]
@@ -333,7 +333,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "af26c0e78f5ac3ad750340038b11b06246ad1bd061cc26a34035a8b19e2efbac",
+      "contentSha256": "bd19b04746cd87883a84d80e7b092cfeb93ea4e1b9187718789aeadc8ec81e2f",
       "triggers": [
         "outcome",
         "data",
@@ -352,7 +352,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "455fc4351b3ccf4a80e53d2ebc14d9deeed2686136fe0781718059cffa2098c4",
+      "contentSha256": "ed8312ba05a500e2ab5b7aec75cb8fcb1927c52bd594b8de1cca95f78bbf7fd6",
       "triggers": [
         "database schema query migration"
       ]
@@ -368,7 +368,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "b99c6c84e25c179d89ffaf4bd873efe220e809f7caf55edabd9dd052f4542ef3",
+      "contentSha256": "fdb37ef54f826d1a8b60a06db09086926c4e01200915e5c76f855de2ab4897d1",
       "triggers": [
         "debug investigate root cause failure"
       ]
@@ -384,7 +384,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "34fc5d0bf0e63b73575cc47ee4a2422cc2dd2d667230125d80b9e3d3e6d67d33",
+      "contentSha256": "712ff2f8070dd56ed6a3ee0528693828d853f0613c5b2ba990027f5793ed0988",
       "triggers": [
         "dependency package upgrade vulnerability"
       ]
@@ -416,7 +416,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "f2dd3d3777e21a099fea219d5f46e2b21187dd7ea8fdf74ed8f340d666d38f4b",
+      "contentSha256": "4d1201f0fa5dfd622f2452963f1a318a502da636dcf85a16a73aa8a8705b68d7",
       "triggers": [
         "deployment release rollout rollback"
       ]
@@ -430,7 +430,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "53df6d8eddc88bb1463a5788d6b94bf88fc3962ddcdd7536c738a245f5547492",
+      "contentSha256": "3b1cd1f5c8d978fe3fe14ff30cb36d2a9c924612cdc2cc681c23ea953f309a45",
       "triggers": [
         "substantial",
         "ui",
@@ -460,7 +460,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "7001fb1fa8bb31a36318a86b68a1f094ee09eead9bdcd1a3b546ea2f461f28a4",
+      "contentSha256": "443889fcb395fd811edb39d7481da99686306351646f1295d26d6c9b0cda3c4c",
       "triggers": [
         "deterministic accounting arithmetic ledger balances"
       ]
@@ -474,7 +474,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "9d1550d90b1086ecbbba1b6fb810961db70758828b55b542ed73ab2228ca95d7",
+      "contentSha256": "bf89604a352477741ca16c436d6674930d6c10dee5b2447244fc06f2a6c536fc",
       "triggers": [
         "explicit",
         "owner",
@@ -495,7 +495,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "d66d0377f53f6c84786791c7d550d6c0f8f33ab0ab51ce485b4ac11091ce2ba5",
+      "contentSha256": "27a3be1d77fe91707f29a652c89de4b25f3d76d20415d8c097bdfc58e70fbf9f",
       "triggers": [
         "domain model entities business rules"
       ]
@@ -525,7 +525,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "30dbf1617a3538422ac278ae14ca370924b0a18a0bb763d4f1e0267d36249f67",
+      "contentSha256": "66a2d375aff08308bd4e0222b03ce7ebfe7446e66eb8719dad3c488118c7dbb5",
       "triggers": [
         "engineering design doctrine maintainable modular code"
       ]
@@ -542,7 +542,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "7a7375310d429afa6435177764bc810514289674561e880420fe62e7d4f6a473",
+      "contentSha256": "50bfd8ccbfaaad6a883b406f9252f7c97e0de18b1b29a7e78a3bb94c8a948558",
       "triggers": [
         "pr",
         "review",
@@ -561,7 +561,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "c038be6a9d8f25ed91e75b61b8424dc1d32e1f69e69ccca83bd488c4e4f77667",
+      "contentSha256": "44bf8ee0d7fd29e661c0d8535cbfa8486710e72519b2fffdc46af01b7f2c2d16",
       "triggers": [
         "executive assistant calendar correspondence meeting preparation"
       ]
@@ -575,7 +575,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "154a417414080ac7e92292f7c11c6b89f16b78596b92c8ce047e22ae7ebc92c5",
+      "contentSha256": "0aae7785b0567d43e88a8d1dd152f168d59bf33f417946ba321c2e315c1ff5fb",
       "triggers": [
         "exploratory",
         "awwwards",
@@ -646,7 +646,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "667637f310fd654ac8d3d7d600ee055f5895312abb44b6e505a879c446cba24b",
+      "contentSha256": "d5ef270f3c973e8bf0fcd3ed33aa953952ff06db824b44b5512091c18403ba53",
       "triggers": [
         "financial planning forecast extrapolation budget"
       ]
@@ -662,7 +662,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "120bef3ba9b0c27f305561119718dc909447969b9b287bf0640f0b4508f0dd11",
+      "contentSha256": "84dbb80a7e45b1c100ff3b904ff30f4f46b34540e50c949181730d86fb2043d4",
       "triggers": [
         "frontend ui component interface"
       ]
@@ -691,7 +691,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "3b0e27f2f125bd22451e08a488ba4660d249cdca92d4f7cf5ffd2be9ee863c83",
+      "contentSha256": "3ee26a2b29bd7766bd6c50326ca05f52be3e1596245adf3b35aa4671eab8ce55",
       "triggers": [
         "3d",
         "gaussian",
@@ -730,7 +730,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "e1d7002f99f29719b4f60109ee7c4b174fcf92bd4ef9f9050d97008e1c05692d",
+      "contentSha256": "4f84c39863bb4f4cdfdb672097698413951f20bc14e373ba91e51697131f11d8",
       "triggers": [
         "authentication",
         "oauth",
@@ -756,7 +756,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "2988a67d53f53d4435a5c3d1395dfb2bc95ee6bfdcca71ae128cdaa153e9a637",
+      "contentSha256": "a73e4523bc031f48109184327116e1428b81a6a5b1b9599f1e460375204b2397",
       "triggers": [
         "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view"
       ]
@@ -772,7 +772,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "0568549dcbea1d4e0a3b5a3bc0b3a2b35a394e6b1eced2232071c1544d47e40a",
+      "contentSha256": "35eac013c91841f66a665b98bc47a15952d7139b29ea22d91a098c60067a0e59",
       "triggers": [
         "production incident outage recovery"
       ]
@@ -788,7 +788,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "d2f463a2c276a768865fb4ed55d0d7590ea141151dc78854f84039c9c5aa39c1",
+      "contentSha256": "86aa985f78d21750193e89aa6f8b9b52567a20761f616587d5ce737a1c373f89",
       "triggers": [
         "third party integration adapter connector"
       ]
@@ -804,7 +804,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "ab340a4959386ece6b616aa377151a6f95e52ade8179859a96e53b8872811856",
+      "contentSha256": "2d6897d9767ef81560a869c1b496ec21579ccc6d30f4f76fae48c095cc5954b8",
       "triggers": [
         "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability"
       ]
@@ -818,7 +818,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "3b6a1d04c00eb1c7e06ac96b9c5018c741efc75bd3b7409b48360808576ec854",
+      "contentSha256": "ae8a0f1a5daf6757e778a6f698ae79cf95708daf5e961bee41ae1ccf38132038",
       "triggers": [
         "research",
         "strategy",
@@ -837,7 +837,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "c607f3d12c4f846c7893efb2a1e2c91c83db9c5163eb8dc2ba81667281dc9957",
+      "contentSha256": "4ab2a81c53c998a60b672fc8d48f44665c484dadf4f7152a78f49335c2b9a2df",
       "triggers": [
         "complex",
         "autonomous",
@@ -858,7 +858,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "ec3f2ac94a8fb1296edce4a1860a492d3837cc62a02d9fa687404c32f1b30ff7",
+      "contentSha256": "22b698eb349f7ef10cc7e0f19c0928a73f9416c99fe1e9d2d9d3e0c9178e8811",
       "triggers": [
         "test",
         "strategy",
@@ -876,7 +876,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "4bc11e5894ad78fa52ef81c4e40d422e021e31db8160cf8c37b61519e6aff52d",
+      "contentSha256": "e10bcda8ccbd9e3b5696a3877caa0c73f3268c130f579acd232ed9d6d35fbea5",
       "triggers": [
         "explicit",
         "user",
@@ -898,7 +898,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "4c7837b5cf887f6b3bf8ece504557875ff6f7e9e5e3ef0b64ad87d5b94f13bd9",
+      "contentSha256": "55cea083641968cdde74a1c3016245043c26557c851d8cf9cbc0d3f4c3ca618e",
       "triggers": [
         "rename",
         "migration",
@@ -917,7 +917,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "6235a4ecd73748c0196d2559658b38c1173b3edf7133306946c6f228e959e89f",
+      "contentSha256": "eac7daff75f5973230148e4b0ef1ed063ee48cc4a7717308782c5e3711b77c74",
       "triggers": [
         "major",
         "self",
@@ -956,7 +956,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "17670d83b4b72e3411a1adc85d0ff0473a407a7c09e10ed7f5bd33ffa57a1d7c",
+      "contentSha256": "06bab0e3f1d24fa4aefb518f8cdaacccb5d22abbe9febf0e1fd12727d3748dff",
       "triggers": [
         "mcp",
         "connector",
@@ -982,7 +982,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "58fa6ef11ce4902bf765e5717cf2ade333507ce2e2933004f1318bb946c1e40f",
+      "contentSha256": "47d7e41aeb232bc3f1c4bef82903aebf78d177fca17845e261457b4104c45662",
       "triggers": [
         "data schema platform migration"
       ]
@@ -996,7 +996,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "fd582e7011d284903c009207b71c381fd0af41184d2eed5b4c58d6c8656729dd",
+      "contentSha256": "f2e0e9793639987d40c9bb70e633586712effcbfe666b31a20c2cfbf8a56baec",
       "triggers": [
         "always",
         "on",
@@ -1016,7 +1016,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "97a7c38af7f2cef23509817aec3053e219797cbe1714090f35548b165d54cacb",
+      "contentSha256": "c4b81201ed5eff9d54fb8d2b2350600534fe95a1582ab56cb29575f5498e26df",
       "triggers": [
         "operator",
         "or",
@@ -1035,7 +1035,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "b241c336d9c45de0c7b018711c7e187801e8cc6d2b9dc4373ab227c95a90d5d6",
+      "contentSha256": "0fda860b56a7bf35d4003e0a158f9ed4789e7887890a0c84f1edd4ae395eb19b",
       "triggers": [
         "logging metrics tracing observability"
       ]
@@ -1049,7 +1049,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "9f41ced2d652a918b9f0e60dc4edfd3464489990c0ab7759155bfc616cc89dd1",
+      "contentSha256": "d2c5db532ed2cec1041e280a593e0693eeae3b4b35d6a21803875cb656150784",
       "triggers": [
         "project",
         "start",
@@ -1069,7 +1069,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "917cb961113fcb2c47a90ea1d1c752c2602eecc44961c15809944df266eccf67",
+      "contentSha256": "e9596e7931a1420cfb011a74f3ca22dc46f3373f1a6f4dc809172cf9bb4f93fb",
       "triggers": [
         "operations process improvement workflow efficiency"
       ]
@@ -1097,7 +1097,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "22729c31700c1700ccf3147963095db3c0d3d64083dbe38afcb3545faae8ab90",
+      "contentSha256": "14f4b23a56ee0179fe078dab6870fc4ae742f7bba4e3cbf36aac2b5b4f80be0e",
       "triggers": [
         "generated",
         "pdf",
@@ -1115,7 +1115,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "2de21119474ffd1f4aef68998a27ef886cfffa3446137a51cd6f252038964422",
+      "contentSha256": "8ffe590b4f29273cf4c0aa6549821faacd07add0c52647cb7d797a07e09bed80",
       "triggers": [
         "performance latency throughput optimize"
       ]
@@ -1129,7 +1129,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "0aaadd9303e8846ec5db38377635cc7f1d26c67882e1f56af68faf5b67342943",
+      "contentSha256": "ad07ddcd2a2569bed4e5886f843cc1cd74d061c0bfda358471e63c9ae3b77d0e",
       "triggers": [
         "measured",
         "slow",
@@ -1151,7 +1151,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "c0bf260db77ff430f19e95c775045acfadbd32264d9b3cc6f895c9d83b9e1249",
+      "contentSha256": "393d15ab1f6a863f4f42ce07b9dc2eab47f179811139604794e65b9cdfdec51f",
       "triggers": [
         "engineering implementation planning task breakdown"
       ]
@@ -1182,7 +1182,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "3d3d5244065c5e15d227eefe2d9c9b24d562ed832a57a645f200a5fb4dfb185b",
+      "contentSha256": "4a5f476c91e1abaa3f2f3192c434d20d1c39b70712eed87bfd097eb7c0f8c61c",
       "triggers": [
         "presentation",
         "slide",
@@ -1217,7 +1217,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "d5d0ea24ac5278d0b5363d28f532b24d4d8224da0fae29479b13b48b55f60031",
+      "contentSha256": "0aad51fd5528ec867a0d452978ccad188d82a8b0ad529768e5da51ed0b2893de",
       "triggers": [
         "new",
         "subsystem",
@@ -1251,7 +1251,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "c2709d9d8f250b364846bf16d0946c4316958f1f3caea5a347cc0e14589a2072",
+      "contentSha256": "2b55a0b626a3a5857be71c2a81638fcb92619f837b8f1c504944106a07a3a8f9",
       "triggers": [
         "product management discovery roadmap prioritisation"
       ]
@@ -1265,7 +1265,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "cc13e8ffcead955f107587c13259a6093023b4dfb3977a4c0befa2cc3f0d311d",
+      "contentSha256": "93df50e5ae6dbb205bcd3b8564fb62264ddb11878f34a57356364a7b60145e66",
       "triggers": [
         "named",
         "project",
@@ -1289,7 +1289,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "e79e2ed6cc9a8962265e33469e14e2c057e451a3403c7cb5937d950171d3a47a",
+      "contentSha256": "b471181bbc7e479f22dd7493bf5e32a1d0d4d00a6c6db32b0fce33b27fe3f2f5",
       "triggers": [
         "project",
         "start"
@@ -1304,7 +1304,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "5cf600aaf9521d387a1cd696391cbc56d6320f1aff53fede4db3bf5eabf59cb4",
+      "contentSha256": "c30a39d7464a9e78a764fd755235aefc73c63d15ac6229e88d81862ca4f4fc40",
       "triggers": [
         "multiple",
         "credible",
@@ -1323,7 +1323,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "a89703aa74bfb0df4b8e1fbd43d2a519a36817701ce1212e4cd1e66aa82fde3c",
+      "contentSha256": "419f1725d2df08819bb28338a04ad2d033889182dcb5f2c076f4741eb557d218",
       "triggers": [
         "account reconciliation close financial statements"
       ]
@@ -1337,7 +1337,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "e1ae1f3842ed364ef434a11fb6e6ff033fa644d9a2688bd0f35413eba79f0b99",
+      "contentSha256": "44d6b983aa08e6a49117cbadfafa1f7bedd4024116851edfcc5025201e731e1c",
       "triggers": [
         "all",
         "web",
@@ -1362,7 +1362,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "e0bd0d38b36896b114dae8b7329c85b6e725358f8a152d086da9a5b39d712e25",
+      "contentSha256": "2064277af81ad0f72fc8104be0631035f9de2fc378392931131024f4689451db",
       "triggers": [
         "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness"
       ]
@@ -1376,7 +1376,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "2256bf091560621dbc34752872bdc39e2910098929a88e4bc8ee67a1e1c4a151",
+      "contentSha256": "c86cf077b78ee5b32a92ebc114dd1014908d68789de48c9ab4d5150894bfccce",
       "triggers": [
         "gsap",
         "scrolltrigger",
@@ -1404,7 +1404,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "4086398c67fe53c857781be7b2f4b3b051a2bc750b646dc59e66a68b27a7b3eb",
+      "contentSha256": "582f47594b1b4e1ba33f8b9f166a70b0b9795e4aebcc6de708547f57590f9863",
       "triggers": [
         "reusable asset component template package discovery reuse"
       ]
@@ -1420,7 +1420,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "ef13dafcc32aefe943491d3f1281b49bf3781274f5c0d3c3c3422ee6ba436235",
+      "contentSha256": "a0b47b99d0337c6d95cbe9df58e1e42f1adbfd8b2b50def820f9082c7ad18e2c",
       "triggers": [
         "code review implementation review"
       ]
@@ -1437,7 +1437,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "47deeaf5daf7115863b84889d72cafe1e2ef8097353cbb6608815bf46f2d1668",
+      "contentSha256": "919216b1235d0ebebe50e72ae26b3065cbab23e31352504407edb8c5b8e60494",
       "triggers": [
         "bug",
         "failure",
@@ -1455,7 +1455,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "355f351d0699923ab2ca5422166a081cd234d04d35a64f953170adbdc175ee4d",
+      "contentSha256": "f2ab6231938a9c1c316ff27f6c27183affed667cfd9d7626cd15c830e7b116e2",
       "triggers": [
         "sales commercial pipeline customer revenue"
       ]
@@ -1471,7 +1471,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "b05e598df866b1f7373f66a6cc3c70505cff57517daa36ef7d95c482e9924c25",
+      "contentSha256": "25b8ccdecddb2ca4d9968da61f668174d8679ad4db426187bb7435851335da81",
       "triggers": [
         "security audit vulnerability review"
       ]
@@ -1500,7 +1500,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "994c5c37baa1ae2f6afa1bba419fb618107820a557e19e6b1e30628f74cae787",
+      "contentSha256": "b20e0b0355bd512440f116611e8c7bf06ac6409035a967569a526d8b16def230",
       "triggers": [
         "seo",
         "search",
@@ -1548,7 +1548,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "f6b420976dc8012c6e79e71c1bd4104ee8c8c6bbfa1fb599673063a1989db27c",
+      "contentSha256": "2796b79bb9217078da14648f6007fc97393fdde80356d633fe9f64d71eb07f05",
       "triggers": [
         "architecture",
         "or",
@@ -1585,7 +1585,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "69a63167e2304f3a14f3afd69dc7177b88577007bc9b5b3847e4e22d2ab4d66d",
+      "contentSha256": "0beaaada6bf7cd167871ae16cfbfdfbcdaf5e485425724b7bac410c2cf246fa0",
       "triggers": [
         "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
       ]
@@ -1599,7 +1599,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "0db5398717f8e70aadfdcb859106a40f30e17539b3e3845b89d8eae47a876bd7",
+      "contentSha256": "5c751f66e011b59f7c872cd91fb7dc1ddd69cdcf398b04cab9fb2cd177495dae",
       "triggers": [
         "start",
         "of",
@@ -1619,7 +1619,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "4989095eb0defeefc1acb297ab3e1543002121f93e2d032837565c0cfe38593e",
+      "contentSha256": "5d2c0f7e2a7d2d19b779788fc741e7e9e54e41e90d5c8483506a4cea1458c831",
       "triggers": [
         "reusable",
         "successful",
@@ -1641,7 +1641,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "45710a15b3e6563b650d02ca7dbc1825bac5ec2ac25f122c7c8af7c146e25e97",
+      "contentSha256": "2e58c8047f23e6bc21f1de0c3e8f6aa49c38a97a8122cbca0cf0950fecde0906",
       "triggers": [
         "software implementation feature bug code engineering"
       ]
@@ -1655,7 +1655,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "d8b98acb021768f5a51d04f18573e6e5c4bdbef9f0c33ee245e0c996c8c82ed6",
+      "contentSha256": "b4e9a03052478484df757a3b5e0af9566da17d43514716937abe69454846d9f6",
       "triggers": [
         "api",
         "scraping",
@@ -1673,7 +1673,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "d410adc756c8ec79d1f33cd5b5d398ce8c1ae408792e65386822ecc28975a747",
+      "contentSha256": "49b0bd95bf0b1289d09e512959201a10e03105675b3b378fe364f25ee122c6c8",
       "triggers": [
         "named",
         "url",
@@ -1696,7 +1696,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "aee2c6e5e60b13a5a38666f784c9dcdddb76ac08d1948f0303dd4430e27337df",
+      "contentSha256": "c889ea1cde4b97feeed9312a6f3bc48cd5f0c7a70e68fbc49a973bb2171ca856",
       "triggers": [
         "quality gate staged validation release controls"
       ]
@@ -1712,7 +1712,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "e9aa9a07d2d0c32f4e5eb0330f89e649a55105f43a5a34f691d921898eb552ab",
+      "contentSha256": "f4f9d6ed4549a19f40da77ab777d457d42085edf41b23de4b0ad3bdf910ab496",
       "triggers": [
         "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators"
       ]
@@ -1728,7 +1728,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "3b670108b24443ab00aa2b751349088bffb97a7829ce0e465021b3ce3b571dfe",
+      "contentSha256": "789c412b3699f74710643340886aa6023a8a5f7d773d247d87d70631d5d224e8",
       "triggers": [
         "test driven development regression test"
       ]
@@ -1742,7 +1742,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "b05e1826293757152e4ab1f93ab99edfc5c0706433e30486fe336b83692c7ca5",
+      "contentSha256": "5b85fd0fcb033b91d56e6580afc3036e9217f04d2817a52b4891b399b828adf4",
       "triggers": [
         "repeated",
         "retrieval",
@@ -1765,7 +1765,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "f40f7843eb6e0c8f6b3ad578a7a922834917a4a79095b5f3f5ddfddb1d8dc202",
+      "contentSha256": "13828d64bbf51971a4055953a56e652f7db870e2e246cf1d6228c1099096d8dc",
       "triggers": [
         "valuation investment merger acquisition financial model"
       ]
@@ -1904,7 +1904,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "a3f09268517ec0617d79d415fcc66d98631530caf1d6c805cf073793205c928e",
+      "contentSha256": "8a48436f57e48a8c5af4d497abb27c0a2ff1715639e4623743d5f5acb173a10d",
       "triggers": [
         "verify validate acceptance evidence"
       ]
@@ -1918,7 +1918,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "725325807c66eab912d8c6336caef70bdc76aee436968a5f0ac7d89419bfc448",
+      "contentSha256": "73fb1fe80ccdbabea16805024fccf5f7183b2a6e9c4b12fbe8d4e8bfed00fa2b",
       "triggers": [
         "planning",
         "or",
@@ -1967,7 +1967,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "98838f70ba6e073d991aca0744056cec32bebd6ea63f063361c4759d5042d04a",
+      "contentSha256": "08457f8b070e37ee8c47a8c625e43ff0c25920eecf4b664fe06ae77208f3cb45",
       "triggers": [
         "website",
         "landing",
@@ -1992,7 +1992,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "cd1a61cd2f9f376a21c475e94afd2b958f7c0fd4e258e27cfa6370f4501b3d9d",
+      "contentSha256": "b2b658b50129821f884be057401c8fa1469dbd20fc8c095c0c83117c5f5c8a23",
       "triggers": [
         "project",
         "create",
@@ -2024,7 +2024,7 @@
       "source": "major-internal",
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 19,
-      "contentSha256": "737bd51b5d4e3d1e4f93621b2db3b22b8913761e4e38221352915355d74ce1f1",
+      "contentSha256": "f6ea785d30d8b19be5be63db10fbda8eaa30afc4d78cf0e0d76427cd465f36bf",
       "triggers": [
         "git worktree isolated concurrent writer branch"
       ]

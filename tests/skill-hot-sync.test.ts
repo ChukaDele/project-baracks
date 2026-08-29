@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -41,7 +42,7 @@ afterEach(() => {
 function sourceCopy(prefix: string): string {
   const source = mkdtempSync(join(tmpdir(), prefix));
   roots.push(source);
-  for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates']) {
+  for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates', 'adapters']) {
     cpSync(join(process.cwd(), directory), join(source, directory), { recursive: true });
   }
   return source;
@@ -63,6 +64,7 @@ describe('Major hot skill sync', () => {
     expect(existsSync(join(current, 'guidance', 'skills-reconciliation-ledger.json'))).toBe(true);
     expect(existsSync(join(current, 'guidance', 'reusable-assets.registry.json'))).toBe(true);
     expect(existsSync(join(current, 'templates', 'project', 'GOAL_STATE.md'))).toBe(true);
+    expect(existsSync(join(current, 'adapters', 'skills', 'CODEX.md'))).toBe(true);
     expect(
       existsSync(join(current, 'skills', 'internal', 'controller-bookkeeping', 'SKILL.md')),
     ).toBe(true);
@@ -79,6 +81,16 @@ describe('Major hot skill sync', () => {
     expect(syncedRegistry.entries).toContainEqual(
       expect.objectContaining({ id: 'project-context-integrity', disclosure: 'hot' }),
     );
+    const hostRoot = join(home, '..');
+    const catalogEntries = syncedRegistry.entries.map((entry) => entry.id).sort();
+    expect(
+      readdirSync(join(hostRoot, '.codex', 'prompts', 'major'))
+        .map((name) => name.replace(/\.md$/, ''))
+        .sort(),
+    ).toEqual(catalogEntries);
+    expect(readFileSync(join(home, 'skills.catalog.json'), 'utf8')).toBe(
+      readFileSync(join(current, 'guidance', 'skills.catalog.json'), 'utf8'),
+    );
 
     const resolved = resolveSkills({
       task: 'Prepare an approved customer invoice, review receivables and payables, and draft a controlled follow-up.',
@@ -89,6 +101,20 @@ describe('Major hot skill sync', () => {
     expect(accounting?.path).toContain(
       '/skill-bundles/current/skills/internal/ar-ap-invoice/SKILL.md',
     );
+  });
+
+  it('rejects a changed referenced skill resource when the catalogue identity is stale', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-resource-identity-home-'));
+    const source = sourceCopy('major-skill-resource-identity-source-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    const resource = join(source, 'skills', 'internal', 'skill-resolver', 'references');
+    mkdirSync(resource, { recursive: true });
+    writeFileSync(join(resource, 'routing-policy.md'), 'changed after catalogue generation\n');
+    expect(() => syncMajorSkills({ sourceRoot: source })).toThrow(
+      /generated skill catalog does not match the canonical registry/,
+    );
+    expect(existsSync(join(home, 'skill-bundles', 'current'))).toBe(false);
   });
 
   it('returns a project-local asset before the metadata index', () => {

@@ -7,7 +7,6 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -19,7 +18,11 @@ import {
   resolveSkills,
 } from '../src/skills/resolver.js';
 import { runSkillCli } from '../src/skills/cli.js';
-import { buildSkillCatalog, searchSkillCatalog } from '../src/skills/catalog.js';
+import {
+  buildSkillCatalog,
+  searchSkillCatalog,
+  skillContentSha256,
+} from '../src/skills/catalog.js';
 
 const roots: string[] = [];
 const priorMajorHome = process.env.MAJOR_HOME;
@@ -146,6 +149,44 @@ describe('runtime skill resolver', () => {
     );
   });
 
+  it('excludes deprecated registry entries from automatic resolution', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-automatic-deprecated-skill-'));
+    roots.push(root);
+    const registry = join(root, 'skills.registry.json');
+    writeFileSync(
+      registry,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: 'skill-resolver',
+            source: 'major-internal',
+            availability: 'all-projects',
+            load: 'skill resolver routing',
+            deprecated: { message: 'retired' },
+          },
+        ],
+      }),
+    );
+    process.env.MAJOR_SKILLS_REGISTRY = registry;
+    expect(resolveSkills({ task: 'Use skill-resolver routing.' }).skills).toEqual([]);
+  });
+
+  it('ignores registry override hooks outside the test environment', () => {
+    const priorNodeEnv = process.env.NODE_ENV;
+    const root = mkdtempSync(join(tmpdir(), 'major-production-registry-override-'));
+    roots.push(root);
+    const registry = join(root, 'skills.registry.json');
+    writeFileSync(registry, JSON.stringify({ version: 1, entries: [] }));
+    process.env.MAJOR_SKILLS_REGISTRY = registry;
+    process.env.NODE_ENV = 'production';
+    try {
+      expect(loadSkillRegistry().length).toBeGreaterThan(30);
+    } finally {
+      process.env.NODE_ENV = priorNodeEnv;
+    }
+  });
+
   it('builds and searches catalogue metadata from the canonical registry', () => {
     const catalog = buildSkillCatalog(loadSkillRegistry(), (entry) =>
       installedSkillPath(entry.id, process.cwd(), entry.source),
@@ -245,7 +286,6 @@ describe('runtime skill resolver', () => {
       join(bundle, 'skills', 'internal', 'hot-skill', 'SKILL.md'),
       '---\nname: hot-skill\ndescription: hot\n---\n\n# Hot\n',
     );
-    const hotContent = readFileSync(join(bundle, 'skills', 'internal', 'hot-skill', 'SKILL.md'));
     writeFileSync(
       join(bundle, 'guidance', 'skills.catalog.json'),
       JSON.stringify({
@@ -261,7 +301,7 @@ describe('runtime skill resolver', () => {
             source: 'major-internal',
             sourceKind: 'INTERNAL_DURABLE',
             registryVersion: 999,
-            contentSha256: createHash('sha256').update(hotContent).digest('hex'),
+            contentSha256: skillContentSha256(join(bundle, 'skills', 'internal', 'hot-skill')),
             triggers: ['hot skill immediate sync'],
           },
         ],

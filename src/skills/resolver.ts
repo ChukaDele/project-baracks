@@ -1,14 +1,15 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import {
   buildSkillCatalog,
   loadGeneratedSkillCatalog,
+  skillContentSha256,
   type SkillCatalogEntry,
 } from './catalog.js';
 import { majorHome } from '../supervisor/state.js';
+import { recordSkillRoutingEvidence } from './routing-evidence.js';
 import {
   loadActiveGeneratedSkills,
   skillPerformanceScore,
@@ -224,7 +225,7 @@ function hotSkillBundleRoot(): string | undefined {
       if (
         !identity?.contentSha256 ||
         !existsSync(path) ||
-        createHash('sha256').update(readFileSync(path)).digest('hex') !== identity.contentSha256
+        skillContentSha256(path) !== identity.contentSha256
       )
         return undefined;
     }
@@ -239,7 +240,8 @@ function readBundleMarkerIdentity(root: string): string {
 }
 
 function registryPath(): string {
-  if (process.env.MAJOR_SKILLS_REGISTRY) return resolve(process.env.MAJOR_SKILLS_REGISTRY);
+  if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILLS_REGISTRY)
+    return resolve(process.env.MAJOR_SKILLS_REGISTRY);
   const hot = hotSkillBundleRoot();
   return hot
     ? join(hot, 'guidance', 'skills.registry.json')
@@ -264,7 +266,8 @@ function generatedCatalog(): Map<string, SkillCatalogEntry> {
 }
 
 function resolverEvalPath(): string {
-  if (process.env.MAJOR_SKILLS_EVALS) return resolve(process.env.MAJOR_SKILLS_EVALS);
+  if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILLS_EVALS)
+    return resolve(process.env.MAJOR_SKILLS_EVALS);
   const hot = hotSkillBundleRoot();
   const hotPath = hot ? join(hot, 'evals', 'skill-resolver') : undefined;
   return hotPath && existsSync(hotPath) ? hotPath : join(runtimeRoot(), 'evals', 'skill-resolver');
@@ -398,7 +401,7 @@ function exactInstalledSkillPath(
   if (entry.source !== 'major-internal') return path;
   const identity = catalog.get(entry.id);
   if (!identity?.contentSha256 || identity.registryVersion !== registryVersion()) return undefined;
-  const actual = createHash('sha256').update(readFileSync(path)).digest('hex');
+  const actual = skillContentSha256(path);
   return actual === identity.contentSha256 ? path : undefined;
 }
 
@@ -547,7 +550,7 @@ function scoreEntry(
   };
 }
 
-export function resolveSkills(input: {
+function resolveSkillsInternal(input: {
   task: string;
   cwd?: string;
   limit?: number;
@@ -579,7 +582,9 @@ export function resolveSkills(input: {
         candidate.id.toLowerCase() === normalized ||
         candidate.aliases.some((alias) => alias.toLowerCase() === normalized),
     );
-    const project = generated.find((candidate) => candidate.skillId.toLowerCase() === normalized);
+    const project = entry
+      ? undefined
+      : generated.find((candidate) => candidate.skillId.toLowerCase() === normalized);
     if (!entry && !project) {
       throw new Error(
         `unknown skill "${requestedId}"; run "major skill search --query ${JSON.stringify(requestedId)}" to inspect installed skills`,
@@ -620,8 +625,19 @@ export function resolveSkills(input: {
   }> = [
     ...(requested.length > 0
       ? explicitEntries
-      : registry.map((entry) => ({ entry, generated: undefined }))),
-    ...(requested.length > 0 ? [] : generated).map((generated) => ({
+      : registry.filter((entry) => !entry.deprecated).map((entry) => ({ entry, generated: undefined }))),
+    ...(requested.length > 0 ? [] : generated)
+      .filter(
+        (candidate) =>
+          !registry.some(
+            (entry) =>
+              entry.id.toLowerCase() === candidate.skillId.toLowerCase() ||
+              entry.aliases.some(
+                (alias) => alias.toLowerCase() === candidate.skillId.toLowerCase(),
+              ),
+          ),
+      )
+      .map((generated) => ({
       entry: {
         id: generated.skillId,
         source: 'gbrain-generated',
@@ -631,7 +647,7 @@ export function resolveSkills(input: {
         disclosure: 'specialist' as const,
       },
       generated,
-    })),
+      })),
   ];
   const matches = candidates
     .map(({ entry, generated }) => {
@@ -767,6 +783,36 @@ export function resolveSkills(input: {
         ,
     },
   };
+}
+
+/** Every resolver caller, including disclosure/runtime callers, records bounded failure evidence. */
+export function resolveSkills(input: {
+  task: string;
+  cwd?: string;
+  limit?: number;
+  now?: Date;
+  skills?: readonly string[];
+}): SkillResolution {
+  try {
+    const result = resolveSkillsInternal(input);
+    if (result.skills.length === 0) {
+      recordSkillRoutingEvidence({
+        kind: 'miss',
+        task: input.task,
+        ...(input.skills ? { requested: input.skills } : {}),
+        reason: 'no installed skill matched',
+      });
+    }
+    return result;
+  } catch (error) {
+    recordSkillRoutingEvidence({
+      kind: 'rejection',
+      task: input.task,
+      ...(input.skills ? { requested: input.skills } : {}),
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**

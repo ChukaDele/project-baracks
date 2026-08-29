@@ -10,10 +10,10 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { retrieveReusableAssets } from '../src/skills/assets.js';
+import { skillContentSha256 } from '../src/skills/catalog.js';
 import { resolveSkills } from '../src/skills/resolver.js';
 import { rollbackMajorSkills, syncMajorSkills } from '../src/skills/sync.js';
 
@@ -40,7 +40,7 @@ afterEach(() => {
 function sourceCopy(): string {
   const source = mkdtempSync(join(tmpdir(), 'major-skill-rollback-source-'));
   roots.push(source);
-  for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates']) {
+  for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates', 'adapters']) {
     cpSync(join(process.cwd(), directory), join(source, directory), { recursive: true });
   }
   return source;
@@ -82,11 +82,10 @@ function installLegacyBundle(home: string, source: string): string {
     join(bundle, 'skills', 'internal', 'presentation-storylining'),
     { recursive: true },
   );
-  const content = readFileSync(
+  const description = readFileSync(
     join(bundle, 'skills', 'internal', 'presentation-storylining', 'SKILL.md'),
-  );
-  const description = content
-    .toString('utf8')
+    'utf8',
+  )
     .match(/^---\n[\s\S]*?^description:\s*(.+)$/m)?.[1]
     ?.trim()
     .replace(/^['"]|['"]$/g, '');
@@ -106,7 +105,9 @@ function installLegacyBundle(home: string, source: string): string {
             source: 'major-internal',
             sourceKind: 'INTERNAL_DURABLE',
             registryVersion: 14,
-            contentSha256: createHash('sha256').update(content).digest('hex'),
+            contentSha256: skillContentSha256(
+              join(bundle, 'skills', 'internal', 'presentation-storylining'),
+            ),
             triggers: ['presentation', 'slide', 'deck', 'board', 'deck', 'strategy', 'deck'],
           },
         ],
