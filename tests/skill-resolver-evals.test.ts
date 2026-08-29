@@ -1,4 +1,5 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { resolveSkills } from '../src/skills/resolver.js';
@@ -13,6 +14,8 @@ const root = join(process.cwd(), 'evals', 'skill-resolver');
 const registry = join(process.cwd(), 'guidance', 'skills.registry.json');
 const priorRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorEvals = process.env.MAJOR_SKILLS_EVALS;
+const priorMajorHome = process.env.MAJOR_HOME;
+const majorHome = mkdtempSync(join(tmpdir(), 'major-resolver-evals-home-'));
 const fixtures = readdirSync(root)
   .filter((name) => name.endsWith('.json'))
   .sort()
@@ -23,11 +26,15 @@ function skillIds(task: string): string[] {
 }
 
 beforeEach(() => {
+  process.env.MAJOR_HOME = majorHome;
   process.env.MAJOR_SKILLS_REGISTRY = registry;
   process.env.MAJOR_SKILLS_EVALS = root;
 });
 
 afterAll(() => {
+  rmSync(majorHome, { recursive: true, force: true });
+  if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
+  else process.env.MAJOR_HOME = priorMajorHome;
   if (priorRegistry === undefined) delete process.env.MAJOR_SKILLS_REGISTRY;
   else process.env.MAJOR_SKILLS_REGISTRY = priorRegistry;
   if (priorEvals === undefined) delete process.env.MAJOR_SKILLS_EVALS;

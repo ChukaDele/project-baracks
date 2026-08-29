@@ -298,6 +298,7 @@ stage_major_control_plane() {
     "$ROOT/pnpm-lock.yaml" \
     "$ROOT/drizzle" \
     "$ROOT/guidance/skills.registry.json" \
+    "$ROOT/guidance/skills.catalog.json" \
     "$ROOT/skills/internal" \
     "$ROOT/evals/skill-resolver"; do
     [[ -e "$source_path" ]] || fail "compiled Major control-plane artifact is missing: $source_path (run pnpm build first)"
@@ -329,6 +330,7 @@ PY
   cp -R "$ROOT/drizzle" "$MAJOR_CONTROL_PLANE_DEST/drizzle"
   mkdir -p "$MAJOR_CONTROL_PLANE_DEST/guidance" "$MAJOR_CONTROL_PLANE_DEST/skills" "$MAJOR_CONTROL_PLANE_DEST/evals"
   cp -f "$ROOT/guidance/skills.registry.json" "$MAJOR_CONTROL_PLANE_DEST/guidance/skills.registry.json"
+  cp -f "$ROOT/guidance/skills.catalog.json" "$MAJOR_CONTROL_PLANE_DEST/guidance/skills.catalog.json"
   cp -R "$ROOT/skills/internal" "$MAJOR_CONTROL_PLANE_DEST/skills/internal"
   cp -R "$ROOT/evals/skill-resolver" "$MAJOR_CONTROL_PLANE_DEST/evals/skill-resolver"
   cp -R "$dependency_source" "$MAJOR_CONTROL_PLANE_DEST/node_modules"

@@ -33,6 +33,7 @@ else
 fi
 
 REGISTRY="$SOURCE_ROOT/guidance/skills.registry.json"
+CATALOG="$SOURCE_ROOT/guidance/skills.catalog.json"
 RECONCILIATION_LEDGER="$SOURCE_ROOT/guidance/skills-reconciliation-ledger.json"
 INTERNAL="$SOURCE_ROOT/skills/internal"
 EVALS="$SOURCE_ROOT/evals/skill-resolver"
@@ -42,22 +43,23 @@ ASSET_CANDIDATES="$SOURCE_ROOT/guidance/reusable-assets.candidates.json"
 CAPABILITY_MATRIX="$SOURCE_ROOT/guidance/worker-capability-matrix.json"
 SOURCE_LEDGER="$SOURCE_ROOT/package/source-ledger.json"
 VENDOR_SOURCES="$SOURCE_ROOT/guidance/vendor-sources.json"
-for required in "$REGISTRY" "$RECONCILIATION_LEDGER" "$ASSETS" "$GBRAIN_ASSETS" "$ASSET_CANDIDATES" "$CAPABILITY_MATRIX" "$SOURCE_LEDGER" "$VENDOR_SOURCES" "$INTERNAL" "$EVALS"; do
+for required in "$REGISTRY" "$CATALOG" "$RECONCILIATION_LEDGER" "$ASSETS" "$GBRAIN_ASSETS" "$ASSET_CANDIDATES" "$CAPABILITY_MATRIX" "$SOURCE_LEDGER" "$VENDOR_SOURCES" "$INTERNAL" "$EVALS"; do
   [ -e "$required" ] || { echo "ERROR: required skill-bundle source missing: $required" >&2; exit 1; }
 done
 
 # Validate the complete knowledge bundle before mutating active Major state.
-REGISTRY_VERSION="$(python3 - "$REGISTRY" "$INTERNAL" "$EVALS" "$ASSETS" "$VENDOR_SOURCES" <<'PY'
+REGISTRY_VERSION="$(python3 - "$REGISTRY" "$CATALOG" "$INTERNAL" "$EVALS" "$ASSETS" "$VENDOR_SOURCES" <<'PY'
 import json
 import re
 import sys
 from pathlib import Path
 
 registry_path = Path(sys.argv[1])
-internal_root = Path(sys.argv[2])
-evals_root = Path(sys.argv[3])
-assets_path = Path(sys.argv[4])
-vendor_sources_path = Path(sys.argv[5])
+catalog_path = Path(sys.argv[2])
+internal_root = Path(sys.argv[3])
+evals_root = Path(sys.argv[4])
+assets_path = Path(sys.argv[5])
+vendor_sources_path = Path(sys.argv[6])
 registry = json.loads(registry_path.read_text())
 version = registry.get('version')
 entries = registry.get('entries')
@@ -78,6 +80,11 @@ for entry in entries:
         internal_ids.append(skill_id)
 if len(ids) != len(set(ids)):
     raise SystemExit('ERROR: duplicate Major skill ids in registry')
+catalog = json.loads(catalog_path.read_text())
+catalog_entries = catalog.get('entries')
+catalog_ids = [entry.get('id') for entry in catalog_entries] if isinstance(catalog_entries, list) and all(isinstance(entry, dict) for entry in catalog_entries) else []
+if catalog.get('version') != 1 or catalog.get('registryVersion') != version or sorted(catalog_ids) != sorted(ids):
+    raise SystemExit('ERROR: generated skill catalog does not match the canonical registry')
 
 vendor_catalog = json.loads(vendor_sources_path.read_text())
 if vendor_catalog.get('schemaVersion') != 1 or vendor_catalog.get('kind') != 'major.vendor-skill-sources' or not isinstance(vendor_catalog.get('sources'), list):
@@ -170,6 +177,7 @@ PY
 rm -rf "$STAGED"
 mkdir -p "$STAGED/guidance" "$STAGED/package" "$STAGED/skills" "$STAGED/evals"
 cp "$REGISTRY" "$STAGED/guidance/skills.registry.json"
+cp "$CATALOG" "$STAGED/guidance/skills.catalog.json"
 cp "$RECONCILIATION_LEDGER" "$STAGED/guidance/skills-reconciliation-ledger.json"
 cp "$CAPABILITY_MATRIX" "$STAGED/guidance/worker-capability-matrix.json"
 cp "$VENDOR_SOURCES" "$STAGED/guidance/vendor-sources.json"

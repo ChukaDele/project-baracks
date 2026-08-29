@@ -450,7 +450,9 @@ def main() -> None:
     global_base = root / "guidance" / "global-worker-rules.md"
     stability = root / "guidance" / "stability-invariants.md"
     skills_src = root / "skills" / "internal"
-    for required in (global_base, stability, skills_src):
+    catalog_src = root / "guidance" / "skills.catalog.json"
+    adapters_src = root / "adapters" / "skills"
+    for required in (global_base, stability, skills_src, catalog_src, adapters_src):
         if not required.exists():
             raise SystemExit(f"required Major source missing: {required}")
 
@@ -466,6 +468,8 @@ def main() -> None:
 
     global_rules = write_stage_file(stage, "global-worker-rules.md", rules)
     add_file(entries, global_rules, home / ".major" / "global-worker-rules.md")
+    catalog_stage = write_stage_file(stage, "skills.catalog.json", catalog_src.read_text())
+    add_file(entries, catalog_stage, home / ".major" / "skills.catalog.json")
 
     skills_stage = stage / "skills" / "internal"
     shutil.copytree(skills_src, skills_stage)
@@ -477,7 +481,9 @@ def main() -> None:
         }
     )
 
-    claude_rule = write_stage_file(stage, "claude-major-global.md", rules)
+    claude_rule = write_stage_file(
+        stage, "claude-major-global.md", rules + "\n" + (adapters_src / "CLAUDE.md").read_text()
+    )
     add_file(entries, claude_rule, home / ".claude" / "major-global.md")
 
     claude_root_stage = write_stage_file(
@@ -491,21 +497,31 @@ def main() -> None:
     codex_stage = write_stage_file(
         stage,
         "codex-agents.md",
-        managed_block(read_text(codex_home / "AGENTS.md"), rules),
+        managed_block(
+            read_text(codex_home / "AGENTS.md"),
+            rules + "\n" + (adapters_src / "CODEX.md").read_text(),
+        ),
     )
     add_file(entries, codex_stage, codex_home / "AGENTS.md")
 
     gemini_stage = write_stage_file(
         stage,
         "gemini.md",
-        managed_block(read_text(home / ".gemini" / "GEMINI.md"), rules),
+        managed_block(
+            read_text(home / ".gemini" / "GEMINI.md"),
+            rules + "\n" + (adapters_src / "GEMINI.md").read_text(),
+        ),
     )
     add_file(entries, gemini_stage, home / ".gemini" / "GEMINI.md")
 
     # Cursor rules require the .mdc extension with YAML frontmatter
     # (description/globs/alwaysApply); a bare .md file is silently not
     # loaded. Clean up the earlier, incorrectly-formatted file on upgrade.
-    cursor_stage = write_stage_file(stage, "cursor-rule.mdc", cursor_mdc_rule(rules))
+    cursor_stage = write_stage_file(
+        stage,
+        "cursor-rule.mdc",
+        cursor_mdc_rule(rules + "\n" + (adapters_src / "RULE.mdc").read_text()),
+    )
     add_file(
         entries,
         cursor_stage,
@@ -559,7 +575,11 @@ def main() -> None:
         )
         add_file(
             entries,
-            write_stage_file(stage, "gemini-plugin-rule.md", rules),
+            write_stage_file(
+                stage,
+                "gemini-plugin-rule.md",
+                rules + "\n" + (adapters_src / "GEMINI.md").read_text(),
+            ),
             plugin_root / "rules" / "major-global.md",
         )
         add_file(

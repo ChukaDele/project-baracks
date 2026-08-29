@@ -1,0 +1,1736 @@
+{
+  "version": 1,
+  "registryVersion": 19,
+  "entries": [
+    {
+      "id": "academic-verify",
+      "title": "Academic Verify",
+      "description": "Use when a consequential scholarly or scientific claim warrants provider-neutral verification from claim to paper, methodology, result, limitations and replication or contradiction.",
+      "aliases": [
+        "paper verification",
+        "literature verification"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support"
+      ]
+    },
+    {
+      "id": "algorithmic-art",
+      "title": "Algorithmic Art",
+      "description": "generative art particles flow fields p5",
+      "aliases": [],
+      "availability": "exploratory-ui-projects",
+      "source": "github:anthropics/skills",
+      "triggers": [
+        "generative",
+        "art",
+        "particles",
+        "flow",
+        "fields",
+        "p5"
+      ]
+    },
+    {
+      "id": "analytics-with-shaper",
+      "title": "Analytics With Shaper",
+      "description": "Use when a task needs SQL-first dashboards, operational analytics, repeated reporting, alerts, exports, embedded analytics, or control-plane visualisation with Taleshape Shaper. Keep Shaper optional and Major authoritative.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "taleshape",
+        "shaper",
+        "sql",
+        "dashboard",
+        "analytics",
+        "observability",
+        "telemetry",
+        "csv"
+      ]
+    },
+    {
+      "id": "api",
+      "title": "Api",
+      "description": "Use when applying the staged api procedure. Apply the narrow api procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "api"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "api endpoint contract integration"
+      ]
+    },
+    {
+      "id": "ar-ap-invoice",
+      "title": "Ar Ap Invoice",
+      "description": "Use when applying the staged ar ap invoice procedure. Investigate receivables, payables and invoice state without issuing, collecting, paying or mutating the system of record.",
+      "aliases": [
+        "ar-ap-invoice"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "accounts receivable payable invoice collections"
+      ]
+    },
+    {
+      "id": "architecture",
+      "title": "Architecture",
+      "description": "Use when applying the staged architecture procedure. Apply the narrow architecture procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "architecture"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "software architecture system design module boundary"
+      ]
+    },
+    {
+      "id": "auth-security",
+      "title": "Auth Security",
+      "description": "Use when applying the staged auth security procedure. Apply the narrow auth security procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "auth-security"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "authentication authorization security access"
+      ]
+    },
+    {
+      "id": "behavior-reward-system",
+      "title": "Behavior Reward System",
+      "description": "Reward autonomous engineering for durable verified product progress rather than visible activity.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "autonomous",
+        "or",
+        "long",
+        "running",
+        "work"
+      ]
+    },
+    {
+      "id": "browser-release-qa",
+      "title": "Browser Release Qa",
+      "description": "Use when applying the staged browser release qa procedure. Apply the narrow browser release qa procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "browser-release-qa"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "browser release quality assurance acceptance"
+      ]
+    },
+    {
+      "id": "capability-freshness",
+      "title": "Capability Freshness",
+      "description": "Use when assessing an upstream skill, MCP, model, runtime or SDK update for a staged capability. Do not auto-upgrade or activate production capability.",
+      "aliases": [
+        "capability-freshness"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "capability freshness version compatibility evidence"
+      ]
+    },
+    {
+      "id": "chief-of-staff-boundary",
+      "title": "Chief Of Staff Boundary",
+      "description": "Use when applying the staged chief of staff boundary procedure. Own strategic prioritisation and decision coordination while excluding administrative execution owned by the Executive Assistant.",
+      "aliases": [
+        "chief-of-staff-boundary"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "chief of staff strategic coordination executive assistant boundary"
+      ]
+    },
+    {
+      "id": "ci-recovery",
+      "title": "Ci Recovery",
+      "description": "Use when CI, GitHub Actions or a pull-request check fails. Inspect the exact failing check, find the root cause, fix safe issues autonomously, and rerun only the relevant validation.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "ci",
+        "github",
+        "actions",
+        "pr",
+        "check",
+        "failure"
+      ]
+    },
+    {
+      "id": "codebase-design",
+      "title": "Codebase Design",
+      "description": "Use when a driver needs a reference lens for module shape, interfaces, information hiding, or architecture coherence. Do not use it to initiate a broad refactor.",
+      "aliases": [
+        "codebase-design"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "codebase design module ownership boundaries"
+      ]
+    },
+    {
+      "id": "competitive-product-audit",
+      "title": "Competitive Product Audit",
+      "description": "Time-boxed review of similar and best-in-class products to extract workflow and usability patterns that materially affect the product.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "project",
+        "start",
+        "or",
+        "material",
+        "product",
+        "work"
+      ]
+    },
+    {
+      "id": "concept-synthesis",
+      "title": "Concept Synthesis",
+      "description": "Use on demand to reduce retrieval noise across existing knowledge by distinguishing duplicates, related concepts and contradictions while preserving provenance, backlinks, minority and abandoned branches.",
+      "aliases": [
+        "knowledge synthesis"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise"
+      ]
+    },
+    {
+      "id": "concurrency",
+      "title": "Concurrency",
+      "description": "Use when applying the staged concurrency procedure. Apply the narrow concurrency procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "concurrency"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "concurrency race condition parallel locking"
+      ]
+    },
+    {
+      "id": "controller-bookkeeping",
+      "title": "Controller Bookkeeping",
+      "description": "Use when applying the staged controller bookkeeping procedure. Classify accounting evidence and prepare reviewable bookkeeping proposals while the ledger owns posting and arithmetic.",
+      "aliases": [
+        "controller-bookkeeping"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "bookkeeping ledger journal controller accounting"
+      ]
+    },
+    {
+      "id": "cost-control",
+      "title": "Cost Control",
+      "description": "Manage provider subscriptions, rate limits, paid APIs, browsers/proxies and infrastructure for throughput without uncontrolled spend.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "provider",
+        "model",
+        "browser",
+        "infrastructure",
+        "cost"
+      ]
+    },
+    {
+      "id": "cross-modal-review",
+      "title": "Cross Modal Review",
+      "description": "Use when applying the staged cross modal review procedure. Apply the narrow cross modal review procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "cross-modal-review"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "cross modal visual document evidence review"
+      ]
+    },
+    {
+      "id": "data-learning-loop",
+      "title": "Data Learning Loop",
+      "description": "Build outcome-learning systems without leakage, false causality or uncontrolled self-modification.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "outcome",
+        "data",
+        "scoring",
+        "learning"
+      ]
+    },
+    {
+      "id": "database",
+      "title": "Database",
+      "description": "Use when applying the staged database procedure. Apply the narrow database procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "database"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "database schema query migration"
+      ]
+    },
+    {
+      "id": "debugging",
+      "title": "Debugging",
+      "description": "Use when applying the staged debugging procedure. Apply the narrow debugging procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "debugging"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "debug investigate root cause failure"
+      ]
+    },
+    {
+      "id": "dependency",
+      "title": "Dependency",
+      "description": "Use when applying the staged dependency procedure. Apply the narrow dependency procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "dependency"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "dependency package upgrade vulnerability"
+      ]
+    },
+    {
+      "id": "deploy-to-vercel",
+      "title": "Deploy To Vercel",
+      "description": "current Vercel deploy deployment preview claim framework detection guidance",
+      "aliases": [
+        "Vercel deploy claimable",
+        "Vercel preview deployment"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "current Vercel deploy deployment preview claim framework detection guidance"
+      ]
+    },
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "description": "Use when applying the staged deployment procedure. Apply the narrow deployment procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "deployment"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "deployment release rollout rollback"
+      ]
+    },
+    {
+      "id": "design-direction-and-taste",
+      "title": "Design Direction And Taste",
+      "description": "Use before substantial UI/website creation, redesign, art-direction changes, or when the user says the design feels generic, bland, AI-looking, too safe, too loud, or lacks taste. Own the design read, surface mode, preserve-vs-redesign decision, visual grammar and calibrated variance/motion/density. Do not own browser QA or motion implementation; hand those to website-design-qa and responsive-motion-systems.",
+      "aliases": [],
+      "availability": "ui-projects",
+      "source": "major-internal",
+      "triggers": [
+        "substantial",
+        "ui",
+        "website",
+        "creation",
+        "redesign",
+        "art",
+        "direction",
+        "generic",
+        "ai",
+        "design",
+        "too",
+        "safe",
+        "too",
+        "loud",
+        "taste"
+      ]
+    },
+    {
+      "id": "deterministic-accounting-boundary",
+      "title": "Deterministic Accounting Boundary",
+      "description": "Use when applying the staged deterministic accounting boundary procedure. Fail closed unless debits, credits, balances, dates and state are computed and validated deterministically.",
+      "aliases": [
+        "deterministic-accounting-boundary"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "deterministic accounting arithmetic ledger balances"
+      ]
+    },
+    {
+      "id": "dev-server-management",
+      "title": "Dev Server Management",
+      "description": "Coordinate an explicitly owner-approved local web-server exception. Cloudflare previews are the default for every web project.",
+      "aliases": [],
+      "availability": "web-projects",
+      "source": "major-internal",
+      "triggers": [
+        "explicit",
+        "owner",
+        "approved",
+        "localhost",
+        "exception",
+        "only"
+      ]
+    },
+    {
+      "id": "domain-modeling",
+      "title": "Domain Modeling",
+      "description": "Use when a material domain term is ambiguous, conflicting, or hard to reverse and a driver needs a shared glossary or bounded-context lens. Do not use for ordinary implementation detail.",
+      "aliases": [
+        "domain-modeling"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "domain model entities business rules"
+      ]
+    },
+    {
+      "id": "emil-kowalski-complete",
+      "title": "Emil Kowalski Complete",
+      "description": "task relevant",
+      "aliases": [],
+      "availability": "all-ui-projects",
+      "source": "github:emilkowalski/skills",
+      "triggers": [
+        "task",
+        "relevant"
+      ]
+    },
+    {
+      "id": "engineering-design-doctrine",
+      "title": "Engineering Design Doctrine",
+      "description": "Use when evaluating a material design, module seam, abstraction, domain boundary, or multi-worker design conflict. Provide reference principles only; do not start a refactor or widen scope.",
+      "aliases": [
+        "engineering-design-doctrine"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "engineering design doctrine maintainable modular code"
+      ]
+    },
+    {
+      "id": "exact-head-pr-review",
+      "title": "Exact Head Pr Review",
+      "description": "Review a pull request against the exact current head SHA and determine truthful readiness.",
+      "aliases": [
+        "immutable-pr-review",
+        "frozen-candidate-review"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "pr",
+        "review",
+        "or",
+        "release"
+      ]
+    },
+    {
+      "id": "executive-assistant",
+      "title": "Executive Assistant",
+      "description": "Use when applying the staged executive assistant procedure. Coordinate briefings, inbox, calendar, meetings, tasks, drafts, follow-up and commitments without strategic decision authority.",
+      "aliases": [
+        "executive-assistant"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "executive assistant calendar correspondence meeting preparation"
+      ]
+    },
+    {
+      "id": "exploratory-creative-dev",
+      "title": "Exploratory Creative Dev",
+      "description": "Build experimental, Awwwards/FWA-style, heavy-motion, immersive or illustration-led web experiences after the art direction is settled. Own specialised creative execution, not generic taste selection.",
+      "aliases": [],
+      "availability": "ui-projects",
+      "source": "major-internal",
+      "triggers": [
+        "exploratory",
+        "awwwards",
+        "fwa",
+        "heavy",
+        "motion",
+        "immersive",
+        "illustrative"
+      ]
+    },
+    {
+      "id": "figma-generate-design",
+      "title": "Figma Generate Design",
+      "description": "create or update figma screen",
+      "aliases": [],
+      "availability": "figma-enabled-projects",
+      "source": "github:openai/skills",
+      "triggers": [
+        "create",
+        "or",
+        "update",
+        "figma",
+        "screen"
+      ]
+    },
+    {
+      "id": "figma-implement-design",
+      "title": "Figma Implement Design",
+      "description": "implement code from figma",
+      "aliases": [],
+      "availability": "figma-enabled-projects",
+      "source": "github:openai/skills",
+      "triggers": [
+        "implement",
+        "code",
+        "from",
+        "figma"
+      ]
+    },
+    {
+      "id": "figma-use",
+      "title": "Figma Use",
+      "description": "programmatic figma read write",
+      "aliases": [],
+      "availability": "figma-enabled-projects",
+      "source": "github:openai/skills",
+      "triggers": [
+        "programmatic",
+        "figma",
+        "read",
+        "write"
+      ]
+    },
+    {
+      "id": "fpa-forecasting-extrapolation",
+      "title": "Fpa Forecasting Extrapolation",
+      "description": "Use when applying the staged fpa forecasting extrapolation procedure. Build assumption-labelled forecasts from sufficient history using deterministic calculations.",
+      "aliases": [
+        "fpa-forecasting-extrapolation"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "financial planning forecast extrapolation budget"
+      ]
+    },
+    {
+      "id": "frontend",
+      "title": "Frontend",
+      "description": "Use when applying the staged frontend procedure. Apply the narrow frontend procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "frontend"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "frontend ui component interface"
+      ]
+    },
+    {
+      "id": "frontend-design",
+      "title": "Frontend Design",
+      "description": "frontend design work",
+      "aliases": [],
+      "availability": "all-ui-projects",
+      "source": "github:anthropics/skills",
+      "triggers": [
+        "frontend",
+        "design",
+        "work"
+      ]
+    },
+    {
+      "id": "gaussian-splatting-spatial-reconstruction",
+      "title": "Gaussian Splatting Spatial Reconstruction",
+      "description": "Use for physical-space or object reconstruction, spatial visualisation, or novel-view rendering with 3D Gaussian Splatting. Treat it as one candidate technique and gate execution by data, hardware, privacy, alternatives, and license.",
+      "aliases": [],
+      "availability": "spatial-projects",
+      "source": "major-internal",
+      "triggers": [
+        "3d",
+        "gaussian",
+        "splatting",
+        "spatial",
+        "reconstruction",
+        "radiance",
+        "field",
+        "colmap",
+        "novel",
+        "view",
+        "splat"
+      ]
+    },
+    {
+      "id": "graph-engineering",
+      "title": "Graph Engineering",
+      "description": "deep graph orchestration",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "github:codejunkie99/graph-engineering",
+      "triggers": [
+        "deep",
+        "graph",
+        "orchestration"
+      ]
+    },
+    {
+      "id": "human-blocker-orchestration",
+      "title": "Human Blocker Orchestration",
+      "description": "Surface human-only authentication and approval blockers in the visible Codex in-app browser, notify the owner, and continue independent work.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "authentication",
+        "oauth",
+        "consent",
+        "2fa",
+        "captcha",
+        "payment",
+        "or",
+        "irreversible",
+        "human",
+        "only",
+        "decision"
+      ]
+    },
+    {
+      "id": "idea-lineage",
+      "title": "Idea Lineage",
+      "description": "Use to reconstruct the evidence-qualified history of an idea or view from existing provenance and temporal facts, including first appearance, changes, causes, superseded versions, conflicts, abandoned branches and the current canonical view.",
+      "aliases": [
+        "view lineage"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view"
+      ]
+    },
+    {
+      "id": "incident",
+      "title": "Incident",
+      "description": "Use when applying the staged incident procedure. Apply the narrow incident procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "incident"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "production incident outage recovery"
+      ]
+    },
+    {
+      "id": "integration",
+      "title": "Integration",
+      "description": "Use when applying the staged integration procedure. Apply the narrow integration procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "integration"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "third party integration adapter connector"
+      ]
+    },
+    {
+      "id": "knowledge-ingest",
+      "title": "Knowledge Ingest",
+      "description": "Use to dispatch notes, pasted text, documents, transcripts, URLs, research or repositories into existing Major and GBrain knowledge interfaces with provenance, identity resolution, dedupe and notability filtering.",
+      "aliases": [
+        "knowledge dispatcher"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability"
+      ]
+    },
+    {
+      "id": "knowledge-work",
+      "title": "Knowledge Work",
+      "description": "Use for substantial research, strategy, synthesis, comparisons, decision memos, market/product analysis or other knowledge work where source quality and reasoning matter. Define the decision, ingest primary sources with the right tools, scale research depth to stakes, use independent skeptic review when useful, and stop once there is enough evidence to make the next good decision.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "research",
+        "strategy",
+        "synthesis",
+        "comparison",
+        "decision",
+        "work"
+      ]
+    },
+    {
+      "id": "lean-graph-engineering",
+      "title": "Lean Graph Engineering",
+      "description": "Design lean task graphs for complex autonomous builds using explicit dependencies, parallel branches, verifiers, repair loops, human gates and stop rules.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "complex",
+        "autonomous",
+        "or",
+        "parallel",
+        "work"
+      ]
+    },
+    {
+      "id": "lean-quality",
+      "title": "Lean Quality",
+      "description": "Use for test strategy, release confidence and verification planning. Maximize confidence per minute with risk-proportional tests instead of exhaustive ceremony.",
+      "aliases": [
+        "quality-gate",
+        "lean-verification"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "test",
+        "strategy",
+        "verification",
+        "release",
+        "confidence"
+      ]
+    },
+    {
+      "id": "learning-capture",
+      "title": "Learning Capture",
+      "description": "Use when the user explicitly corrects agent behavior, says a mistake has happened before, identifies a recurring failure, or a reusable procedure succeeds. Fix the current task first, then capture the lesson and decide whether it stays project-local, becomes global guidance, or should be skillified.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "explicit",
+        "user",
+        "correction",
+        "repeated",
+        "mistake",
+        "recurring",
+        "failure",
+        "reusable",
+        "success"
+      ]
+    },
+    {
+      "id": "legacy-cleanup",
+      "title": "Legacy Cleanup",
+      "description": "Complete migrations and replacements by removing obsolete active code, configuration, guidance, names and duplicate paths after the successor is verified.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "rename",
+        "migration",
+        "provider",
+        "swap",
+        "architecture",
+        "replacement"
+      ]
+    },
+    {
+      "id": "major-self-maintenance",
+      "title": "Major Self Maintenance",
+      "description": "Use whenever Major modifies its own repository, skills, resolver, policies, runtime, installers or learning system. Never leave Major main red. Batch changes on an unopened branch, keep skill registry/evals/catalog atomic, run the complete local gate, use independent review for material behavior changes, and merge only after the exact head is green.",
+      "aliases": [],
+      "availability": "major-repo",
+      "source": "major-internal",
+      "triggers": [
+        "major",
+        "self",
+        "change",
+        "skill",
+        "routing",
+        "learning",
+        "policy",
+        "runtime",
+        "installer"
+      ]
+    },
+    {
+      "id": "mcp-builder",
+      "title": "Mcp Builder",
+      "description": "build or improve mcp server",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "github:anthropics/skills",
+      "triggers": [
+        "build",
+        "or",
+        "improve",
+        "mcp",
+        "server"
+      ]
+    },
+    {
+      "id": "mcp-integration-ops",
+      "title": "Mcp Integration Ops",
+      "description": "Use for MCP servers, plugins, connectors, provider tools, OAuth-backed integrations, tool exposure failures, reconnects, missing capabilities or claims that an integration is installed/connected. Distinguish installed, configured, exposed, authenticated, permissioned and proven by a real operation; diagnose the earliest broken boundary and use the native integration before browser workarounds.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "mcp",
+        "connector",
+        "plugin",
+        "integration",
+        "authentication",
+        "tool",
+        "exposure",
+        "reconnect",
+        "permission",
+        "provider",
+        "operation"
+      ]
+    },
+    {
+      "id": "migration",
+      "title": "Migration",
+      "description": "Use when applying the staged migration procedure. Apply the narrow migration procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "migration"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "data schema platform migration"
+      ]
+    },
+    {
+      "id": "mvp-speed-prioritisation",
+      "title": "Mvp Speed Prioritisation",
+      "description": "Always simplify broad requirements into the fastest credible MVP proof before expanding scope.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "always",
+        "on",
+        "project",
+        "and",
+        "large",
+        "feature",
+        "planning"
+      ]
+    },
+    {
+      "id": "nontechnical-ux",
+      "title": "Nontechnical Ux",
+      "description": "Design workflows for non-technical operators with plain language, safe defaults, visible status and guided recovery.",
+      "aliases": [],
+      "availability": "all-product-projects",
+      "source": "major-internal",
+      "triggers": [
+        "operator",
+        "or",
+        "user",
+        "workflow"
+      ]
+    },
+    {
+      "id": "observability",
+      "title": "Observability",
+      "description": "Use when applying the staged observability procedure. Apply the narrow observability procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "observability"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "logging metrics tracing observability"
+      ]
+    },
+    {
+      "id": "open-source-leverage",
+      "title": "Open Source Leverage",
+      "description": "Find and evaluate maintained open-source tools or products that can reduce build time without unsafe lock-in.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "project",
+        "start",
+        "or",
+        "commodity",
+        "build"
+      ]
+    },
+    {
+      "id": "operations-improvement-core",
+      "title": "Operations Improvement Core",
+      "description": "Use for process maps, workflow improvement, constraint analysis, SOPs, automation opportunities, tool evaluation, capacity planning, KPI review, incident learning or waste detection.",
+      "aliases": [
+        "operations-improvement-core"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "operations process improvement workflow efficiency"
+      ]
+    },
+    {
+      "id": "pdf",
+      "title": "Pdf",
+      "description": "pdf task",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "github:openai/skills",
+      "triggers": [
+        "pdf",
+        "task"
+      ]
+    },
+    {
+      "id": "pdf-reporting-qa",
+      "title": "Pdf Reporting Qa",
+      "description": "Generate and review reliable PDF reports with stable pagination, readable hierarchy and no clipping/orphaned content.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "generated",
+        "pdf",
+        "reporting"
+      ]
+    },
+    {
+      "id": "performance",
+      "title": "Performance",
+      "description": "Use when applying the staged performance procedure. Apply the narrow performance procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "performance"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "performance latency throughput optimize"
+      ]
+    },
+    {
+      "id": "performance-caching",
+      "title": "Performance Caching",
+      "description": "Use when a real workflow, page, query, build or integration is measurably slow. Find the dominant bottleneck and apply the simplest high-leverage performance fix before rewriting architecture.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "measured",
+        "slow",
+        "workflow",
+        "page",
+        "query",
+        "build",
+        "integration"
+      ]
+    },
+    {
+      "id": "planning",
+      "title": "Planning",
+      "description": "Use when applying the staged planning procedure. Apply the narrow planning procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "planning"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "engineering implementation planning task breakdown"
+      ]
+    },
+    {
+      "id": "playwright",
+      "title": "Playwright",
+      "description": "real browser automation debugging qa",
+      "aliases": [],
+      "availability": "web-projects",
+      "source": "github:openai/skills",
+      "triggers": [
+        "real",
+        "browser",
+        "automation",
+        "debugging",
+        "qa"
+      ]
+    },
+    {
+      "id": "presentation-storylining",
+      "title": "Presentation Storylining",
+      "description": "Use for substantial presentations, slide decks, board decks, strategy decks, consulting-style decks, investor/sales proposals, executive updates, or any slide artifact where the argument and decision logic matter. Turn evidence into a governing thought, structured storyline, ghost deck, assertion-led slide titles, slide-level proof and adversarial QA before visual rendering. Compose with knowledge-work for research and decision analysis, and with design/rendering skills only after the story is sound.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "presentation",
+        "slide",
+        "deck",
+        "board",
+        "deck",
+        "strategy",
+        "deck",
+        "consulting",
+        "deck",
+        "investor",
+        "deck",
+        "sales",
+        "deck",
+        "proposal",
+        "executive",
+        "update",
+        "pitch",
+        "storyline",
+        "action",
+        "title",
+        "ghost",
+        "deck"
+      ]
+    },
+    {
+      "id": "prior-art-discovery",
+      "title": "Prior Art Discovery",
+      "description": "Required gate before substantial new infrastructure: search existing implementations and record an ADOPT, WRAP, BORROW or BUILD decision.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "new",
+        "subsystem",
+        "provider",
+        "integration",
+        "agent",
+        "runtime",
+        "sandbox",
+        "router",
+        "memory",
+        "auth",
+        "scraper",
+        "workflow",
+        "engine",
+        "browser",
+        "mcp",
+        "installation",
+        "deployment",
+        "major",
+        "dependency"
+      ]
+    },
+    {
+      "id": "product-management-core",
+      "title": "Product Management Core",
+      "description": "Use when framing a product problem, discovery, requirement, prioritisation, roadmap decision, experiment, metric, scope decision or post-launch learning. Compose research, design and analytics rather than duplicate them.",
+      "aliases": [
+        "product-management-core"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "product management discovery roadmap prioritisation"
+      ]
+    },
+    {
+      "id": "project-context-integrity",
+      "title": "Project Context Integrity",
+      "description": "Use whenever a task names, implies, links to, or references a project/repository and before cross-project edits, handoffs, migrations or fixes. Confirm that the active repo is the intended target. If the task clearly belongs to another known project, do not patch the current repo; reroute to the correct repo automatically when unambiguous, or stop and surface the mismatch when ambiguous.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "named",
+        "project",
+        "repository",
+        "path",
+        "cross",
+        "project",
+        "edit",
+        "handoff",
+        "migration",
+        "wrong",
+        "project"
+      ]
+    },
+    {
+      "id": "project-start",
+      "title": "Project Start",
+      "description": "Prepare a new repository quickly by clarifying the outcome, inspecting related assets, installing skills, selecting the first vertical slice and establishing concise project truth.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "project",
+        "start"
+      ]
+    },
+    {
+      "id": "rapid-ui-prototype",
+      "title": "Rapid Ui Prototype",
+      "description": "Compare a small number of credible interaction approaches before committing to a consequential UI pattern.",
+      "aliases": [],
+      "availability": "ui-projects",
+      "source": "major-internal",
+      "triggers": [
+        "multiple",
+        "credible",
+        "ui",
+        "options"
+      ]
+    },
+    {
+      "id": "reconciliation-close-statements",
+      "title": "Reconciliation Close Statements",
+      "description": "Use when applying the staged reconciliation close statements procedure. Prepare deterministic reconciliations, close checklists and statement tie-outs with explicit exceptions.",
+      "aliases": [
+        "reconciliation-close-statements"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "account reconciliation close financial statements"
+      ]
+    },
+    {
+      "id": "remote-first-web-development",
+      "title": "Remote First Web Development",
+      "description": "Enforce GitHub plus Cloudflare preview before browser work on a web project. Deny local browser targets unless the owner explicitly approves a project-specific exception.",
+      "aliases": [],
+      "availability": "web-projects",
+      "source": "major-internal",
+      "triggers": [
+        "all",
+        "web",
+        "project",
+        "ui",
+        "work",
+        "browser",
+        "preview",
+        "visual",
+        "qa",
+        "acceptance"
+      ]
+    },
+    {
+      "id": "research-compendium",
+      "title": "Research Compendium",
+      "description": "Use to create or update a reusable structured research asset containing question, scope, source index, claim map, findings, contradictions, uncertainty, gaps, synthesis, implications, freshness and project or entity links.",
+      "aliases": [
+        "research dossier"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness"
+      ]
+    },
+    {
+      "id": "responsive-motion-systems",
+      "title": "Responsive Motion Systems",
+      "description": "Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.",
+      "aliases": [],
+      "availability": "web-projects",
+      "source": "major-internal",
+      "triggers": [
+        "gsap",
+        "scrolltrigger",
+        "sticky",
+        "pinned",
+        "scrollytelling",
+        "card",
+        "stacking",
+        "hero",
+        "video",
+        "parallax",
+        "threejs",
+        "zoom",
+        "motion"
+      ]
+    },
+    {
+      "id": "reusable-asset-discovery",
+      "title": "Reusable Asset Discovery",
+      "description": "Use before material new implementation to retrieve a compatible reusable implementation in the required local-map, GBrain-index, canonical-package, historical-candidate and prior-art order. Use when deciding whether code, a component, a template, a validator, a schema, an adapter or a calculator should be reused, wrapped, promoted or built. Do not create a new asset registry or copy source trees into GBrain.",
+      "aliases": [
+        "reusable-asset-discovery"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "reusable asset component template package discovery reuse"
+      ]
+    },
+    {
+      "id": "review",
+      "title": "Review",
+      "description": "Use when applying the staged review procedure. Apply the narrow review procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "review"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "code review implementation review"
+      ]
+    },
+    {
+      "id": "root-cause-qa",
+      "title": "Root Cause Qa",
+      "description": "Diagnose failures and regressions, fix the underlying cause and add only valuable regression protection.",
+      "aliases": [
+        "root-cause-analysis",
+        "failure-investigation"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "bug",
+        "failure",
+        "regression"
+      ]
+    },
+    {
+      "id": "sales-commercial-core",
+      "title": "Sales Commercial Core",
+      "description": "Use for account prioritisation, company research, meeting preparation, deal strategy, follow-up drafts, pipeline review, forecasting, CRM hygiene analysis or customer evidence. Keep provider actions in adapters.",
+      "aliases": [
+        "sales-commercial-core"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "sales commercial pipeline customer revenue"
+      ]
+    },
+    {
+      "id": "security-audit",
+      "title": "Security Audit",
+      "description": "Use when applying the staged security audit procedure. Apply the narrow security audit procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "security-audit"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "security audit vulnerability review"
+      ]
+    },
+    {
+      "id": "security-threat-model",
+      "title": "Security Threat Model",
+      "description": "material security risk",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "github:openai/skills",
+      "triggers": [
+        "material",
+        "security",
+        "risk"
+      ]
+    },
+    {
+      "id": "seo-os",
+      "title": "Seo Os",
+      "description": "Use for substantive SEO, search growth, technical SEO, keyword/content opportunity research, site architecture, authority/link work, local SEO, AI-search visibility/GEO/AEO, SEO measurement, or autonomous SEO improvement. Orchestrates evidence, prioritisation, safe execution, verification and learning while reusing OpenSEO and other mature providers instead of rebuilding commodity tooling.",
+      "aliases": [],
+      "availability": "web-projects",
+      "source": "major-internal",
+      "triggers": [
+        "seo",
+        "search",
+        "engine",
+        "optimization",
+        "organic",
+        "search",
+        "keyword",
+        "serp",
+        "gsc",
+        "search",
+        "console",
+        "technical",
+        "seo",
+        "on",
+        "page",
+        "seo",
+        "content",
+        "seo",
+        "site",
+        "architecture",
+        "internal",
+        "linking",
+        "backlinks",
+        "authority",
+        "local",
+        "seo",
+        "geo",
+        "aeo",
+        "ai",
+        "search",
+        "open",
+        "seo",
+        "openseo",
+        "rank",
+        "tracking"
+      ]
+    },
+    {
+      "id": "simple-modular-code",
+      "title": "Simple Modular Code",
+      "description": "Produce the simplest correct, reusable and replaceable implementation for architecture and coding tasks.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "architecture",
+        "or",
+        "implementation"
+      ]
+    },
+    {
+      "id": "skill-creator",
+      "title": "Skill Creator",
+      "description": "create evaluate or improve persistent skill",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "github:anthropics/skills",
+      "triggers": [
+        "create",
+        "evaluate",
+        "or",
+        "improve",
+        "persistent",
+        "skill"
+      ]
+    },
+    {
+      "id": "skill-harvest",
+      "title": "Skill Harvest",
+      "description": "Use to discover and assess prior art for a recurring capability, then reuse, configure, integrate, harvest a generic pattern, build only the missing delta, or reject it with evidence before proposing activation through Major's existing skill lifecycle.",
+      "aliases": [
+        "skillpack-harvest",
+        "capability-harvest"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
+      ]
+    },
+    {
+      "id": "skill-resolver",
+      "title": "Skill Resolver",
+      "description": "Use at the start of substantive work to select only the small set of Major skills that materially improve the task. Prefer precise trigger matching and avoid loading overlapping or irrelevant skills.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "start",
+        "of",
+        "substantive",
+        "work",
+        "select",
+        "relevant",
+        "skills"
+      ]
+    },
+    {
+      "id": "skillify",
+      "title": "Skillify",
+      "description": "Use after a novel workflow succeeds or a recurring failure is solved and the procedure is likely to recur. Convert the working procedure into a tested reusable skill pack instead of adding more permanent orchestration code or raw memory.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "reusable",
+        "successful",
+        "procedure",
+        "or",
+        "recurring",
+        "solved",
+        "failure"
+      ]
+    },
+    {
+      "id": "software-engineering",
+      "title": "Software Engineering",
+      "description": "Use when applying the staged software engineering procedure. Compose the smallest relevant engineering procedures without duplicating their contracts.",
+      "aliases": [
+        "software-engineering"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "software implementation feature bug code engineering"
+      ]
+    },
+    {
+      "id": "source-adapter-engineering",
+      "title": "Source Adapter Engineering",
+      "description": "Build modular external-data sourcing using official structured sources first, replaceable adapters, deduplication, retries and health monitoring.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "api",
+        "scraping",
+        "feed",
+        "external",
+        "data"
+      ]
+    },
+    {
+      "id": "source-ingestion",
+      "title": "Source Ingestion",
+      "description": "Use whenever the user asks to summarize, analyze, extract, compare or learn from a specific URL, video, file, repository, document, audio source or other named primary source. Route to the best native/deterministic tool, follow source-specific fallbacks, preserve provenance, and never substitute secondary-source reconstruction without saying so.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "named",
+        "url",
+        "file",
+        "video",
+        "audio",
+        "document",
+        "primary",
+        "source"
+      ]
+    },
+    {
+      "id": "staged-quality-controls",
+      "title": "Staged Quality Controls",
+      "description": "Use when applying the staged staged quality controls procedure. Apply the narrow staged quality controls procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "staged-quality-controls"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "quality gate staged validation release controls"
+      ]
+    },
+    {
+      "id": "strategic-reading",
+      "title": "Strategic Reading",
+      "description": "Use when reading substantive material to apply it to a real problem by extracting mechanisms, causes, limits, counterexamples, contradictions, implications, actions, risks and indicators rather than merely summarizing.",
+      "aliases": [
+        "applied reading"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators"
+      ]
+    },
+    {
+      "id": "tdd",
+      "title": "Tdd",
+      "description": "Use when applying the staged tdd procedure. Apply the narrow tdd procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "tdd"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "test driven development regression test"
+      ]
+    },
+    {
+      "id": "tools-as-code",
+      "title": "Tools As Code",
+      "description": "Use when a task needs repeated retrieval, filtering, fan-out, dedupe, ranking, transformation, or multi-step deterministic tool calls that would otherwise consume many model turns. Compose approved tools/CLIs/connectors with a short temporary program, then reason over the result.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "repeated",
+        "retrieval",
+        "filter",
+        "dedupe",
+        "rank",
+        "transform",
+        "tool",
+        "composition"
+      ]
+    },
+    {
+      "id": "valuation-investment-ma",
+      "title": "Valuation Investment Ma",
+      "description": "Use when applying the staged valuation investment ma procedure. Prepare evidence-linked valuation and transaction analysis without investment or binding authority.",
+      "aliases": [
+        "valuation-investment-ma"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "valuation investment merger acquisition financial model"
+      ]
+    },
+    {
+      "id": "vercel-cli-with-tokens",
+      "title": "Vercel Cli With Tokens",
+      "description": "current Vercel CLI token authentication project environment deployment configuration guidance",
+      "aliases": [
+        "Vercel CLI with tokens",
+        "Vercel token CLI",
+        "Vercel environment variables"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "current Vercel CLI token authentication project environment deployment configuration guidance"
+      ]
+    },
+    {
+      "id": "vercel-composition-patterns",
+      "title": "Vercel Composition Patterns",
+      "description": "current React component composition compound components state props guidance",
+      "aliases": [
+        "React composition patterns",
+        "component composition"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "current React component composition compound components state props guidance"
+      ]
+    },
+    {
+      "id": "vercel-deploy",
+      "title": "Vercel Deploy",
+      "description": "preview or production vercel deployment",
+      "aliases": [],
+      "availability": "vercel-projects",
+      "source": "github:openai/skills",
+      "triggers": [
+        "preview",
+        "or",
+        "production",
+        "vercel",
+        "deployment"
+      ]
+    },
+    {
+      "id": "vercel-optimize",
+      "title": "Vercel Optimize",
+      "description": "vercel performance cost reliability caching functions billing",
+      "aliases": [
+        "Vercel Optimize",
+        "Vercel performance",
+        "Vercel cost",
+        "Vercel caching"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "vercel",
+        "performance",
+        "cost",
+        "reliability",
+        "caching",
+        "functions",
+        "billing"
+      ]
+    },
+    {
+      "id": "vercel-react-best-practices",
+      "title": "Vercel React Best Practices",
+      "description": "current React Next.js performance rendering bundle server guidance",
+      "aliases": [
+        "React best practices",
+        "Next.js performance",
+        "React performance"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "current React Next.js performance rendering bundle server guidance"
+      ]
+    },
+    {
+      "id": "vercel-react-native-skills",
+      "title": "Vercel React Native Skills",
+      "description": "current React Native mobile list navigation animation guidance",
+      "aliases": [
+        "React Native guidelines",
+        "React Native performance"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "current React Native mobile list navigation animation guidance"
+      ]
+    },
+    {
+      "id": "vercel-react-view-transitions",
+      "title": "Vercel React View Transitions",
+      "description": "current React view transitions animation navigation guidance",
+      "aliases": [
+        "React view transitions",
+        "view transition guidance"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "current React view transitions animation navigation guidance"
+      ]
+    },
+    {
+      "id": "verification",
+      "title": "Verification",
+      "description": "Use when applying the staged verification procedure. Apply the narrow verification procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "verification"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "verify validate acceptance evidence"
+      ]
+    },
+    {
+      "id": "vertical-slice-delivery",
+      "title": "Vertical Slice Delivery",
+      "description": "Plan and implement the smallest end-to-end user outcome with visible result and evidence.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "planning",
+        "or",
+        "implementation"
+      ]
+    },
+    {
+      "id": "web-design-guidelines",
+      "title": "Web Design Guidelines",
+      "description": "current web design accessibility UX performance guidance",
+      "aliases": [
+        "web design guidelines",
+        "Vercel web design",
+        "web accessibility guidance"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "current web design accessibility UX performance guidance"
+      ]
+    },
+    {
+      "id": "webapp-testing",
+      "title": "Webapp Testing",
+      "description": "browser or webapp qa",
+      "aliases": [],
+      "availability": "web-projects",
+      "source": "github:anthropics/skills",
+      "triggers": [
+        "browser",
+        "or",
+        "webapp",
+        "qa"
+      ]
+    },
+    {
+      "id": "website-design-qa",
+      "title": "Website Design Qa",
+      "description": "Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.",
+      "aliases": [],
+      "availability": "web-projects",
+      "source": "major-internal",
+      "triggers": [
+        "website",
+        "landing",
+        "marketing",
+        "responsive",
+        "visual",
+        "browser",
+        "production",
+        "launch",
+        "accessibility",
+        "performance",
+        "seo",
+        "qa"
+      ]
+    },
+    {
+      "id": "workspace-lifecycle-management",
+      "title": "Workspace Lifecycle Management",
+      "description": "Use when creating, cloning, locating, moving, parking, deleting or archiving a project; when disk/storage pressure is high; when duplicate local project copies appear; when deciding local vs cloud development; or when handling large project assets, dependency caches and Docker storage. Preserve canonical project identity and non-Git state while keeping the Mac as a lean active workspace.",
+      "aliases": [],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "project",
+        "create",
+        "clone",
+        "locate",
+        "move",
+        "park",
+        "delete",
+        "archive",
+        "storage",
+        "disk",
+        "pressure",
+        "duplicate",
+        "repo",
+        "large",
+        "assets",
+        "local",
+        "cloud"
+      ]
+    },
+    {
+      "id": "worktree",
+      "title": "Worktree",
+      "description": "Use when applying the staged worktree procedure. Apply the narrow worktree procedure and return evidence, exceptions and a bounded recommendation.",
+      "aliases": [
+        "worktree"
+      ],
+      "availability": "all-projects",
+      "source": "major-internal",
+      "triggers": [
+        "git worktree isolated concurrent writer branch"
+      ]
+    },
+    {
+      "id": "writing-guidelines",
+      "title": "Writing Guidelines",
+      "description": "current Vercel writing copy content clarity voice structure guidance",
+      "aliases": [
+        "Vercel writing guidelines",
+        "Vercel copy guidance"
+      ],
+      "availability": "vercel-projects",
+      "source": "vercel-agent-skills",
+      "triggers": [
+        "current Vercel writing copy content clarity voice structure guidance"
+      ]
+    }
+  ]
+}

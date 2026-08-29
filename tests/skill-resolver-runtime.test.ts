@@ -10,8 +10,15 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { auditSkillReachability, discloseSkills, resolveSkills } from '../src/skills/resolver.js';
+import {
+  auditSkillReachability,
+  discloseSkills,
+  installedSkillPath,
+  loadSkillRegistry,
+  resolveSkills,
+} from '../src/skills/resolver.js';
 import { runSkillCli } from '../src/skills/cli.js';
+import { buildSkillCatalog, searchSkillCatalog } from '../src/skills/catalog.js';
 
 const roots: string[] = [];
 const priorMajorHome = process.env.MAJOR_HOME;
@@ -19,6 +26,9 @@ const priorSkillsRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorSkillEvals = process.env.MAJOR_SKILLS_EVALS;
 
 beforeEach(() => {
+  const home = mkdtempSync(join(tmpdir(), 'major-resolver-home-'));
+  roots.push(home);
+  process.env.MAJOR_HOME = home;
   process.env.MAJOR_SKILLS_REGISTRY = join(process.cwd(), 'guidance', 'skills.registry.json');
   process.env.MAJOR_SKILLS_EVALS = join(process.cwd(), 'evals', 'skill-resolver');
 });
@@ -76,6 +86,74 @@ describe('runtime skill resolver', () => {
         limit: 3,
       }).skills.map((skill) => skill.id),
     ).toContain('root-cause-qa');
+  });
+
+  it('composes mandatory explicit skills and emits inspectable evidence', () => {
+    const result = resolveSkills({
+      task: 'Review this regression efficiently.',
+      skills: ['root-cause-qa', 'lean-quality'],
+    });
+    expect(result.receipt).toMatchObject({
+      mode: 'explicit',
+      requested: ['root-cause-qa', 'lean-quality'],
+      selected: ['lean-quality', 'root-cause-qa'],
+    });
+    expect(result.receipt.evidence).toHaveLength(2);
+    expect(
+      result.skills.every((skill) => skill.reason.startsWith('explicit skill selection')),
+    ).toBe(true);
+  });
+
+  it('deduplicates an explicit id and alias to one canonical skill', () => {
+    const result = resolveSkills({
+      task: 'Find the underlying defect.',
+      skills: ['root-cause-qa', 'root-cause-analysis'],
+    });
+    expect(result.receipt.requested).toEqual(['root-cause-qa', 'root-cause-analysis']);
+    expect(result.receipt.selected).toEqual(['root-cause-qa']);
+    expect(result.skills).toHaveLength(1);
+  });
+
+  it('fails clearly when any explicit skill is unknown', () => {
+    expect(() =>
+      resolveSkills({ task: 'Do the work.', skills: ['lean-quality', 'not-installed'] }),
+    ).toThrow(/unknown skill "not-installed".*major skill search/);
+  });
+
+  it('fails clearly when an explicitly selected registry skill is deprecated', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-deprecated-skill-'));
+    roots.push(root);
+    const registry = join(root, 'skills.registry.json');
+    writeFileSync(
+      registry,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: 'old-review',
+            source: 'major-internal',
+            availability: 'all-projects',
+            load: 'old review',
+            deprecated: { replacement: 'exact-head-pr-review', message: 'legacy alias retired' },
+          },
+        ],
+      }),
+    );
+    process.env.MAJOR_SKILLS_REGISTRY = registry;
+    expect(() => resolveSkills({ task: 'Review it.', skills: ['old-review'] })).toThrow(
+      /deprecated skill "old-review"; use "exact-head-pr-review" instead: legacy alias retired/,
+    );
+  });
+
+  it('builds and searches catalogue metadata from the canonical registry', () => {
+    const catalog = buildSkillCatalog(loadSkillRegistry(), (entry) =>
+      installedSkillPath(entry.id, process.cwd(), entry.source),
+    );
+    expect(catalog).toHaveLength(loadSkillRegistry().length);
+    expect(searchSkillCatalog(catalog, 'root cause regression')[0]).toMatchObject({
+      id: 'root-cause-qa',
+      source: 'major-internal',
+    });
   });
 
   it('classifies hot, active specialist, and dormant skills deterministically', () => {

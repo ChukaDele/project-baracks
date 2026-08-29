@@ -1,4 +1,11 @@
-import { auditSkillReachability, resolveSkills } from './resolver.js';
+import {
+  auditSkillReachability,
+  installedSkillPath,
+  loadSkillRegistry,
+  resolveSkills,
+} from './resolver.js';
+import { buildSkillCatalog, searchSkillCatalog } from './catalog.js';
+import { recordSkillRoutingEvidence } from './routing-evidence.js';
 import {
   deprecateGeneratedSkill,
   listSkillCandidates,
@@ -17,6 +24,12 @@ import { fetchVendorSection } from './vendor.js';
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : undefined;
+}
+
+function flags(args: string[], name: string): string[] {
+  return args.flatMap((value, index) =>
+    value === name && args[index + 1] ? [args[index + 1]!] : [],
+  );
 }
 
 export async function runSkillCli(args: string[]): Promise<boolean> {
@@ -56,14 +69,45 @@ export async function runSkillCli(args: string[]): Promise<boolean> {
   if (args[1] === 'resolve') {
     const task = flag(args, '--task');
     if (!task) throw new Error('missing required --task');
-    const result = resolveSkills({ task, cwd: flag(args, '--cwd') ?? process.cwd() });
+    const selected = flags(args, '--skill');
+    let result;
+    try {
+      result = resolveSkills({
+        task,
+        cwd: flag(args, '--cwd') ?? process.cwd(),
+        ...(selected.length ? { skills: selected } : {}),
+      });
+    } catch (error) {
+      recordSkillRoutingEvidence({
+        kind: 'rejection',
+        task,
+        requested: selected,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    if (result.skills.length === 0) {
+      recordSkillRoutingEvidence({ kind: 'miss', task, reason: 'no installed skill matched' });
+    }
     if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
     else if (result.skills.length === 0) console.log('No installed Major skill matched this task.');
     else {
       for (const skill of result.skills) {
         console.log(`${skill.id}\t${skill.path ?? skill.reference}\t${skill.reason}`);
       }
+      console.log(`receipt\t${result.receipt.mode}\t${result.receipt.selected.join(',')}`);
     }
+    return true;
+  }
+  if (args[1] === 'search' || args[1] === 'catalog') {
+    const cwd = flag(args, '--cwd') ?? process.cwd();
+    const catalog = buildSkillCatalog(loadSkillRegistry(), (entry) =>
+      installedSkillPath(entry.id, cwd, entry.source),
+    );
+    const query = flag(args, '--query');
+    const result = query ? searchSkillCatalog(catalog, query) : catalog;
+    if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));
+    else for (const skill of result) console.log(`${skill.id}\t${skill.description}`);
     return true;
   }
   if (args[1] === 'vendor') {

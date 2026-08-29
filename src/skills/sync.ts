@@ -158,6 +158,7 @@ function filesBelow(root: string): string[] {
 function validateSource(sourceRoot: string): {
   registry: Registry;
   registryPath: string;
+  catalogPath: string;
   reconciliationLedgerPath: string;
   sourceLedgerPath: string;
   capabilityMatrixPath: string;
@@ -168,6 +169,7 @@ function validateSource(sourceRoot: string): {
   assetPaths: string[];
 } {
   const registryPath = join(sourceRoot, 'guidance', 'skills.registry.json');
+  const catalogPath = join(sourceRoot, 'guidance', 'skills.catalog.json');
   const reconciliationLedgerPath = join(sourceRoot, 'guidance', 'skills-reconciliation-ledger.json');
   const sourceLedgerPath = join(sourceRoot, 'package', 'source-ledger.json');
   const capabilityMatrixPath = join(sourceRoot, 'guidance', 'worker-capability-matrix.json');
@@ -177,6 +179,7 @@ function validateSource(sourceRoot: string): {
   const assetRegistryPath = join(sourceRoot, 'guidance', 'reusable-assets.registry.json');
   for (const path of [
     registryPath,
+    catalogPath,
     reconciliationLedgerPath,
     sourceLedgerPath,
     capabilityMatrixPath,
@@ -202,6 +205,25 @@ function validateSource(sourceRoot: string): {
   }
 
   const registry = assertRegistry(JSON.parse(readFileSync(registryPath, 'utf8')));
+  const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as {
+    version?: unknown;
+    registryVersion?: unknown;
+    entries?: Array<{ id?: unknown }>;
+  };
+  const catalogIds = Array.isArray(catalog.entries)
+    ? catalog.entries
+        .map((entry) => entry.id)
+        .filter((id): id is string => typeof id === 'string')
+    : [];
+  const registryIds = registry.entries.map((entry) => entry.id).sort();
+  if (
+    catalog.version !== 1 ||
+    catalog.registryVersion !== registry.version ||
+    catalogIds.length !== catalog.entries?.length ||
+    JSON.stringify([...catalogIds].sort()) !== JSON.stringify(registryIds)
+  ) {
+    throw new Error('generated skill catalog does not match the canonical registry');
+  }
   const vendorCatalog = loadVendorCatalog(vendorSourcePath);
   for (const entry of registry.entries.filter((candidate) => candidate.sourceKind === 'VENDOR_LIVE')) {
     const source = vendorCatalog.sources.find((candidate) => candidate.id === entry.source);
@@ -312,6 +334,7 @@ function validateSource(sourceRoot: string): {
   return {
     registry,
     registryPath,
+    catalogPath,
     reconciliationLedgerPath,
     sourceLedgerPath,
     capabilityMatrixPath,
@@ -400,6 +423,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   mkdirSync(join(staged, 'skills'), { recursive: true });
   mkdirSync(join(staged, 'evals'), { recursive: true });
   cpSync(validated.registryPath, join(staged, 'guidance', 'skills.registry.json'));
+  cpSync(validated.catalogPath, join(staged, 'guidance', 'skills.catalog.json'));
   cpSync(
     validated.reconciliationLedgerPath,
     join(staged, 'guidance', 'skills-reconciliation-ledger.json'),

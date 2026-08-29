@@ -20,6 +20,8 @@ for p in Path('.').rglob('*.json'):
 PY
 
 node scripts/validate-skills.mjs || fail "skills, YAML frontmatter, resolver fixtures, or reusable asset metadata"
+node scripts/generate-skill-catalog.mjs
+git diff --exit-code -- guidance/skills.catalog.json adapters/skills || fail "generated skill catalogue or host adapters are stale"
 
 python3 - <<'PY'
 import json

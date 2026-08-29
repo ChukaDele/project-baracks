@@ -32,6 +32,9 @@ const registryEntrySchema = z.object({
   load: z.string(),
   aliases: z.array(z.string().min(1)).default([]),
   disclosure: z.enum(['hot', 'specialist']).default('specialist'),
+  deprecated: z
+    .object({ replacement: z.string().min(1).optional(), message: z.string().min(1).optional() })
+    .optional(),
 });
 
 const registrySchema = z.object({
@@ -60,6 +63,14 @@ export interface ResolvedSkill {
 export interface SkillResolution {
   task: string;
   skills: ResolvedSkill[];
+  receipt: SkillResolutionReceipt;
+}
+
+export interface SkillResolutionReceipt {
+  mode: 'explicit' | 'automatic' | 'project';
+  requested: string[];
+  selected: string[];
+  evidence: Array<{ id: string; score: number; reason: string; source: string }>;
 }
 
 export type SkillDisclosureState = 'HOT' | 'ACTIVE' | 'DORMANT';
@@ -283,7 +294,7 @@ function vendorMatchAllowed(entry: SkillRegistryEntry, task: string): boolean {
   );
 }
 
-function skillPath(id: string, cwd: string, source: string): string | undefined {
+export function installedSkillPath(id: string, cwd: string, source: string): string | undefined {
   const immutable = join(runtimeRoot(), 'skills', 'internal');
   const legacyMutableGlobal = join(majorHome(), 'skills', 'internal');
   const hot = hotSkillBundleRoot();
@@ -412,6 +423,7 @@ export function resolveSkills(input: {
   cwd?: string;
   limit?: number;
   now?: Date;
+  skills?: readonly string[];
 }): SkillResolution {
   const task = input.task.trim();
   if (!task) throw new Error('skill resolution task must not be empty');
@@ -420,9 +432,60 @@ export function resolveSkills(input: {
   const vendorCatalog = readVendorCatalog();
   const examples = resolverExamples();
   const generated = loadActiveGeneratedSkills(cwd);
-  const matches = [
-    ...loadSkillRegistry().map((entry) => ({ entry, generated: undefined })),
-    ...generated.map((generated) => ({
+  const registry = loadSkillRegistry();
+  const requested = [...new Set((input.skills ?? []).map((id) => id.trim()).filter(Boolean))];
+  if (input.skills && requested.length === 0) {
+    throw new Error('explicit skill selection requires at least one --skill <id>');
+  }
+  const explicitEntriesById = new Map<string, {
+    entry: SkillRegistryEntry;
+    generated: SkillCandidate | undefined;
+  }>();
+  for (const requestedId of requested) {
+    const normalized = requestedId.toLowerCase();
+    const entry = registry.find(
+      (candidate) =>
+        candidate.id.toLowerCase() === normalized ||
+        candidate.aliases.some((alias) => alias.toLowerCase() === normalized),
+    );
+    const project = generated.find((candidate) => candidate.skillId.toLowerCase() === normalized);
+    if (!entry && !project) {
+      throw new Error(
+        `unknown skill "${requestedId}"; run "major skill search --query ${JSON.stringify(requestedId)}" to inspect installed skills`,
+      );
+    }
+    if (entry?.deprecated) {
+      const replacement = entry.deprecated.replacement
+        ? `; use "${entry.deprecated.replacement}" instead`
+        : '';
+      throw new Error(
+        `deprecated skill "${entry.id}"${replacement}${entry.deprecated.message ? `: ${entry.deprecated.message}` : ''}`,
+      );
+    }
+    const resolved = project
+      ? {
+          entry: {
+            id: project.skillId,
+            source: 'gbrain-generated',
+            availability: 'project',
+            load: project.trigger,
+            aliases: [],
+            disclosure: 'specialist' as const,
+          },
+          generated: project,
+        }
+      : { entry: entry!, generated: undefined };
+    explicitEntriesById.set(resolved.entry.id, resolved);
+  }
+  const explicitEntries = [...explicitEntriesById.values()];
+  const candidates: Array<{
+    entry: SkillRegistryEntry;
+    generated: SkillCandidate | undefined;
+  }> = [
+    ...(requested.length > 0
+      ? explicitEntries
+      : registry.map((entry) => ({ entry, generated: undefined }))),
+    ...(requested.length > 0 ? [] : generated).map((generated) => ({
       entry: {
         id: generated.skillId,
         source: 'gbrain-generated',
@@ -433,9 +496,13 @@ export function resolveSkills(input: {
       },
       generated,
     })),
-  ]
+  ];
+  const matches = candidates
     .map(({ entry, generated }) => {
-      const scored = scoreEntry(entry, task, examples);
+      const scored =
+        requested.length > 0
+          ? { score: 1_000, reason: `explicit skill selection: ${entry.id}` }
+          : scoreEntry(entry, task, examples);
       const sourceKind = generated
         ? 'PROJECT_LOCAL'
         : inferSkillSourceKind(entry.source, entry.sourceKind);
@@ -453,7 +520,7 @@ export function resolveSkills(input: {
     })
     .filter(
       ({ entry, score, sourceKind, vendor }) =>
-        score >= 5 &&
+        score >= (requested.length > 0 ? 1_000 : 5) &&
         (sourceKind !== 'VENDOR_LIVE' ||
           (vendor !== undefined && vendorMatchAllowed(entry, task))),
     )
@@ -478,7 +545,7 @@ export function resolveSkills(input: {
       ? generatedSkillPath(match.generated)
       : match.sourceKind === 'VENDOR_LIVE'
         ? undefined
-        : skillPath(match.entry.id, cwd, match.entry.source);
+        : installedSkillPath(match.entry.id, cwd, match.entry.source);
     if (!path && !match.vendor) continue;
     const reference = match.vendor?.referenceUrl ?? path;
     if (!reference) continue;
@@ -494,9 +561,35 @@ export function resolveSkills(input: {
         ? `${match.reason}; live vendor source ${match.vendor.sourceId} (${match.vendor.state})`
         : match.reason,
     });
-    if (skills.length >= (input.limit ?? 6)) break;
+    if (skills.length >= (input.limit ?? (explicitEntries.length || 6))) break;
   }
-  return { task, skills };
+  if (requested.length > 0 && skills.length !== explicitEntries.length) {
+    const selected = new Set(skills.map((skill) => skill.id));
+    const missing = explicitEntries.map(({ entry }) => entry.id).filter((id) => !selected.has(id));
+    throw new Error(`explicit skill selection unavailable: ${missing.join(', ')}`);
+  }
+  const mode: SkillResolutionReceipt['mode'] = requested.length
+    ? skills.some((skill) => skill.sourceKind === 'PROJECT_LOCAL')
+      ? 'project'
+      : 'explicit'
+    : skills.some((skill) => skill.sourceKind === 'PROJECT_LOCAL')
+      ? 'project'
+      : 'automatic';
+  return {
+    task,
+    skills,
+    receipt: {
+      mode,
+      requested,
+      selected: skills.map((skill) => skill.id),
+      evidence: skills.map((skill) => ({
+        id: skill.id,
+        score: skill.score,
+        reason: skill.reason,
+        source: skill.source,
+      })),
+    },
+  };
 }
 
 /**
@@ -601,7 +694,7 @@ export function discloseSkills(input: {
       disclosedVendorBytes += contentBytes;
       continue;
     }
-    const path = selected?.path ?? skillPath(entry.id, cwd, entry.source);
+    const path = selected?.path ?? installedSkillPath(entry.id, cwd, entry.source);
     if (!path || disclosedBodyBytes >= bodyBudget) continue;
     const original = readFileSync(path, 'utf8');
     const allowance = Math.min(perBodyBudget, bodyBudget - disclosedBodyBytes);
@@ -622,7 +715,7 @@ export function discloseSkills(input: {
   const manifestDisclosedBytes = jsonBytes(manifest);
   const bodyBeforeBytes = registry.reduce((total, entry) => {
     if (inferSkillSourceKind(entry.source, entry.sourceKind) === 'VENDOR_LIVE') return total;
-    const path = skillPath(entry.id, cwd, entry.source);
+    const path = installedSkillPath(entry.id, cwd, entry.source);
     return total + (path ? statSync(path).size : 0);
   }, 0);
   const vendorCatalogFile = vendorCatalogPath();
@@ -676,7 +769,7 @@ export function auditSkillReachability(cwd = process.cwd()): SkillAudit {
   const internal = entries
     .filter((entry) => entry.source === 'major-internal')
     .map((entry) => {
-      const path = skillPath(entry.id, resolve(cwd), entry.source);
+      const path = installedSkillPath(entry.id, resolve(cwd), entry.source);
       return { id: entry.id, reachable: Boolean(path), ...(path ? { path } : {}) };
     });
   const registered = new Set(internal.map((entry) => entry.id));
