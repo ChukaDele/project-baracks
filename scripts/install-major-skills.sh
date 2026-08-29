@@ -5,9 +5,16 @@ MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL_TARGET="${1:-$(pwd)}"
 PROFILE="${2:-core}"
 FEATURES="${3:-}"
+
+case "$PROFILE" in
+  core|knowledge|web-ui|exploratory|full) ;;
+  *) echo "ERROR: profile must be core, knowledge, web-ui, exploratory, or full" >&2; exit 2 ;;
+esac
+
 INTERNAL="$MAJOR_ROOT/skills/internal"
 CATALOG="$MAJOR_ROOT/guidance/skills.catalog.json"
 ADAPTERS="$MAJOR_ROOT/adapters/skills"
+FEATURES="$(node "$MAJOR_ROOT/scripts/materialize-project-skill-registry.mjs" normalize-features "$MAJOR_ROOT" "$INSTALL_TARGET" "$PROFILE" "$FEATURES")"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/major-skills.XXXXXX")"
 STAGED_TARGET="$TMP/project"
 TARGET="$STAGED_TARGET"
@@ -15,11 +22,6 @@ AGENT_SKILLS="$TARGET/.agents/skills"
 CLAUDE_SKILLS="$TARGET/.claude/skills"
 CODEX_SKILLS="$TARGET/.codex/skills"
 LOCK="$TARGET/MAJOR_SKILLS.lock"
-
-case "$PROFILE" in
-  core|knowledge|web-ui|exploratory|full) ;;
-  *) echo "ERROR: profile must be core, knowledge, web-ui, exploratory, or full" >&2; exit 2 ;;
-esac
 
 node "$MAJOR_ROOT/scripts/generate-skill-catalog.mjs" --check
 mkdir -p "$STAGED_TARGET" "$INSTALL_TARGET"

@@ -6,9 +6,14 @@ import { join, relative, resolve } from 'node:path';
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const [command, rootArg, targetArg, profile, featuresArg = '', locksArg = ''] =
   process.argv.slice(2);
-if (!['plan', 'materialize'].includes(command) || !rootArg || !targetArg || !profile)
+if (
+  !['normalize-features', 'plan', 'materialize'].includes(command) ||
+  !rootArg ||
+  !targetArg ||
+  !profile
+)
   throw new Error(
-    'usage: materialize-project-skill-registry.mjs plan|materialize ROOT TARGET PROFILE [FEATURES] [LOCKS]',
+    'usage: materialize-project-skill-registry.mjs normalize-features|plan|materialize ROOT TARGET PROFILE [FEATURES] [LOCKS]',
   );
 const root = resolve(rootArg);
 const target = resolve(targetArg);
@@ -16,7 +21,24 @@ const registry = JSON.parse(readFileSync(join(root, 'guidance/skills.registry.js
 const canonicalCatalog = JSON.parse(
   readFileSync(join(root, 'guidance/skills.catalog.json'), 'utf8'),
 );
-const features = new Set(featuresArg.split(',').filter(Boolean));
+const knownFeatures = new Set(
+  registry.entries.flatMap((entry) => entry.projectInstall?.features ?? []),
+);
+const featureValues = featuresArg === '' ? [] : featuresArg.split(',');
+for (const feature of featureValues) {
+  if (!slug.test(feature))
+    throw new Error(`malformed installer feature: ${JSON.stringify(feature)}`);
+  if (!knownFeatures.has(feature))
+    throw new Error(`unknown installer feature: ${JSON.stringify(feature)}`);
+}
+if (new Set(featureValues).size !== featureValues.length)
+  throw new Error('duplicate installer feature input');
+featureValues.sort();
+const features = new Set(featureValues);
+if (command === 'normalize-features') {
+  process.stdout.write(featureValues.join(','));
+  process.exit(0);
+}
 const eligible = (contract) =>
   contract.profiles.includes(profile) ||
   (contract.features ?? []).some((feature) => features.has(feature));
@@ -154,7 +176,7 @@ const projectRegistry = {
   version: registry.version,
   projectProjection: {
     profile,
-    features: [...features].sort(),
+    features: featureValues,
     canonicalRegistryVersion: registry.version,
     sources: [...locks.entries()].sort().map(([sourceKey, lock]) => ({ sourceKey, ...lock })),
   },

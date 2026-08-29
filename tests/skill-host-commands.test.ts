@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -15,6 +16,21 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const roots: string[] = [];
 const priorHome = process.env.MAJOR_HOME;
 const priorRegistry = process.env.MAJOR_SKILLS_REGISTRY;
+
+function snapshotTree(root: string): Array<[string, string]> {
+  const snapshot: Array<[string, string]> = [];
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else snapshot.push([path.slice(root.length + 1), readFileSync(path, 'utf8')]);
+    }
+  };
+  walk(root);
+  return snapshot;
+}
 
 type CommandAdapter = {
   discovery: string;
@@ -104,6 +120,30 @@ afterEach(() => {
 });
 
 describe('installed host skill commands', () => {
+  it.each([
+    ['unknown', 'not-canonical', 'unknown installer feature'],
+    ['duplicate', 'figma,figma', 'duplicate installer feature input'],
+    ['malformed', 'figma,,pdf', 'malformed installer feature'],
+  ])('rejects %s installer features without changing the target', (_kind, features, message) => {
+    const target = mkdtempSync(join(tmpdir(), 'major-invalid-feature-install-'));
+    roots.push(target);
+    const owned = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
+    mkdirSync(dirname(owned), { recursive: true });
+    writeFileSync(owned, '# project owned\n');
+    writeFileSync(join(target, 'MAJOR_SKILLS.lock'), 'project-owned lock\n');
+
+    const before = JSON.stringify(snapshotTree(target));
+    const result = spawnSync(
+      'bash',
+      ['scripts/install-major-skills.sh', target, 'core', features],
+      { env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' }, encoding: 'utf8' },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(message);
+    expect(JSON.stringify(snapshotTree(target))).toBe(before);
+  });
+
   it('stages discovery and namespaced per-skill commands for every supported host', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-command-home-'));
     const stage = mkdtempSync(join(tmpdir(), 'major-command-stage-'));
