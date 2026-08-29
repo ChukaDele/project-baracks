@@ -245,8 +245,10 @@ export function setRunStatus(
   db: DbConn,
   runId: string,
   status: (typeof agentRuns.$inferInsert)['status'],
+  options: { sessionRef?: string } = {},
 ) {
   const patch: Partial<typeof agentRuns.$inferInsert> = { status };
+  if (options.sessionRef) patch.sessionRef = options.sessionRef;
   if (status === 'running') patch.startedAt = nowIso();
   if (status && ['succeeded', 'failed', 'cancelled', 'timed_out', 'checkpointed'].includes(status))
     patch.endedAt = nowIso();

@@ -870,6 +870,10 @@ export const independentReviewReceipts = sqliteTable(
     project: text('project').notNull(),
     goalId: text('goal_id').notNull(),
     runId: text('run_id').notNull(),
+    /** Canonical Major task/run/provider binding. Nullable only for legacy rows. */
+    taskId: text('task_id').references(() => tasks.id),
+    providerId: text('provider_id').references(() => agentProviders.id),
+    providerAccountLabel: text('provider_account_label'),
     dispatchId: text('dispatch_id').notNull().unique(),
     provider: text('provider').notNull(),
     sourceHead: text('source_head').notNull(),
@@ -890,6 +894,37 @@ export const independentReviewReceipts = sqliteTable(
     enumCheck('independent_review_receipts_execution_valid', 'execution_status', ['succeeded']),
     check('independent_review_receipts_head_valid', sql`length(source_head) = 40`),
     check('independent_review_receipts_causal', sql`review_started_at >= pending_claimed_at`),
+  ],
+);
+
+/** Durable authority commit for supervisor completion. SQLite is the single
+ * commit boundary; supervisor-state.json is a recoverable projection. */
+export const supervisorCompletionCommits = sqliteTable(
+  'supervisor_completion_commits',
+  {
+    id: id(),
+    project: text('project').notNull(),
+    goalId: text('goal_id').notNull(),
+    receiptId: text('receipt_id')
+      .notNull()
+      .unique()
+      .references(() => independentReviewReceipts.id),
+    pendingClaimedAt: text('pending_claimed_at').notNull(),
+    sourceHead: text('source_head').notNull(),
+    sourceTreeDigest: text('source_tree_digest').notNull(),
+    verdict: text('verdict', { enum: ['pass', 'fail'] }).notNull(),
+    finalGoalJson: text('final_goal_json').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('supervisor_completion_commits_goal').on(t.project, t.goalId),
+    enumCheck('supervisor_completion_commits_verdict_valid', 'verdict', ['pass', 'fail']),
+    check('supervisor_completion_commits_head_valid', sql`length(source_head) = 40`),
+    check('supervisor_completion_commits_tree_valid', sql`length(source_tree_digest) = 64`),
+    check(
+      'supervisor_completion_commits_projection_valid',
+      sql`json_valid(final_goal_json) AND json_extract(final_goal_json, '$.id') = goal_id AND json_extract(final_goal_json, '$.project') = project AND json_type(final_goal_json, '$.pendingCompletion') IS NULL AND ((verdict = 'pass' AND json_extract(final_goal_json, '$.status') = 'done') OR (verdict = 'fail' AND json_extract(final_goal_json, '$.status') = 'active'))`,
+    ),
   ],
 );
 

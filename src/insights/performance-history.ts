@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import type { DbConn } from '../db/client.js';
-import { independentReviewReceipts, runPerformanceObservations } from '../db/schema.js';
+import {
+  agentProviders,
+  agentRuns,
+  independentReviewReceipts,
+  runPerformanceObservations,
+} from '../db/schema.js';
 import { redactValue } from '../security/redact.js';
 
 export const RUN_INSIGHT_SCHEMA = 'major.run-insight.v1' as const;
@@ -172,8 +177,11 @@ export function recordIndependentReviewExecution(
     project: string;
     goalId: string;
     runId: string;
+    taskId: string;
     dispatchId: string;
     provider: string;
+    providerId: string;
+    providerAccountLabel: string;
     sourceHead: string;
     pendingClaimedAt: string;
     reviewStartedAt: string;
@@ -185,8 +193,11 @@ export function recordIndependentReviewExecution(
     !input.project.trim() ||
     !input.goalId.trim() ||
     !input.runId.trim() ||
+    !input.taskId.trim() ||
     !input.dispatchId.trim() ||
-    !input.provider.trim()
+    !input.provider.trim() ||
+    !input.providerId.trim() ||
+    !input.providerAccountLabel.trim()
   ) {
     throw new Error('independent review execution identity is incomplete');
   }
@@ -204,6 +215,34 @@ export function recordIndependentReviewExecution(
   ) {
     throw new Error('independent review execution predates the pending completion claim');
   }
+  const canonicalRun = db
+    .select({
+      taskId: agentRuns.taskId,
+      providerId: agentRuns.providerId,
+      provider: agentProviders.name,
+      accountLabel: agentProviders.accountLabel,
+      purpose: agentRuns.purpose,
+      sourceHead: agentRuns.sourceHead,
+      status: agentRuns.status,
+    })
+    .from(agentRuns)
+    .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
+    .where(eq(agentRuns.id, input.runId))
+    .get();
+  if (
+    !canonicalRun ||
+    canonicalRun.taskId !== input.taskId ||
+    canonicalRun.providerId !== input.providerId ||
+    canonicalRun.provider !== (input.provider === 'claude' ? 'claude-code' : input.provider) ||
+    canonicalRun.accountLabel !== input.providerAccountLabel ||
+    canonicalRun.purpose !== 'review' ||
+    canonicalRun.sourceHead !== input.sourceHead ||
+    canonicalRun.status !== 'succeeded'
+  ) {
+    throw new Error(
+      'independent review authority requires the canonical succeeded task run, exact head, review purpose, and routed provider account',
+    );
+  }
   const id = randomUUID();
   db.insert(independentReviewReceipts)
     .values({
@@ -211,8 +250,11 @@ export function recordIndependentReviewExecution(
       project: input.project.trim(),
       goalId: input.goalId,
       runId: input.runId,
+      taskId: input.taskId,
       dispatchId: input.dispatchId,
       provider: input.provider.trim(),
+      providerId: input.providerId,
+      providerAccountLabel: input.providerAccountLabel,
       sourceHead: input.sourceHead,
       purpose: input.review.purpose,
       verdict: input.review.verdict,

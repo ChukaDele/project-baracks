@@ -13,8 +13,11 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { desc, eq } from 'drizzle-orm';
 import { redactText } from '../security/redact.js';
 import { openDb, type Db } from '../db/client.js';
+import { agentProviders, agentRuns, supervisorCompletionCommits } from '../db/schema.js';
+import { newId } from '../domain/ids.js';
 import { getIndependentReviewReceipt } from '../insights/performance-history.js';
 import {
   evaluateTaskPromotionProof,
@@ -151,6 +154,10 @@ export interface SupervisorGoal {
         reviewDispatch?: {
           id: string;
           provider: WorkerHost;
+          providerId?: string;
+          providerAccountLabel?: string;
+          taskId?: string;
+          runId?: string;
           startedAt: string;
         };
       }
@@ -199,7 +206,7 @@ function emptyState(): SupervisorState {
 
 const stateLockSleep = new Int32Array(new SharedArrayBuffer(4));
 
-function mutateSupervisorState<T>(operation: (state: SupervisorState) => T): T {
+function withSupervisorStateLock<T>(operation: (state: SupervisorState) => T): T {
   const path = `${statePath()}.lock`;
   mkdirSync(dirname(path), { recursive: true });
   const deadline = Date.now() + 5_000;
@@ -221,9 +228,7 @@ function mutateSupervisorState<T>(operation: (state: SupervisorState) => T): T {
   }
   try {
     const state = readSupervisorState();
-    const result = operation(state);
-    writeSupervisorState(state);
-    return result;
+    return operation(state);
   } finally {
     closeSync(fd);
     try {
@@ -232,6 +237,14 @@ function mutateSupervisorState<T>(operation: (state: SupervisorState) => T): T {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
   }
+}
+
+function mutateSupervisorState<T>(operation: (state: SupervisorState) => T): T {
+  return withSupervisorStateLock((state) => {
+    const result = operation(state);
+    writeSupervisorState(state);
+    return result;
+  });
 }
 
 export function readSupervisorState(): SupervisorState {
@@ -500,6 +513,8 @@ export function updateGoal(id: string, patch: Partial<Omit<SupervisorGoal, 'id'>
 
 /** Apply an independent grade to the currently pending worker completion
  * claim. A worker claim alone can never mark a goal done. */
+class CompletionSourceFenceError extends Error {}
+
 export function applyIndependentCompletionGrade(input: {
   goalId: string;
   receiptId: string;
@@ -509,160 +524,235 @@ export function applyIndependentCompletionGrade(input: {
   const db = input.db ?? ownedDb!.db;
   let applied: { goal: SupervisorGoal; authorityRejection?: string };
   try {
-    applied = db.transaction(
-      (tx) => {
-        const receipt = getIndependentReviewReceipt(tx, input.receiptId);
-        if (!receipt) {
-          throw new Error('independent completion requires a durable review receipt');
-        }
-        return mutateSupervisorState((state) => {
-          const goal = state.goals.find((candidate) => candidate.id === input.goalId);
-          if (!goal) throw new Error(`goal not found: ${input.goalId}`);
-          const pending = goal.pendingCompletion;
-          if (!pending) throw new Error(`goal ${input.goalId} has no pending completion claim`);
-          if (!pending.sourceHead) {
-            throw new Error(
-              'pending completion has no exact-head binding; legacy claim requires revalidation',
-            );
-          }
-          if (receipt.project !== goal.project || receipt.goalId !== input.goalId) {
-            throw new Error('independent-review receipt belongs to a different project or goal');
-          }
-          if (receipt.purpose !== 'independent_completion_review') {
-            throw new Error('completion grade requires an independent-review receipt');
-          }
-          if (pending.sourceHead !== receipt.sourceHead) {
-            throw new Error('independent completion run evidence is for a different exact head');
-          }
-          if (
-            receipt.executionStatus !== 'succeeded' ||
-            receipt.pendingClaimedAt !== pending.claimedAt ||
-            Date.parse(receipt.reviewStartedAt) < Date.parse(pending.claimedAt)
-          ) {
-            throw new Error('independent completion receipt is causally stale or unsuccessful');
-          }
-          if (
-            !pending.reviewDispatch ||
-            receipt.dispatchId !== pending.reviewDispatch.id ||
-            receipt.provider !== pending.reviewDispatch.provider ||
-            receipt.reviewStartedAt !== pending.reviewDispatch.startedAt
-          ) {
-            throw new Error(
-              'independent completion receipt is not from the Major-owned review dispatch',
-            );
-          }
-          if (!receipt.runId.trim()) {
-            throw new Error('independent completion requires a durable run id');
-          }
-          if (!WORKER_HOSTS.includes(receipt.provider)) {
-            throw new Error('independent-review receipt has an unknown provider identity');
-          }
-          if (pending.coordinator === receipt.provider) {
-            throw new Error(
-              `independent completion grade refused: ${receipt.provider} made the completion claim`,
-            );
-          }
-          const evidence = receipt.evidence.trim();
-          if (!evidence) throw new Error('independent completion evidence must not be empty');
-          if (
-            !pending.sourceTreeDigest ||
-            !sourceIdentityMatches(
-              { sourceHead: pending.sourceHead, sourceTreeDigest: pending.sourceTreeDigest },
-              readSupervisorSourceIdentity(goal.repoPath),
-            )
-          ) {
-            goal.status = 'active';
-            goal.pendingCompletion = undefined;
-            goal.activePid = undefined;
-            goal.lastFinishedAt = new Date().toISOString();
-            goal.nextRunAt = new Date().toISOString();
-            goal.lastSummary =
-              'Pending completion was reopened because its exact repository or source-tree identity changed before grade application.';
-            goal.updatedAt = new Date().toISOString();
-            return { goal, authorityRejection: 'candidate source identity changed' };
-          }
-          if (receipt.verdict === 'pass') {
-            const candidate = pending.candidate;
-            let bindingFailure: string | undefined;
-            if (
-              !candidate ||
-              candidate.sourceHead !== pending.sourceHead ||
-              candidate.sourceTreeDigest !== pending.sourceTreeDigest
-            ) {
-              bindingFailure = 'pending completion lacks its exact frozen candidate binding';
-            } else {
-              const resolved = resolveCanonicalTaskBinding(tx, goal.repoPath);
-              if (candidate.resolution === 'task') {
-                if (
-                  !resolved.ok ||
-                  resolved.binding.taskId !== candidate.task.taskId ||
-                  resolved.binding.projectId !== candidate.task.projectId ||
-                  resolved.binding.frozenCriteriaJson !== candidate.task.frozenCriteriaJson
-                ) {
-                  bindingFailure = 'canonical task binding changed after candidate freeze';
-                } else {
-                  try {
-                    const criteria = parseCompletionCriteria(candidate.task.frozenCriteriaJson);
-                    if (
-                      criteria.progressiveValidation &&
-                      criteria.progressiveValidation.candidateHead !== candidate.sourceHead
-                    ) {
-                      bindingFailure = 'canonical task criteria target a different candidate head';
-                    } else {
-                      const proof = evaluateTaskPromotionProof(tx, {
-                        taskId: candidate.task.taskId,
-                        repoPath: goal.repoPath,
-                      });
-                      if (!proof.ok) bindingFailure = proof.failures.join('; ');
-                    }
-                  } catch (error) {
-                    bindingFailure = `canonical task criteria are invalid: ${error instanceof Error ? error.message : String(error)}`;
-                  }
-                }
-              } else if (candidate.resolution === 'no_task') {
-                if (resolved.ok || resolved.kind !== 'no_task') {
-                  bindingFailure =
-                    'canonical task resolution changed after no-task candidate freeze';
-                }
-              } else {
-                bindingFailure = `non-authoritative ${candidate.resolution} candidate cannot be graded`;
-              }
+    applied = withSupervisorStateLock((state) => {
+      let result: { goal: SupervisorGoal; authorityRejection?: string };
+      try {
+        result = db.transaction(
+          (tx) => {
+            const receipt = getIndependentReviewReceipt(tx, input.receiptId);
+            if (!receipt) {
+              throw new Error('independent completion requires a durable review receipt');
             }
-            if (bindingFailure) {
+            const goal = state.goals.find((candidate) => candidate.id === input.goalId);
+            if (!goal) throw new Error(`goal not found: ${input.goalId}`);
+            const pending = goal.pendingCompletion;
+            if (!pending) throw new Error(`goal ${input.goalId} has no pending completion claim`);
+            if (!pending.sourceHead) {
+              throw new Error(
+                'pending completion has no exact-head binding; legacy claim requires revalidation',
+              );
+            }
+            if (receipt.project !== goal.project || receipt.goalId !== input.goalId) {
+              throw new Error('independent-review receipt belongs to a different project or goal');
+            }
+            if (receipt.purpose !== 'independent_completion_review') {
+              throw new Error('completion grade requires an independent-review receipt');
+            }
+            if (pending.sourceHead !== receipt.sourceHead) {
+              throw new Error('independent completion run evidence is for a different exact head');
+            }
+            if (
+              receipt.executionStatus !== 'succeeded' ||
+              receipt.pendingClaimedAt !== pending.claimedAt ||
+              Date.parse(receipt.reviewStartedAt) < Date.parse(pending.claimedAt)
+            ) {
+              throw new Error('independent completion receipt is causally stale or unsuccessful');
+            }
+            if (
+              !pending.reviewDispatch ||
+              receipt.dispatchId !== pending.reviewDispatch.id ||
+              receipt.provider !== pending.reviewDispatch.provider ||
+              receipt.reviewStartedAt !== pending.reviewDispatch.startedAt ||
+              receipt.taskId !== pending.reviewDispatch.taskId ||
+              receipt.runId !== pending.reviewDispatch.runId ||
+              receipt.providerId !== pending.reviewDispatch.providerId ||
+              receipt.providerAccountLabel !== pending.reviewDispatch.providerAccountLabel
+            ) {
+              throw new Error(
+                'independent completion receipt is not from the Major-owned review dispatch',
+              );
+            }
+            if (!receipt.runId.trim()) {
+              throw new Error('independent completion requires a durable run id');
+            }
+            const canonicalRun = tx
+              .select({
+                taskId: agentRuns.taskId,
+                providerId: agentRuns.providerId,
+                provider: agentProviders.name,
+                accountLabel: agentProviders.accountLabel,
+                purpose: agentRuns.purpose,
+                sourceHead: agentRuns.sourceHead,
+                status: agentRuns.status,
+              })
+              .from(agentRuns)
+              .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
+              .where(eq(agentRuns.id, receipt.runId))
+              .get();
+            if (
+              !canonicalRun ||
+              canonicalRun.taskId !== receipt.taskId ||
+              canonicalRun.providerId !== receipt.providerId ||
+              canonicalRun.provider !==
+                (receipt.provider === 'claude' ? 'claude-code' : receipt.provider) ||
+              canonicalRun.accountLabel !== receipt.providerAccountLabel ||
+              canonicalRun.purpose !== 'review' ||
+              canonicalRun.sourceHead !== receipt.sourceHead ||
+              canonicalRun.status !== 'succeeded'
+            ) {
+              throw new Error(
+                'independent completion requires its canonical succeeded task review run and routed provider account',
+              );
+            }
+            if (!WORKER_HOSTS.includes(receipt.provider)) {
+              throw new Error('independent-review receipt has an unknown provider identity');
+            }
+            if (pending.coordinator === receipt.provider) {
+              throw new Error(
+                `independent completion grade refused: ${receipt.provider} made the completion claim`,
+              );
+            }
+            const evidence = receipt.evidence.trim();
+            if (!evidence) throw new Error('independent completion evidence must not be empty');
+            if (
+              !pending.sourceTreeDigest ||
+              !sourceIdentityMatches(
+                { sourceHead: pending.sourceHead, sourceTreeDigest: pending.sourceTreeDigest },
+                readSupervisorSourceIdentity(goal.repoPath),
+              )
+            ) {
               goal.status = 'active';
               goal.pendingCompletion = undefined;
               goal.activePid = undefined;
               goal.lastFinishedAt = new Date().toISOString();
               goal.nextRunAt = new Date().toISOString();
-              goal.lastSummary = `Pending completion was reopened because final candidate promotion proof failed: ${bindingFailure}`;
+              goal.lastSummary =
+                'Pending completion was reopened because its exact repository or source-tree identity changed before grade application.';
               goal.updatedAt = new Date().toISOString();
-              return { goal, authorityRejection: bindingFailure };
+              return { goal, authorityRejection: 'candidate source identity changed' };
             }
-          }
-          goal.pendingCompletion = undefined;
-          goal.activePid = undefined;
-          goal.lastFinishedAt = new Date().toISOString();
-          goal.ownerGate = undefined;
-          goal.consecutiveFailures = 0;
-          if (receipt.verdict === 'pass') {
-            goal.status = 'done';
-            goal.nextRunAt = undefined;
-            goal.lastSummary = redactText(
-              `Independent validation passed: ${pending.summary}. Evidence: ${evidence}`,
-            );
-          } else {
-            goal.status = 'active';
-            goal.nextRunAt = new Date().toISOString();
-            goal.lastSummary = redactText(
-              `Independent validation rejected completion: ${evidence}`,
-            );
-          }
-          goal.updatedAt = new Date().toISOString();
-          return { goal };
-        });
-      },
-      { behavior: 'immediate' },
-    );
+            if (receipt.verdict === 'pass') {
+              const candidate = pending.candidate;
+              let bindingFailure: string | undefined;
+              if (
+                !candidate ||
+                candidate.sourceHead !== pending.sourceHead ||
+                candidate.sourceTreeDigest !== pending.sourceTreeDigest
+              ) {
+                bindingFailure = 'pending completion lacks its exact frozen candidate binding';
+              } else {
+                const resolved = resolveCanonicalTaskBinding(tx, goal.repoPath);
+                if (candidate.resolution === 'task') {
+                  if (
+                    !resolved.ok ||
+                    resolved.binding.taskId !== candidate.task.taskId ||
+                    resolved.binding.projectId !== candidate.task.projectId ||
+                    resolved.binding.frozenCriteriaJson !== candidate.task.frozenCriteriaJson
+                  ) {
+                    bindingFailure = 'canonical task binding changed after candidate freeze';
+                  } else {
+                    try {
+                      const criteria = parseCompletionCriteria(candidate.task.frozenCriteriaJson);
+                      if (
+                        criteria.progressiveValidation &&
+                        criteria.progressiveValidation.candidateHead !== candidate.sourceHead
+                      ) {
+                        bindingFailure =
+                          'canonical task criteria target a different candidate head';
+                      } else {
+                        const proof = evaluateTaskPromotionProof(tx, {
+                          taskId: candidate.task.taskId,
+                          repoPath: goal.repoPath,
+                        });
+                        if (!proof.ok) bindingFailure = proof.failures.join('; ');
+                      }
+                    } catch (error) {
+                      bindingFailure = `canonical task criteria are invalid: ${error instanceof Error ? error.message : String(error)}`;
+                    }
+                  }
+                } else if (candidate.resolution === 'no_task') {
+                  if (resolved.ok || resolved.kind !== 'no_task') {
+                    bindingFailure =
+                      'canonical task resolution changed after no-task candidate freeze';
+                  }
+                } else {
+                  bindingFailure = `non-authoritative ${candidate.resolution} candidate cannot be graded`;
+                }
+              }
+              if (bindingFailure) {
+                goal.status = 'active';
+                goal.pendingCompletion = undefined;
+                goal.activePid = undefined;
+                goal.lastFinishedAt = new Date().toISOString();
+                goal.nextRunAt = new Date().toISOString();
+                goal.lastSummary = `Pending completion was reopened because final candidate promotion proof failed: ${bindingFailure}`;
+                goal.updatedAt = new Date().toISOString();
+                return { goal, authorityRejection: bindingFailure };
+              }
+            }
+            goal.pendingCompletion = undefined;
+            goal.activePid = undefined;
+            goal.lastFinishedAt = new Date().toISOString();
+            goal.ownerGate = undefined;
+            goal.consecutiveFailures = 0;
+            if (receipt.verdict === 'pass') {
+              goal.status = 'done';
+              goal.nextRunAt = undefined;
+              goal.lastSummary = redactText(
+                `Independent validation passed: ${pending.summary}. Evidence: ${evidence}`,
+              );
+            } else {
+              goal.status = 'active';
+              goal.nextRunAt = new Date().toISOString();
+              goal.lastSummary = redactText(
+                `Independent validation rejected completion: ${evidence}`,
+              );
+            }
+            goal.updatedAt = new Date().toISOString();
+            tx.insert(supervisorCompletionCommits)
+              .values({
+                id: newId('scommit'),
+                project: goal.project,
+                goalId: goal.id,
+                receiptId: receipt.id,
+                pendingClaimedAt: pending.claimedAt,
+                sourceHead: pending.sourceHead,
+                sourceTreeDigest: pending.sourceTreeDigest,
+                verdict: receipt.verdict,
+                finalGoalJson: JSON.stringify(goal),
+              })
+              .run();
+            if (
+              !sourceIdentityMatches(
+                { sourceHead: pending.sourceHead, sourceTreeDigest: pending.sourceTreeDigest },
+                readSupervisorSourceIdentity(goal.repoPath),
+              )
+            ) {
+              throw new CompletionSourceFenceError(
+                'candidate source identity changed during commit',
+              );
+            }
+            return { goal };
+          },
+          { behavior: 'immediate' },
+        );
+      } catch (error) {
+        if (!(error instanceof CompletionSourceFenceError)) throw error;
+        const goal = state.goals.find((candidate) => candidate.id === input.goalId);
+        if (!goal) throw new Error(`goal not found: ${input.goalId}`);
+        goal.status = 'active';
+        goal.pendingCompletion = undefined;
+        goal.activePid = undefined;
+        goal.lastFinishedAt = new Date().toISOString();
+        goal.nextRunAt = new Date().toISOString();
+        goal.lastSummary =
+          'Pending completion was reopened because its exact source identity changed at the durable commit boundary.';
+        goal.updatedAt = new Date().toISOString();
+        result = { goal, authorityRejection: 'candidate source identity changed during commit' };
+      }
+      writeSupervisorState(state);
+      return result;
+    });
   } finally {
     ownedDb?.sqlite.close();
   }
@@ -670,6 +760,43 @@ export function applyIndependentCompletionGrade(input: {
     throw new Error(`independent completion grade refused: ${applied.authorityRejection}`);
   }
   return applied.goal;
+}
+
+/** Materialize a committed completion decision after a crash between the
+ * SQLite authority commit and the JSON projection write. A refined or
+ * otherwise replaced pending claim is never resurrected. */
+export function recoverSupervisorCompletion(goalId: string, db?: Db): SupervisorGoal | undefined {
+  const ownedDb = db ? undefined : openDb();
+  const connection = db ?? ownedDb!.db;
+  try {
+    const committed = connection
+      .select()
+      .from(supervisorCompletionCommits)
+      .where(eq(supervisorCompletionCommits.goalId, goalId))
+      .orderBy(desc(supervisorCompletionCommits.createdAt))
+      .get();
+    if (!committed) return undefined;
+    const finalGoal = JSON.parse(committed.finalGoalJson) as SupervisorGoal;
+    if (
+      finalGoal.id !== goalId ||
+      finalGoal.project !== committed.project ||
+      finalGoal.pendingCompletion !== undefined ||
+      (committed.verdict === 'pass' ? finalGoal.status !== 'done' : finalGoal.status !== 'active')
+    ) {
+      throw new Error('durable supervisor completion commit contains an invalid goal projection');
+    }
+    return mutateSupervisorState((state) => {
+      const goalIndex = state.goals.findIndex((candidate) => candidate.id === goalId);
+      if (goalIndex < 0) throw new Error(`goal not found: ${goalId}`);
+      const current = state.goals[goalIndex]!;
+      if (current.status === 'done') return current;
+      if (current.pendingCompletion?.claimedAt !== committed.pendingClaimedAt) return current;
+      state.goals[goalIndex] = finalGoal;
+      return finalGoal;
+    });
+  } finally {
+    ownedDb?.sqlite.close();
+  }
 }
 
 export function getGoal(id: string): SupervisorGoal | undefined {

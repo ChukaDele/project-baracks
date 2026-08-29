@@ -2,10 +2,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyIndependentCompletionGrade,
   readSupervisorState,
+  recoverSupervisorCompletion,
   updateGoal,
   writeSupervisorState,
   type SupervisorGoal,
@@ -16,8 +18,8 @@ import {
 } from '../src/supervisor/runtime.js';
 import type { WorkerReport } from '../src/supervisor/worker-report.js';
 import { openDb } from '../src/db/client.js';
-import { runPerformanceObservations } from '../src/db/schema.js';
-import { reviewFindings } from '../src/db/schema.js';
+import { agentProviders, projects, runPerformanceObservations } from '../src/db/schema.js';
+import { reviewFindings, supervisorCompletionCommits } from '../src/db/schema.js';
 import {
   recordPerformanceObservation,
   recordIndependentReviewExecution,
@@ -27,8 +29,9 @@ import { readSupervisorSourceIdentity } from '../src/supervisor/source-identity.
 import { addProject } from '../src/config/project-service.js';
 import { projectConfigSchema } from '../src/config/project-config.js';
 import { addTask, getTask, transitionTask } from '../src/domain/task-service.js';
+import { createRun, setRunStatus } from '../src/domain/run-service.js';
 import { newId } from '../src/domain/ids.js';
-import { recordQualifyingVerification } from './helpers.js';
+import { ensureObservedModel, recordQualifyingVerification } from './helpers.js';
 
 let root: string;
 let controlRoot: string;
@@ -86,6 +89,46 @@ function reviewReceiptId(
 ) {
   const dispatchId = `dispatch-${provider}-${verdict}-${sourceHead}-${goalId}`;
   const current = readSupervisorState().goals[0];
+  let project;
+  try {
+    project = addProject(
+      reviewDb.db,
+      projectConfigSchema.parse({ name: `major-${goalId}`, repoPath: root }),
+    );
+  } catch {
+    project = reviewDb.db.select().from(projects).get()!;
+  }
+  const taskId =
+    current?.pendingCompletion?.candidate?.resolution === 'task'
+      ? current.pendingCompletion.candidate.task.taskId
+      : addTask(reviewDb.db, { projectId: project.id, title: 'completion review authority' }).id;
+  const providerDbName = provider === 'claude' ? 'claude-code' : provider;
+  let providerRow = reviewDb.db
+    .select()
+    .from(agentProviders)
+    .where(eq(agentProviders.name, providerDbName))
+    .get();
+  if (!providerRow) {
+    const providerId = newId('aprov');
+    reviewDb.db.insert(agentProviders).values({ id: providerId, name: providerDbName }).run();
+    providerRow = reviewDb.db
+      .select()
+      .from(agentProviders)
+      .where(eq(agentProviders.id, providerId))
+      .get()!;
+  }
+  const modelId = ensureObservedModel(reviewDb.db, providerRow.id, 'review-model');
+  const run = createRun(reviewDb.db, {
+    taskId,
+    providerId: providerRow.id,
+    modelId,
+    modelRef: 'review-model',
+    purpose: 'review',
+    billingMode: 'subscription_included',
+    routingReason: 'test independent review',
+    sourceHead,
+  });
+  setRunStatus(reviewDb.db, run.id, 'succeeded');
   if (current?.pendingCompletion) {
     updateGoal(current.id, {
       pendingCompletion: {
@@ -93,6 +136,10 @@ function reviewReceiptId(
         reviewDispatch: {
           id: dispatchId,
           provider,
+          providerId: providerRow.id,
+          providerAccountLabel: providerRow.accountLabel,
+          taskId,
+          runId: run.id,
           startedAt: '2026-08-11T00:02:00.000Z',
         },
       },
@@ -101,9 +148,12 @@ function reviewReceiptId(
   return recordIndependentReviewExecution(reviewDb.db, {
     project: 'major',
     goalId,
-    runId: 'run-review',
+    runId: run.id,
+    taskId,
     dispatchId,
     provider,
+    providerId: providerRow.id,
+    providerAccountLabel: providerRow.accountLabel,
     sourceHead,
     pendingClaimedAt: '2026-08-11T00:01:00.000Z',
     reviewStartedAt: '2026-08-11T00:02:00.000Z',
@@ -279,6 +329,51 @@ describe('independent goal completion', () => {
     expect(result.pendingCompletion).toBeUndefined();
     expect(result.lastSummary).toContain('Independent validation passed');
     expect(readSupervisorState().goals[0]!.status).toBe('done');
+    const committed = reviewDb.db.select().from(supervisorCompletionCommits).get()!;
+    expect(committed).toMatchObject({
+      goalId: 'goal-1',
+      verdict: 'pass',
+      sourceHead: readSupervisorSourceIdentity(root)!.sourceHead,
+    });
+    expect(() =>
+      reviewDb.sqlite
+        .prepare('DELETE FROM supervisor_completion_commits WHERE id = ?')
+        .run(committed.id),
+    ).toThrow(/append-only/);
+  });
+
+  it('recovers the done projection from the single durable completion commit', () => {
+    const receiptId = reviewReceiptId('claude', 'pass', 'durable exact-head review passed');
+    applyIndependentCompletionGrade({ goalId: 'goal-1', receiptId, db: reviewDb.db });
+    writeSupervisorState({ version: 1, goals: [pendingGoal()], sessions: [] });
+
+    const recovered = recoverSupervisorCompletion('goal-1', reviewDb.db);
+    expect(recovered?.status).toBe('done');
+    expect(recovered?.pendingCompletion).toBeUndefined();
+    expect(readSupervisorState().goals[0]!.status).toBe('done');
+  });
+
+  it('rolls back authority and reopens when the source tree changes at the commit write', () => {
+    const receiptId = reviewReceiptId('claude', 'pass', 'reviewed the frozen source tree');
+    reviewDb.sqlite.function('mutate_source_at_commit', () => {
+      writeFileSync(join(root, 'candidate.txt'), 'mutated by concurrent writer at commit\n');
+      return 1;
+    });
+    reviewDb.sqlite.exec(`
+      CREATE TRIGGER mutate_source_at_completion_commit
+      AFTER INSERT ON supervisor_completion_commits
+      BEGIN
+        SELECT mutate_source_at_commit();
+      END;
+    `);
+
+    expect(() =>
+      applyIndependentCompletionGrade({ goalId: 'goal-1', receiptId, db: reviewDb.db }),
+    ).toThrow(/source identity changed during commit/i);
+    expect(reviewDb.db.select().from(supervisorCompletionCommits).all()).toEqual([]);
+    const reopened = readSupervisorState().goals[0]!;
+    expect(reopened.status).toBe('active');
+    expect(reopened.pendingCompletion).toBeUndefined();
   });
 
   it('atomically reopens instead of applying a passing grade after source mutation', () => {

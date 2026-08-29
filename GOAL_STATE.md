@@ -322,6 +322,14 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   concurrent SQLite authority changes through the supervisor done transition. Refinement now revokes
   the old authority epoch first, while an immediate transaction serializes final binding/proof and
   state transition; 73/73 affected tests plus typecheck, targeted lint, and formatting passed.
+- Independent review regression: `1a386ac` left the final authority in SQLite and supervisor done in
+  a separate JSON write without a recovery projection, sampled source identity outside the authority
+  write, and accepted a gateway run ID without a canonical task/provider-account run. SQLite now owns
+  one append-only completion commit, JSON state recovers from it, the write performs a post-insert
+  exact HEAD/tree fence with rollback and reopen, and receipts require the succeeded persisted review
+  run for the exact task, head, purpose, provider, and routed account. The proportional gate passed
+  71/71 affected migration, receipt, runtime, and completion tests plus typecheck, targeted lint, and
+  formatting; the full matrix was intentionally not run.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

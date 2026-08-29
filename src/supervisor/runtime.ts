@@ -10,7 +10,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { and, eq } from 'drizzle-orm';
 import { openDb, type DbConn } from '../db/client.js';
+import { agentModels, agentProviders } from '../db/schema.js';
 import {
   evaluateTaskPromotionProof,
   parseCompletionCriteria,
@@ -18,7 +20,10 @@ import {
   type CanonicalTaskBinding,
 } from '../domain/completion.js';
 import { assessPromotion, planProgressiveValidation } from '../domain/sdlc.js';
-import { getProjectByRepoPath } from '../config/project-service.js';
+import { addTask } from '../domain/task-service.js';
+import { createRun, setRunStatus } from '../domain/run-service.js';
+import { addProject, getProjectByRepoPath } from '../config/project-service.js';
+import { projectConfigSchema } from '../config/project-config.js';
 import {
   listCapabilities,
   blockCapabilityVerification,
@@ -66,6 +71,7 @@ import {
   isLiveWorkerFresh,
   majorHome,
   readSupervisorState,
+  recoverSupervisorCompletion,
   updateGoal,
   WORKER_HOSTS,
   type SupervisorGoal,
@@ -918,6 +924,7 @@ export async function runGoalCycle(
   goalId: string,
   options: { maxTimeoutMs?: number } = {},
 ): Promise<GoalCycleOutcome> {
+  recoverSupervisorCompletion(goalId);
   const goal = getGoal(goalId);
   if (!goal) throw new Error(`goal not found: ${goalId}`);
   if (goal.status === 'done' || goal.status === 'paused') return { ranCycle: false };
@@ -980,6 +987,73 @@ async function runPendingCompletionReview(
   const reviewStartedAt = new Date().toISOString();
   const dispatchId = randomUUID();
   const sourceTreeDigest = pending.sourceTreeDigest;
+  const reviewState = openDb();
+  let canonicalReview: {
+    taskId: string;
+    runId: string;
+    providerId: string;
+    providerAccountLabel: string;
+  };
+  try {
+    let project;
+    try {
+      project = getProjectByRepoPath(reviewState.db, goal.repoPath);
+    } catch {
+      project = addProject(
+        reviewState.db,
+        projectConfigSchema.parse({ name: goal.project, repoPath: goal.repoPath }),
+      );
+    }
+    const taskId =
+      pending.candidate.resolution === 'task'
+        ? pending.candidate.task.taskId
+        : addTask(reviewState.db, {
+            projectId: project.id,
+            title: `Independent completion review for supervisor goal ${goal.id}`,
+            description: 'Major-owned review authority task; not a promotable implementation task.',
+          }).id;
+    const routed = parseCapacityKey(selection.provider);
+    const provider = reviewState.db
+      .select()
+      .from(agentProviders)
+      .where(
+        and(
+          eq(agentProviders.name, routed.providerName),
+          eq(agentProviders.accountLabel, routed.accountLabel),
+        ),
+      )
+      .get();
+    if (!provider) throw new Error('routed independent-review provider account is not persisted');
+    const model = reviewState.db
+      .select()
+      .from(agentModels)
+      .where(
+        and(eq(agentModels.providerId, provider.id), eq(agentModels.modelRef, selection.modelRef)),
+      )
+      .get();
+    if (!model || model.billingMode === 'unknown') {
+      throw new Error('routed independent-review model has no authoritative billing state');
+    }
+    const run = createRun(reviewState.db, {
+      taskId,
+      providerId: provider.id,
+      modelId: model.id,
+      modelRef: model.modelRef,
+      purpose: 'review',
+      billingMode: model.billingMode,
+      routingReason: selection.reason,
+      sourceHead: pending.sourceHead,
+    });
+    setRunStatus(reviewState.db, run.id, 'running');
+    canonicalReview = {
+      taskId,
+      runId: run.id,
+      providerId: provider.id,
+      providerAccountLabel: provider.accountLabel,
+    };
+  } finally {
+    reviewState.sqlite.close();
+  }
   updateGoal(goal.id, {
     activePid: process.pid,
     lastStartedAt: reviewStartedAt,
@@ -988,7 +1062,15 @@ async function runPendingCompletionReview(
     lastSummary: `Independent completion review running on ${selection.host}.`,
     pendingCompletion: {
       ...pending,
-      reviewDispatch: { id: dispatchId, provider: selection.host, startedAt: reviewStartedAt },
+      reviewDispatch: {
+        id: dispatchId,
+        provider: selection.host,
+        providerId: canonicalReview.providerId,
+        providerAccountLabel: canonicalReview.providerAccountLabel,
+        taskId: canonicalReview.taskId,
+        runId: canonicalReview.runId,
+        startedAt: reviewStartedAt,
+      },
     },
   });
   const outcome = await runWorker({
@@ -1010,8 +1092,24 @@ async function runPendingCompletionReview(
       `Use read-only exact-head checks. Do not implement, merge, install, or trust the completing worker's conclusion.\n` +
       `End with exactly one provider-owned line: MAJOR_RESULT: {"status":"active","summary":"review summary","independentReview":{"purpose":"independent_completion_review","goalId":"${goal.id}","sourceHead":"${pending.sourceHead}","verdict":"pass|fail","evidence":"specific evidence"}}`,
   });
+  const runStatusState = openDb();
+  try {
+    const providerSessionRef = outcome.runId ?? outcome.sessionRef;
+    setRunStatus(
+      runStatusState.db,
+      canonicalReview.runId,
+      outcome.status === 'succeeded'
+        ? 'succeeded'
+        : outcome.status === 'timed_out'
+          ? 'timed_out'
+          : 'failed',
+      providerSessionRef ? { sessionRef: providerSessionRef } : {},
+    );
+  } finally {
+    runStatusState.sqlite.close();
+  }
   const report = outcome.status === 'succeeded' ? parseWorkerReport(outcome.stdout) : undefined;
-  if (!outcome.runId || !report?.independentReview) {
+  if (!report?.independentReview) {
     updateGoal(goal.id, {
       activePid: undefined,
       lastFinishedAt: new Date().toISOString(),
@@ -1036,9 +1134,12 @@ async function runPendingCompletionReview(
     receiptId = recordIndependentReviewExecution(receiptState.db, {
       project: goal.project,
       goalId: goal.id,
-      runId: outcome.runId,
+      runId: canonicalReview.runId,
+      taskId: canonicalReview.taskId,
       dispatchId,
       provider: selection.host,
+      providerId: canonicalReview.providerId,
+      providerAccountLabel: canonicalReview.providerAccountLabel,
       sourceHead: pending.sourceHead,
       pendingClaimedAt: pending.claimedAt,
       reviewStartedAt,

@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { openDb } from '../src/db/client.js';
-import { independentReviewReceipts, runPerformanceObservations } from '../src/db/schema.js';
+import {
+  agentProviders,
+  independentReviewReceipts,
+  runPerformanceObservations,
+} from '../src/db/schema.js';
+import { addProject } from '../src/config/project-service.js';
+import { projectConfigSchema } from '../src/config/project-config.js';
+import { addTask } from '../src/domain/task-service.js';
+import { createRun, setRunStatus } from '../src/domain/run-service.js';
+import { newId } from '../src/domain/ids.js';
+import { ensureObservedModel } from './helpers.js';
 import {
   listPerformanceObservations,
   performanceHistoryReport,
@@ -39,6 +49,25 @@ function receipt(
 describe('durable performance history', () => {
   it('keeps generic history observational and mints authority only from review execution', () => {
     const { db, sqlite } = openDb(':memory:');
+    const project = addProject(
+      db,
+      projectConfigSchema.parse({ name: 'project-baracks', repoPath: '/tmp/project-baracks' }),
+    );
+    const task = addTask(db, { projectId: project.id, title: 'independent review authority' });
+    const providerId = newId('aprov');
+    db.insert(agentProviders).values({ id: providerId, name: 'codex' }).run();
+    const modelId = ensureObservedModel(db, providerId, 'review-model');
+    const run = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelId,
+      modelRef: 'review-model',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'test independent review',
+      sourceHead: 'a'.repeat(40),
+    });
+    setRunStatus(db, run.id, 'succeeded');
     const review = {
       runEvidence: { runId: 'provider-run', sourceHead: 'a'.repeat(40) },
       independentReview: {
@@ -65,8 +94,11 @@ describe('durable performance history', () => {
         project: 'github.com/chukadele/project-baracks',
         goalId: 'goal-1',
         runId: 'stale-provider-run',
+        taskId: task.id,
         dispatchId: 'stale-dispatch',
         provider: 'codex',
+        providerId,
+        providerAccountLabel: 'default',
         sourceHead: 'a'.repeat(40),
         pendingClaimedAt: '2026-08-27T02:00:00.000Z',
         reviewStartedAt: '2026-08-27T01:59:59.000Z',
@@ -74,12 +106,32 @@ describe('durable performance history', () => {
         review: review.independentReview,
       }),
     ).toThrow(/predates the pending completion claim/);
+    expect(() =>
+      recordIndependentReviewExecution(db, {
+        project: 'github.com/chukadele/project-baracks',
+        goalId: 'goal-1',
+        runId: run.id,
+        taskId: task.id,
+        dispatchId: 'wrong-account-dispatch',
+        provider: 'codex',
+        providerId,
+        providerAccountLabel: 'another-account',
+        sourceHead: 'a'.repeat(40),
+        pendingClaimedAt: '2026-08-27T01:30:00.000Z',
+        reviewStartedAt: '2026-08-27T02:00:00.000Z',
+        executionStatus: 'succeeded',
+        review: review.independentReview,
+      }),
+    ).toThrow(/canonical succeeded task run.*routed provider account/i);
     recordIndependentReviewExecution(db, {
       project: 'github.com/chukadele/project-baracks',
       goalId: 'goal-1',
-      runId: 'provider-run',
+      runId: run.id,
+      taskId: task.id,
       dispatchId: 'review-dispatch',
       provider: 'codex',
+      providerId,
+      providerAccountLabel: 'default',
       sourceHead: 'a'.repeat(40),
       pendingClaimedAt: '2026-08-27T01:30:00.000Z',
       reviewStartedAt: '2026-08-27T02:00:00.000Z',
@@ -96,7 +148,7 @@ describe('durable performance history', () => {
     expect(authority).toMatchObject({
       project: 'github.com/chukadele/project-baracks',
       goalId: 'goal-1',
-      runId: 'provider-run',
+      runId: run.id,
       provider: 'codex',
       sourceHead: 'a'.repeat(40),
       purpose: 'independent_completion_review',
