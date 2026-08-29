@@ -75,11 +75,12 @@ describe('P1-3 database-enforced completion criteria', () => {
   it('rejects untriggered canonical broad-validation proof in service and SQLite', () => {
     const { db, sqlite } = openDb(':memory:');
     const project = seedProject(db);
+    const candidateHead = 'a'.repeat(40);
     const task = addTask(db, {
       projectId: project.id,
       title: 'focused candidate',
       completionCriteriaJson: JSON.stringify({
-        progressiveValidation: { review: 'none', candidateHead: 'a'.repeat(40) },
+        progressiveValidation: { review: 'none', candidateHead },
       }),
     });
     for (const status of [
@@ -98,7 +99,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       'critical_path_behavior',
       'broader_validation',
     ])
-      recordQualifyingVerification(db, task.id, { validationSubject });
+      recordQualifyingVerification(db, task.id, { validationSubject, sourceHead: candidateHead });
     const criteria = parseCompletionCriteria(getTask(db, task.id).completionCriteriaSnapshotJson);
     expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
       'untriggered broader validation evidence is not promotable',
@@ -242,7 +243,10 @@ describe('P1-3 database-enforced completion criteria', () => {
     ] as const) {
       transitionTask(db, task.id, status);
     }
-    recordQualifyingVerification(db, task.id, { validationSubject: 'focused_tests' });
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'focused_tests',
+      sourceHead: candidateHead,
+    });
     const forceComplete = () =>
       sqlite
         .prepare(`UPDATE tasks SET status = 'completed', version = version + 1 WHERE id = ?`)
@@ -251,16 +255,20 @@ describe('P1-3 database-enforced completion criteria', () => {
 
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'cheapest_compile_type_or_build',
+      sourceHead: candidateHead,
     });
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'critical_path_behavior',
+      sourceHead: candidateHead,
     });
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'risk_specific_check:authority boundary',
+      sourceHead: candidateHead,
     });
     expect(() => forceComplete()).toThrow(/risk-specific validation/);
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'risk_specific_check:legacy compatibility',
+      sourceHead: candidateHead,
     });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'implementation-provider' }).run();

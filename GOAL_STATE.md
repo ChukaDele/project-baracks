@@ -271,6 +271,12 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   authority row and the supervisor goal reopens. The affected gate passed 80/80 tests across four
   focused files plus typecheck, targeted lint, and formatting. The broad matrix was not run because
   the requested proportional gate bounded validation to the changed completion path.
+- Broader-validation evidence (append-only): candidate `3a329a25` triggered the bounded broader gate
+  for blast radius across shared run creation, admission, task completion, SQLite enforcement, and
+  migrations. Cost was one nine-file test invocation (6.86 seconds wall time; 9.96 seconds aggregate
+  test time); expected information gain was detecting frozen-head fixture drift and authority/schema
+  regressions without paying for the unrelated full matrix. After explicitly binding qualifying
+  verification fixtures to their frozen candidate head, all 9 files and 138/138 tests passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
 - Final ordinary gate for `7385b13`: 106/106 files and 910/910 tests passed.
 - Final resource gate for `7385b13`: 139 tests passed with 5 expected skips.
@@ -351,6 +357,10 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   the transaction helper still had to perform COMMIT. Completion now uses a fence-owned explicit commit
   primitive; a writer injected after its last assertion and before transaction completion prevents the
   append-only authority row from committing and reopens the pending goal.
+- Broader-validation regression: `3a329a25` passed the focused completion fence but two direct-SQL
+  enforcement cases used qualifying verification fixtures without the task's frozen candidate head.
+  The fixtures now provide that exact head; production `createRun` and SQLite frozen-head enforcement
+  remain strict, and the repaired affected broader gate passes 138/138.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,
