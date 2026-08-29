@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { openDb } from '../src/db/client.js';
-import { runPerformanceObservations } from '../src/db/schema.js';
+import { independentReviewReceipts, runPerformanceObservations } from '../src/db/schema.js';
 import {
   listPerformanceObservations,
   performanceHistoryReport,
@@ -36,6 +36,71 @@ function receipt(
 }
 
 describe('durable performance history', () => {
+  it('projects only successful Major provider review runs into append-only grade authority', () => {
+    const { db, sqlite } = openDb(':memory:');
+    const review = {
+      runEvidence: { runId: 'provider-run', sourceHead: 'a'.repeat(40) },
+      independentReview: {
+        purpose: 'independent_completion_review',
+        goalId: 'goal-1',
+        sourceHead: 'a'.repeat(40),
+        verdict: 'pass',
+        evidence: 'provider-produced exact-head verdict',
+      },
+    };
+    recordPerformanceObservation(db, {
+      project: 'github.com/chukadele/project-baracks',
+      source: 'dsh',
+      receipt: receipt('2026-08-27T00:00:00.000Z', review),
+    });
+    const genericObservationId = db
+      .select({ id: runPerformanceObservations.id })
+      .from(runPerformanceObservations)
+      .get()!.id;
+    expect(() =>
+      db
+        .insert(independentReviewReceipts)
+        .values({
+          id: 'forged-review-receipt',
+          observationId: genericObservationId,
+          project: 'github.com/chukadele/project-baracks',
+          goalId: 'goal-1',
+          runId: 'provider-run',
+          provider: 'codex',
+          sourceHead: 'a'.repeat(40),
+          purpose: 'independent_completion_review',
+          verdict: 'pass',
+          evidence: 'provider-produced exact-head verdict',
+        })
+        .run(),
+    ).toThrow(/matching Major provider-run evidence/);
+    recordPerformanceObservation(db, {
+      project: 'github.com/chukadele/project-baracks',
+      source: 'major',
+      receipt: receipt('2026-08-27T01:00:00.000Z', { ...review, outcome: 'failed' }),
+    });
+    expect(db.select().from(independentReviewReceipts).all()).toEqual([]);
+    recordPerformanceObservation(db, {
+      project: 'github.com/chukadele/project-baracks',
+      source: 'major',
+      receipt: receipt('2026-08-27T02:00:00.000Z', review),
+    });
+    const authority = db.select().from(independentReviewReceipts).get()!;
+    expect(authority).toMatchObject({
+      project: 'github.com/chukadele/project-baracks',
+      goalId: 'goal-1',
+      runId: 'provider-run',
+      provider: 'codex',
+      sourceHead: 'a'.repeat(40),
+      purpose: 'independent_completion_review',
+      verdict: 'pass',
+    });
+    expect(() =>
+      sqlite.prepare('DELETE FROM independent_review_receipts WHERE id = ?').run(authority.id),
+    ).toThrow(/append-only/);
+    sqlite.close();
+  });
+
   it('rejects malformed receipt fields at the durable boundary', () => {
     const { db, sqlite } = openDb(':memory:');
     expect(() =>

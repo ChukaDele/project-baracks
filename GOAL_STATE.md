@@ -29,6 +29,8 @@ Substantive. Risk: authority/process semantics. Review: independent.
 - Preserve compact state, review semantics, delivery evidence, and READY behavioral proof.
 - Fail closed on qualifying or ambiguous canonical tasks, bind task reviews to their frozen exact
   head, and accept supervisor completion grades only from Major-owned review receipts.
+- Require focused and independent task implementation/repair/review runs to carry the frozen
+  candidate head, and derive no-task requirements from `decideSdlc` before worker dispatch.
 - Run focused/risk-specific checks plus the cheapest relevant type check; do not run the full matrix.
 
 ## Evidence
@@ -126,6 +128,13 @@ installation and installed behavior proof follow normal merge.
   evidence from the succeeded provider-owned durable run receipt; CLI caller labels are not authority.
 - Progressive independent task review freezes `candidateHead`; implementation and review provider
   separation is evaluated only among succeeded runs bound to that exact head in service and SQLite.
+- Every progressive task freezes `candidateHead`, including focused review. Run creation and SQLite
+  reject implementation, repair, or review runs whose source head is absent or different.
+- Generic performance history remains observational. Only a completed Major provider review run can
+  project an append-only independent-review receipt, and only that receipt can grade pending work.
+- No-task promotion contracts are deterministically classified from Major-owned operation facts
+  before dispatch; material-risk proof uses exact structured criterion/evidence records persisted in
+  pending completion rather than matching free-text prefixes.
 
 ## Completed evidence
 
@@ -174,6 +183,11 @@ installation and installed behavior proof follow normal merge.
   receipts exclusively supply independent verdicts; task review runs persist and match the frozen
   candidate head; and untriggered broad proof is rejected by service and SQLite. The affected gate
   passed 120/120 tests across seven focused files plus typecheck, targeted lint, and formatting.
+- Fresh exact-head binding repair: progressive focused and independent run creation now enforces the
+  frozen candidate SHA in service and SQLite; project grading consumes a dedicated append-only review
+  receipt rather than arbitrary history; and classifier-derived no-task contracts require exact
+  structured material-risk evidence. The affected gate passed 124/124 tests across seven files before
+  the final clean-head freeze.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -211,6 +225,10 @@ installation and installed behavior proof follow normal merge.
   state, let callers shape project-grade verdicts, lacked task-run exact-head persistence, derived
   no-task requirements from the completing report, and accepted untriggered canonical broad proof.
   Focused authority and parity regressions now protect those seams.
+- Independent review regression: `37096b5` stored task source heads without requiring them at run
+  creation, let generic history objects feed grading, defaulted no-task requirements outside the SDLC
+  classifier, and matched risk evidence by text prefix. Focused service/SQLite/receipt/classifier
+  regressions now protect those authority boundaries.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

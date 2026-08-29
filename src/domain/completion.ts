@@ -73,11 +73,11 @@ export const completionCriteriaSchema = z
             message: 'broad validation requires recorded cost and expected information gain',
           });
         }
-        if (value.review === 'independent' && !value.candidateHead) {
+        if (!value.candidateHead) {
           context.addIssue({
             code: 'custom',
             path: ['candidateHead'],
-            message: 'independent review requires an exact candidate head',
+            message: 'progressive validation requires an exact candidate head',
           });
         }
       })

@@ -78,7 +78,9 @@ describe('P1-3 database-enforced completion criteria', () => {
     const task = addTask(db, {
       projectId: project.id,
       title: 'focused candidate',
-      completionCriteriaJson: JSON.stringify({ progressiveValidation: { review: 'none' } }),
+      completionCriteriaJson: JSON.stringify({
+        progressiveValidation: { review: 'none', candidateHead: 'a'.repeat(40) },
+      }),
     });
     for (const status of [
       'ready',
@@ -134,6 +136,7 @@ describe('P1-3 database-enforced completion criteria', () => {
     expect(() =>
       updateCriteria({
         progressiveValidation: {
+          candidateHead: 'a'.repeat(40),
           broaderValidationTriggers: ['promotion_policy'],
           broadValidationJustification: {
             cost: 'two minutes',

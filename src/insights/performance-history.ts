@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import type { DbConn } from '../db/client.js';
-import { runPerformanceObservations } from '../db/schema.js';
+import { independentReviewReceipts, runPerformanceObservations } from '../db/schema.js';
 import { redactValue } from '../security/redact.js';
 
 export const RUN_INSIGHT_SCHEMA = 'major.run-insight.v1' as const;
@@ -150,9 +150,10 @@ export function recordPerformanceObservation(
 ): Receipt {
   if (!input.project.trim()) throw new Error('performance observation requires project identity');
   const receipt = validateRunInsight(input.receipt);
+  const observationId = randomUUID();
   db.insert(runPerformanceObservations)
     .values({
-      id: randomUUID(),
+      id: observationId,
       project: input.project.trim(),
       goalId: receipt.goalId,
       source: input.source,
@@ -161,6 +162,33 @@ export function recordPerformanceObservation(
       recordedAt: receipt.recordedAt,
     })
     .run();
+  const review = receipt.independentReview;
+  const run = receipt.runEvidence;
+  const provider = receipt.worker?.coordinator?.trim();
+  if (
+    input.source === 'major' &&
+    receipt.outcome === 'completed' &&
+    review &&
+    run &&
+    provider &&
+    review.goalId === receipt.goalId &&
+    review.sourceHead === run.sourceHead
+  ) {
+    db.insert(independentReviewReceipts)
+      .values({
+        id: randomUUID(),
+        observationId,
+        project: input.project.trim(),
+        goalId: receipt.goalId,
+        runId: run.runId,
+        provider,
+        sourceHead: run.sourceHead,
+        purpose: review.purpose,
+        verdict: review.verdict,
+        evidence: review.evidence,
+      })
+      .run();
+  }
   return receipt;
 }
 
@@ -208,6 +236,14 @@ export function getPerformanceObservationRecord(db: DbConn, id: string) {
     .where(eq(runPerformanceObservations.id, id))
     .get();
   return row ? { ...row, receipt: validateRunInsight(JSON.parse(row.receiptJson)) } : undefined;
+}
+
+export function getIndependentReviewReceipt(db: DbConn, id: string) {
+  return db
+    .select()
+    .from(independentReviewReceipts)
+    .where(eq(independentReviewReceipts.id, id))
+    .get();
 }
 
 function workerKey(receipt: Receipt): string | undefined {

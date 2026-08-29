@@ -3,6 +3,78 @@
 -- without $.progressiveValidation retain the existing proof semantics.
 ALTER TABLE agent_runs ADD COLUMN source_head text;
 --> statement-breakpoint
+CREATE TABLE independent_review_receipts (
+  id text PRIMARY KEY NOT NULL,
+  observation_id text NOT NULL UNIQUE REFERENCES run_performance_observations(id),
+  project text NOT NULL,
+  goal_id text NOT NULL,
+  run_id text NOT NULL,
+  provider text NOT NULL,
+  source_head text NOT NULL CHECK(length(source_head) = 40 AND source_head NOT GLOB '*[^0-9a-f]*'),
+  purpose text NOT NULL CHECK(purpose = 'independent_completion_review'),
+  verdict text NOT NULL CHECK(verdict IN ('pass', 'fail')),
+  evidence text NOT NULL CHECK(trim(evidence) <> ''),
+  created_at text NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX independent_review_receipts_goal ON independent_review_receipts(project, goal_id);
+--> statement-breakpoint
+CREATE TRIGGER independent_review_receipts_source_valid
+BEFORE INSERT ON independent_review_receipts
+WHEN NOT EXISTS (
+  SELECT 1 FROM run_performance_observations observation
+  WHERE observation.id = NEW.observation_id
+    AND observation.source = 'major'
+    AND observation.project = NEW.project
+    AND observation.goal_id = NEW.goal_id
+    AND json_extract(observation.receipt_json, '$.outcome') = 'completed'
+    AND json_extract(observation.receipt_json, '$.runEvidence.runId') = NEW.run_id
+    AND json_extract(observation.receipt_json, '$.runEvidence.sourceHead') = NEW.source_head
+    AND json_extract(observation.receipt_json, '$.worker.coordinator') = NEW.provider
+    AND json_extract(observation.receipt_json, '$.independentReview.purpose') = NEW.purpose
+    AND json_extract(observation.receipt_json, '$.independentReview.goalId') = NEW.goal_id
+    AND json_extract(observation.receipt_json, '$.independentReview.sourceHead') = NEW.source_head
+    AND json_extract(observation.receipt_json, '$.independentReview.verdict') = NEW.verdict
+    AND json_extract(observation.receipt_json, '$.independentReview.evidence') = NEW.evidence
+)
+BEGIN
+  SELECT RAISE(ABORT, 'independent review receipt requires matching Major provider-run evidence');
+END;
+--> statement-breakpoint
+CREATE TRIGGER independent_review_receipts_append_only_update
+BEFORE UPDATE ON independent_review_receipts BEGIN
+  SELECT RAISE(ABORT, 'independent review receipts are append-only');
+END;
+--> statement-breakpoint
+CREATE TRIGGER independent_review_receipts_append_only_delete
+BEFORE DELETE ON independent_review_receipts BEGIN
+  SELECT RAISE(ABORT, 'independent review receipts are append-only');
+END;
+--> statement-breakpoint
+CREATE TRIGGER agent_runs_progressive_head_insert
+BEFORE INSERT ON agent_runs
+WHEN NEW.purpose IN ('implementation', 'repair', 'review')
+  AND EXISTS (
+    SELECT 1 FROM tasks t
+    WHERE t.id = NEW.task_id
+      AND json_type(t.completion_criteria_snapshot_json, '$.progressiveValidation') = 'object'
+      AND (
+        NEW.source_head IS NULL
+        OR NEW.source_head <> json_extract(t.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead')
+      )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'progressive task run requires the frozen candidate head');
+END;
+--> statement-breakpoint
+CREATE TRIGGER agent_runs_source_head_format_insert
+BEFORE INSERT ON agent_runs
+WHEN NEW.source_head IS NOT NULL
+  AND (length(NEW.source_head) <> 40 OR NEW.source_head GLOB '*[^0-9a-f]*')
+BEGIN
+  SELECT RAISE(ABORT, 'agent run source head must be an exact lowercase SHA');
+END;
+--> statement-breakpoint
 DROP TRIGGER IF EXISTS tasks_completion_criteria_valid_insert;
 --> statement-breakpoint
 DROP TRIGGER IF EXISTS tasks_completion_criteria_valid_update;
@@ -44,7 +116,7 @@ WHEN NEW.completion_criteria_json IS NOT NULL AND (
       OR COALESCE(json_type(NEW.completion_criteria_json, '$.progressiveValidation.repositoryPolicyRequiresBroadValidation'), 'false') NOT IN ('true', 'false')
       OR COALESCE(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.review'), 'focused') NOT IN ('none', 'focused', 'independent')
       OR (json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NOT NULL AND (json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') <> 'text' OR length(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead')) <> 40 OR json_extract(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') GLOB '*[^0-9a-f]*'))
-      OR (COALESCE(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.review'), 'focused') = 'independent' AND json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NULL)
+      OR json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NULL
       OR (
         json_type(NEW.completion_criteria_json, '$.progressiveValidation.broadValidationJustification') IS NOT NULL AND (
           json_type(NEW.completion_criteria_json, '$.progressiveValidation.broadValidationJustification') <> 'object'
@@ -109,7 +181,7 @@ WHEN NEW.completion_criteria_json IS NOT NULL AND (
       OR COALESCE(json_type(NEW.completion_criteria_json, '$.progressiveValidation.repositoryPolicyRequiresBroadValidation'), 'false') NOT IN ('true', 'false')
       OR COALESCE(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.review'), 'focused') NOT IN ('none', 'focused', 'independent')
       OR (json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NOT NULL AND (json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') <> 'text' OR length(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead')) <> 40 OR json_extract(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') GLOB '*[^0-9a-f]*'))
-      OR (COALESCE(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.review'), 'focused') = 'independent' AND json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NULL)
+      OR json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NULL
       OR (
         json_type(NEW.completion_criteria_json, '$.progressiveValidation.broadValidationJustification') IS NOT NULL AND (
           json_type(NEW.completion_criteria_json, '$.progressiveValidation.broadValidationJustification') <> 'object'

@@ -76,7 +76,7 @@ import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
 import {
   completedWorkflow,
-  DEFAULT_SUPERVISOR_PROMOTION_CONTRACT,
+  deriveSupervisorPromotionContract,
   parseWorkerReport,
   type WorkerReport,
 } from './worker-report.js';
@@ -121,7 +121,8 @@ export function coordinatorDonePromotionProof(
         checkedAt: new Date().toISOString(),
       };
     }
-    const contract = goal.promotionContract ?? DEFAULT_SUPERVISOR_PROMOTION_CONTRACT;
+    const contract =
+      goal.promotionContract ?? deriveSupervisorPromotionContract({ autonomous: false });
     const plan = planProgressiveValidation({
       riskSpecificChecks: contract.materialRiskCriteria,
       triggers: Object.fromEntries(
@@ -131,7 +132,9 @@ export function coordinatorDonePromotionProof(
     });
     const missingRiskCriteria = contract.materialRiskCriteria.filter(
       (criterion) =>
-        !evidence.materialRiskChecks.some((proof) => proof.startsWith(`${criterion}:`)),
+        !evidence.materialRiskChecks.some(
+          (proof) => proof.criterion === criterion && proof.evidence.trim().length > 0,
+        ),
     );
     const broadPassed =
       evidence.broaderValidation.performed === plan.broaderValidationRequired &&
@@ -656,7 +659,7 @@ CANONICAL TARGET:
 - repository path: ${goal.repoPath}
 ${hop?.canonicalTask ? `\nQUALIFYING CANONICAL TASK:\n- task id: ${hop.canonicalTask.taskId}\n- frozen completion criteria: ${hop.canonicalTask.frozenCriteriaJson}\nTask workflows may cite this task ID; Major re-resolves it by repository identity.\n` : ''}
 FROZEN NO-TASK PROMOTION CONTRACT:
-${JSON.stringify(goal.promotionContract ?? DEFAULT_SUPERVISOR_PROMOTION_CONTRACT)}
+${JSON.stringify(goal.promotionContract ?? deriveSupervisorPromotionContract({ requiredOperations: goal.requiredOperations, autonomous: goal.autonomous }))}
 This contract is Major-owned and was fixed before this report; report evidence cannot redefine it.
 
 ${workspaceContract}
@@ -729,7 +732,7 @@ You cannot access or mutate Major's global control state. Before ending, emit ex
 single-line result for the parent coordinator to validate and apply:
 Normal supervisor done claims require structured pre-promotion evidence; task workflows may instead cite their canonical task ID for durable database proof.
   MAJOR_RESULT: {"status":"active","summary":"what now works and next critical path","assetCandidate":{"id":"reusable-id","kind":"module","summary":"what it implements","locator":"relative/path","tags":["tag"],"scope":"shared"}}
-  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence","promotionEvidence":{"focusedTests":"focused changed-behavior tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"focused","passed":true},"blockerFindings":0}}
+  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence","promotionEvidence":{"focusedTests":"focused changed-behavior tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"none","passed":true},"blockerFindings":0}}
   MAJOR_RESULT: {"status":"blocked","summary":"what is complete","ownerGate":"exact owner action"}
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
 
@@ -1113,7 +1116,10 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
   });
   if (!goal.promotionContract) {
-    goal.promotionContract = structuredClone(DEFAULT_SUPERVISOR_PROMOTION_CONTRACT);
+    goal.promotionContract = deriveSupervisorPromotionContract({
+      requiredOperations: goal.requiredOperations,
+      autonomous: goal.autonomous,
+    });
     updateGoal(goal.id, { promotionContract: goal.promotionContract });
   }
   const workerStartedAtMs = Date.now();
@@ -1321,7 +1327,11 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
             ? { promotionEvidence: promotionProof.promotionEvidence }
             : {}),
           promotionContract: structuredClone(
-            goal.promotionContract ?? DEFAULT_SUPERVISOR_PROMOTION_CONTRACT,
+            goal.promotionContract ??
+              deriveSupervisorPromotionContract({
+                requiredOperations: goal.requiredOperations,
+                autonomous: goal.autonomous,
+              }),
           ),
         },
         retryImmediately: false,

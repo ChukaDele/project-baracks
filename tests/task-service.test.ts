@@ -40,6 +40,7 @@ import {
   transitionTask,
 } from '../src/domain/task-service.js';
 import { coordinatorDonePromotionProof } from '../src/supervisor/runtime.js';
+import { deriveSupervisorPromotionContract } from '../src/supervisor/worker-report.js';
 import {
   completeTaskProperly,
   ensureObservedModel,
@@ -175,6 +176,55 @@ describe('dependency blocking', () => {
 });
 
 describe('completion proof and guarded completion transition', () => {
+  it('requires focused task implementation and review runs to use the frozen candidate head', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const candidateHead = 'a'.repeat(40);
+    const task = addTask(db, {
+      projectId: project.id,
+      title: 'focused exact-head task',
+      completionCriteriaJson: JSON.stringify({
+        progressiveValidation: { review: 'focused', candidateHead },
+      }),
+    });
+    transitionTask(db, task.id, 'ready');
+    transitionTask(db, task.id, 'queued');
+    const providerId = newId('aprov');
+    db.insert(agentProviders).values({ id: providerId, name: 'focused-provider' }).run();
+    ensureObservedModel(db, providerId, 'focused-model');
+    const base = {
+      taskId: task.id,
+      providerId,
+      modelRef: 'focused-model',
+      billingMode: 'subscription_included' as const,
+      routingReason: 'focused exact-head proof',
+    };
+    expect(() => createRun(db, { ...base, purpose: 'implementation' })).toThrow(
+      /requires frozen candidate head/,
+    );
+    expect(() => createRun(db, { ...base, purpose: 'review', sourceHead: 'b'.repeat(40) })).toThrow(
+      /requires frozen candidate head/,
+    );
+    expect(
+      createRun(db, { ...base, purpose: 'implementation', sourceHead: candidateHead }),
+    ).toMatchObject({ sourceHead: candidateHead });
+    expect(() =>
+      db
+        .insert(agentRuns)
+        .values({
+          id: newId('arun'),
+          taskId: task.id,
+          providerId,
+          modelRef: 'focused-model',
+          purpose: 'review',
+          billingMode: 'subscription_included',
+          routingReason: 'direct SQL bypass',
+          status: 'pending',
+        })
+        .run(),
+    ).toThrow(/frozen candidate head/);
+  });
+
   it('fails closed when task omission would hide an ambiguous canonical workflow', () => {
     const db = testDb();
     const project = seedProject(db);
@@ -221,7 +271,12 @@ describe('completion proof and guarded completion transition', () => {
       focusedTests: 'focused changed-behavior tests passed',
       cheapestCompileTypeOrBuild: 'typecheck passed',
       criticalPathBehavior: 'completion lifecycle passed',
-      materialRiskChecks: ['summary-only completion rejection passed'],
+      materialRiskChecks: [
+        {
+          criterion: 'summary-only completion rejection',
+          evidence: 'focused regression passed',
+        },
+      ],
       broaderValidation: {
         triggers: [],
         repositoryPolicyRequires: false,
@@ -293,6 +348,57 @@ describe('completion proof and guarded completion transition', () => {
               expectedInformationGain: 'none expected',
               evidence: 'broad suite passed',
             },
+          },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: ['required pre-promotion evidence is missing'] });
+  });
+
+  it('derives no-task risk/review requirements before the report and matches structured evidence', () => {
+    const db = testDb();
+    const promotionContract = deriveSupervisorPromotionContract({
+      autonomous: false,
+      requiredOperations: ['completion_policy'],
+    });
+    expect(promotionContract).toMatchObject({
+      review: 'independent',
+      materialRiskCriteria: ['authority'],
+    });
+    const report = {
+      status: 'done' as const,
+      summary: 'classifier-bound proof',
+      promotionEvidence: {
+        focusedTests: 'passed',
+        cheapestCompileTypeOrBuild: 'passed',
+        criticalPathBehavior: 'passed',
+        materialRiskChecks: [{ criterion: 'authority', evidence: 'authority regression passed' }],
+        broaderValidation: {
+          triggers: [],
+          repositoryPolicyRequires: false,
+          performed: false,
+        },
+        review: { level: 'independent' as const, passed: true },
+        blockerFindings: 0,
+      },
+    };
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        report,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        {
+          ...report,
+          promotionEvidence: {
+            ...report.promotionEvidence,
+            materialRiskChecks: [
+              { criterion: 'authority-adjacent', evidence: 'free text prefix must not qualify' },
+            ],
           },
         },
       ),
@@ -627,6 +733,7 @@ describe('completion proof and guarded completion transition', () => {
       parseCompletionCriteria(
         JSON.stringify({
           progressiveValidation: {
+            candidateHead: 'a'.repeat(40),
             broaderValidationTriggers: ['promotion_policy'],
             broadValidationJustification: {
               cost: 'about two deterministic test minutes',

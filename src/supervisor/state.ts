@@ -14,8 +14,10 @@ import {
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
+import { openDb, type DbConn } from '../db/client.js';
+import { getIndependentReviewReceipt } from '../insights/performance-history.js';
 import {
-  DEFAULT_SUPERVISOR_PROMOTION_CONTRACT,
+  deriveSupervisorPromotionContract,
   type PrePromotionEvidence,
   type SupervisorPromotionContract,
 } from './worker-report.js';
@@ -254,6 +256,10 @@ export function startGoal(input: {
         existing.repoPath = resolve(input.repoPath);
         existing.autonomous = input.autonomous;
         existing.requiredOperations = input.requiredOperations;
+        existing.promotionContract = deriveSupervisorPromotionContract({
+          requiredOperations: input.requiredOperations,
+          autonomous: input.autonomous,
+        });
         existing.status = 'active';
         existing.updatedAt = now;
         existing.ownerGate = undefined;
@@ -282,7 +288,10 @@ export function startGoal(input: {
       createdAt: now,
       updatedAt: now,
       nextRunAt: now,
-      promotionContract: structuredClone(DEFAULT_SUPERVISOR_PROMOTION_CONTRACT),
+      promotionContract: deriveSupervisorPromotionContract({
+        requiredOperations: input.requiredOperations,
+        autonomous: input.autonomous,
+      }),
     };
     state.goals.push(goal);
     return goal;
@@ -333,7 +342,7 @@ export function admitGoal(input: {
       autonomous: false,
       status: 'active',
       preferredCoordinator: input.preferredCoordinator ?? 'claude',
-      promotionContract: structuredClone(DEFAULT_SUPERVISOR_PROMOTION_CONTRACT),
+      promotionContract: deriveSupervisorPromotionContract({ autonomous: false }),
       cycle: 0,
       consecutiveFailures: 0,
       createdAt: now,
@@ -430,16 +439,14 @@ export function updateGoal(id: string, patch: Partial<Omit<SupervisorGoal, 'id'>
  * claim. A worker claim alone can never mark a goal done. */
 export function applyIndependentCompletionGrade(input: {
   goalId: string;
-  receipt: {
-    provider: WorkerHost;
-    runId: string;
-    sourceHead: string;
-    purpose: 'independent_completion_review';
-    goalId: string;
-    verdict: 'pass' | 'fail';
-    evidence: string;
-  };
+  receiptId: string;
+  db?: DbConn;
 }): SupervisorGoal {
+  const ownedDb = input.db ? undefined : openDb();
+  const db = input.db ?? ownedDb!.db;
+  const receipt = getIndependentReviewReceipt(db, input.receiptId);
+  ownedDb?.sqlite.close();
+  if (!receipt) throw new Error('independent completion requires a durable review receipt');
   return mutateSupervisorState((state) => {
     const goal = state.goals.find((candidate) => candidate.id === input.goalId);
     if (!goal) throw new Error(`goal not found: ${input.goalId}`);
@@ -450,31 +457,34 @@ export function applyIndependentCompletionGrade(input: {
         'pending completion has no exact-head binding; legacy claim requires revalidation',
       );
     }
-    if (input.receipt.purpose !== 'independent_completion_review') {
+    if (receipt.project !== goal.project || receipt.goalId !== input.goalId) {
+      throw new Error('independent-review receipt belongs to a different project or goal');
+    }
+    if (receipt.purpose !== 'independent_completion_review') {
       throw new Error('completion grade requires an independent-review receipt');
     }
-    if (input.receipt.goalId !== input.goalId) {
-      throw new Error('independent-review receipt belongs to a different goal');
-    }
-    if (pending.sourceHead !== input.receipt.sourceHead) {
+    if (pending.sourceHead !== receipt.sourceHead) {
       throw new Error('independent completion run evidence is for a different exact head');
     }
-    if (!input.receipt.runId.trim()) {
+    if (!receipt.runId.trim()) {
       throw new Error('independent completion requires a durable run id');
     }
-    if (pending.coordinator === input.receipt.provider) {
+    if (!WORKER_HOSTS.includes(receipt.provider as WorkerHost)) {
+      throw new Error('independent-review receipt has an unknown provider identity');
+    }
+    if (pending.coordinator === receipt.provider) {
       throw new Error(
-        `independent completion grade refused: ${input.receipt.provider} made the completion claim`,
+        `independent completion grade refused: ${receipt.provider} made the completion claim`,
       );
     }
-    const evidence = input.receipt.evidence.trim();
+    const evidence = receipt.evidence.trim();
     if (!evidence) throw new Error('independent completion evidence must not be empty');
     goal.pendingCompletion = undefined;
     goal.activePid = undefined;
     goal.lastFinishedAt = new Date().toISOString();
     goal.ownerGate = undefined;
     goal.consecutiveFailures = 0;
-    if (input.receipt.verdict === 'pass') {
+    if (receipt.verdict === 'pass') {
       goal.status = 'done';
       goal.nextRunAt = undefined;
       goal.lastSummary = redactText(

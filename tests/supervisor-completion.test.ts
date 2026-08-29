@@ -14,9 +14,16 @@ import {
   mutationClaimRefusalGoalPatch,
 } from '../src/supervisor/runtime.js';
 import type { WorkerReport } from '../src/supervisor/worker-report.js';
+import { openDb } from '../src/db/client.js';
+import { independentReviewReceipts, runPerformanceObservations } from '../src/db/schema.js';
+import {
+  recordPerformanceObservation,
+  RUN_INSIGHT_SCHEMA,
+} from '../src/insights/performance-history.js';
 
 let root: string;
 let priorStatePath: string | undefined;
+let reviewDb: ReturnType<typeof openDb>;
 
 function pendingGoal(): SupervisorGoal {
   return {
@@ -56,37 +63,80 @@ function pendingGoal(): SupervisorGoal {
   };
 }
 
-function reviewReceipt(
+function reviewReceiptId(
   provider: 'claude' | 'codex',
   verdict: 'pass' | 'fail',
   evidence: string,
   sourceHead = 'a'.repeat(40),
+  goalId = 'goal-1',
 ) {
-  return {
-    provider,
-    runId: 'run-review',
-    sourceHead,
-    purpose: 'independent_completion_review' as const,
-    goalId: 'goal-1',
-    verdict,
-    evidence,
-  };
+  recordPerformanceObservation(reviewDb.db, {
+    project: 'major',
+    source: 'major',
+    receipt: {
+      schema: RUN_INSIGHT_SCHEMA,
+      recordedAt: new Date().toISOString(),
+      goalId,
+      outcome: 'completed',
+      worker: { coordinator: provider, provider, model: 'review-model' },
+      runEvidence: { runId: 'run-review', sourceHead },
+      independentReview: {
+        purpose: 'independent_completion_review',
+        goalId,
+        sourceHead,
+        verdict,
+        evidence,
+      },
+    },
+  });
+  return reviewDb.db
+    .select({ id: independentReviewReceipts.id })
+    .from(independentReviewReceipts)
+    .all()
+    .at(-1)!.id;
 }
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-completion-'));
   priorStatePath = process.env.MAJOR_STATE_PATH;
   process.env.MAJOR_STATE_PATH = join(root, 'supervisor-state.json');
+  reviewDb = openDb(':memory:');
   writeSupervisorState({ version: 1, goals: [pendingGoal()], sessions: [] });
 });
 
 afterEach(() => {
   if (priorStatePath === undefined) delete process.env.MAJOR_STATE_PATH;
   else process.env.MAJOR_STATE_PATH = priorStatePath;
+  reviewDb.sqlite.close();
   rmSync(root, { recursive: true, force: true });
 });
 
 describe('independent goal completion', () => {
+  it('refuses an arbitrary generic history receipt as completion authority', () => {
+    recordPerformanceObservation(reviewDb.db, {
+      project: 'major',
+      source: 'major',
+      receipt: {
+        schema: RUN_INSIGHT_SCHEMA,
+        recordedAt: new Date().toISOString(),
+        goalId: 'goal-1',
+        outcome: 'completed',
+        worker: { coordinator: 'claude', provider: 'claude', model: 'review-model' },
+      },
+    });
+    const historyId = reviewDb.db
+      .select({ id: runPerformanceObservations.id })
+      .from(runPerformanceObservations)
+      .get()!.id;
+    expect(() =>
+      applyIndependentCompletionGrade({
+        goalId: 'goal-1',
+        receiptId: historyId,
+        db: reviewDb.db,
+      }),
+    ).toThrow(/durable review receipt/);
+  });
+
   it('rejects only the canonical Codex BUILT claim when Lima observed no returned delta', () => {
     const done: WorkerReport = { status: 'done', summary: 'acceptance task passed' };
     const built: WorkerReport = { status: 'active', summary: 'BUILT provider route' };
@@ -157,11 +207,12 @@ describe('independent goal completion', () => {
     });
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',
-      receipt: reviewReceipt(
+      receiptId: reviewReceiptId(
         'claude',
         'pass',
         'exact-head tests and representative behavior passed',
       ),
+      db: reviewDb.db,
     });
     expect(result.status).toBe('done');
     expect(result.pendingCompletion).toBeUndefined();
@@ -172,11 +223,12 @@ describe('independent goal completion', () => {
   it('reopens work when independent validation rejects the claim', () => {
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',
-      receipt: reviewReceipt(
+      receiptId: reviewReceiptId(
         'claude',
         'fail',
         'runtime behavior does not match the completion claim',
       ),
+      db: reviewDb.db,
     });
     expect(result.status).toBe('active');
     expect(result.pendingCompletion).toBeUndefined();
@@ -187,26 +239,29 @@ describe('independent goal completion', () => {
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        receipt: reviewReceipt('claude', 'pass', 'wrong head', 'b'.repeat(40)),
+        receiptId: reviewReceiptId('claude', 'pass', 'wrong head', 'b'.repeat(40)),
+        db: reviewDb.db,
       }),
     ).toThrow(/different exact head/);
   });
 
   it('rejects a provider-owned review receipt for a different goal', () => {
-    const receipt = reviewReceipt('claude', 'pass', 'wrong goal');
+    const receiptId = reviewReceiptId('claude', 'pass', 'wrong goal', 'a'.repeat(40), 'goal-2');
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        receipt: { ...receipt, goalId: 'goal-2' },
+        receiptId,
+        db: reviewDb.db,
       }),
-    ).toThrow(/different goal/);
+    ).toThrow(/different project or goal/);
   });
 
   it('refuses self-grading and goals without a pending completion claim', () => {
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        receipt: reviewReceipt('codex', 'pass', 'self grade'),
+        receiptId: reviewReceiptId('codex', 'pass', 'self grade'),
+        db: reviewDb.db,
       }),
     ).toThrow(/made the completion claim/);
 
@@ -216,7 +271,8 @@ describe('independent goal completion', () => {
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        receipt: reviewReceipt('claude', 'pass', 'no claim'),
+        receiptId: reviewReceiptId('claude', 'pass', 'no claim'),
+        db: reviewDb.db,
       }),
     ).toThrow(/no pending completion claim/);
   });

@@ -17,6 +17,7 @@ import { assertCapabilityAvailable } from '../security/capabilities.js';
 import { redactText, redactValue } from '../security/redact.js';
 import { StaleClaimError } from './claim-service.js';
 import { isApprovedDecision } from './decision-service.js';
+import { parseCompletionCriteria } from './completion.js';
 import { newId, nowIso } from './ids.js';
 
 export class RunAuthorisationError extends Error {
@@ -95,6 +96,16 @@ export function createRun(db: Db, rawInput: NewRunInput) {
     (tx) => {
       const task = tx.select().from(tasks).where(eq(tasks.id, input.taskId)).get();
       if (!task) throw new Error(`task not found: ${input.taskId}`);
+      if (['implementation', 'repair', 'review'].includes(input.purpose)) {
+        const progressive = parseCompletionCriteria(
+          task.completionCriteriaSnapshotJson,
+        ).progressiveValidation;
+        if (progressive && input.sourceHead !== progressive.candidateHead) {
+          throw new RunAuthorisationError(
+            `${input.purpose} run requires frozen candidate head ${progressive.candidateHead}`,
+          );
+        }
+      }
 
       if (input.billingMode === 'unknown') {
         throw new RunAuthorisationError(

@@ -536,6 +536,10 @@ export const agentRuns = sqliteTable(
     enumCheck('agent_runs_purpose_valid', 'purpose', RUN_PURPOSES),
     enumCheck('agent_runs_status_valid', 'status', RUN_STATUSES),
     enumCheck('agent_runs_billing_mode_valid', 'billing_mode', BILLING_MODES),
+    check(
+      'agent_runs_source_head_valid',
+      sql`source_head IS NULL OR (length(source_head) = 40 AND source_head NOT GLOB '*[^0-9a-f]*')`,
+    ),
     // Paid billing modes require an authorising DecisionRequest reference.
     check(
       'agent_runs_paid_requires_decision',
@@ -853,6 +857,37 @@ export const runPerformanceObservations = sqliteTable(
     index('run_performance_observations_goal_time').on(t.project, t.goalId, t.recordedAt),
     enumCheck('run_performance_observations_source_valid', 'source', ['major', 'dsh']),
     check('run_performance_observations_schema_v1', sql`schema = 'major.run-insight.v1'`),
+  ],
+);
+
+/** Major-owned append-only authority receipt produced only from a completed
+ * provider review observation. Generic performance history is not completion
+ * authority; this narrow projection is. */
+export const independentReviewReceipts = sqliteTable(
+  'independent_review_receipts',
+  {
+    id: id(),
+    observationId: text('observation_id')
+      .notNull()
+      .unique()
+      .references(() => runPerformanceObservations.id),
+    project: text('project').notNull(),
+    goalId: text('goal_id').notNull(),
+    runId: text('run_id').notNull(),
+    provider: text('provider').notNull(),
+    sourceHead: text('source_head').notNull(),
+    purpose: text('purpose', { enum: ['independent_completion_review'] }).notNull(),
+    verdict: text('verdict', { enum: ['pass', 'fail'] }).notNull(),
+    evidence: text('evidence').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('independent_review_receipts_goal').on(t.project, t.goalId),
+    enumCheck('independent_review_receipts_purpose_valid', 'purpose', [
+      'independent_completion_review',
+    ]),
+    enumCheck('independent_review_receipts_verdict_valid', 'verdict', ['pass', 'fail']),
+    check('independent_review_receipts_head_valid', sql`length(source_head) = 40`),
   ],
 );
 

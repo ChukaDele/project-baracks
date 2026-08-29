@@ -1,4 +1,5 @@
 import { redactText } from '../security/redact.js';
+import { decideSdlc, type SdlcRisk } from '../domain/sdlc.js';
 
 const WORKER_REPORT_PREFIX = 'MAJOR_RESULT: ';
 const FINAL_REPORT_TYPE = 'major.result.final';
@@ -11,7 +12,7 @@ export interface PrePromotionEvidence {
   focusedTests: string;
   cheapestCompileTypeOrBuild: string;
   criticalPathBehavior: string;
-  materialRiskChecks: string[];
+  materialRiskChecks: { criterion: string; evidence: string }[];
   broaderValidation: {
     triggers: (
       | 'blast_radius'
@@ -43,6 +44,43 @@ export const DEFAULT_SUPERVISOR_PROMOTION_CONTRACT: SupervisorPromotionContract 
   broaderValidationTriggers: [],
   repositoryPolicyRequiresBroadValidation: false,
 };
+
+const RISK_CRITERIA: readonly [keyof SdlcRisk, RegExp, string][] = [
+  ['touchesAuthority', /authority|permission|policy|promotion|completion|review/i, 'authority'],
+  ['touchesPersistence', /database|sqlite|schema|migration|persist|storage/i, 'persistence'],
+  ['touchesSecurity', /security|secret|credential|authentication|authorization/i, 'security'],
+  ['externalEffect', /deploy|publish|push|merge|external[_ -]?write/i, 'external effect'],
+  ['irreversible', /irreversible|destructive|delete|drop/i, 'irreversibility'],
+  ['broadBlastRadius', /shared|global|runtime|installer|broad/i, 'blast radius'],
+];
+
+/** Freeze no-task completion requirements from Major-owned routing facts.
+ * Worker prose and the completing report are deliberately absent. */
+export function deriveSupervisorPromotionContract(input: {
+  requiredOperations?: readonly string[] | undefined;
+  autonomous: boolean;
+}): SupervisorPromotionContract {
+  const operations = [...new Set(input.requiredOperations ?? [])];
+  const risk: SdlcRisk = {};
+  const materialRiskCriteria: string[] = [];
+  for (const [field, pattern, criterion] of RISK_CRITERIA) {
+    if (operations.some((operation) => pattern.test(operation))) {
+      risk[field] = true;
+      materialRiskCriteria.push(criterion);
+    }
+  }
+  const decision = decideSdlc({
+    estimatedFiles: Math.max(1, operations.length),
+    acceptancePaths: Math.max(1, operations.length),
+    risk,
+  });
+  return {
+    review: decision.review,
+    materialRiskCriteria,
+    broaderValidationTriggers: risk.broadBlastRadius ? ['blast_radius'] : [],
+    repositoryPolicyRequiresBroadValidation: false,
+  };
+}
 
 export interface WorkerReport {
   status: 'active' | 'blocked' | 'done';
@@ -175,17 +213,32 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
         typeof record[name] === 'string' ? redactText(record[name].trim()).slice(0, 4_000) : '';
       const materialRiskChecks = Array.isArray(record.materialRiskChecks)
         ? record.materialRiskChecks
-            .filter((item): item is string => typeof item === 'string')
-            .map((item) => redactText(item.trim()).slice(0, 2_000))
-            .filter(Boolean)
+            .map((item) => {
+              if (typeof item === 'string') {
+                const legacy = redactText(item.trim()).slice(0, 2_000);
+                return legacy ? { criterion: `legacy:${legacy}`, evidence: legacy } : undefined;
+              }
+              if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
+              const proof = item as Record<string, unknown>;
+              if (
+                typeof proof.criterion !== 'string' ||
+                !proof.criterion.trim() ||
+                typeof proof.evidence !== 'string' ||
+                !proof.evidence.trim()
+              )
+                return undefined;
+              return {
+                criterion: redactText(proof.criterion.trim()).slice(0, 500),
+                evidence: redactText(proof.evidence.trim()).slice(0, 2_000),
+              };
+            })
+            .filter((item): item is { criterion: string; evidence: string } => Boolean(item))
             .slice(0, 24)
         : undefined;
       if (
         !Array.isArray(record.materialRiskChecks) ||
         record.materialRiskChecks.length > 24 ||
-        record.materialRiskChecks.some(
-          (item) => typeof item !== 'string' || item.trim().length === 0,
-        )
+        materialRiskChecks?.length !== record.materialRiskChecks.length
       )
         return undefined;
       const broad = record.broaderValidation;
