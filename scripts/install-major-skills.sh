@@ -225,7 +225,7 @@ gemini = target / '.gemini/commands'
 for entry in catalog['entries']:
     skill_id = entry['id']
     command_path(gemini, skill_id, '.toml').write_text(
-        f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{args}} --skill {skill_id} --json`."\n'
+        f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{{{args}}}} --skill {skill_id} --json`."\n'
     )
 PY
 

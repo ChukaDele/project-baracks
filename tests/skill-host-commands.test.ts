@@ -19,6 +19,8 @@ const priorRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 type CommandAdapter = {
   discovery: string;
   explicit: string;
+  discoveryDescription?: string;
+  explicitDescription?: string;
 };
 
 function markdownAdapter(discovery: string, explicit: string): CommandAdapter {
@@ -36,7 +38,7 @@ function markdownAdapter(discovery: string, explicit: string): CommandAdapter {
 }
 
 function geminiTomlAdapter(discovery: string, explicit: string): CommandAdapter {
-  const parse = (artifact: string, path: string): string => {
+  const parse = (artifact: string, path: string): { description: string; command: string } => {
     const fields = new Map<string, string>();
     for (const line of artifact.trimEnd().split('\n')) {
       const match = line.match(/^([a-z]+) = ("(?:[^"\\]|\\.)*")$/);
@@ -47,11 +49,15 @@ function geminiTomlAdapter(discovery: string, explicit: string): CommandAdapter 
     const prompt = fields.get('prompt')!;
     const command = prompt.match(/`([^`\n]+)`/)?.[1];
     expect(command, path).toBeDefined();
-    return command!;
+    return { description: fields.get('description')!, command: command! };
   };
+  const discoveryArtifact = parse(readFileSync(discovery, 'utf8'), discovery);
+  const explicitArtifact = parse(readFileSync(explicit, 'utf8'), explicit);
   return {
-    discovery: parse(readFileSync(discovery, 'utf8'), discovery),
-    explicit: parse(readFileSync(explicit, 'utf8'), explicit),
+    discovery: discoveryArtifact.command,
+    explicit: explicitArtifact.command,
+    discoveryDescription: discoveryArtifact.description,
+    explicitDescription: explicitArtifact.description,
   };
 }
 
@@ -220,11 +226,29 @@ describe('installed host skill commands', () => {
 
   it('installs the core project profile transactionally while preserving project-owned skills', () => {
     const target = mkdtempSync(join(tmpdir(), 'major-project-skill-install-'));
-    roots.push(target);
+    const home = mkdtempSync(join(tmpdir(), 'major-project-command-home-'));
+    roots.push(target, home);
+    process.env.MAJOR_HOME = join(home, '.major');
+    process.env.MAJOR_SKILLS_REGISTRY = resolve('guidance/skills.registry.json');
+    const bin = join(home, 'bin');
+    mkdirSync(bin, { recursive: true });
+    const major = join(bin, 'major');
+    writeFileSync(
+      major,
+      `#!/bin/sh\nexec "${process.execPath}" "${resolve('dist/entry.js')}" "$@"\n`,
+    );
+    chmodSync(major, 0o755);
+    const commandEnv = {
+      ...process.env,
+      HOME: home,
+      NODE_ENV: 'test',
+      PATH: `${bin}:${process.env.PATH ?? ''}`,
+    };
     const custom = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
     mkdirSync(dirname(custom), { recursive: true });
     writeFileSync(custom, '# project owned\n');
     const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      env: commandEnv,
       encoding: 'utf8',
     });
     expect(result.status, result.stderr).toBe(0);
@@ -232,5 +256,42 @@ describe('installed host skill commands', () => {
     expect(existsSync(join(target, '.agents', 'skills.catalog.json'))).toBe(true);
     expect(existsSync(join(target, '.codex', 'prompts', 'major', 'root-cause-qa.md'))).toBe(true);
     expect(readFileSync(join(target, 'MAJOR_SKILLS.lock'), 'utf8')).toContain('[skills]');
-  });
+
+    const discoveryPath = join(target, '.gemini', 'commands', 'major.toml');
+    const explicitPath = join(target, '.gemini', 'commands', 'major', 'root-cause-qa.toml');
+    expect(readFileSync(discoveryPath, 'utf8')).toContain('{{args}}');
+    expect(readFileSync(explicitPath, 'utf8')).toContain('{{args}}');
+    const adapter = geminiTomlAdapter(discoveryPath, explicitPath);
+    expect(adapter.discoveryDescription).toBe('Discover Major skills');
+    expect(adapter.explicitDescription).toBe('Invoke Major skill root-cause-qa');
+    expect(adapter.discovery).toBe('major skill search --query {{args}}');
+    expect(adapter.explicit).toBe(
+      'major skill resolve --task {{args}} --skill root-cause-qa --json',
+    );
+
+    const discovery = adapter.discovery.replace('{{args}}', "'root cause regression'");
+    const searchResult = spawnSync('sh', ['-c', discovery], {
+      env: commandEnv,
+      encoding: 'utf8',
+    });
+    expect(searchResult.status, searchResult.stderr).toBe(0);
+    expect(searchResult.stdout).toContain('root-cause-qa');
+
+    const explicit = adapter.explicit.replace(
+      '{{args}}',
+      "'Investigate and verify this regression'",
+    );
+    const resolveResult = spawnSync('sh', ['-c', explicit], {
+      env: commandEnv,
+      encoding: 'utf8',
+    });
+    expect(resolveResult.status, resolveResult.stderr).toBe(0);
+    const receipt = JSON.parse(resolveResult.stdout) as { receipt: { selected: string[] } };
+    expect(receipt.receipt.selected).toContain('root-cause-qa');
+
+    const unknown = explicit.replace('--skill root-cause-qa', '--skill missing-skill');
+    const failed = spawnSync('sh', ['-c', unknown], { env: commandEnv, encoding: 'utf8' });
+    expect(failed.status).not.toBe(0);
+    expect(failed.stderr).toContain('unknown skill "missing-skill"');
+  }, 15_000);
 });
