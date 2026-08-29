@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -60,12 +60,14 @@ import {
 } from './policy.js';
 import {
   activeGoals,
+  applyIndependentCompletionGrade,
   getGoal,
   gitCommonDir,
   isLiveWorkerFresh,
   majorHome,
   readSupervisorState,
   updateGoal,
+  WORKER_HOSTS,
   type SupervisorGoal,
   type WorkerHost,
 } from './state.js';
@@ -82,6 +84,7 @@ import {
 } from './worker-report.js';
 import {
   RUN_INSIGHT_SCHEMA,
+  recordIndependentReviewExecution,
   recordPerformanceObservation,
 } from '../insights/performance-history.js';
 import { configuredExecutionPath, executionPathStatus } from '../execution/path.js';
@@ -921,20 +924,112 @@ export async function runGoalCycle(
   const goal = getGoal(goalId);
   if (!goal) throw new Error(`goal not found: ${goalId}`);
   if (goal.status === 'done' || goal.status === 'paused') return { ranCycle: false };
-  if (goal.pendingCompletion) {
-    console.error(`Goal ${goal.id} is awaiting an independent completion grade.`);
-    return { ranCycle: false };
-  }
   const releaseRepoLock = tryAcquireRepoCycleLock(goal.repoPath);
   if (!releaseRepoLock) {
     console.error(`Repository ${goal.repoPath} already has an active Major integration owner.`);
     return { ranCycle: false };
   }
   try {
-    await runLockedGoalCycle(goal, options.maxTimeoutMs);
+    if (goal.pendingCompletion) {
+      await runPendingCompletionReview(goal, options.maxTimeoutMs);
+    } else {
+      await runLockedGoalCycle(goal, options.maxTimeoutMs);
+    }
     return { ranCycle: true };
   } finally {
     releaseRepoLock();
+  }
+}
+
+async function runPendingCompletionReview(
+  goal: SupervisorGoal,
+  maxTimeoutMs?: number,
+): Promise<void> {
+  const pending = goal.pendingCompletion;
+  if (!pending?.sourceHead) {
+    updateGoal(goal.id, {
+      status: 'active',
+      pendingCompletion: undefined,
+      lastSummary: 'Legacy pending completion lacked an exact head and must be revalidated.',
+      nextRunAt: new Date().toISOString(),
+    });
+    return;
+  }
+  const currentHead = exactRepositoryHead(goal.repoPath);
+  if (currentHead !== pending.sourceHead) {
+    updateGoal(goal.id, {
+      status: 'active',
+      pendingCompletion: undefined,
+      lastSummary: 'Pending completion became stale because the repository head changed.',
+      nextRunAt: new Date().toISOString(),
+    });
+    return;
+  }
+  const eligibleHosts = WORKER_HOSTS.filter((host) => host !== pending.coordinator);
+  const selection = routeGoalExecution(goal, { eligibleHosts });
+  if (selection.kind === 'checkpoint') {
+    updateGoal(goal.id, {
+      lastSummary: `Independent completion review is waiting for different-provider capacity: ${selection.reason}`,
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+    });
+    return;
+  }
+  const reviewStartedAt = new Date().toISOString();
+  const dispatchId = randomUUID();
+  updateGoal(goal.id, {
+    activePid: process.pid,
+    lastStartedAt: reviewStartedAt,
+    lastCoordinator: selection.host,
+    lastAccountLabel: selection.accountLabel,
+    lastSummary: `Independent completion review running on ${selection.host}.`,
+    pendingCompletion: {
+      ...pending,
+      reviewDispatch: { id: dispatchId, provider: selection.host, startedAt: reviewStartedAt },
+    },
+  });
+  const outcome = await runWorker({
+    host: selection.host,
+    taskId: `${goal.id}:completion-review`,
+    resourceId: `review:${goal.project}`,
+    cwd: goal.repoPath,
+    timeoutMs: maxTimeoutMs ?? 15 * 60 * 1000,
+    modelRef: selection.modelRef,
+    accountLabel: selection.accountLabel,
+    prompt:
+      `Independently review the pending completion claim for project ${goal.project}.\n` +
+      `Goal ID: ${goal.id}\nExact source head: ${pending.sourceHead}\n` +
+      `Claim: ${pending.summary}\n` +
+      `Use read-only exact-head checks. Do not implement, merge, install, or trust the completing worker's conclusion.\n` +
+      `End with exactly one provider-owned line: MAJOR_RESULT: {"status":"active","summary":"review summary","independentReview":{"purpose":"independent_completion_review","goalId":"${goal.id}","sourceHead":"${pending.sourceHead}","verdict":"pass|fail","evidence":"specific evidence"}}`,
+  });
+  const report = outcome.status === 'succeeded' ? parseWorkerReport(outcome.stdout) : undefined;
+  if (!outcome.runId || !report?.independentReview) {
+    updateGoal(goal.id, {
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: 'Independent completion review produced no authoritative provider receipt.',
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+    });
+    return;
+  }
+  const receiptState = openDb();
+  let receiptId: string;
+  try {
+    receiptId = recordIndependentReviewExecution(receiptState.db, {
+      project: goal.project,
+      goalId: goal.id,
+      runId: outcome.runId,
+      dispatchId,
+      provider: selection.host,
+      sourceHead: pending.sourceHead,
+      pendingClaimedAt: pending.claimedAt,
+      reviewStartedAt,
+      executionStatus: 'succeeded',
+      review: report.independentReview,
+    });
+    applyIndependentCompletionGrade({ goalId: goal.id, receiptId, db: receiptState.db });
+  } finally {
+    receiptState.sqlite.close();
   }
 }
 
@@ -1547,7 +1642,6 @@ export async function runDaemon(): Promise<void> {
       const policy = getProjectPolicy(goal.project, goal.repoPath);
       if (policy.trust !== 'unattended' || !policy.allowBackground) return false;
       if (!goal.autonomous || goal.status === 'blocked') return false;
-      if (goal.pendingCompletion) return false;
       if (goal.activePid && pidAlive(goal.activePid)) return false;
       return !goal.nextRunAt || Date.parse(goal.nextRunAt) <= now;
     });

@@ -15,9 +15,10 @@ import {
 } from '../src/supervisor/runtime.js';
 import type { WorkerReport } from '../src/supervisor/worker-report.js';
 import { openDb } from '../src/db/client.js';
-import { independentReviewReceipts, runPerformanceObservations } from '../src/db/schema.js';
+import { runPerformanceObservations } from '../src/db/schema.js';
 import {
   recordPerformanceObservation,
+  recordIndependentReviewExecution,
   RUN_INSIGHT_SCHEMA,
 } from '../src/insights/performance-history.js';
 
@@ -70,30 +71,38 @@ function reviewReceiptId(
   sourceHead = 'a'.repeat(40),
   goalId = 'goal-1',
 ) {
-  recordPerformanceObservation(reviewDb.db, {
-    project: 'major',
-    source: 'major',
-    receipt: {
-      schema: RUN_INSIGHT_SCHEMA,
-      recordedAt: new Date().toISOString(),
-      goalId,
-      outcome: 'completed',
-      worker: { coordinator: provider, provider, model: 'review-model' },
-      runEvidence: { runId: 'run-review', sourceHead },
-      independentReview: {
-        purpose: 'independent_completion_review',
-        goalId,
-        sourceHead,
-        verdict,
-        evidence,
+  const dispatchId = `dispatch-${provider}-${verdict}-${sourceHead}-${goalId}`;
+  const current = readSupervisorState().goals[0];
+  if (current?.pendingCompletion) {
+    updateGoal(current.id, {
+      pendingCompletion: {
+        ...current.pendingCompletion,
+        reviewDispatch: {
+          id: dispatchId,
+          provider,
+          startedAt: '2026-08-11T00:02:00.000Z',
+        },
       },
+    });
+  }
+  return recordIndependentReviewExecution(reviewDb.db, {
+    project: 'major',
+    goalId,
+    runId: 'run-review',
+    dispatchId,
+    provider,
+    sourceHead,
+    pendingClaimedAt: '2026-08-11T00:01:00.000Z',
+    reviewStartedAt: '2026-08-11T00:02:00.000Z',
+    executionStatus: 'succeeded',
+    review: {
+      purpose: 'independent_completion_review',
+      goalId,
+      sourceHead,
+      verdict,
+      evidence,
     },
   });
-  return reviewDb.db
-    .select({ id: independentReviewReceipts.id })
-    .from(independentReviewReceipts)
-    .all()
-    .at(-1)!.id;
 }
 
 beforeEach(() => {

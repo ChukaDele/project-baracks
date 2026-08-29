@@ -70,8 +70,12 @@ export function deriveSupervisorPromotionContract(input: {
     }
   }
   const decision = decideSdlc({
-    estimatedFiles: Math.max(1, operations.length),
-    acceptancePaths: Math.max(1, operations.length),
+    // Admission has no worker-authored scope evidence yet. Unknown scope is
+    // therefore frozen as substantive, never silently downgraded to the
+    // low-risk fast path. Explicit bounded task workflows retain their own
+    // deterministic classifier inputs.
+    estimatedFiles: Math.max(3, operations.length),
+    acceptancePaths: Math.max(2, operations.length),
     risk,
   });
   return {

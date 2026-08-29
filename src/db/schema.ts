@@ -860,25 +860,25 @@ export const runPerformanceObservations = sqliteTable(
   ],
 );
 
-/** Major-owned append-only authority receipt produced only from a completed
- * provider review observation. Generic performance history is not completion
- * authority; this narrow projection is. */
+/** Major-owned append-only authority receipt produced only by the dedicated
+ * post-claim provider review execution path. Performance history is never
+ * completion authority. */
 export const independentReviewReceipts = sqliteTable(
   'independent_review_receipts',
   {
     id: id(),
-    observationId: text('observation_id')
-      .notNull()
-      .unique()
-      .references(() => runPerformanceObservations.id),
     project: text('project').notNull(),
     goalId: text('goal_id').notNull(),
     runId: text('run_id').notNull(),
+    dispatchId: text('dispatch_id').notNull().unique(),
     provider: text('provider').notNull(),
     sourceHead: text('source_head').notNull(),
     purpose: text('purpose', { enum: ['independent_completion_review'] }).notNull(),
     verdict: text('verdict', { enum: ['pass', 'fail'] }).notNull(),
     evidence: text('evidence').notNull(),
+    pendingClaimedAt: text('pending_claimed_at').notNull(),
+    reviewStartedAt: text('review_started_at').notNull(),
+    executionStatus: text('execution_status', { enum: ['succeeded'] }).notNull(),
     createdAt: createdAt(),
   },
   (t) => [
@@ -887,7 +887,9 @@ export const independentReviewReceipts = sqliteTable(
       'independent_completion_review',
     ]),
     enumCheck('independent_review_receipts_verdict_valid', 'verdict', ['pass', 'fail']),
+    enumCheck('independent_review_receipts_execution_valid', 'execution_status', ['succeeded']),
     check('independent_review_receipts_head_valid', sql`length(source_head) = 40`),
+    check('independent_review_receipts_causal', sql`review_started_at >= pending_claimed_at`),
   ],
 );
 

@@ -150,10 +150,9 @@ export function recordPerformanceObservation(
 ): Receipt {
   if (!input.project.trim()) throw new Error('performance observation requires project identity');
   const receipt = validateRunInsight(input.receipt);
-  const observationId = randomUUID();
   db.insert(runPerformanceObservations)
     .values({
-      id: observationId,
+      id: randomUUID(),
       project: input.project.trim(),
       goalId: receipt.goalId,
       source: input.source,
@@ -162,34 +161,68 @@ export function recordPerformanceObservation(
       recordedAt: receipt.recordedAt,
     })
     .run();
-  const review = receipt.independentReview;
-  const run = receipt.runEvidence;
-  const provider = receipt.worker?.coordinator?.trim();
-  if (
-    input.source === 'major' &&
-    receipt.outcome === 'completed' &&
-    review &&
-    run &&
-    provider &&
-    review.goalId === receipt.goalId &&
-    review.sourceHead === run.sourceHead
-  ) {
-    db.insert(independentReviewReceipts)
-      .values({
-        id: randomUUID(),
-        observationId,
-        project: input.project.trim(),
-        goalId: receipt.goalId,
-        runId: run.runId,
-        provider,
-        sourceHead: run.sourceHead,
-        purpose: review.purpose,
-        verdict: review.verdict,
-        evidence: review.evidence,
-      })
-      .run();
-  }
   return receipt;
+}
+
+/** Mint completion authority only from the dedicated provider execution
+ * controlled by Major after the worker completion claim already exists. */
+export function recordIndependentReviewExecution(
+  db: DbConn,
+  input: {
+    project: string;
+    goalId: string;
+    runId: string;
+    dispatchId: string;
+    provider: string;
+    sourceHead: string;
+    pendingClaimedAt: string;
+    reviewStartedAt: string;
+    executionStatus: 'succeeded';
+    review: NonNullable<Receipt['independentReview']>;
+  },
+): string {
+  if (
+    !input.project.trim() ||
+    !input.goalId.trim() ||
+    !input.runId.trim() ||
+    !input.dispatchId.trim() ||
+    !input.provider.trim()
+  ) {
+    throw new Error('independent review execution identity is incomplete');
+  }
+  if (!/^[0-9a-f]{40}$/.test(input.sourceHead)) throw new Error('invalid review source head');
+  if (input.review.goalId !== input.goalId || input.review.sourceHead !== input.sourceHead) {
+    throw new Error('provider review verdict is not bound to this goal and exact head');
+  }
+  if (input.review.purpose !== 'independent_completion_review' || !input.review.evidence.trim()) {
+    throw new Error('provider review verdict is invalid');
+  }
+  if (
+    !Number.isFinite(Date.parse(input.pendingClaimedAt)) ||
+    !Number.isFinite(Date.parse(input.reviewStartedAt)) ||
+    Date.parse(input.reviewStartedAt) < Date.parse(input.pendingClaimedAt)
+  ) {
+    throw new Error('independent review execution predates the pending completion claim');
+  }
+  const id = randomUUID();
+  db.insert(independentReviewReceipts)
+    .values({
+      id,
+      project: input.project.trim(),
+      goalId: input.goalId,
+      runId: input.runId,
+      dispatchId: input.dispatchId,
+      provider: input.provider.trim(),
+      sourceHead: input.sourceHead,
+      purpose: input.review.purpose,
+      verdict: input.review.verdict,
+      evidence: input.review.evidence.trim(),
+      pendingClaimedAt: input.pendingClaimedAt,
+      reviewStartedAt: input.reviewStartedAt,
+      executionStatus: input.executionStatus,
+    })
+    .run();
+  return id;
 }
 
 export function listPerformanceObservations(

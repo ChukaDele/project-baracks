@@ -96,7 +96,7 @@ export function createRun(db: Db, rawInput: NewRunInput) {
     (tx) => {
       const task = tx.select().from(tasks).where(eq(tasks.id, input.taskId)).get();
       if (!task) throw new Error(`task not found: ${input.taskId}`);
-      if (['implementation', 'repair', 'review'].includes(input.purpose)) {
+      if (['verification', 'implementation', 'repair', 'review'].includes(input.purpose)) {
         const progressive = parseCompletionCriteria(
           task.completionCriteriaSnapshotJson,
         ).progressiveValidation;

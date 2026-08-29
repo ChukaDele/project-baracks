@@ -202,12 +202,25 @@ describe('completion proof and guarded completion transition', () => {
     expect(() => createRun(db, { ...base, purpose: 'implementation' })).toThrow(
       /requires frozen candidate head/,
     );
+    expect(() => createRun(db, { ...base, purpose: 'verification' })).toThrow(
+      /requires frozen candidate head/,
+    );
     expect(() => createRun(db, { ...base, purpose: 'review', sourceHead: 'b'.repeat(40) })).toThrow(
       /requires frozen candidate head/,
     );
-    expect(
-      createRun(db, { ...base, purpose: 'implementation', sourceHead: candidateHead }),
-    ).toMatchObject({ sourceHead: candidateHead });
+    const implementation = createRun(db, {
+      ...base,
+      purpose: 'implementation',
+      sourceHead: candidateHead,
+    });
+    expect(implementation).toMatchObject({ sourceHead: candidateHead });
+    expect(() =>
+      db
+        .update(agentRuns)
+        .set({ sourceHead: 'b'.repeat(40) })
+        .where(eq(agentRuns.id, implementation.id))
+        .run(),
+    ).toThrow(/source head is immutable/);
     expect(() =>
       db
         .insert(agentRuns)
@@ -219,6 +232,21 @@ describe('completion proof and guarded completion transition', () => {
           purpose: 'review',
           billingMode: 'subscription_included',
           routingReason: 'direct SQL bypass',
+          status: 'pending',
+        })
+        .run(),
+    ).toThrow(/frozen candidate head/);
+    expect(() =>
+      db
+        .insert(agentRuns)
+        .values({
+          id: newId('arun'),
+          taskId: task.id,
+          providerId,
+          modelRef: 'focused-model',
+          purpose: 'verification',
+          billingMode: 'subscription_included',
+          routingReason: 'direct SQL verification bypass',
           status: 'pending',
         })
         .run(),
@@ -577,10 +605,11 @@ describe('completion proof and guarded completion transition', () => {
       'cheapest_compile_type_or_build',
       'critical_path_behavior',
     ]) {
-      recordQualifyingVerification(db, task.id, { validationSubject });
+      recordQualifyingVerification(db, task.id, { validationSubject, sourceHead: candidateHead });
     }
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'risk_specific_check:authority boundary',
+      sourceHead: candidateHead,
     });
     const providerId = newId('aprov');
     db.insert(agentProviders).values({ id: providerId, name: 'builder' }).run();
@@ -611,6 +640,7 @@ describe('completion proof and guarded completion transition', () => {
     );
     recordQualifyingVerification(db, task.id, {
       validationSubject: 'risk_specific_check:legacy compatibility',
+      sourceHead: candidateHead,
     });
 
     db.insert(reviewFindings)

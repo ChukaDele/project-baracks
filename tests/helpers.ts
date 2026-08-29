@@ -78,7 +78,7 @@ export function ensureObservedModel(
 export function recordQualifyingVerification(
   db: Db,
   taskId: string,
-  input: { validationSubject?: string } = {},
+  input: { validationSubject?: string; sourceHead?: string } = {},
 ) {
   const providerId = ensureProvider(db);
   const run = createRun(db, {
@@ -88,6 +88,7 @@ export function recordQualifyingVerification(
     purpose: 'verification',
     billingMode: 'subscription_included',
     routingReason: 'test verification',
+    ...(input.sourceHead ? { sourceHead: input.sourceHead } : {}),
   });
   setRunStatus(db, run.id, 'succeeded');
   const vrun = recordVerificationRun(db, {

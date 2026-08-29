@@ -128,6 +128,11 @@ export interface SupervisorGoal {
         promotionEvidence?: PrePromotionEvidence;
         promotionContract?: SupervisorPromotionContract;
         sourceHead?: string;
+        reviewDispatch?: {
+          id: string;
+          provider: WorkerHost;
+          startedAt: string;
+        };
       }
     | undefined;
 }
@@ -466,10 +471,25 @@ export function applyIndependentCompletionGrade(input: {
     if (pending.sourceHead !== receipt.sourceHead) {
       throw new Error('independent completion run evidence is for a different exact head');
     }
+    if (
+      receipt.executionStatus !== 'succeeded' ||
+      receipt.pendingClaimedAt !== pending.claimedAt ||
+      Date.parse(receipt.reviewStartedAt) < Date.parse(pending.claimedAt)
+    ) {
+      throw new Error('independent completion receipt is causally stale or unsuccessful');
+    }
+    if (
+      !pending.reviewDispatch ||
+      receipt.dispatchId !== pending.reviewDispatch.id ||
+      receipt.provider !== pending.reviewDispatch.provider ||
+      receipt.reviewStartedAt !== pending.reviewDispatch.startedAt
+    ) {
+      throw new Error('independent completion receipt is not from the Major-owned review dispatch');
+    }
     if (!receipt.runId.trim()) {
       throw new Error('independent completion requires a durable run id');
     }
-    if (!WORKER_HOSTS.includes(receipt.provider as WorkerHost)) {
+    if (!WORKER_HOSTS.includes(receipt.provider)) {
       throw new Error('independent-review receipt has an unknown provider identity');
     }
     if (pending.coordinator === receipt.provider) {

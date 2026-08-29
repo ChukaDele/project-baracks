@@ -200,6 +200,7 @@ export function evaluateCompletionProof(
     .selectDistinct({
       id: verificationRuns.id,
       validationSubject: verificationRuns.validationSubject,
+      sourceHead: agentRuns.sourceHead,
     })
     .from(verificationRuns)
     .innerJoin(
@@ -228,7 +229,13 @@ export function evaluateCompletionProof(
       ),
     )
     .all();
-  const passedVerifications = qualifyingVerifications.length;
+  const progressive = criteria.progressiveValidation;
+  const effectiveVerifications = progressive
+    ? qualifyingVerifications.filter(
+        (verification) => verification.sourceHead === progressive.candidateHead,
+      )
+    : qualifyingVerifications;
+  const passedVerifications = effectiveVerifications.length;
   if (passedVerifications < criteria.minPassedVerificationRuns) {
     failures.push(
       `requires ${criteria.minPassedVerificationRuns} qualifying passed verification run(s) ` +
@@ -249,7 +256,6 @@ export function evaluateCompletionProof(
         ),
       )
       .get()?.n ?? 0;
-  const progressive = criteria.progressiveValidation;
   if (progressive) {
     const triggerSet = new Set(progressive.broaderValidationTriggers);
     const plan = planProgressiveValidation({
@@ -260,7 +266,7 @@ export function evaluateCompletionProof(
       repositoryPolicyRequiresBroadValidation: progressive.repositoryPolicyRequiresBroadValidation,
     });
     const provenSubjects = new Set(
-      qualifyingVerifications
+      effectiveVerifications
         .map((verification) => verification.validationSubject)
         .filter((subject): subject is string => subject !== null),
     );

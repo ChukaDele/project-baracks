@@ -132,6 +132,12 @@ installation and installed behavior proof follow normal merge.
   reject implementation, repair, or review runs whose source head is absent or different.
 - Generic performance history remains observational. Only a completed Major provider review run can
   project an append-only independent-review receipt, and only that receipt can grade pending work.
+- Pending completion now creates its own durable Major review-dispatch identity after the claim;
+  only the successful different-provider execution for that dispatch can mint a causally fresh grade.
+- Progressive verification, implementation, repair, and review runs all carry the frozen candidate
+  head. SQLite rejects mutation of `source_head` after insert and completion ignores other heads.
+- Unknown no-task scope freezes as substantive at admission; worker output cannot downgrade it to
+  the low-risk fast path, while exact criterion/evidence pairs retain bounded MVP validation.
 - No-task promotion contracts are deterministically classified from Major-owned operation facts
   before dispatch; material-risk proof uses exact structured criterion/evidence records persisted in
   pending completion rather than matching free-text prefixes.
@@ -188,6 +194,12 @@ installation and installed behavior proof follow normal merge.
   receipt rather than arbitrary history; and classifier-derived no-task contracts require exact
   structured material-risk evidence. The affected gate passed 124/124 tests across seven files before
   the final clean-head freeze.
+- Different-provider causal repair: generic history no longer projects completion authority; a
+  post-claim Major review dispatch binds project, goal, exact head, provider, purpose, successful
+  execution, provider verdict, and dispatch time in one append-only receipt. Progressive verification
+  joins the exact-head service/SQLite gate and source heads are immutable. The affected gate passed
+  90/90 focused tests across five files plus typecheck, targeted lint/format, Major validation, and
+  stability validation; the full matrix remains intentionally unrun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -229,6 +241,10 @@ installation and installed behavior proof follow normal merge.
   creation, let generic history objects feed grading, defaulted no-task requirements outside the SDLC
   classifier, and matched risk evidence by text prefix. Focused service/SQLite/receipt/classifier
   regressions now protect those authority boundaries.
+- Independent review regression: `2b8ea1ef` still let generic history mint review authority, had no
+  post-claim review execution state, allowed stale/self-shaped receipts, omitted verification from
+  exact-head enforcement, permitted source-head mutation, and classified unknown supervisor scope
+  as low risk. Focused causal, receipt, run-service, and SQLite regressions now protect these seams.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

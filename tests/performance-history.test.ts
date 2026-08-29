@@ -4,6 +4,7 @@ import { independentReviewReceipts, runPerformanceObservations } from '../src/db
 import {
   listPerformanceObservations,
   performanceHistoryReport,
+  recordIndependentReviewExecution,
   recordPerformanceObservation,
 } from '../src/insights/performance-history.js';
 
@@ -36,7 +37,7 @@ function receipt(
 }
 
 describe('durable performance history', () => {
-  it('projects only successful Major provider review runs into append-only grade authority', () => {
+  it('keeps generic history observational and mints authority only from review execution', () => {
     const { db, sqlite } = openDb(':memory:');
     const review = {
       runEvidence: { runId: 'provider-run', sourceHead: 'a'.repeat(40) },
@@ -47,44 +48,50 @@ describe('durable performance history', () => {
         verdict: 'pass',
         evidence: 'provider-produced exact-head verdict',
       },
-    };
+    } as const;
     recordPerformanceObservation(db, {
       project: 'github.com/chukadele/project-baracks',
       source: 'dsh',
       receipt: receipt('2026-08-27T00:00:00.000Z', review),
     });
-    const genericObservationId = db
-      .select({ id: runPerformanceObservations.id })
-      .from(runPerformanceObservations)
-      .get()!.id;
-    expect(() =>
-      db
-        .insert(independentReviewReceipts)
-        .values({
-          id: 'forged-review-receipt',
-          observationId: genericObservationId,
-          project: 'github.com/chukadele/project-baracks',
-          goalId: 'goal-1',
-          runId: 'provider-run',
-          provider: 'codex',
-          sourceHead: 'a'.repeat(40),
-          purpose: 'independent_completion_review',
-          verdict: 'pass',
-          evidence: 'provider-produced exact-head verdict',
-        })
-        .run(),
-    ).toThrow(/matching Major provider-run evidence/);
     recordPerformanceObservation(db, {
       project: 'github.com/chukadele/project-baracks',
       source: 'major',
       receipt: receipt('2026-08-27T01:00:00.000Z', { ...review, outcome: 'failed' }),
     });
     expect(db.select().from(independentReviewReceipts).all()).toEqual([]);
+    expect(() =>
+      recordIndependentReviewExecution(db, {
+        project: 'github.com/chukadele/project-baracks',
+        goalId: 'goal-1',
+        runId: 'stale-provider-run',
+        dispatchId: 'stale-dispatch',
+        provider: 'codex',
+        sourceHead: 'a'.repeat(40),
+        pendingClaimedAt: '2026-08-27T02:00:00.000Z',
+        reviewStartedAt: '2026-08-27T01:59:59.000Z',
+        executionStatus: 'succeeded',
+        review: review.independentReview,
+      }),
+    ).toThrow(/predates the pending completion claim/);
+    recordIndependentReviewExecution(db, {
+      project: 'github.com/chukadele/project-baracks',
+      goalId: 'goal-1',
+      runId: 'provider-run',
+      dispatchId: 'review-dispatch',
+      provider: 'codex',
+      sourceHead: 'a'.repeat(40),
+      pendingClaimedAt: '2026-08-27T01:30:00.000Z',
+      reviewStartedAt: '2026-08-27T02:00:00.000Z',
+      executionStatus: 'succeeded',
+      review: review.independentReview,
+    });
     recordPerformanceObservation(db, {
       project: 'github.com/chukadele/project-baracks',
       source: 'major',
       receipt: receipt('2026-08-27T02:00:00.000Z', review),
     });
+    expect(db.select().from(independentReviewReceipts).all()).toHaveLength(1);
     const authority = db.select().from(independentReviewReceipts).get()!;
     expect(authority).toMatchObject({
       project: 'github.com/chukadele/project-baracks',

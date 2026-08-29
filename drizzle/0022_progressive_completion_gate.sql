@@ -5,41 +5,22 @@ ALTER TABLE agent_runs ADD COLUMN source_head text;
 --> statement-breakpoint
 CREATE TABLE independent_review_receipts (
   id text PRIMARY KEY NOT NULL,
-  observation_id text NOT NULL UNIQUE REFERENCES run_performance_observations(id),
   project text NOT NULL,
   goal_id text NOT NULL,
   run_id text NOT NULL,
+  dispatch_id text NOT NULL UNIQUE,
   provider text NOT NULL,
   source_head text NOT NULL CHECK(length(source_head) = 40 AND source_head NOT GLOB '*[^0-9a-f]*'),
   purpose text NOT NULL CHECK(purpose = 'independent_completion_review'),
   verdict text NOT NULL CHECK(verdict IN ('pass', 'fail')),
   evidence text NOT NULL CHECK(trim(evidence) <> ''),
+  pending_claimed_at text NOT NULL,
+  review_started_at text NOT NULL CHECK(review_started_at >= pending_claimed_at),
+  execution_status text NOT NULL CHECK(execution_status = 'succeeded'),
   created_at text NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX independent_review_receipts_goal ON independent_review_receipts(project, goal_id);
---> statement-breakpoint
-CREATE TRIGGER independent_review_receipts_source_valid
-BEFORE INSERT ON independent_review_receipts
-WHEN NOT EXISTS (
-  SELECT 1 FROM run_performance_observations observation
-  WHERE observation.id = NEW.observation_id
-    AND observation.source = 'major'
-    AND observation.project = NEW.project
-    AND observation.goal_id = NEW.goal_id
-    AND json_extract(observation.receipt_json, '$.outcome') = 'completed'
-    AND json_extract(observation.receipt_json, '$.runEvidence.runId') = NEW.run_id
-    AND json_extract(observation.receipt_json, '$.runEvidence.sourceHead') = NEW.source_head
-    AND json_extract(observation.receipt_json, '$.worker.coordinator') = NEW.provider
-    AND json_extract(observation.receipt_json, '$.independentReview.purpose') = NEW.purpose
-    AND json_extract(observation.receipt_json, '$.independentReview.goalId') = NEW.goal_id
-    AND json_extract(observation.receipt_json, '$.independentReview.sourceHead') = NEW.source_head
-    AND json_extract(observation.receipt_json, '$.independentReview.verdict') = NEW.verdict
-    AND json_extract(observation.receipt_json, '$.independentReview.evidence') = NEW.evidence
-)
-BEGIN
-  SELECT RAISE(ABORT, 'independent review receipt requires matching Major provider-run evidence');
-END;
 --> statement-breakpoint
 CREATE TRIGGER independent_review_receipts_append_only_update
 BEFORE UPDATE ON independent_review_receipts BEGIN
@@ -53,7 +34,7 @@ END;
 --> statement-breakpoint
 CREATE TRIGGER agent_runs_progressive_head_insert
 BEFORE INSERT ON agent_runs
-WHEN NEW.purpose IN ('implementation', 'repair', 'review')
+WHEN NEW.purpose IN ('verification', 'implementation', 'repair', 'review')
   AND EXISTS (
     SELECT 1 FROM tasks t
     WHERE t.id = NEW.task_id
@@ -65,6 +46,13 @@ WHEN NEW.purpose IN ('implementation', 'repair', 'review')
   )
 BEGIN
   SELECT RAISE(ABORT, 'progressive task run requires the frozen candidate head');
+END;
+--> statement-breakpoint
+CREATE TRIGGER agent_runs_source_head_immutable
+BEFORE UPDATE OF source_head ON agent_runs
+WHEN NEW.source_head IS NOT OLD.source_head
+BEGIN
+  SELECT RAISE(ABORT, 'agent run source head is immutable');
 END;
 --> statement-breakpoint
 CREATE TRIGGER agent_runs_source_head_format_insert
@@ -228,6 +216,8 @@ BEGIN
     WHERE v.task_id = NEW.id AND v.status = 'passed' AND v.exit_code = 0
       AND v.started_at IS NOT NULL AND v.ended_at IS NOT NULL
       AND r.status = 'succeeded'
+      AND (json_type(NEW.completion_criteria_snapshot_json, '$.progressiveValidation') IS NULL
+        OR r.source_head = json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead'))
   ) < COALESCE(json_extract(NEW.completion_criteria_snapshot_json, '$.minPassedVerificationRuns'), 1)
     THEN RAISE(ABORT, 'completion requires the immutable task-specific minimum of qualifying passed verification runs')
   END;
@@ -246,6 +236,7 @@ BEGIN
           AND v.status = 'passed' AND v.exit_code = 0
           AND v.started_at IS NOT NULL AND v.ended_at IS NOT NULL
           AND r.status = 'succeeded'
+          AND r.source_head = json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead')
       )
     ) THEN RAISE(ABORT, 'completion missing required progressive validation')
   END;
@@ -260,6 +251,7 @@ BEGIN
           AND v.status = 'passed' AND v.exit_code = 0
           AND v.started_at IS NOT NULL AND v.ended_at IS NOT NULL
           AND r.status = 'succeeded'
+          AND r.source_head = json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead')
       )
     ) THEN RAISE(ABORT, 'completion missing required risk-specific validation')
   END;
@@ -276,6 +268,7 @@ BEGIN
         AND v.status = 'passed' AND v.exit_code = 0
         AND v.started_at IS NOT NULL AND v.ended_at IS NOT NULL
         AND r.status = 'succeeded'
+        AND r.source_head = json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead')
     ) THEN RAISE(ABORT, 'completion missing required broader validation')
   END;
   SELECT CASE WHEN json_type(NEW.completion_criteria_snapshot_json, '$.progressiveValidation') = 'object'
@@ -288,6 +281,7 @@ BEGIN
       WHERE v.task_id = NEW.id AND v.validation_subject = 'broader_validation'
         AND v.status = 'passed' AND v.exit_code = 0
         AND v.started_at IS NOT NULL AND v.ended_at IS NOT NULL AND r.status = 'succeeded'
+        AND r.source_head = json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead')
     ) THEN RAISE(ABORT, 'completion rejects untriggered broader validation')
   END;
   SELECT CASE WHEN json_type(NEW.completion_criteria_snapshot_json, '$.progressiveValidation') = 'object'
