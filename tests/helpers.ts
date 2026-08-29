@@ -13,8 +13,15 @@ import {
   taskSuggestions,
   type BillingMode,
 } from '../src/db/schema.js';
+import { recordIndependentReviewExecution } from '../src/insights/performance-history.js';
 import { newId, nowIso } from '../src/domain/ids.js';
-import { addEvidence, getSuggestion, transitionTask, getTask } from '../src/domain/task-service.js';
+import {
+  addEvidence,
+  addTask,
+  getSuggestion,
+  transitionTask,
+  getTask,
+} from '../src/domain/task-service.js';
 import { createRun, recordVerificationRun, setRunStatus } from '../src/domain/run-service.js';
 import type { ModelState } from '../src/providers/types.js';
 
@@ -78,7 +85,7 @@ export function ensureObservedModel(
 export function recordQualifyingVerification(
   db: Db,
   taskId: string,
-  input: { validationSubject?: string } = {},
+  input: { validationSubject?: string; sourceHead?: string } = {},
 ) {
   const providerId = ensureProvider(db);
   const run = createRun(db, {
@@ -88,6 +95,7 @@ export function recordQualifyingVerification(
     purpose: 'verification',
     billingMode: 'subscription_included',
     routingReason: 'test verification',
+    ...(input.sourceHead ? { sourceHead: input.sourceHead } : {}),
   });
   setRunStatus(db, run.id, 'succeeded');
   const vrun = recordVerificationRun(db, {
@@ -157,6 +165,100 @@ export function materialiseApprovedSuggestion(db: Db, suggestionId: string, note
 
 export function seedProject(db: Db, name = 'demo') {
   return addProject(db, projectConfigSchema.parse({ name, repoPath: '~/Projects/demo' }));
+}
+
+/** Canonical distinct succeeded worker/reviewer provenance for policy tests. */
+export function canonicalGradeProvenance(
+  db: Db,
+  input: { id: string; project: string; goalId?: string; sourceHead?: string },
+) {
+  const fixtureId = newId('task');
+  const sourceHead = input.sourceHead ?? 'a'.repeat(40);
+  const sourceTreeDigest = 'b'.repeat(64);
+  const project = addProject(
+    db,
+    projectConfigSchema.parse({
+      name: `grade-${fixtureId}`,
+      repoPath: `/tmp/grade-${fixtureId}`,
+    }),
+  );
+  const task = addTask(db, { projectId: project.id, title: `grade ${input.id}` });
+  let workerProviderId = db
+    .select({ id: agentProviders.id })
+    .from(agentProviders)
+    .where(and(eq(agentProviders.name, 'codex'), eq(agentProviders.accountLabel, 'worker')))
+    .get()?.id;
+  if (!workerProviderId) {
+    workerProviderId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: workerProviderId, name: 'codex', accountLabel: 'worker' })
+      .run();
+  }
+  ensureObservedModel(db, workerProviderId, 'grade-model');
+  const reviewed = createRun(db, {
+    taskId: task.id,
+    providerId: workerProviderId,
+    modelRef: 'grade-model',
+    purpose: 'implementation',
+    billingMode: 'subscription_included',
+    routingReason: 'canonical policy fixture worker',
+    sourceHead,
+  });
+  setRunStatus(db, reviewed.id, 'succeeded', { sessionRef: `worker-session-${fixtureId}` });
+  let reviewerProviderId = db
+    .select({ id: agentProviders.id })
+    .from(agentProviders)
+    .where(and(eq(agentProviders.name, 'claude-code'), eq(agentProviders.accountLabel, 'review')))
+    .get()?.id;
+  if (!reviewerProviderId) {
+    reviewerProviderId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: reviewerProviderId, name: 'claude-code', accountLabel: 'review' })
+      .run();
+  }
+  ensureObservedModel(db, reviewerProviderId, 'grade-model');
+  const review = createRun(db, {
+    taskId: task.id,
+    providerId: reviewerProviderId,
+    modelRef: 'grade-model',
+    purpose: 'review',
+    billingMode: 'subscription_included',
+    routingReason: 'canonical policy fixture review',
+    sourceHead,
+  });
+  setRunStatus(db, review.id, 'succeeded', { sessionRef: `review-session-${fixtureId}` });
+  const goalId = input.goalId ?? `goal-${input.id}`;
+  const reviewReceiptId = recordIndependentReviewExecution(db, {
+    project: input.project,
+    goalId,
+    runId: review.id,
+    reviewedRunId: reviewed.id,
+    taskId: task.id,
+    dispatchId: `dispatch-${fixtureId}`,
+    provider: 'claude',
+    providerId: reviewerProviderId,
+    providerAccountLabel: 'review',
+    sourceHead,
+    sourceTreeDigest,
+    pendingClaimedAt: '2026-08-27T01:00:00.000Z',
+    reviewStartedAt: '2026-08-27T02:00:00.000Z',
+    executionStatus: 'succeeded',
+    review: {
+      purpose: 'independent_completion_review',
+      goalId,
+      sourceHead,
+      verdict: 'pass',
+      evidence: 'canonical policy fixture passed',
+    },
+  });
+  return {
+    db,
+    providerAccountLabel: 'review',
+    reviewExecutionId: review.id,
+    reviewedExecutionId: reviewed.id,
+    plannerExecutionId: reviewed.id,
+    reviewReceiptId,
+  };
 }
 
 export function model(overrides: Partial<ModelState> & { modelRef: string }): ModelState {

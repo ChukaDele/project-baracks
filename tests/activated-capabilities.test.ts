@@ -140,6 +140,8 @@ describe('the v0.5.2 capability gate', () => {
         expiresAt: new Date(Date.now() + 60_000).toISOString(),
       });
       expect(allowGuestMutationForHost('codex', root)).toBe(true);
+      expect(allowGuestMutationForHost('codex', root, true)).toBe(false);
+      expect(allowGuestMutationForHost('claude', root, true)).toBe(false);
       expect(allowGuestMutationForHost('antigravity', root)).toBe(false);
       expect(() =>
         executeMajorCommand({

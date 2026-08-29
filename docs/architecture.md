@@ -238,7 +238,7 @@ During pilot:
 
 Builder-authored CI is useful but cannot by itself promote trust.
 
-The first representative Major acceptance test is JSS in `workshop/assist`: Major must make useful product progress on the real JSS goal in a visible foreground cycle, respect the single-worker ceiling, preserve state, avoid owner gates, and leave objective evidence. An independent provider then grades the exact result.
+The first representative Major acceptance test is JSS in `workshop/assist`: Major must make useful product progress on the real JSS goal in a visible foreground cycle, respect the single-worker ceiling, preserve state, avoid owner gates, and leave objective evidence. A separate read-only review execution then grades the exact result with durable provider/account provenance.
 
 ## 10. Memory and learning
 

@@ -515,8 +515,11 @@ export const agentRuns = sqliteTable(
     paidUsageDecisionId: text('paid_usage_decision_id').references(
       (): AnySQLiteColumn => decisionRequests.id,
     ),
-    /** Non-null when review independence was compromised (same-provider review). */
+    /** Non-null when review execution independence was compromised (for
+     * example implementer-session reuse or a writable review boundary). */
     independenceLoss: text('independence_loss'),
+    /** Exact repository head evaluated by this run. Nullable for legacy rows. */
+    sourceHead: text('source_head'),
     allowanceState: text('allowance_state'),
     worktreeId: text('worktree_id'),
     /** Execution status of this run — NOT the task's canonical status. */
@@ -534,6 +537,10 @@ export const agentRuns = sqliteTable(
     enumCheck('agent_runs_purpose_valid', 'purpose', RUN_PURPOSES),
     enumCheck('agent_runs_status_valid', 'status', RUN_STATUSES),
     enumCheck('agent_runs_billing_mode_valid', 'billing_mode', BILLING_MODES),
+    check(
+      'agent_runs_source_head_valid',
+      sql`source_head IS NULL OR (length(source_head) = 40 AND source_head NOT GLOB '*[^0-9a-f]*')`,
+    ),
     // Paid billing modes require an authorising DecisionRequest reference.
     check(
       'agent_runs_paid_requires_decision',
@@ -851,6 +858,90 @@ export const runPerformanceObservations = sqliteTable(
     index('run_performance_observations_goal_time').on(t.project, t.goalId, t.recordedAt),
     enumCheck('run_performance_observations_source_valid', 'source', ['major', 'dsh']),
     check('run_performance_observations_schema_v1', sql`schema = 'major.run-insight.v1'`),
+  ],
+);
+
+/** Major-owned append-only authority receipt produced only by the dedicated
+ * post-claim provider review execution path. Performance history is never
+ * completion authority. */
+export const independentReviewReceipts = sqliteTable(
+  'independent_review_receipts',
+  {
+    id: id(),
+    project: text('project').notNull(),
+    goalId: text('goal_id').notNull(),
+    runId: text('run_id').notNull(),
+    reviewedRunId: text('reviewed_run_id').references(() => agentRuns.id),
+    reviewSessionRef: text('review_session_ref'),
+    reviewedSessionRef: text('reviewed_session_ref'),
+    /** Canonical Major task/run/provider binding. Nullable only for legacy rows. */
+    taskId: text('task_id').references(() => tasks.id),
+    providerId: text('provider_id').references(() => agentProviders.id),
+    providerAccountLabel: text('provider_account_label'),
+    dispatchId: text('dispatch_id').notNull().unique(),
+    provider: text('provider').notNull(),
+    sourceHead: text('source_head').notNull(),
+    sourceTreeDigest: text('source_tree_digest'),
+    purpose: text('purpose', { enum: ['independent_completion_review'] }).notNull(),
+    verdict: text('verdict', { enum: ['pass', 'fail'] }).notNull(),
+    evidence: text('evidence').notNull(),
+    pendingClaimedAt: text('pending_claimed_at').notNull(),
+    reviewStartedAt: text('review_started_at').notNull(),
+    executionStatus: text('execution_status', { enum: ['succeeded'] }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('independent_review_receipts_goal').on(t.project, t.goalId),
+    enumCheck('independent_review_receipts_purpose_valid', 'purpose', [
+      'independent_completion_review',
+    ]),
+    enumCheck('independent_review_receipts_verdict_valid', 'verdict', ['pass', 'fail']),
+    enumCheck('independent_review_receipts_execution_valid', 'execution_status', ['succeeded']),
+    check('independent_review_receipts_head_valid', sql`length(source_head) = 40`),
+    check(
+      'independent_review_receipts_tree_valid',
+      sql`source_tree_digest IS NULL OR length(source_tree_digest) = 64`,
+    ),
+    check(
+      'independent_review_receipts_distinct_runs',
+      sql`reviewed_run_id IS NULL OR reviewed_run_id <> run_id`,
+    ),
+    check(
+      'independent_review_receipts_session_refs_valid',
+      sql`(review_session_ref IS NULL AND reviewed_session_ref IS NULL) OR (trim(review_session_ref) <> '' AND trim(reviewed_session_ref) <> '')`,
+    ),
+    check('independent_review_receipts_causal', sql`review_started_at >= pending_claimed_at`),
+  ],
+);
+
+/** Durable authority commit for supervisor completion. SQLite is the single
+ * commit boundary; supervisor-state.json is a recoverable projection. */
+export const supervisorCompletionCommits = sqliteTable(
+  'supervisor_completion_commits',
+  {
+    id: id(),
+    project: text('project').notNull(),
+    goalId: text('goal_id').notNull(),
+    receiptId: text('receipt_id')
+      .notNull()
+      .unique()
+      .references(() => independentReviewReceipts.id),
+    pendingClaimedAt: text('pending_claimed_at').notNull(),
+    sourceHead: text('source_head').notNull(),
+    sourceTreeDigest: text('source_tree_digest').notNull(),
+    verdict: text('verdict', { enum: ['pass', 'fail'] }).notNull(),
+    finalGoalJson: text('final_goal_json').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('supervisor_completion_commits_goal').on(t.project, t.goalId),
+    enumCheck('supervisor_completion_commits_verdict_valid', 'verdict', ['pass', 'fail']),
+    check('supervisor_completion_commits_head_valid', sql`length(source_head) = 40`),
+    check('supervisor_completion_commits_tree_valid', sql`length(source_tree_digest) = 64`),
+    check(
+      'supervisor_completion_commits_projection_valid',
+      sql`json_valid(final_goal_json) AND json_extract(final_goal_json, '$.id') = goal_id AND json_extract(final_goal_json, '$.project') = project AND json_type(final_goal_json, '$.pendingCompletion') IS NULL AND ((verdict = 'pass' AND json_extract(final_goal_json, '$.status') = 'done') OR (verdict = 'fail' AND json_extract(final_goal_json, '$.status') = 'active'))`,
+    ),
   ],
 );
 

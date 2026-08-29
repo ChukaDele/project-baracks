@@ -8,7 +8,12 @@ import {
   roadmapItems,
   tasks,
 } from '../src/db/schema.js';
-import { evaluateCompletionProof, parseCompletionCriteria } from '../src/domain/completion.js';
+import {
+  evaluateCompletionProof,
+  parseCompletionCriteria,
+  REVIEW_SEVERITY_STORAGE,
+  reviewSeverityFromStorage,
+} from '../src/domain/completion.js';
 import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
 import {
@@ -34,6 +39,11 @@ import {
   SuggestionApprovalUnavailableError,
   transitionTask,
 } from '../src/domain/task-service.js';
+import { coordinatorDonePromotionProof } from '../src/supervisor/runtime.js';
+import {
+  assessSupervisorAdmissionRisk,
+  deriveSupervisorPromotionContract,
+} from '../src/supervisor/worker-report.js';
 import {
   completeTaskProperly,
   ensureObservedModel,
@@ -169,6 +179,350 @@ describe('dependency blocking', () => {
 });
 
 describe('completion proof and guarded completion transition', () => {
+  it('classifies no-task admission from typed outcome and policy facts and fails closed', () => {
+    const workshopPolicy = {
+      projectClass: 'workshop' as const,
+      trust: 'build' as const,
+      allowExternalWrites: false,
+      allowPaidSpend: false,
+    };
+    const bounded = assessSupervisorAdmissionRisk({
+      outcome: 'Fix typo',
+      policy: workshopPolicy,
+    });
+    expect(bounded.classification).toBe('bounded');
+    expect(
+      deriveSupervisorPromotionContract({
+        admissionRiskAssessment: bounded,
+        autonomous: false,
+      }).review,
+    ).toBe('none');
+
+    const substantive = assessSupervisorAdmissionRisk({
+      outcome: 'Build the smallest credible end-to-end onboarding workflow',
+      policy: workshopPolicy,
+    });
+    expect(substantive.classification).toBe('substantive');
+    expect(
+      deriveSupervisorPromotionContract({
+        admissionRiskAssessment: substantive,
+        autonomous: false,
+      }).review,
+    ).toBe('focused');
+
+    const consequential = assessSupervisorAdmissionRisk({
+      outcome: 'Repair completion authority policy',
+      policy: workshopPolicy,
+    });
+    expect(consequential).toMatchObject({
+      classification: 'high_consequence',
+      materialRiskCriteria: ['authority'],
+    });
+    expect(
+      deriveSupervisorPromotionContract({
+        admissionRiskAssessment: consequential,
+        autonomous: false,
+      }).review,
+    ).toBe('independent');
+
+    const accessControl = assessSupervisorAdmissionRisk({
+      outcome: 'Fix session access control for signed-in users',
+      policy: workshopPolicy,
+    });
+    expect(accessControl).toMatchObject({
+      classification: 'high_consequence',
+      materialRiskCriteria: ['security'],
+    });
+
+    const unavailable = assessSupervisorAdmissionRisk({ outcome: 'Ship it' });
+    expect(unavailable.classification).toBe('unavailable');
+    expect(
+      deriveSupervisorPromotionContract({
+        admissionRiskAssessment: unavailable,
+        autonomous: false,
+      }),
+    ).toMatchObject({ review: 'independent', broaderValidationTriggers: ['blast_radius'] });
+  });
+  it('requires focused task implementation and review runs to use the frozen candidate head', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    const candidateHead = 'a'.repeat(40);
+    const task = addTask(db, {
+      projectId: project.id,
+      title: 'focused exact-head task',
+      completionCriteriaJson: JSON.stringify({
+        progressiveValidation: { review: 'focused', candidateHead },
+      }),
+    });
+    transitionTask(db, task.id, 'ready');
+    transitionTask(db, task.id, 'queued');
+    const providerId = newId('aprov');
+    db.insert(agentProviders).values({ id: providerId, name: 'focused-provider' }).run();
+    ensureObservedModel(db, providerId, 'focused-model');
+    const base = {
+      taskId: task.id,
+      providerId,
+      modelRef: 'focused-model',
+      billingMode: 'subscription_included' as const,
+      routingReason: 'focused exact-head proof',
+    };
+    expect(() => createRun(db, { ...base, purpose: 'implementation' })).toThrow(
+      /requires frozen candidate head/,
+    );
+    expect(() => createRun(db, { ...base, purpose: 'verification' })).toThrow(
+      /requires frozen candidate head/,
+    );
+    expect(() => createRun(db, { ...base, purpose: 'review', sourceHead: 'b'.repeat(40) })).toThrow(
+      /requires frozen candidate head/,
+    );
+    const implementation = createRun(db, {
+      ...base,
+      purpose: 'implementation',
+      sourceHead: candidateHead,
+    });
+    expect(implementation).toMatchObject({ sourceHead: candidateHead });
+    expect(() =>
+      db
+        .update(agentRuns)
+        .set({ sourceHead: 'b'.repeat(40) })
+        .where(eq(agentRuns.id, implementation.id))
+        .run(),
+    ).toThrow(/source head is immutable/);
+    expect(() =>
+      db
+        .insert(agentRuns)
+        .values({
+          id: newId('arun'),
+          taskId: task.id,
+          providerId,
+          modelRef: 'focused-model',
+          purpose: 'review',
+          billingMode: 'subscription_included',
+          routingReason: 'direct SQL bypass',
+          status: 'pending',
+        })
+        .run(),
+    ).toThrow(/frozen candidate head/);
+    expect(() =>
+      db
+        .insert(agentRuns)
+        .values({
+          id: newId('arun'),
+          taskId: task.id,
+          providerId,
+          modelRef: 'focused-model',
+          purpose: 'verification',
+          billingMode: 'subscription_included',
+          routingReason: 'direct SQL verification bypass',
+          status: 'pending',
+        })
+        .run(),
+    ).toThrow(/frozen candidate head/);
+  });
+
+  it('fails closed when task omission would hide an ambiguous canonical workflow', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    for (const title of ['candidate one', 'candidate two']) {
+      const task = readyTask(db, project.id, title);
+      for (const status of [
+        'queued',
+        'running',
+        'verifying',
+        'reviewing',
+        'ready_to_merge',
+      ] as const) {
+        transitionTask(db, task.id, status);
+      }
+    }
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/demo' },
+        {
+          status: 'done',
+          summary: 'attempted no-task fallback',
+          promotionEvidence: {
+            focusedTests: 'passed',
+            cheapestCompileTypeOrBuild: 'passed',
+            criticalPathBehavior: 'passed',
+            materialRiskChecks: [],
+            broaderValidation: {
+              triggers: [],
+              repositoryPolicyRequires: false,
+              performed: false,
+            },
+            review: { level: 'focused', passed: true },
+            blockerFindings: 0,
+          },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: [expect.stringMatching(/2 ready_to_merge task/)] });
+  });
+
+  it('accepts structured supervisor promotion evidence without requiring a task row', () => {
+    const db = testDb();
+    const admissionRiskAssessment = assessSupervisorAdmissionRisk({
+      outcome: 'Build the onboarding workflow',
+      policy: {
+        projectClass: 'workshop',
+        trust: 'build',
+        allowExternalWrites: false,
+        allowPaidSpend: false,
+      },
+    });
+    const promotionContract = deriveSupervisorPromotionContract({
+      admissionRiskAssessment,
+      autonomous: false,
+    });
+    const promotionEvidence = {
+      focusedTests: 'focused changed-behavior tests passed',
+      cheapestCompileTypeOrBuild: 'typecheck passed',
+      criticalPathBehavior: 'completion lifecycle passed',
+      materialRiskChecks: [
+        {
+          criterion: 'summary-only completion rejection',
+          evidence: 'focused regression passed',
+        },
+      ],
+      broaderValidation: {
+        triggers: [],
+        repositoryPolicyRequires: false,
+        performed: false,
+      },
+      review: { level: 'focused' as const, passed: true },
+      blockerFindings: 0,
+    };
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        { status: 'done', summary: 'structured claim', promotionEvidence },
+      ),
+    ).toMatchObject({ ok: true, taskId: undefined, promotionEvidence });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        { status: 'done', summary: 'summary only' },
+      ),
+    ).toMatchObject({
+      ok: false,
+      failures: ['done completion requires structured pre-promotion evidence'],
+    });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        {
+          status: 'done',
+          summary: 'broad proof missing economics',
+          promotionEvidence: {
+            ...promotionEvidence,
+            broaderValidation: {
+              triggers: ['promotion_policy'],
+              repositoryPolicyRequires: false,
+              performed: true,
+            },
+          },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: ['required pre-promotion evidence is missing'] });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        {
+          status: 'done',
+          summary: 'blocked proof',
+          promotionEvidence: { ...promotionEvidence, blockerFindings: 1 },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: ['BLOCKER findings remain'] });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        {
+          status: 'done',
+          summary: 'untriggered broad proof',
+          promotionEvidence: {
+            ...promotionEvidence,
+            broaderValidation: {
+              triggers: [],
+              repositoryPolicyRequires: false,
+              performed: true,
+              cost: 'one minute',
+              expectedInformationGain: 'none expected',
+              evidence: 'broad suite passed',
+            },
+          },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: ['required pre-promotion evidence is missing'] });
+  });
+
+  it('derives no-task risk/review requirements before the report and matches structured evidence', () => {
+    const db = testDb();
+    const admissionRiskAssessment = assessSupervisorAdmissionRisk({
+      outcome: 'Repair completion authority policy',
+      requiredOperations: ['completion_policy'],
+      policy: {
+        projectClass: 'workshop',
+        trust: 'build',
+        allowExternalWrites: false,
+        allowPaidSpend: false,
+      },
+    });
+    const promotionContract = deriveSupervisorPromotionContract({
+      admissionRiskAssessment,
+      autonomous: false,
+    });
+    expect(promotionContract).toMatchObject({
+      review: 'independent',
+      materialRiskCriteria: ['authority'],
+    });
+    const report = {
+      status: 'done' as const,
+      summary: 'classifier-bound proof',
+      promotionEvidence: {
+        focusedTests: 'passed',
+        cheapestCompileTypeOrBuild: 'passed',
+        criticalPathBehavior: 'passed',
+        materialRiskChecks: [{ criterion: 'authority', evidence: 'authority regression passed' }],
+        broaderValidation: {
+          triggers: [],
+          repositoryPolicyRequires: false,
+          performed: false,
+        },
+        review: { level: 'independent' as const, passed: true },
+        blockerFindings: 0,
+      },
+    };
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        report,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
+        {
+          ...report,
+          promotionEvidence: {
+            ...report.promotionEvidence,
+            materialRiskChecks: [
+              { criterion: 'authority-adjacent', evidence: 'free text prefix must not qualify' },
+            ],
+          },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: ['required pre-promotion evidence is missing'] });
+  });
+
   function taskAtReadyToMerge(db: ReturnType<typeof testDb>) {
     const project = seedProject(db);
     const task = readyTask(db, project.id, 'ship it');
@@ -293,10 +647,253 @@ describe('completion proof and guarded completion transition', () => {
       .run();
     const blocked = evaluateCompletionProof(db, task.id, defaultCriteria());
     expect(blocked.ok).toBe(false);
-    expect(blocked.failures.join('; ')).toMatch(/open critical\/major/);
+    expect(blocked.failures.join('; ')).toMatch(/open BLOCKER/);
 
     db.update(reviewFindings).set({ status: 'fixed' }).run();
     expect(evaluateCompletionProof(db, task.id, defaultCriteria()).ok).toBe(true);
+  });
+
+  it('maps canonical review severities onto storage without losing the legacy blocker alias', () => {
+    expect(REVIEW_SEVERITY_STORAGE).toEqual({
+      BLOCKER: 'critical',
+      IMPORTANT: 'minor',
+      NIT: 'info',
+    });
+    expect(reviewSeverityFromStorage('critical')).toBe('BLOCKER');
+    expect(reviewSeverityFromStorage('major')).toBe('BLOCKER');
+    expect(reviewSeverityFromStorage('minor')).toBe('IMPORTANT');
+    expect(reviewSeverityFromStorage('info')).toBe('NIT');
+  });
+
+  it('connects progressive proof and PROMOTABLE semantics to durable completion', () => {
+    const db = testDb();
+    const candidateHead = 'a'.repeat(40);
+    const project = seedProject(db);
+    const task = addTask(db, {
+      projectId: project.id,
+      title: 'progressively validated candidate',
+      completionCriteriaJson: JSON.stringify({
+        progressiveValidation: {
+          review: 'independent',
+          candidateHead,
+          riskSpecificChecks: ['authority boundary', 'legacy compatibility'],
+        },
+      }),
+    });
+    transitionTask(db, task.id, 'ready');
+    for (const status of [
+      'queued',
+      'running',
+      'verifying',
+      'reviewing',
+      'ready_to_merge',
+    ] as const) {
+      transitionTask(db, task.id, status);
+    }
+    for (const validationSubject of [
+      'focused_tests',
+      'cheapest_compile_type_or_build',
+      'critical_path_behavior',
+    ]) {
+      recordQualifyingVerification(db, task.id, { validationSubject, sourceHead: candidateHead });
+    }
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'risk_specific_check:authority boundary',
+      sourceHead: candidateHead,
+    });
+    const providerId = newId('aprov');
+    db.insert(agentProviders).values({ id: providerId, name: 'builder' }).run();
+    ensureObservedModel(db, providerId, 'codex');
+    const implementationRun = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelRef: 'codex',
+      purpose: 'implementation',
+      billingMode: 'subscription_included',
+      routingReason: 'implementation',
+      sourceHead: candidateHead,
+    });
+    setRunStatus(db, implementationRun.id, 'succeeded');
+    const reviewRun = createRun(db, {
+      taskId: task.id,
+      providerId,
+      modelRef: 'codex',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'focused review',
+      independenceLoss: 'review reused the implementer execution context',
+      sourceHead: candidateHead,
+    });
+    setRunStatus(db, reviewRun.id, 'succeeded');
+    const criteria = parseCompletionCriteria(getTask(db, task.id).completionCriteriaSnapshotJson);
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'missing risk-specific verification: legacy compatibility',
+    );
+    recordQualifyingVerification(db, task.id, {
+      validationSubject: 'risk_specific_check:legacy compatibility',
+      sourceHead: candidateHead,
+    });
+
+    db.insert(reviewFindings)
+      .values({
+        id: newId('rfind'),
+        taskId: task.id,
+        agentRunId: reviewRun.id,
+        severity: REVIEW_SEVERITY_STORAGE.IMPORTANT,
+        summary: 'valuable follow-up that does not prevent a safe MVP',
+      })
+      .run();
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'required review has not passed',
+    );
+    const sameProviderAliasId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: sameProviderAliasId, name: 'builder', accountLabel: 'secondary' })
+      .run();
+    ensureObservedModel(db, sameProviderAliasId, 'codex');
+    const sameProviderAliasReview = createRun(db, {
+      taskId: task.id,
+      providerId: sameProviderAliasId,
+      modelRef: 'codex',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'same canonical provider through another account',
+      independenceLoss: 'review reused the implementer execution context',
+      sourceHead: candidateHead,
+    });
+    setRunStatus(db, sameProviderAliasReview.id, 'succeeded');
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'required review has not passed',
+    );
+
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'required review has not passed',
+    );
+    const compromisedProviderId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: compromisedProviderId, name: 'compromised-reviewer' })
+      .run();
+    ensureObservedModel(db, compromisedProviderId, 'codex');
+    const compromisedReviewRun = createRun(db, {
+      taskId: task.id,
+      providerId: compromisedProviderId,
+      modelRef: 'codex',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'compromised review',
+      independenceLoss: 'review reused the implementer execution context',
+      sourceHead: candidateHead,
+    });
+    setRunStatus(db, compromisedReviewRun.id, 'succeeded');
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'required review has not passed',
+    );
+    const independentProviderId = newId('aprov');
+    db.insert(agentProviders)
+      .values({ id: independentProviderId, name: 'builder', accountLabel: 'review' })
+      .run();
+    ensureObservedModel(db, independentProviderId, 'codex');
+    const independentReviewRun = createRun(db, {
+      taskId: task.id,
+      providerId: independentProviderId,
+      modelRef: 'codex',
+      purpose: 'review',
+      billingMode: 'subscription_included',
+      routingReason: 'execution-independent same-provider review',
+      sourceHead: candidateHead,
+    });
+    setRunStatus(db, independentReviewRun.id, 'succeeded');
+    expect(evaluateCompletionProof(db, task.id, criteria)).toMatchObject({
+      ok: false,
+      failures: ['required review has not passed'],
+    });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/demo' },
+        { status: 'done', summary: 'canonical proof passed', taskId: task.id },
+        { liveHead: candidateHead },
+      ),
+    ).toMatchObject({ ok: true, taskId: task.id });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/demo' },
+        { status: 'done', summary: 'stale canonical proof', taskId: task.id },
+        { liveHead: 'b'.repeat(40) },
+      ),
+    ).toMatchObject({
+      ok: false,
+      failures: ['live repository head does not match the canonical task frozen candidate head'],
+    });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/demo' },
+        { status: 'done', summary: 'claim' },
+      ),
+    ).toMatchObject({
+      ok: false,
+      failures: ['done completion must cite the disclosed canonical taskId'],
+    });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/not-demo' },
+        { status: 'done', summary: 'wrong repository', taskId: task.id },
+      ),
+    ).toMatchObject({ ok: false });
+
+    db.insert(reviewFindings)
+      .values({
+        id: newId('rfind'),
+        taskId: task.id,
+        agentRunId: reviewRun.id,
+        severity: REVIEW_SEVERITY_STORAGE.BLOCKER,
+        summary: 'unsafe promotion boundary',
+      })
+      .run();
+    const blocked = evaluateCompletionProof(db, task.id, criteria);
+    expect(blocked.ok).toBe(false);
+    expect(blocked.failures).toContain('BLOCKER findings remain');
+  });
+
+  it('records cost and expected information gain when broad validation is required', () => {
+    expect(() =>
+      parseCompletionCriteria(
+        JSON.stringify({
+          progressiveValidation: { broaderValidationTriggers: ['promotion_policy'] },
+        }),
+      ),
+    ).toThrow(/cost and expected information gain/);
+    expect(
+      parseCompletionCriteria(
+        JSON.stringify({
+          progressiveValidation: {
+            candidateHead: 'a'.repeat(40),
+            broaderValidationTriggers: ['promotion_policy'],
+            broadValidationJustification: {
+              cost: 'about two deterministic test minutes',
+              expectedInformationGain: 'detect migration and completion-trigger drift',
+            },
+          },
+        }),
+      ).progressiveValidation?.broadValidationJustification,
+    ).toEqual({
+      cost: 'about two deterministic test minutes',
+      expectedInformationGain: 'detect migration and completion-trigger drift',
+    });
+  });
+
+  it('rejects whitespace-only criteria exactly as the SQLite boundary does', () => {
+    expect(() =>
+      parseCompletionCriteria(JSON.stringify({ requiredDecisionCategories: ['   '] })),
+    ).toThrow();
+    expect(() =>
+      parseCompletionCriteria(
+        JSON.stringify({ progressiveValidation: { riskSpecificChecks: ['   '] } }),
+      ),
+    ).toThrow();
   });
 
   it('enforces task-specific criteria (artifact and required decisions)', () => {
@@ -332,6 +929,18 @@ describe('completion proof and guarded completion transition', () => {
       ref: 'https://github.com/x/y/pull/1',
       summary: 'PR opened',
     });
+    expect(evaluateCompletionProof(db, task.id, criteria()).failures.join('; ')).toMatch(
+      /'merge' DecisionRequest/,
+    );
+
+    const otherProject = seedProject(db, 'other');
+    const wrongProjectDecision = createDecisionRequest(db, {
+      taskId: task.id,
+      projectId: otherProject.id,
+      category: 'merge',
+      question: 'wrong project approval?',
+    });
+    resolveDecision(db, wrongProjectDecision.id, 'approved', 'not authoritative');
     expect(evaluateCompletionProof(db, task.id, criteria()).failures.join('; ')).toMatch(
       /'merge' DecisionRequest/,
     );

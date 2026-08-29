@@ -34,6 +34,10 @@ import type { ProviderApprovalAuthority } from '../security/provider-approval-po
 import type { ApprovalCategory } from '../security/provider-approval-policy.js';
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { hashSourceWorkspaceTree } from '../execution/workspace-transfer.js';
+import {
+  tryAcquireRepositoryWriterFence,
+  type RepositoryWriterFence,
+} from './repository-writer-fence.js';
 
 export function captureProviderApprovalRequest(input: {
   cwd: string;
@@ -200,6 +204,7 @@ export async function runGatewayCommand(input: {
   resourceLeaseId?: string;
   resourceLeaseFencingToken?: string;
   resourceLeaseTtlMs?: number;
+  readOnlyWorkspace?: boolean;
   providerRequest?: {
     host: WorkerHost;
     prompt: string;
@@ -223,6 +228,7 @@ export async function runGatewayCommand(input: {
       args: input.args,
       cwd: resolve(input.cwd),
       allowedRoots: gatewayAllowedRoots(input.cwd, input.extraAllowedRoots),
+      ...(input.readOnlyWorkspace ? { readOnlyWorkspace: true } : {}),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.resourceLeaseId ? { resourceLeaseId: input.resourceLeaseId } : {}),
       ...(input.resourceLeaseFencingToken
@@ -354,8 +360,36 @@ export async function runWorker(input: {
   accountLabel?: string;
   resumeSessionRef?: string;
   approvalAuthority?: ProviderApprovalAuthority;
+  /** Enforce a provider execution that cannot mutate the admitted workspace. */
+  readOnly?: boolean;
+  /** Existing canonical writer lease held by the integration owner. */
+  writerFence?: RepositoryWriterFence;
 }): Promise<WorkerOutcome> {
   const started = Date.now();
+  const mayMutate = allowGuestMutationForHost(input.host, input.cwd, input.readOnly);
+  let ownedWriterFence: RepositoryWriterFence | undefined;
+  if (mayMutate) {
+    if (input.writerFence) {
+      if (resolve(input.writerFence.repoPath) !== resolve(input.cwd)) {
+        throw new Error('repository writer fence belongs to a different source tree');
+      }
+      input.writerFence.assertUncontended();
+    } else {
+      ownedWriterFence = tryAcquireRepositoryWriterFence(input.cwd);
+      if (!ownedWriterFence) {
+        return {
+          host: input.host,
+          status: 'failed',
+          exitCode: null,
+          stdout: '',
+          stderr: 'Major repository writer fence refused concurrent tree mutation',
+          durationMs: Date.now() - started,
+          rateLimited: false,
+          exhausted: false,
+        };
+      }
+    }
+  }
   const leaseTtlMs = Math.max(input.timeoutMs ?? 0, 30 * 60 * 1000) + 5 * 60 * 1000;
   const request = requestResource({
     kind: 'worker',
@@ -386,7 +420,7 @@ export async function runWorker(input: {
         ? request.lease
         : await waitForResource(request.request, input.timeoutMs);
     const resourceWaitMs = Math.max(0, Date.now() - started);
-    const allowGuestMutation = allowGuestMutationForHost(input.host, input.cwd);
+    const allowGuestMutation = allowGuestMutationForHost(input.host, input.cwd, input.readOnly);
     const workspaceHash = mutationWorkspaceHashForHost(input.host, input.cwd, allowGuestMutation);
     const providerRequest = {
       host: input.host,
@@ -408,6 +442,7 @@ export async function runWorker(input: {
         resourceLeaseId: lease!.id,
         resourceLeaseFencingToken: lease!.fencingToken,
         resourceLeaseTtlMs: leaseTtlMs,
+        ...(input.readOnly ? { readOnlyWorkspace: true } : {}),
         providerRequest: {
           ...providerRequest,
           ...(resumeSessionRef ? { resumeSessionRef } : {}),
@@ -466,10 +501,16 @@ export async function runWorker(input: {
     };
   } finally {
     if (lease) releaseResource(lease.id, lease.fencingToken);
+    ownedWriterFence?.release();
   }
 }
 
-export function allowGuestMutationForHost(host: WorkerHost, cwd: string): boolean {
+export function allowGuestMutationForHost(
+  host: WorkerHost,
+  cwd: string,
+  readOnly = false,
+): boolean {
+  if (readOnly) return false;
   if (host === 'claude' || host === 'cursor') return true;
   if (host !== 'codex') return false;
   try {

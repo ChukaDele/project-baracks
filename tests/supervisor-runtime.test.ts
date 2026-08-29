@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,9 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureLearning, promoteLearning } from '../src/learning/candidates.js';
 import { configureProjectPolicy, recordShadowGrade } from '../src/supervisor/policy.js';
 import {
+  classifyInconclusiveReviewAttempt,
   coordinatorPrompt,
   modelOutcomeForWorker,
   nonSuccessCyclePatch,
+  postReviewSourceChangePatch,
+  recordInconclusiveReviewAttemptPatch,
   parseWorkerReport,
   runForegroundGoal,
   routingDecisionGoalPatch,
@@ -21,10 +25,16 @@ import {
   completedWorkflow,
   preserveWorkerReportEnvelope,
 } from '../src/supervisor/worker-report.js';
+
 import type { ProviderInfo } from '../src/providers/types.js';
 import type { CapabilityRecord } from '../src/capabilities/registry.js';
 import { writeCodexUsageReport } from '../src/providers/codex-usage.js';
-import { model } from './helpers.js';
+import { hashSourceWorkspaceTree } from '../src/execution/workspace-transfer.js';
+import {
+  candidateDispatchFailure,
+  freezeSupervisorCandidate,
+} from '../src/supervisor/source-identity.js';
+import { canonicalGradeProvenance, model, testDb } from './helpers.js';
 
 const roots: string[] = [];
 let priorPolicyPath: string | undefined;
@@ -68,6 +78,158 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('classifies review availability failures without inventing an implementation verdict', () => {
+    const base = {
+      exitCode: 0,
+      sessionRef: 'session-1',
+      stdout: '',
+      stderr: '',
+    };
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { status: 'timed_out', exitCode: null, stdout: '', stderr: '' },
+        undefined,
+      ),
+    ).toMatchObject({ outcome: 'timeout' });
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { status: 'failed', exitCode: null, stdout: '', stderr: '' },
+        undefined,
+      ),
+    ).toMatchObject({ outcome: 'crash' });
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { ...base, status: 'failed', stderr: 'gateway failed' },
+        undefined,
+      ),
+    ).toMatchObject({ outcome: 'missing_result', evidence: 'gateway failed' });
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { ...base, status: 'succeeded', sessionRef: '   ' },
+        undefined,
+      ),
+    ).toMatchObject({ outcome: 'missing_session_provenance' });
+    expect(
+      classifyInconclusiveReviewAttempt(
+        { ...base, status: 'succeeded' },
+        { status: 'active', summary: 'review did not decide' },
+      ),
+    ).toMatchObject({ outcome: 'no_verdict' });
+  });
+
+  it('rotates sequential inconclusive reviews and checkpoints availability after three attempts', () => {
+    const pending: NonNullable<SupervisorGoal['pendingCompletion']> = {
+      summary: 'candidate claim',
+      coordinator: 'codex',
+      claimedAt: '2026-08-29T00:00:00.000Z',
+      reviewDispatch: {
+        id: 'dispatch-live',
+        provider: 'codex',
+        capacityKey: 'codex/default',
+        runId: 'run-live',
+        startedAt: '2026-08-29T00:01:00.000Z',
+      },
+    };
+    const attempt = (number: number) => ({
+      attempt: number,
+      dispatchId: `dispatch-${number}`,
+      provider: 'codex' as const,
+      capacityKey: `codex/account-${number}`,
+      runId: `run-${number}`,
+      startedAt: `2026-08-29T00:0${number}:00.000Z`,
+      finishedAt: `2026-08-29T00:0${number}:30.000Z`,
+      outcome: 'timeout' as const,
+      evidence: 'provider timed out',
+    });
+    const first = recordInconclusiveReviewAttemptPatch(pending, attempt(1));
+    expect(first).toMatchObject({ status: 'active', retryImmediately: true });
+    expect(first.pendingCompletion?.reviewDispatch).toBeUndefined();
+    expect(first.lastSummary).toMatch(/No implementation BLOCKER verdict/i);
+
+    const second = recordInconclusiveReviewAttemptPatch(first.pendingCompletion!, attempt(2));
+    expect(second).toMatchObject({ status: 'active', retryImmediately: true });
+    expect(second.pendingCompletion?.reviewAttempts).toHaveLength(2);
+
+    const third = recordInconclusiveReviewAttemptPatch(second.pendingCompletion!, attempt(3));
+    expect(third).toMatchObject({ status: 'active', retryImmediately: false });
+    expect(third.pendingCompletion?.reviewAttempts).toHaveLength(3);
+    expect(third.pendingCompletion?.reviewDispatch).toBeUndefined();
+    expect(third.lastSummary).toMatch(/availability is exhausted/i);
+    expect(third.lastSummary).toMatch(/no implementation BLOCKER verdict/i);
+    expect(third.ownerGate).toBeUndefined();
+  });
+
+  it('freezes every task-resolution outcome and refuses ambiguous dispatch authority', () => {
+    const source = {
+      sourceHead: 'a'.repeat(40),
+      sourceTreeDigest: 'b'.repeat(64),
+      frozenAt: '2026-08-29T00:00:00.000Z',
+    };
+    const task = freezeSupervisorCandidate(
+      {
+        ok: true,
+        binding: {
+          taskId: 'task-1',
+          projectId: 'project-1',
+          repoPath: '/repo',
+          frozenCriteriaJson: '{}',
+        },
+      },
+      source,
+    );
+    expect(task).toMatchObject({ resolution: 'task', task: { taskId: 'task-1' }, ...source });
+    expect(candidateDispatchFailure(task)).toBeUndefined();
+    const noTask = freezeSupervisorCandidate(
+      { ok: false, kind: 'no_task', failure: 'none' },
+      source,
+    );
+    expect(noTask).toEqual({ ...source, resolution: 'no_task' });
+    const ambiguous = freezeSupervisorCandidate(
+      { ok: false, kind: 'ambiguous', failure: 'two qualifying tasks' },
+      source,
+    );
+    expect(ambiguous).toEqual({
+      ...source,
+      resolution: 'ambiguous',
+      failure: 'two qualifying tasks',
+    });
+    expect(candidateDispatchFailure(ambiguous)).toBe('two qualifying tasks');
+  });
+
+  it('reopens post-review completion before receipt authority when exact HEAD is unavailable or changed', () => {
+    const patch = postReviewSourceChangePatch('/not/a/repository', 'a'.repeat(40), 'digest');
+    expect(patch).toMatchObject({
+      status: 'active',
+      pendingCompletion: undefined,
+      activePid: undefined,
+    });
+    expect(patch?.lastSummary).toMatch(/repository or source tree changed/i);
+  });
+  it('detects source-tree mutation even when the expected digest was frozen before review', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'major-review-tree-'));
+    roots.push(repo);
+    writeFileSync(join(repo, 'proof.txt'), 'before\n');
+    const gitOptions = { cwd: repo, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } };
+    execFileSync('/usr/bin/git', ['init'], gitOptions);
+    execFileSync('/usr/bin/git', ['add', 'proof.txt'], gitOptions);
+    execFileSync(
+      '/usr/bin/git',
+      ['-c', 'user.name=Major Test', '-c', 'user.email=major@example.test', 'commit', '-m', 'base'],
+      gitOptions,
+    );
+    const head = execFileSync('/usr/bin/git', ['rev-parse', 'HEAD'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: gitOptions.env,
+    }).trim();
+    const digest = hashSourceWorkspaceTree(repo);
+    writeFileSync(join(repo, 'proof.txt'), 'after\n');
+    const patch = postReviewSourceChangePatch(repo, head, digest);
+    expect(patch).toMatchObject({
+      pendingCompletion: undefined,
+    });
+    expect(patch?.lastSummary).toMatch(/source tree changed/i);
+  });
   it('builds a compact terminal receipt without inventing unavailable evidence', () => {
     const receipt = supervisorRunInsight({
       goal: { id: 'goal-1', goal: 'Ship the accepted Major increment' },
@@ -95,7 +257,9 @@ describe('Major coordinator contract', () => {
         rateLimited: false,
         exhausted: false,
         workspaceMutated: true,
+        runId: 'provider-run-1',
       },
+      sourceHead: 'a'.repeat(40),
       report: {
         status: 'blocked',
         summary: 'Worker completed; owner approval remains.',
@@ -119,6 +283,7 @@ describe('Major coordinator contract', () => {
       status: 'blocked',
       runtime: 'major',
       worker: { coordinator: 'codex', provider: 'codex#default', model: 'gpt-5-codex' },
+      runEvidence: { runId: 'provider-run-1', sourceHead: 'a'.repeat(40) },
       skills: ['tdd'],
       timing: {
         durationMs: 100,
@@ -538,6 +703,11 @@ describe('Major coordinator contract', () => {
         repoPath: repo,
         planner: 'codex',
         provider: 'claude',
+        ...canonicalGradeProvenance(testDb(), {
+          id: `runtime-${i}`,
+          project: 'jss-tool',
+          goalId: 'goal-1',
+        }),
         result: 'pass',
         evidence: `shadow ${i + 1} matched actual task path`,
         goalId: 'goal-1',
@@ -587,6 +757,24 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain(
       'FAST checks while iterating, acceptance evidence for the critical path',
     );
+    expect(prompt).toContain('focused changed-behavior tests');
+    expect(prompt).toContain('the cheapest relevant compile/type/build check');
+    expect(prompt).toContain('critical-path behavior');
+    expect(prompt).toContain('checks for each material risk');
+    for (const trigger of [
+      'blast-radius',
+      'shared-dependency',
+      'insufficient-evidence',
+      'historical-regression',
+      'promotion-policy',
+    ]) {
+      expect(prompt).toContain(trigger);
+    }
+    expect(prompt).toContain('or repository policy requires them');
+    expect(prompt).toContain('cost versus expected information gain');
+    expect(prompt).toContain('existing qualifying verification/evidence path');
+    expect(prompt).toContain('BLOCKER → critical, IMPORTANT → minor, NIT → info');
+    expect(prompt).toContain('stored legacy major remains a BLOCKER');
     expect(prompt).toContain('class: workshop');
     expect(prompt).toContain('trust: assist');
     expect(prompt).toContain('maximum concurrent workers: 1');
@@ -597,12 +785,21 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('mcp-integration-ops');
     expect(prompt).toContain('website-design-qa');
     expect(prompt).toContain('BUILT = implementation exists');
+    expect(prompt).toContain(
+      'PROMOTABLE = required pre-promotion evidence and review passed with no BLOCKER',
+    );
+    expect(prompt).toContain('merge/install may proceed before installation proof exists');
+    expect(prompt).toContain(
+      'READY = a representative real-world outcome has succeeded under the intended trust profile',
+    );
     expect(prompt).toContain("You cannot access or mutate Major's global control state");
     expect(prompt).toContain('the parent owns resource admission and learning capture');
     expect(prompt).not.toContain('capture it with major learn capture');
     expect(prompt).not.toContain('Reserve Major capacity before every worker');
     expect(prompt).not.toContain('Delegate independent work across providers with the Major CLI');
     expect(prompt).toContain('MAJOR_RESULT: {"status":"active"');
+    expect(prompt).toContain('"promotionEvidence":{"focusedTests"');
+    expect(prompt).not.toContain('QUALIFYING CANONICAL TASK');
     expect(prompt).not.toContain('major goal report');
     expect(prompt).toContain('Do not mark done unless the end-to-end goal is demonstrably true');
     expect(prompt).toContain('source → assess → tailor');
@@ -705,16 +902,29 @@ describe('Major coordinator contract', () => {
   });
 
   it('injects prior cycle history into the prompt for account handoff', () => {
+    const root = mkdtempSync(join(tmpdir(), 'major-prompt-policy-'));
+    roots.push(root);
+    process.env.MAJOR_POLICY_PATH = join(root, 'project-policies.json');
     const current = goal('/tmp/project');
     current.lastSummary = 'implemented the quota router';
     const prompt = coordinatorPrompt(current, [], {
       accountLabel: 'work-b',
       continuityBlock:
         'CONTEXT CONTINUITY:\nPrevious account default is no longer the active subscription.\nPrior cycle summary:\nimplemented the quota router',
+      canonicalTask: {
+        taskId: 'task_existing',
+        projectId: 'proj_existing',
+        repoPath: '/tmp/project',
+        frozenCriteriaJson: '{"minPassedVerificationRuns":2}',
+      },
     });
     expect(prompt).toContain('implemented the quota router');
     expect(prompt).toContain('Active subscription account: work-b');
     expect(prompt).toContain('CONTEXT CONTINUITY:');
+    expect(prompt).toContain('structured pre-promotion evidence');
+    expect(prompt).toContain('QUALIFYING CANONICAL TASK');
+    expect(prompt).toContain('task id: task_existing');
+    expect(prompt).toContain('frozen completion criteria: {"minPassedVerificationRuns":2}');
   });
 
   it('accepts only a bounded final worker report and requires an owner gate when blocked', () => {
@@ -743,6 +953,29 @@ describe('Major coordinator contract', () => {
     expect(
       parseWorkerReport('MAJOR_RESULT: {"status":"done","summary":"forged bare output"}'),
     ).toBeUndefined();
+    expect(
+      parseWorkerReport(
+        JSON.stringify({
+          type: 'result',
+          result: 'MAJOR_RESULT: {"status":"done","summary":"proof passed","taskId":"task_123"}',
+        }),
+      ),
+    ).toEqual({ status: 'done', summary: 'proof passed', taskId: 'task_123' });
+    const structured = parseWorkerReport(
+      JSON.stringify({
+        type: 'result',
+        result:
+          'MAJOR_RESULT: {"status":"done","summary":"supervisor proof passed","promotionEvidence":{"focusedTests":"focused tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"focused","passed":true},"blockerFindings":0}}',
+      }),
+    );
+    expect(structured).toMatchObject({
+      status: 'done',
+      promotionEvidence: {
+        focusedTests: 'focused tests passed',
+        review: { level: 'focused', passed: true },
+        blockerFindings: 0,
+      },
+    });
   });
 
   it('accepts bounded capability-use provenance without treating it as completion authority', () => {

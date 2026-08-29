@@ -17,6 +17,7 @@ import { assertCapabilityAvailable } from '../security/capabilities.js';
 import { redactText, redactValue } from '../security/redact.js';
 import { StaleClaimError } from './claim-service.js';
 import { isApprovedDecision } from './decision-service.js';
+import { parseCompletionCriteria } from './completion.js';
 import { newId, nowIso } from './ids.js';
 
 export class RunAuthorisationError extends Error {
@@ -43,6 +44,7 @@ export interface NewRunInput {
    * provider/model. Validated inside the run-creation transaction. */
   paidUsageDecisionId?: string;
   independenceLoss?: string;
+  sourceHead?: string;
   allowanceState?: string;
   worktreeId?: string;
   now?: () => Date;
@@ -76,10 +78,14 @@ export function createRun(db: Db, rawInput: NewRunInput) {
     routingReason: rawInput.routingReason,
     paidUsageDecisionId: rawInput.paidUsageDecisionId,
     independenceLoss: rawInput.independenceLoss,
+    sourceHead: rawInput.sourceHead,
     allowanceState: rawInput.allowanceState,
     worktreeId: rawInput.worktreeId,
     now: rawInput.now,
   });
+  if (input.sourceHead !== undefined && !/^[0-9a-f]{40}$/.test(input.sourceHead)) {
+    throw new RunAuthorisationError('run sourceHead must be an exact 40-character lowercase SHA');
+  }
   if (PAID_BILLING_MODES.includes(input.billingMode)) {
     assertCapabilityAvailable('paid-provider-execution');
   }
@@ -90,6 +96,16 @@ export function createRun(db: Db, rawInput: NewRunInput) {
     (tx) => {
       const task = tx.select().from(tasks).where(eq(tasks.id, input.taskId)).get();
       if (!task) throw new Error(`task not found: ${input.taskId}`);
+      if (['verification', 'implementation', 'repair', 'review'].includes(input.purpose)) {
+        const progressive = parseCompletionCriteria(
+          task.completionCriteriaSnapshotJson,
+        ).progressiveValidation;
+        if (progressive && input.sourceHead !== progressive.candidateHead) {
+          throw new RunAuthorisationError(
+            `${input.purpose} run requires frozen candidate head ${progressive.candidateHead}`,
+          );
+        }
+      }
 
       if (input.billingMode === 'unknown') {
         throw new RunAuthorisationError(
@@ -191,6 +207,7 @@ export function createRun(db: Db, rawInput: NewRunInput) {
         routingReason: input.routingReason,
         paidUsageDecisionId: input.paidUsageDecisionId ?? null,
         independenceLoss: input.independenceLoss ?? null,
+        sourceHead: input.sourceHead ?? null,
         allowanceState: input.allowanceState ?? null,
         worktreeId: input.worktreeId ?? null,
         status: 'pending' as const,
@@ -228,8 +245,10 @@ export function setRunStatus(
   db: DbConn,
   runId: string,
   status: (typeof agentRuns.$inferInsert)['status'],
+  options: { sessionRef?: string } = {},
 ) {
   const patch: Partial<typeof agentRuns.$inferInsert> = { status };
+  if (options.sessionRef) patch.sessionRef = options.sessionRef;
   if (status === 'running') patch.startedAt = nowIso();
   if (status && ['succeeded', 'failed', 'cancelled', 'timed_out', 'checkpointed'].includes(status))
     patch.endedAt = nowIso();

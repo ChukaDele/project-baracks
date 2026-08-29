@@ -114,8 +114,8 @@
       "optionalSkills": ["security-audit", "cross-modal-review"],
       "permissionProfile": "read-only-verdict",
       "boundary": "Reviews the frozen candidate only. The candidate author cannot act as this role.",
-      "qualityGate": "Candidate digest, acceptance contract, and independent reviewer identity are explicit.",
-      "gaps": ["external independent provider remains required"]
+      "qualityGate": "Candidate digest, acceptance contract, distinct read-only review execution, and reviewer provider/account/run provenance are explicit.",
+      "gaps": []
     },
     {
       "id": "operations-automation-director",

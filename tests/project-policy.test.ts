@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { testDb, canonicalGradeProvenance } from './helpers.js';
 import {
   clearGlobalStop,
   configureProjectPolicy,
@@ -16,9 +17,19 @@ import {
 let root = '';
 let priorPolicyPath: string | undefined;
 let priorStopPath: string | undefined;
+let db: ReturnType<typeof testDb>;
+
+function shadowProvenance(id: string) {
+  return canonicalGradeProvenance(db, { id, project: 'jss-tool', goalId: 'goal-1' });
+}
+
+function executionProvenance(id: string) {
+  return canonicalGradeProvenance(db, { id, project: 'jss-tool', goalId: 'goal-1' });
+}
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-policy-'));
+  db = testDb();
   priorPolicyPath = process.env.MAJOR_POLICY_PATH;
   priorStopPath = process.env.MAJOR_STOP_PATH;
   process.env.MAJOR_POLICY_PATH = join(root, 'policies.json');
@@ -46,6 +57,7 @@ function earnAssist(project = 'jss-tool', repoPath = '/tmp/jss-tool') {
       repoPath,
       planner: 'codex',
       provider: 'claude',
+      ...shadowProvenance(String(i)),
       result: 'pass',
       evidence: `shadow ${i + 1} matched the real task path`,
       goalId: 'goal-1',
@@ -168,7 +180,8 @@ describe('Major project trust policy', () => {
     recordIndependentGrade({
       project: 'jss-tool',
       repoPath: '/tmp/jss-tool',
-      provider: 'codex',
+      provider: 'claude',
+      ...executionProvenance('unattended'),
       result: 'pass',
       evidence: 'Independent review of a representative build-mode run passed.',
       goalId: 'goal-1',
@@ -200,6 +213,7 @@ describe('Major project trust policy', () => {
       project: 'jss-tool',
       repoPath: '/tmp/jss-tool',
       provider: 'claude',
+      ...executionProvenance('build'),
       result: 'pass',
       evidence: 'Independent review of the representative assist run passed.',
       goalId: 'goal-1',

@@ -1,12 +1,38 @@
 # Goal state
 
-## Active outcome
+## Intent
 
-[One concrete outcome]
+[One concrete outcome and why it matters]
 
-## Acceptance evidence
+## Work profile
 
-- [Observable proof required to call this outcome done]
+[Small: outcome + acceptance only / Substantive: compact state below]
+
+Risk: [low / persistence / authority / security / external / irreversible / broad]
+Review: [none / focused / independent]
+
+## Spec
+
+- [Observable acceptance requirement]
+
+## Plan
+
+- [Smallest ordered implementation slice; omit for small low-risk work]
+
+## Evidence
+
+- [Observed proof; omit until evidence exists]
+
+Delivery evidence (record only task-applicable rows; omitted rows are not required):
+
+- IMPLEMENTED: [unproven / proven — implementation evidence]
+- TESTED: [unproven / proven — deterministic check evidence]
+- STAGED: [unproven / proven — staged-candidate evidence]
+- RESOLVED: [unproven / proven — issue/dependency resolution evidence]
+- LOADED: [unproven / proven — runtime/configuration load evidence]
+- FOLLOWED: [unproven / proven — procedure/policy adherence evidence]
+- INSTALLED: [unproven / proven — exact-artifact installation evidence]
+- BEHAVIORALLY PROVEN: [unproven / proven — representative outcome evidence]
 
 ## Critical-path dependencies
 
@@ -18,7 +44,10 @@
 
 ## Current status
 
-[Not started / Running / Verifying / Repairing / Blocked owner / Done]
+[Planned / Built / Validated / Ready; plus Running / Repairing / Blocked owner when active]
+
+Installation proof: [not required / unproven / proven]
+Representative behaviour proof: [unproven / proven]
 
 ## Current bottleneck
 
@@ -31,6 +60,11 @@
 ## Completed evidence
 
 - [Completed work → objective evidence → remaining impact]
+
+## Failure regression
+
+- [Project-specific failure → reproduction → expected result → focused verification artifact]
+- [Optional separate sanitized, generalisable learning candidate → existing GBrain learning path]
 
 ## Next executable action
 

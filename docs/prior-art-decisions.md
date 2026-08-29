@@ -4,6 +4,16 @@ Future Major agents must consult this log before rebuilding a capability or addi
 
 Record format: Capability, Date, Candidates, Decision, Reason, Major-specific layer retained, Rejected alternatives, Evidence.
 
+## 2026-08-28 — lightweight intent-to-evidence SDLC state
+
+- **Capability:** proportional intent-to-spec-to-plan-to-evidence state, review, regression learning, and delivery proof for Major work.
+- **Candidates:** the canonical project `GOAL_STATE.md` template and shared reusable-asset record; existing task, evidence, review-finding, learning, worktree, policy, and readiness paths; a new workflow engine, database schema, or external SDLC framework.
+- **Decision:** WRAP the existing goal-state template and readiness guidance. BUILD only a pure deterministic assessment module and focused tests for the missing policy delta. KEEP all existing orchestration and persistence paths.
+- **Reason:** the repository already owns durable state, execution, evidence, review, learning, and promotion. Another store or workflow runtime would duplicate authority and slow small work. The missing behavior is a compact, testable classification and truthful proof vocabulary.
+- **Major-specific layer retained:** supervisor orchestration, isolated worktrees, project policy, immutable evidence, review findings, independent completion grading, project learning capture, GBrain promotion, and supported installation/release gates.
+- **Rejected alternatives:** a second task lifecycle; schema migration; mandatory independent review for every change; embedding project regressions in GBrain; treating installation as readiness; adopting an external workflow platform.
+- **Evidence:** `guidance/gbrain-reusable-assets.index.json` identifies the canonical goal-state template; `templates/project/GOAL_STATE.md`, `src/domain/completion.ts`, `src/supervisor/autonomy.ts`, `src/learning/candidates.ts`, and `guidance/readiness-and-independent-validation.md` already implement the retained paths. The missing delta is covered by `src/domain/sdlc.ts` and `tests/sdlc.test.ts`, including the exact intent/spec/plan/evidence contract, non-blocking nit/speculation regressions, and task-applicable delivery-evidence matrix without a new persistence path.
+
 ## 2026-08-28 - Shaper analytics and Gaussian Splatting reconstruction
 
 - **Capability:** optional SQL analytics over Major telemetry and spatial reconstruction guidance
@@ -297,7 +307,7 @@ The user brief names `skill-harvest` and `knowledge-ingest`; their provenance in
 | `knowledge-ingest` (donor checkout: `ingest`) | **ADD** | Add one Major dispatcher that classifies and dedupes inputs, separates source claims from conclusions and routes notable durable meaning through existing GBrain interfaces. It owns no page store. | `skills/internal/knowledge-ingest/SKILL.md`; `src/knowledge/semantics.ts`. |
 | `research-compendium` | **ADD** | Add a reusable structured research-asset contract containing citations and derived knowledge, never copyrighted full text; GBrain remains storage authority. | `skills/internal/research-compendium/SKILL.md`. |
 | `academic-verify` | **ADD** | Add provider-neutral, warranted verification from claim through methodology, results, limitations and replication/contradiction, with distinct evidence-strength judgments. | `skills/internal/academic-verify/SKILL.md`. |
-| `cross-modal-review` | **MERGE** | Strengthen the existing skill: deterministic checks first, independent provider diversity when expected value warrants it, preserve disagreements, and prohibit implementer self-certification. | `skills/internal/cross-modal-review/SKILL.md`. |
+| `cross-modal-review` | **MERGE** | Strengthen the existing skill: deterministic checks first, execution-independent read-only review when expected value warrants it, durable provider/account/run provenance, preserved disagreements, and no implementer self-certification. Provider diversity is optional corroboration. | `skills/internal/cross-modal-review/SKILL.md`. |
 | `functional-area-resolver` | **MERGE** | Merge aliases, positive/negative/near-neighbour evidence into Major's single canonical resolver while preserving HOT/ACTIVE/DORMANT disclosure. No second resolver is introduced. | `src/skills/resolver.ts`; `evals/skill-resolver/*.json`. |
 | `minion-orchestrator` | **MERGE** | Merge only deterministic-versus-reasoning execution classification into existing Major routing; mechanical checks use tools without unnecessary model calls. Reject its queue, scheduler and runtime. | `skills/internal/skill-harvest/SKILL.md`; existing Major supervisor and resolver. |
 
@@ -313,6 +323,17 @@ These are independently authored Major workflow contracts, not copied donor impl
 - **Major-specific layer retained:** the locked file store, canonical resource ownership and queue, worker heartbeat/lifecycle integration, process-liveness checks, gateway containment, and atomic reclaim under the existing lock
 - **Rejected alternatives:** BullMQ/Redis; a Redis-backed lease service; a second queue; an external scheduler; an unfenced time-only reclaim; a new platform, framework or runtime
 - **Evidence:** `src/supervisor/resources.ts`, `tests/resources.test.ts`, `tests/worker-resource-lifecycle.test.ts`, `src/supervisor/worker.ts`, `src/security/major-gateway.ts`, and the retained DSH performance evidence showing high infrastructure wait.
+
+## 2026-08-29 — bounded sequential independent-review failover
+
+- **Capability:** continue an exact-candidate independent review across inconclusive provider availability without weakening review provenance or adding another scheduler
+- **Date:** 2026-08-29
+- **Candidates:** Major's existing foreground continuation, repository writer fence, provider/account router, canonical agent runs and pending-completion state; parallel duplicate reviews; an external queue or retry service; treating provider failure as a code-review BLOCKER
+- **Decision:** WRAP the existing foreground continuation and routing path. Persist each inconclusive attempt on the pending claim, exclude its provider/account capacity key, clear the single dispatch before immediate continuation, and stop after at most three sequential attempts. Keep timeout, crash, missing result, missing verdict and missing session provenance as reviewer-availability evidence; only a provider-owned verdict can pass or fail the implementation.
+- **Reason:** the worker already releases its resource lease in `finally`, the foreground loop already advances authorized work synchronously, and the repository writer fence already prevents parallel integration ownership. Reusing those boundaries yields fresh canonical executions without a duplicate queue, parallel review spend or a synthetic verdict.
+- **Major-specific layer retained:** exact HEAD/tree binding, read-only containment, durable provider session identity, canonical run linkage, same-provider execution independence, provider/account routing, append-only receipt authority and explicit availability exhaustion
+- **Rejected alternatives:** parallel review fan-out; retrying the same capacity indefinitely; converting provider availability into a BLOCKER finding; accepting a result without durable session provenance; adding a queue, daemon, scheduler or external retry dependency
+- **Evidence:** `src/supervisor/runtime.ts`, `src/supervisor/state.ts`, and focused classification/three-attempt continuation cases in `tests/supervisor-runtime.test.ts`.
 
 ## 2026-08-28 — Vercel live-vendor skill source and section disclosure
 

@@ -4,7 +4,7 @@
 
 Deploy Major as an **always-present control plane with scoped execution**, not an always-running autonomous daemon.
 
-The pilot is successful only when Major advances a real JSS outcome correctly and an independent provider grades the result. CLI/attachment health alone is plumbing evidence.
+The pilot is successful only when Major advances a real JSS outcome correctly and an execution-independent reviewer grades the result. CLI/attachment health alone is plumbing evidence.
 
 Normal execution uses the headless Major core, trusted provider CLIs and the
 host Seatbelt boundary. Orca owns the operational workspace, worktrees,
@@ -102,9 +102,9 @@ A run that only proves `major` exists, state persists, or a process starts is a 
 
 ## Independent grade
 
-The builder/provider that performed the last coordinator pass cannot grade the run.
+The execution that performed the last coordinator pass cannot grade itself.
 
-Use a different provider in read-only/isolated review mode to inspect:
+Use a separately dispatched provider execution in read-only/isolated review mode to inspect (provider diversity is useful provenance, not the independence predicate):
 
 - exact Major head;
 - exact JSS head/PR/output produced;
@@ -119,13 +119,13 @@ Record the result:
 
 ```sh
 major project grade jss-tool \
-  --provider <independent-provider> \
-  --result pass \
-  --goal-id <goal-id> \
-  --evidence "<short exact evidence summary>"
+  --review-receipt-id <major-owned-review-receipt-id> \
+  --goal-id <goal-id>
 ```
 
-Major refuses the grade when the provider matches the recorded last coordinator.
+Major refuses a reused, writable, self-issued, or otherwise compromised review execution. A
+same-provider grade is accepted only from the distinct Major-owned review dispatch bound to the
+pending claim, exact candidate, and persisted provider/account/run provenance.
 
 ## Promotion
 

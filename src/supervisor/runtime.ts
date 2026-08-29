@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -10,8 +10,20 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { openDb } from '../db/client.js';
-import { getProjectByRepoPath } from '../config/project-service.js';
+import { and, eq } from 'drizzle-orm';
+import { openDb, type DbConn } from '../db/client.js';
+import { agentModels, agentProviders } from '../db/schema.js';
+import {
+  evaluateTaskPromotionProof,
+  parseCompletionCriteria,
+  resolveCanonicalTaskBinding,
+  type CanonicalTaskBinding,
+} from '../domain/completion.js';
+import { assessPromotion, planProgressiveValidation } from '../domain/sdlc.js';
+import { addTask } from '../domain/task-service.js';
+import { createRun, setRunStatus } from '../domain/run-service.js';
+import { addProject, getProjectByRepoPath } from '../config/project-service.js';
+import { projectConfigSchema } from '../config/project-config.js';
 import {
   listCapabilities,
   blockCapabilityVerification,
@@ -54,10 +66,12 @@ import {
 } from './policy.js';
 import {
   activeGoals,
+  applyIndependentCompletionGrade,
   getGoal,
   isLiveWorkerFresh,
   majorHome,
   readSupervisorState,
+  recoverSupervisorCompletion,
   updateGoal,
   type SupervisorGoal,
   type WorkerHost,
@@ -67,14 +81,146 @@ import { computeProviderReadiness } from '../doctor/readiness.js';
 import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integration.js';
 import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
-import { completedWorkflow, parseWorkerReport } from './worker-report.js';
+import {
+  completedWorkflow,
+  assessSupervisorAdmissionRisk,
+  deriveSupervisorPromotionContract,
+  parseWorkerReport,
+  type WorkerReport,
+} from './worker-report.js';
+import {
+  tryAcquireRepositoryWriterFence,
+  type RepositoryWriterFence,
+} from './repository-writer-fence.js';
 import {
   RUN_INSIGHT_SCHEMA,
+  recordIndependentReviewExecution,
   recordPerformanceObservation,
 } from '../insights/performance-history.js';
 import { configuredExecutionPath, executionPathStatus } from '../execution/path.js';
+import { hashSourceWorkspaceTree } from '../execution/workspace-transfer.js';
+import {
+  exactRepositoryHead,
+  candidateDispatchFailure,
+  freezeSupervisorCandidate,
+  readSupervisorSourceIdentity,
+  sourceIdentityMatches,
+  type SupervisorCandidateRecord,
+} from './source-identity.js';
+
+export { exactRepositoryHead } from './source-identity.js';
 
 export { parseWorkerReport } from './worker-report.js';
+
+export function coordinatorDonePromotionProof(
+  db: DbConn,
+  goal: Pick<SupervisorGoal, 'repoPath' | 'promotionContract'>,
+  report: WorkerReport,
+  options: { liveHead?: string | undefined } = {},
+) {
+  if (report.status !== 'done') return undefined;
+  const resolved = resolveCanonicalTaskBinding(db, goal.repoPath);
+  if (!report.taskId) {
+    if (!resolved.ok && resolved.kind !== 'no_task') {
+      return {
+        taskId: undefined,
+        ok: false,
+        failures: [resolved.failure],
+        checkedAt: new Date().toISOString(),
+      };
+    }
+    if (resolved.ok) {
+      return {
+        taskId: resolved.binding.taskId,
+        ok: false,
+        failures: ['done completion must cite the disclosed canonical taskId'],
+        checkedAt: new Date().toISOString(),
+      };
+    }
+    const evidence = report.promotionEvidence;
+    if (!evidence) {
+      return {
+        taskId: undefined,
+        ok: false,
+        failures: ['done completion requires structured pre-promotion evidence'],
+        checkedAt: new Date().toISOString(),
+      };
+    }
+    const contract =
+      goal.promotionContract ?? deriveSupervisorPromotionContract({ autonomous: false });
+    const plan = planProgressiveValidation({
+      riskSpecificChecks: contract.materialRiskCriteria,
+      triggers: Object.fromEntries(
+        contract.broaderValidationTriggers.map((trigger) => [trigger, true]),
+      ),
+      repositoryPolicyRequiresBroadValidation: contract.repositoryPolicyRequiresBroadValidation,
+    });
+    const missingRiskCriteria = contract.materialRiskCriteria.filter(
+      (criterion) =>
+        !evidence.materialRiskChecks.some(
+          (proof) => proof.criterion === criterion && proof.evidence.trim().length > 0,
+        ),
+    );
+    const broadPassed =
+      evidence.broaderValidation.performed === plan.broaderValidationRequired &&
+      (!evidence.broaderValidation.performed ||
+        (Boolean(evidence.broaderValidation.cost?.trim()) &&
+          Boolean(evidence.broaderValidation.expectedInformationGain?.trim()) &&
+          Boolean(evidence.broaderValidation.evidence?.trim())));
+    const promotion = assessPromotion({
+      prePromotionEvidencePassed:
+        Boolean(evidence.focusedTests.trim()) &&
+        Boolean(evidence.cheapestCompileTypeOrBuild.trim()) &&
+        Boolean(evidence.criticalPathBehavior.trim()) &&
+        missingRiskCriteria.length === 0 &&
+        broadPassed,
+      review: contract.review,
+      reviewPassed: evidence.review.level === contract.review && evidence.review.passed,
+      blockerFindings: evidence.blockerFindings,
+    });
+    return {
+      taskId: undefined,
+      ok: promotion.promotion === 'PROMOTABLE',
+      failures: promotion.blockers,
+      checkedAt: new Date().toISOString(),
+      promotionEvidence: evidence,
+    };
+  }
+  if (!resolved.ok) {
+    return {
+      taskId: '',
+      ok: false,
+      failures: [resolved.failure],
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (report.taskId !== resolved.binding.taskId) {
+    return {
+      taskId: resolved.binding.taskId,
+      ok: false,
+      failures: ['done completion must cite the disclosed canonical taskId'],
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  const progressive = parseCompletionCriteria(
+    resolved.binding.frozenCriteriaJson,
+  ).progressiveValidation;
+  if (progressive) {
+    const liveHead = options.liveHead ?? exactRepositoryHead(goal.repoPath);
+    if (liveHead !== progressive.candidateHead) {
+      return {
+        taskId: resolved.binding.taskId,
+        ok: false,
+        failures: ['live repository head does not match the canonical task frozen candidate head'],
+        checkedAt: new Date().toISOString(),
+      };
+    }
+  }
+  return evaluateTaskPromotionProof(db, {
+    taskId: resolved.binding.taskId,
+    repoPath: goal.repoPath,
+  });
+}
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
@@ -224,7 +370,10 @@ export function selectCoordinator(
  * headless Major path and the explicit compatibility cycle cannot diverge. */
 export function routeGoalExecution(
   goal: SupervisorGoal,
-  options: { eligibleHosts?: readonly WorkerHost[] } = {},
+  options: {
+    eligibleHosts?: readonly WorkerHost[];
+    excludedCapacityKeys?: readonly string[];
+  } = {},
 ): CoordinatorSelection {
   assertExecutionAllowed(getProjectPolicy(goal.project, goal.repoPath));
   const providerState = openDb();
@@ -232,12 +381,15 @@ export function routeGoalExecution(
   try {
     const providerInfos = loadPersistedProviderInfos(providerState.db);
     const eligibleHosts = options.eligibleHosts ? new Set(options.eligibleHosts) : undefined;
-    const eligibleProviderInfos = eligibleHosts
-      ? providerInfos.filter((provider) => {
-          const host = PROVIDER_HOSTS[parseCapacityKey(provider.name).providerName];
-          return host !== undefined && eligibleHosts.has(host);
-        })
-      : providerInfos;
+    const excludedCapacityKeys = new Set(options.excludedCapacityKeys ?? []);
+    const eligibleProviderInfos = providerInfos.filter((provider) => {
+      if (excludedCapacityKeys.has(provider.name)) return false;
+      if (eligibleHosts) {
+        const host = PROVIDER_HOSTS[parseCapacityKey(provider.name).providerName];
+        return host !== undefined && eligibleHosts.has(host);
+      }
+      return true;
+    });
     selection = selectCoordinator(goal, eligibleProviderInfos);
     if (selection.kind === 'route') {
       const routedSelection = selection;
@@ -452,7 +604,11 @@ function trustContract(policy: ProjectPolicy): string {
 export function coordinatorPrompt(
   goal: SupervisorGoal,
   capabilities: readonly CapabilityRecord[] = [],
-  hop?: { accountLabel: string; continuityBlock: string },
+  hop?: {
+    accountLabel: string;
+    continuityBlock: string;
+    canonicalTask?: CanonicalTaskBinding;
+  },
 ): string {
   const context = readProjectContext(goal.repoPath);
   const learningContext = readLearningContext(goal.project, goal.repoPath);
@@ -515,6 +671,11 @@ ${goal.goal}
 CANONICAL TARGET:
 - project: ${goal.project}
 - repository path: ${goal.repoPath}
+${hop?.canonicalTask ? `\nQUALIFYING CANONICAL TASK:\n- task id: ${hop.canonicalTask.taskId}\n- frozen completion criteria: ${hop.canonicalTask.frozenCriteriaJson}\nTask workflows may cite this task ID; Major re-resolves it by repository identity.\n` : ''}
+FROZEN NO-TASK PROMOTION CONTRACT:
+${JSON.stringify(goal.promotionContract ?? deriveSupervisorPromotionContract({ admissionRiskAssessment: goal.admissionRiskAssessment, requiredOperations: goal.requiredOperations, autonomous: goal.autonomous }))}
+This contract is Major-owned and was fixed before this report; report evidence cannot redefine it.
+${goal.candidate ? `FROZEN CANDIDATE:\n${JSON.stringify(goal.candidate)}\nValidate and report only this exact candidate binding, HEAD, and source-tree digest; any mutation or binding change requires a new candidate cycle.\n` : ''}
 
 ${workspaceContract}
 
@@ -550,6 +711,9 @@ MAJOR OPERATING CONTRACT:
 - Reuse the existing project, validated capability, maintained library or skill before building a new subsystem. For substantial infrastructure, follow the recorded ADOPT, WRAP, BORROW or BUILD decision.
 - Keep the injected CURRENT PROJECT CONTEXT current through concise outcome, critical-path, ownership, interface, decision and evidence updates. Work the critical path first and remove the smallest present constraint.
 - Prefer deletion and simpler code over new moving parts. Use FAST checks while iterating, acceptance evidence for the critical path, and only risk-proportionate independent review or frozen-candidate release validation.
+- Progressive validation is the default: require focused changed-behavior tests, the cheapest relevant compile/type/build check, critical-path behavior, and checks for each material risk.
+- Do not run broad suites unless explicit blast-radius, shared-dependency, insufficient-evidence, historical-regression, or promotion-policy triggers apply, or repository policy requires them. Before broad validation, record its cost versus expected information gain and run it only when that tradeoff supports the promotion decision.
+- At the durable task-completion boundary, record each required progressive check through the existing qualifying verification/evidence path with its canonical validation subject. Use the existing review-finding storage mapping: BLOCKER → critical, IMPORTANT → minor, NIT → info; stored legacy major remains a BLOCKER.
 - RESOLVED MAJOR SKILLS contains bounded resolver-selected guidance: HOT core bodies, ACTIVE SPECIALIST bodies, and a DORMANT manifest. Do not attempt host access to undisclosed skill paths.
 - Read project LEARNINGS.md and the Major learning candidates below before acting. Do not repeat a captured correction merely because a fresh worker lacks chat history.
 - Prefer the smallest capable tool/skill before creating more orchestration. If a short deterministic script can retrieve/filter/dedupe/transform data more reliably than repeated model turns, use Tools-as-Code.
@@ -574,14 +738,16 @@ MAJOR OPERATING CONTRACT:
 READINESS LANGUAGE:
 - BUILT = implementation exists.
 - VALIDATED = deterministic checks plus an independent grader support the claim.
+- PROMOTABLE = required pre-promotion evidence and review passed with no BLOCKER; merge/install may proceed before installation proof exists.
 - READY = a representative real-world outcome has succeeded under the intended trust profile.
 Never use these terms interchangeably.
 
 DURABLE CONTROL:
 You cannot access or mutate Major's global control state. Before ending, emit exactly one final
 single-line result for the parent coordinator to validate and apply:
+Normal supervisor done claims require structured pre-promotion evidence; task workflows may instead cite their canonical task ID for durable database proof.
   MAJOR_RESULT: {"status":"active","summary":"what now works and next critical path","assetCandidate":{"id":"reusable-id","kind":"module","summary":"what it implements","locator":"relative/path","tags":["tag"],"scope":"shared"}}
-  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence"}
+  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence","promotionEvidence":{"focusedTests":"focused changed-behavior tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"none","passed":true},"blockerFindings":0}}
   MAJOR_RESULT: {"status":"blocked","summary":"what is complete","ownerGate":"exact owner action"}
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
 
@@ -603,37 +769,8 @@ ${hop ? `\n${hop.continuityBlock}\nActive subscription account: ${hop.accountLab
  * two goals, aliases, manual invocations, or daemon cycles from concurrently
  * writing the same working tree. Delegated writers still require worktrees. */
 export function tryAcquireRepoCycleLock(repoPath: string): (() => void) | undefined {
-  const dir = join(majorHome(), 'supervisor-repo-locks');
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const key = createHash('sha256').update(resolve(repoPath)).digest('hex').slice(0, 32);
-  const path = join(dir, `${key}.pid`);
-  if (existsSync(path)) {
-    const lockText = readFileSync(path, 'utf8').trim();
-    const lockAgeMs = Date.now() - statSync(path).mtimeMs;
-    if (!lockText && lockAgeMs <= 30_000) return undefined;
-    const prior = Number.parseInt(lockText, 10);
-    if (Number.isFinite(prior) && pidAlive(prior)) return undefined;
-    if (lockAgeMs <= 30_000) return undefined;
-    unlinkSync(path);
-  }
-  let fd: number;
-  try {
-    fd = openSync(path, 'wx', 0o600);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
-    throw error;
-  }
-  writeFileSync(fd, `${process.pid}\n`);
-  closeSync(fd);
-  return () => {
-    try {
-      if (existsSync(path) && readFileSync(path, 'utf8').trim() === String(process.pid)) {
-        unlinkSync(path);
-      }
-    } catch {
-      // Best effort. A stale lock is reclaimed after this process exits.
-    }
-  };
+  const fence = tryAcquireRepositoryWriterFence(repoPath);
+  return fence ? () => fence.release() : undefined;
 }
 
 /** Whether a runGoalCycle() call actually attempted a coordinator turn.
@@ -658,6 +795,7 @@ export function supervisorRunInsight(input: {
     majorPreparationMs?: number;
     majorFinalizationMs?: number;
   };
+  sourceHead?: string;
 }) {
   const workerDurationMs = Number.isFinite(
     input.outcome.providerExecutionMs ?? input.outcome.durationMs,
@@ -709,6 +847,12 @@ export function supervisorRunInsight(input: {
       provider: input.selection.provider,
       model: input.selection.modelRef,
     },
+    ...(input.outcome.runId && input.sourceHead
+      ? { runEvidence: { runId: input.outcome.runId, sourceHead: input.sourceHead } }
+      : {}),
+    ...(input.report?.independentReview
+      ? { independentReview: input.report.independentReview }
+      : {}),
     skills: input.skills,
     timing: {
       durationMs: input.totalDurationMs,
@@ -760,24 +904,383 @@ export async function runGoalCycle(
   goalId: string,
   options: { maxTimeoutMs?: number } = {},
 ): Promise<GoalCycleOutcome> {
+  recoverSupervisorCompletion(goalId);
   const goal = getGoal(goalId);
   if (!goal) throw new Error(`goal not found: ${goalId}`);
   if (goal.status === 'done' || goal.status === 'paused') return { ranCycle: false };
-  if (goal.pendingCompletion) {
-    console.error(`Goal ${goal.id} is awaiting an independent completion grade.`);
-    return { ranCycle: false };
-  }
-  const releaseRepoLock = tryAcquireRepoCycleLock(goal.repoPath);
-  if (!releaseRepoLock) {
+  const writerFence = tryAcquireRepositoryWriterFence(goal.repoPath);
+  if (!writerFence) {
     console.error(`Repository ${goal.repoPath} already has an active Major integration owner.`);
     return { ranCycle: false };
   }
   try {
-    await runLockedGoalCycle(goal, options.maxTimeoutMs);
+    if (goal.pendingCompletion) {
+      await runPendingCompletionReview(goal, options.maxTimeoutMs, writerFence);
+    } else {
+      await runLockedGoalCycle(goal, options.maxTimeoutMs, writerFence);
+    }
     return { ranCycle: true };
   } finally {
-    releaseRepoLock();
+    writerFence.release();
   }
+}
+
+async function runPendingCompletionReview(
+  goal: SupervisorGoal,
+  maxTimeoutMs?: number,
+  writerFence?: RepositoryWriterFence,
+): Promise<void> {
+  const pending = goal.pendingCompletion;
+  if (
+    !pending?.sourceHead ||
+    !pending.sourceTreeDigest ||
+    !pending.candidate ||
+    !pending.reviewedRun
+  ) {
+    updateGoal(goal.id, {
+      status: 'active',
+      pendingCompletion: undefined,
+      lastSummary:
+        'Legacy pending completion lacked exact candidate or reviewed-execution provenance and must be revalidated.',
+      nextRunAt: new Date().toISOString(),
+    });
+    return;
+  }
+  if (
+    !sourceIdentityMatches(
+      { sourceHead: pending.sourceHead, sourceTreeDigest: pending.sourceTreeDigest },
+      readSupervisorSourceIdentity(goal.repoPath),
+    )
+  ) {
+    updateGoal(goal.id, {
+      status: 'active',
+      pendingCompletion: undefined,
+      lastSummary:
+        'Pending completion became stale because its repository or source-tree identity changed.',
+      nextRunAt: new Date().toISOString(),
+    });
+    return;
+  }
+  const recoveredPending = recoverAbandonedReviewDispatch(goal, pending);
+  if (recoveredPending) {
+    updateGoal(goal.id, recoveredPending);
+    return;
+  }
+  const priorAttempts = pending.reviewAttempts ?? [];
+  if (priorAttempts.length >= MAX_INDEPENDENT_REVIEW_ATTEMPTS) {
+    updateGoal(goal.id, reviewerAvailabilityExhaustedPatch(pending, priorAttempts));
+    return;
+  }
+  const selection = routeGoalExecution(goal, {
+    excludedCapacityKeys: priorAttempts.map((attempt) => attempt.capacityKey),
+  });
+  if (selection.kind === 'checkpoint') {
+    updateGoal(goal.id, {
+      retryImmediately: false,
+      lastSummary:
+        priorAttempts.length > 0
+          ? `Independent reviewer availability is exhausted after ${priorAttempts.length} inconclusive attempt${priorAttempts.length === 1 ? '' : 's'}; no implementation BLOCKER verdict was produced. ${selection.reason}`
+          : `Independent completion review is waiting for execution capacity: ${selection.reason}`,
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+    });
+    return;
+  }
+  const reviewStartedAt = new Date().toISOString();
+  const dispatchId = randomUUID();
+  const sourceTreeDigest = pending.sourceTreeDigest;
+  const reviewState = openDb();
+  let canonicalReview: {
+    taskId: string;
+    runId: string;
+    providerId: string;
+    providerAccountLabel: string;
+  };
+  try {
+    const taskId = pending.reviewedRun.taskId;
+    const routed = parseCapacityKey(selection.provider);
+    const provider = reviewState.db
+      .select()
+      .from(agentProviders)
+      .where(
+        and(
+          eq(agentProviders.name, routed.providerName),
+          eq(agentProviders.accountLabel, routed.accountLabel),
+        ),
+      )
+      .get();
+    if (!provider) throw new Error('routed independent-review provider account is not persisted');
+    const model = reviewState.db
+      .select()
+      .from(agentModels)
+      .where(
+        and(eq(agentModels.providerId, provider.id), eq(agentModels.modelRef, selection.modelRef)),
+      )
+      .get();
+    if (!model || model.billingMode === 'unknown') {
+      throw new Error('routed independent-review model has no authoritative billing state');
+    }
+    const run = createRun(reviewState.db, {
+      taskId,
+      providerId: provider.id,
+      modelId: model.id,
+      modelRef: model.modelRef,
+      purpose: 'review',
+      billingMode: model.billingMode,
+      routingReason: selection.reason,
+      sourceHead: pending.sourceHead,
+    });
+    setRunStatus(reviewState.db, run.id, 'running');
+    canonicalReview = {
+      taskId,
+      runId: run.id,
+      providerId: provider.id,
+      providerAccountLabel: provider.accountLabel,
+    };
+  } finally {
+    reviewState.sqlite.close();
+  }
+  updateGoal(goal.id, {
+    activePid: process.pid,
+    lastStartedAt: reviewStartedAt,
+    lastCoordinator: selection.host,
+    lastAccountLabel: selection.accountLabel,
+    lastSummary: `Independent completion review running on ${selection.host}.`,
+    pendingCompletion: {
+      ...pending,
+      reviewDispatch: {
+        id: dispatchId,
+        provider: selection.host,
+        capacityKey: selection.provider,
+        providerId: canonicalReview.providerId,
+        providerAccountLabel: canonicalReview.providerAccountLabel,
+        taskId: canonicalReview.taskId,
+        runId: canonicalReview.runId,
+        startedAt: reviewStartedAt,
+      },
+    },
+  });
+  const outcome = await runWorker({
+    host: selection.host,
+    taskId: `${goal.id}:completion-review`,
+    resourceId: `review:${goal.project}`,
+    cwd: goal.repoPath,
+    timeoutMs: maxTimeoutMs ?? 15 * 60 * 1000,
+    modelRef: selection.modelRef,
+    accountLabel: selection.accountLabel,
+    readOnly: true,
+    prompt:
+      `Independently review the pending completion claim for project ${goal.project}.\n` +
+      `Goal ID: ${goal.id}\nExact source head: ${pending.sourceHead}\n` +
+      `Frozen objective: ${goal.goal}\n` +
+      `Frozen promotion contract: ${JSON.stringify(pending.promotionContract)}\n` +
+      `Structured completion evidence: ${JSON.stringify({ taskId: pending.taskId, promotionCheckedAt: pending.promotionCheckedAt, promotionEvidence: pending.promotionEvidence })}\n` +
+      `Canonical task ID: ${pending.taskId ?? 'none'}\nClaim: ${pending.summary}\n` +
+      `Use read-only exact-head checks. Do not implement, merge, install, or trust the completing worker's conclusion.\n` +
+      `End with exactly one provider-owned line: MAJOR_RESULT: {"status":"active","summary":"review summary","independentReview":{"purpose":"independent_completion_review","goalId":"${goal.id}","sourceHead":"${pending.sourceHead}","verdict":"pass|fail","evidence":"specific evidence"}}`,
+  });
+  const runStatusState = openDb();
+  const reviewSessionRef = outcome.sessionRef?.trim();
+  try {
+    setRunStatus(
+      runStatusState.db,
+      canonicalReview.runId,
+      outcome.status === 'succeeded' && reviewSessionRef
+        ? 'succeeded'
+        : outcome.status === 'timed_out'
+          ? 'timed_out'
+          : 'failed',
+      reviewSessionRef ? { sessionRef: reviewSessionRef } : {},
+    );
+  } finally {
+    runStatusState.sqlite.close();
+  }
+  const report = outcome.status === 'succeeded' ? parseWorkerReport(outcome.stdout) : undefined;
+  const inconclusive = classifyInconclusiveReviewAttempt(outcome, report);
+  if (inconclusive) {
+    updateGoal(
+      goal.id,
+      recordInconclusiveReviewAttemptPatch(pending, {
+        attempt: priorAttempts.length + 1,
+        dispatchId,
+        provider: selection.host,
+        capacityKey: selection.provider,
+        runId: canonicalReview.runId,
+        startedAt: reviewStartedAt,
+        finishedAt: new Date().toISOString(),
+        outcome: inconclusive.outcome,
+        evidence: inconclusive.evidence,
+      }),
+    );
+    return;
+  }
+  if (!report?.independentReview) {
+    throw new Error('conclusive independent review unexpectedly lacked a verdict');
+  }
+  const changedHeadPatch = postReviewSourceChangePatch(
+    goal.repoPath,
+    pending.sourceHead,
+    sourceTreeDigest,
+    outcome.workspaceMutated,
+  );
+  if (changedHeadPatch) {
+    updateGoal(goal.id, changedHeadPatch);
+    return;
+  }
+  const receiptState = openDb();
+  let receiptId: string;
+  try {
+    receiptId = recordIndependentReviewExecution(receiptState.db, {
+      project: goal.project,
+      goalId: goal.id,
+      runId: canonicalReview.runId,
+      reviewedRunId: pending.reviewedRun.runId,
+      taskId: canonicalReview.taskId,
+      dispatchId,
+      provider: selection.host,
+      providerId: canonicalReview.providerId,
+      providerAccountLabel: canonicalReview.providerAccountLabel,
+      sourceHead: pending.sourceHead,
+      sourceTreeDigest: pending.sourceTreeDigest,
+      pendingClaimedAt: pending.claimedAt,
+      reviewStartedAt,
+      executionStatus: 'succeeded',
+      review: report.independentReview,
+    });
+    applyIndependentCompletionGrade({
+      goalId: goal.id,
+      receiptId,
+      db: receiptState.db,
+      ...(writerFence ? { writerFence } : {}),
+    });
+  } finally {
+    receiptState.sqlite.close();
+  }
+}
+
+const MAX_INDEPENDENT_REVIEW_ATTEMPTS = 3;
+type PendingCompletion = NonNullable<SupervisorGoal['pendingCompletion']>;
+type ReviewAttempt = NonNullable<PendingCompletion['reviewAttempts']>[number];
+
+export function classifyInconclusiveReviewAttempt(
+  outcome: Pick<WorkerOutcome, 'status' | 'exitCode' | 'sessionRef' | 'stdout' | 'stderr'>,
+  report: WorkerReport | undefined,
+): Pick<ReviewAttempt, 'outcome' | 'evidence'> | undefined {
+  if (outcome.status === 'timed_out') {
+    return { outcome: 'timeout', evidence: 'review provider timed out before a verdict' };
+  }
+  if (outcome.status === 'failed') {
+    return outcome.exitCode === null
+      ? { outcome: 'crash', evidence: 'review provider exited without a process result' }
+      : {
+          outcome: 'missing_result',
+          evidence: trim(
+            outcome.stderr || outcome.stdout || 'review provider failed without a result',
+          ),
+        };
+  }
+  if (!outcome.sessionRef?.trim()) {
+    return {
+      outcome: 'missing_session_provenance',
+      evidence: 'review provider returned no durable session identity',
+    };
+  }
+  if (!report) {
+    return { outcome: 'missing_result', evidence: 'review provider returned no Major result' };
+  }
+  if (!report.independentReview) {
+    return { outcome: 'no_verdict', evidence: 'review result contained no independent verdict' };
+  }
+  return undefined;
+}
+
+export function recordInconclusiveReviewAttemptPatch(
+  pending: PendingCompletion,
+  attempt: ReviewAttempt,
+): Partial<SupervisorGoal> {
+  const attempts = [...(pending.reviewAttempts ?? []), attempt];
+  if (attempts.length >= MAX_INDEPENDENT_REVIEW_ATTEMPTS) {
+    return reviewerAvailabilityExhaustedPatch(pending, attempts);
+  }
+  const pendingWithoutDispatch = { ...pending };
+  delete pendingWithoutDispatch.reviewDispatch;
+  return {
+    status: 'active',
+    activePid: undefined,
+    retryImmediately: true,
+    pendingCompletion: { ...pendingWithoutDispatch, reviewAttempts: attempts },
+    lastFinishedAt: attempt.finishedAt,
+    lastSummary: `Independent review attempt ${attempt.attempt} was inconclusive (${attempt.outcome}); its lease was released and Major will select a fresh independent execution. No implementation BLOCKER verdict was produced.`,
+    nextRunAt: new Date().toISOString(),
+  };
+}
+
+function reviewerAvailabilityExhaustedPatch(
+  pending: PendingCompletion,
+  attempts: ReviewAttempt[],
+): Partial<SupervisorGoal> {
+  const pendingWithoutDispatch = { ...pending };
+  delete pendingWithoutDispatch.reviewDispatch;
+  return {
+    status: 'active',
+    activePid: undefined,
+    retryImmediately: false,
+    pendingCompletion: { ...pendingWithoutDispatch, reviewAttempts: attempts },
+    lastFinishedAt: attempts.at(-1)?.finishedAt ?? new Date().toISOString(),
+    lastSummary: `Independent reviewer availability is exhausted after ${attempts.length} inconclusive attempts; no implementation BLOCKER verdict was produced.`,
+    nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+  };
+}
+
+function recoverAbandonedReviewDispatch(
+  goal: SupervisorGoal,
+  pending: PendingCompletion,
+): Partial<SupervisorGoal> | undefined {
+  const dispatch = pending.reviewDispatch;
+  if (!dispatch?.runId || !dispatch.capacityKey) return undefined;
+  const state = openDb();
+  try {
+    setRunStatus(state.db, dispatch.runId, 'failed');
+  } finally {
+    state.sqlite.close();
+  }
+  const finishedAt = new Date().toISOString();
+  return recordInconclusiveReviewAttemptPatch(pending, {
+    attempt: (pending.reviewAttempts?.length ?? 0) + 1,
+    dispatchId: dispatch.id,
+    provider: dispatch.provider,
+    capacityKey: dispatch.capacityKey,
+    runId: dispatch.runId,
+    startedAt: dispatch.startedAt,
+    finishedAt,
+    outcome: 'crash',
+    evidence: `Major recovered abandoned review dispatch ${dispatch.id} after acquiring the repository writer fence`,
+  });
+}
+
+/** Re-read exact HEAD after the provider returns and fail closed before any
+ * receipt is recorded or applied. Undefined/unreadable HEAD is also stale. */
+export function postReviewSourceChangePatch(
+  repoPath: string,
+  expectedHead: string,
+  expectedSourceTreeDigest: string,
+  workspaceMutated?: boolean,
+): Partial<SupervisorGoal> | undefined {
+  let unchanged = workspaceMutated !== true && exactRepositoryHead(repoPath) === expectedHead;
+  try {
+    unchanged = unchanged && hashSourceWorkspaceTree(repoPath) === expectedSourceTreeDigest;
+  } catch {
+    unchanged = false;
+  }
+  if (unchanged) return undefined;
+  return {
+    status: 'active',
+    activePid: undefined,
+    pendingCompletion: undefined,
+    lastFinishedAt: new Date().toISOString(),
+    lastSummary:
+      'Pending completion was reopened because the repository or source tree changed during independent review.',
+    nextRunAt: new Date().toISOString(),
+  };
 }
 
 /** Bounded safety net so an authoritative-exhaustion loop can never hot-loop
@@ -861,7 +1364,11 @@ export async function runForegroundGoal(
   return { hops };
 }
 
-async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): Promise<void> {
+async function runLockedGoalCycle(
+  goal: SupervisorGoal,
+  maxTimeoutMs?: number,
+  writerFence?: RepositoryWriterFence,
+): Promise<void> {
   const cycleStartedAtMs = Date.now();
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const selection = routeGoalExecution(goal);
@@ -935,6 +1442,120 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     // The prompt already reports a degraded resolver. Outcome recording must
     // not turn resolver unavailability into a second execution failure.
   }
+  const continuity = contextContinuity({
+    nextHost: host,
+    nextAccountLabel: routedSelection.accountLabel,
+    ...(goal.lastCoordinator ? { lastCoordinator: goal.lastCoordinator } : {}),
+    ...(goal.lastAccountLabel ? { lastAccountLabel: goal.lastAccountLabel } : {}),
+    ...(goal.lastSessionRef ? { lastSessionRef: goal.lastSessionRef } : {}),
+    ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
+  });
+  if (!goal.admissionRiskAssessment) {
+    goal.admissionRiskAssessment = assessSupervisorAdmissionRisk({
+      outcome: goal.goal,
+      requiredOperations: goal.requiredOperations,
+      policy,
+    });
+    goal.promotionContract = deriveSupervisorPromotionContract({
+      admissionRiskAssessment: goal.admissionRiskAssessment,
+      requiredOperations: goal.requiredOperations,
+      autonomous: goal.autonomous,
+    });
+    updateGoal(goal.id, {
+      admissionRiskAssessment: goal.admissionRiskAssessment,
+      promotionContract: goal.promotionContract,
+    });
+  }
+  const workerStartedAtMs = Date.now();
+  let canonicalTask: CanonicalTaskBinding | undefined;
+  let candidate: SupervisorCandidateRecord | undefined;
+  let canonicalWorker:
+    | {
+        taskId: string;
+        runId: string;
+        providerId: string;
+        providerAccountLabel: string;
+      }
+    | undefined;
+  const taskState = openDb();
+  try {
+    const resolvedTask = resolveCanonicalTaskBinding(taskState.db, goal.repoPath);
+    const sourceIdentity = readSupervisorSourceIdentity(goal.repoPath);
+    if (!sourceIdentity) {
+      updateGoal(goal.id, {
+        status: 'active',
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary: 'Candidate source identity could not be frozen before dispatch.',
+        nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+        pendingCompletion: undefined,
+        retryImmediately: false,
+      });
+      return;
+    }
+    candidate = freezeSupervisorCandidate(resolvedTask, sourceIdentity);
+    if (resolvedTask.ok) canonicalTask = resolvedTask.binding;
+    let project;
+    try {
+      project = getProjectByRepoPath(taskState.db, goal.repoPath);
+    } catch {
+      project = addProject(
+        taskState.db,
+        projectConfigSchema.parse({ name: goal.project, repoPath: goal.repoPath }),
+      );
+    }
+    const taskId = resolvedTask.ok
+      ? resolvedTask.binding.taskId
+      : addTask(taskState.db, {
+          projectId: project.id,
+          title: `Supervisor worker execution for goal ${goal.id}`,
+          description: 'Major-owned canonical execution provenance; not a promotable task.',
+        }).id;
+    const routed = parseCapacityKey(routedSelection.provider);
+    const provider = taskState.db
+      .select()
+      .from(agentProviders)
+      .where(
+        and(
+          eq(agentProviders.name, routed.providerName),
+          eq(agentProviders.accountLabel, routed.accountLabel),
+        ),
+      )
+      .get();
+    if (!provider) throw new Error('routed worker provider account is not persisted');
+    const model = taskState.db
+      .select()
+      .from(agentModels)
+      .where(
+        and(
+          eq(agentModels.providerId, provider.id),
+          eq(agentModels.modelRef, routedSelection.modelRef),
+        ),
+      )
+      .get();
+    if (!model || model.billingMode === 'unknown') {
+      throw new Error('routed worker model has no authoritative billing state');
+    }
+    const run = createRun(taskState.db, {
+      taskId,
+      providerId: provider.id,
+      modelId: model.id,
+      modelRef: model.modelRef,
+      purpose: resolvedTask.ok ? 'repair' : 'implementation',
+      billingMode: model.billingMode,
+      routingReason: routedSelection.reason,
+      sourceHead: sourceIdentity.sourceHead,
+    });
+    setRunStatus(taskState.db, run.id, 'running');
+    canonicalWorker = {
+      taskId,
+      runId: run.id,
+      providerId: provider.id,
+      providerAccountLabel: provider.accountLabel,
+    };
+  } finally {
+    taskState.sqlite.close();
+  }
   updateGoal(goal.id, {
     status: 'running',
     cycle: goal.cycle + 1,
@@ -947,17 +1568,47 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     // actually requires the human action.
     ownerGate: undefined,
     pendingCompletion: undefined,
+    candidate,
   });
-
-  const continuity = contextContinuity({
-    nextHost: host,
-    nextAccountLabel: routedSelection.accountLabel,
-    ...(goal.lastCoordinator ? { lastCoordinator: goal.lastCoordinator } : {}),
-    ...(goal.lastAccountLabel ? { lastAccountLabel: goal.lastAccountLabel } : {}),
-    ...(goal.lastSessionRef ? { lastSessionRef: goal.lastSessionRef } : {}),
-    ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
-  });
-  const workerStartedAtMs = Date.now();
+  goal.candidate = candidate;
+  const dispatchFailure = candidate ? candidateDispatchFailure(candidate) : 'candidate missing';
+  let taskHeadFailure: string | undefined;
+  if (candidate?.resolution === 'task') {
+    try {
+      const progressive = parseCompletionCriteria(
+        candidate.task.frozenCriteriaJson,
+      ).progressiveValidation;
+      if (progressive && progressive.candidateHead !== candidate.sourceHead) {
+        taskHeadFailure = 'canonical task criteria target a different candidate head';
+      }
+    } catch (error) {
+      taskHeadFailure = `canonical task criteria are invalid: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+  if (dispatchFailure || taskHeadFailure) {
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: `Canonical task resolution refused worker dispatch: ${dispatchFailure ?? taskHeadFailure}`,
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      pendingCompletion: undefined,
+      retryImmediately: false,
+    });
+    return;
+  }
+  if (candidate && !sourceIdentityMatches(candidate, readSupervisorSourceIdentity(goal.repoPath))) {
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: 'Candidate source identity changed before worker dispatch.',
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      pendingCompletion: undefined,
+      retryImmediately: false,
+    });
+    return;
+  }
   const outcome = await runWorker({
     host,
     taskId: goal.id,
@@ -965,6 +1616,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
       accountLabel: routedSelection.accountLabel,
       continuityBlock: continuity.promptBlock,
+      ...(canonicalTask ? { canonicalTask } : {}),
     }),
     cwd: goal.repoPath,
     // Clamped to whatever foreground continuation budget remains, so a
@@ -973,9 +1625,43 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     timeoutMs: Math.min(Math.max(1, policy.maxRunMinutes) * 60 * 1000, maxTimeoutMs ?? Infinity),
     modelRef: routedSelection.modelRef,
     accountLabel: routedSelection.accountLabel,
+    ...(writerFence ? { writerFence } : {}),
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
+  const workerSessionRef = outcome.sessionRef?.trim();
+  if (canonicalWorker) {
+    const runState = openDb();
+    try {
+      setRunStatus(
+        runState.db,
+        canonicalWorker.runId,
+        outcome.status === 'succeeded' && workerSessionRef
+          ? 'succeeded'
+          : outcome.status === 'timed_out'
+            ? 'timed_out'
+            : 'failed',
+        workerSessionRef ? { sessionRef: workerSessionRef } : {},
+      );
+    } finally {
+      runState.sqlite.close();
+    }
+  }
   const workerFinishedAtMs = Date.now();
+  if (outcome.status === 'succeeded' && !workerSessionRef) {
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary:
+        'Worker result was refused because the provider returned no durable session identity.',
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      pendingCompletion: undefined,
+      retryImmediately: false,
+    });
+    return;
+  }
+  const finishedSourceIdentity = readSupervisorSourceIdentity(goal.repoPath);
+  const sourceHead = finishedSourceIdentity?.sourceHead;
   let terminalReport: ReturnType<typeof parseWorkerReport> = undefined;
   const recordTerminalObservation = () => {
     const settled = getGoal(goal.id);
@@ -997,6 +1683,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
               majorPreparationMs: Math.max(0, workerStartedAtMs - cycleStartedAtMs),
               majorFinalizationMs: Math.max(0, Date.now() - workerFinishedAtMs),
             },
+            ...(sourceHead ? { sourceHead } : {}),
           }),
         });
       } finally {
@@ -1108,6 +1795,48 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       return;
     }
     if (report?.status === 'done') {
+      if (candidate && !sourceIdentityMatches(candidate, finishedSourceIdentity)) {
+        updateGoal(goal.id, {
+          status: 'active',
+          consecutiveFailures: 0,
+          activePid: undefined,
+          lastFinishedAt: new Date().toISOString(),
+          lastSummary:
+            'Worker done claim refused because the frozen candidate source identity changed during validation.',
+          nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+          pendingCompletion: undefined,
+          retryImmediately: false,
+          ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
+        });
+        recordTerminalObservation();
+        return;
+      }
+      const completionState = openDb();
+      let promotionProof: ReturnType<typeof coordinatorDonePromotionProof>;
+      try {
+        promotionProof = coordinatorDonePromotionProof(completionState.db, goal, report, {
+          liveHead: sourceHead,
+        });
+      } finally {
+        completionState.sqlite.close();
+      }
+      if (!promotionProof?.ok) {
+        updateGoal(goal.id, {
+          status: 'active',
+          consecutiveFailures: 0,
+          activePid: undefined,
+          lastFinishedAt: new Date().toISOString(),
+          lastSummary:
+            `Worker done claim refused by canonical promotion proof: ` +
+            `${promotionProof?.failures.join('; ') ?? 'proof unavailable'}${learningWarning}`,
+          nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+          pendingCompletion: undefined,
+          retryImmediately: false,
+          ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
+        });
+        recordTerminalObservation();
+        return;
+      }
       const claimedAt = new Date().toISOString();
       updateGoal(goal.id, {
         status: 'active',
@@ -1116,7 +1845,37 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
         lastFinishedAt: claimedAt,
         lastSummary: `Worker completion claim awaiting independent validation: ${report.summary}${learningWarning}`,
         nextRunAt: undefined,
-        pendingCompletion: { summary: report.summary, coordinator: host, claimedAt },
+        pendingCompletion: {
+          summary: report.summary,
+          coordinator: host,
+          claimedAt,
+          ...(promotionProof.taskId ? { taskId: promotionProof.taskId } : {}),
+          promotionCheckedAt: promotionProof.checkedAt,
+          ...(sourceHead ? { sourceHead } : {}),
+          ...(finishedSourceIdentity
+            ? { sourceTreeDigest: finishedSourceIdentity.sourceTreeDigest }
+            : {}),
+          ...(candidate ? { candidate: structuredClone(candidate) } : {}),
+          ...(canonicalWorker
+            ? {
+                reviewedRun: {
+                  ...canonicalWorker,
+                  provider: host,
+                },
+              }
+            : {}),
+          ...('promotionEvidence' in promotionProof && promotionProof.promotionEvidence
+            ? { promotionEvidence: promotionProof.promotionEvidence }
+            : {}),
+          promotionContract: structuredClone(
+            goal.promotionContract ??
+              deriveSupervisorPromotionContract({
+                admissionRiskAssessment: goal.admissionRiskAssessment,
+                requiredOperations: goal.requiredOperations,
+                autonomous: goal.autonomous,
+              }),
+          ),
+        },
         retryImmediately: false,
         ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
       });
@@ -1330,7 +2089,6 @@ export async function runDaemon(): Promise<void> {
       const policy = getProjectPolicy(goal.project, goal.repoPath);
       if (policy.trust !== 'unattended' || !policy.allowBackground) return false;
       if (!goal.autonomous || goal.status === 'blocked') return false;
-      if (goal.pendingCompletion) return false;
       if (goal.activePid && pidAlive(goal.activePid)) return false;
       return !goal.nextRunAt || Date.parse(goal.nextRunAt) <= now;
     });

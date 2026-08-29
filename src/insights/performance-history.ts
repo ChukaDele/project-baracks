@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import type { DbConn } from '../db/client.js';
-import { runPerformanceObservations } from '../db/schema.js';
+import {
+  agentProviders,
+  agentRuns,
+  independentReviewReceipts,
+  runPerformanceObservations,
+} from '../db/schema.js';
 import { redactValue } from '../security/redact.js';
 
 export const RUN_INSIGHT_SCHEMA = 'major.run-insight.v1' as const;
@@ -11,12 +16,20 @@ export const RUN_INSIGHT_OUTCOMES = ['completed', 'blocked', 'failed', 'cancelle
 export type RunInsightOutcome = (typeof RUN_INSIGHT_OUTCOMES)[number];
 
 type Effect = { subject: string; effect: 'helped' | 'hurt'; evidence: string };
-type Receipt = Record<string, unknown> & {
+export type Receipt = Record<string, unknown> & {
   schema: typeof RUN_INSIGHT_SCHEMA;
   recordedAt: string;
   goalId: string;
   outcome?: RunInsightOutcome;
   worker?: { coordinator?: string | null; provider?: string | null; model?: string | null };
+  runEvidence?: { runId: string; sourceHead: string };
+  independentReview?: {
+    purpose: 'independent_completion_review';
+    goalId: string;
+    sourceHead: string;
+    verdict: 'pass' | 'fail';
+    evidence: string;
+  };
   timing?: {
     durationMs?: number | null;
     productiveWorkMs?: number | null;
@@ -60,6 +73,17 @@ export function validateRunInsight(value: unknown): Receipt {
   }
   if (receipt.outcome !== undefined && !isRunInsightOutcome(receipt.outcome)) {
     throw new Error('run insight outcome must be completed, blocked, failed, or cancelled');
+  }
+  const review = receipt.independentReview;
+  if (
+    review !== undefined &&
+    (review.purpose !== 'independent_completion_review' ||
+      !review.goalId?.trim() ||
+      !/^[0-9a-f]{40}$/.test(review.sourceHead) ||
+      !['pass', 'fail'].includes(review.verdict) ||
+      !review.evidence?.trim())
+  ) {
+    throw new Error('run insight independent review receipt is invalid');
   }
   for (const key of ['skills', 'failures', 'humanInterventions'] as const) {
     const field = receipt[key];
@@ -145,6 +169,144 @@ export function recordPerformanceObservation(
   return receipt;
 }
 
+/** Mint completion authority only from the dedicated provider execution
+ * controlled by Major after the worker completion claim already exists. */
+export function recordIndependentReviewExecution(
+  db: DbConn,
+  input: {
+    project: string;
+    goalId: string;
+    runId: string;
+    reviewedRunId: string;
+    taskId: string;
+    dispatchId: string;
+    provider: string;
+    providerId: string;
+    providerAccountLabel: string;
+    sourceHead: string;
+    sourceTreeDigest: string;
+    pendingClaimedAt: string;
+    reviewStartedAt: string;
+    executionStatus: 'succeeded';
+    review: NonNullable<Receipt['independentReview']>;
+  },
+): string {
+  if (
+    !input.project.trim() ||
+    !input.goalId.trim() ||
+    !input.runId.trim() ||
+    !input.reviewedRunId.trim() ||
+    !input.taskId.trim() ||
+    !input.dispatchId.trim() ||
+    !input.provider.trim() ||
+    !input.providerId.trim() ||
+    !input.providerAccountLabel.trim()
+  ) {
+    throw new Error('independent review execution identity is incomplete');
+  }
+  if (!/^[0-9a-f]{40}$/.test(input.sourceHead)) throw new Error('invalid review source head');
+  if (!/^[0-9a-f]{64}$/.test(input.sourceTreeDigest)) {
+    throw new Error('invalid reviewed source-tree digest');
+  }
+  if (input.runId === input.reviewedRunId) {
+    throw new Error('independent review must be a distinct execution');
+  }
+  if (input.review.goalId !== input.goalId || input.review.sourceHead !== input.sourceHead) {
+    throw new Error('provider review verdict is not bound to this goal and exact head');
+  }
+  if (input.review.purpose !== 'independent_completion_review' || !input.review.evidence.trim()) {
+    throw new Error('provider review verdict is invalid');
+  }
+  if (
+    !Number.isFinite(Date.parse(input.pendingClaimedAt)) ||
+    !Number.isFinite(Date.parse(input.reviewStartedAt)) ||
+    Date.parse(input.reviewStartedAt) < Date.parse(input.pendingClaimedAt)
+  ) {
+    throw new Error('independent review execution predates the pending completion claim');
+  }
+  const reviewedRun = db
+    .select({
+      taskId: agentRuns.taskId,
+      purpose: agentRuns.purpose,
+      sourceHead: agentRuns.sourceHead,
+      sessionRef: agentRuns.sessionRef,
+      status: agentRuns.status,
+    })
+    .from(agentRuns)
+    .where(eq(agentRuns.id, input.reviewedRunId))
+    .get();
+  if (
+    !reviewedRun ||
+    reviewedRun.taskId !== input.taskId ||
+    !['implementation', 'repair'].includes(reviewedRun.purpose) ||
+    reviewedRun.sourceHead !== input.sourceHead ||
+    !reviewedRun.sessionRef?.trim() ||
+    reviewedRun.status !== 'succeeded'
+  ) {
+    throw new Error(
+      'independent review authority requires a distinct canonical succeeded implementation or repair run at the exact head',
+    );
+  }
+  const canonicalRun = db
+    .select({
+      taskId: agentRuns.taskId,
+      providerId: agentRuns.providerId,
+      provider: agentProviders.name,
+      accountLabel: agentProviders.accountLabel,
+      purpose: agentRuns.purpose,
+      independenceLoss: agentRuns.independenceLoss,
+      sourceHead: agentRuns.sourceHead,
+      sessionRef: agentRuns.sessionRef,
+      status: agentRuns.status,
+    })
+    .from(agentRuns)
+    .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
+    .where(eq(agentRuns.id, input.runId))
+    .get();
+  if (
+    !canonicalRun ||
+    canonicalRun.taskId !== input.taskId ||
+    canonicalRun.providerId !== input.providerId ||
+    canonicalRun.provider !== (input.provider === 'claude' ? 'claude-code' : input.provider) ||
+    canonicalRun.accountLabel !== input.providerAccountLabel ||
+    canonicalRun.purpose !== 'review' ||
+    canonicalRun.independenceLoss !== null ||
+    canonicalRun.sourceHead !== input.sourceHead ||
+    !canonicalRun.sessionRef?.trim() ||
+    canonicalRun.status !== 'succeeded'
+  ) {
+    throw new Error(
+      'independent review authority requires the canonical succeeded task run, exact head, review purpose, and routed provider account',
+    );
+  }
+  const id = randomUUID();
+  db.insert(independentReviewReceipts)
+    .values({
+      id,
+      project: input.project.trim(),
+      goalId: input.goalId,
+      runId: input.runId,
+      reviewedRunId: input.reviewedRunId,
+      reviewSessionRef: canonicalRun.sessionRef.trim(),
+      reviewedSessionRef: reviewedRun.sessionRef.trim(),
+      taskId: input.taskId,
+      dispatchId: input.dispatchId,
+      provider: input.provider.trim(),
+      providerId: input.providerId,
+      providerAccountLabel: input.providerAccountLabel,
+      sourceHead: input.sourceHead,
+      sourceTreeDigest: input.sourceTreeDigest,
+      purpose: input.review.purpose,
+      verdict: input.review.verdict,
+      evidence: input.review.evidence.trim(),
+      pendingClaimedAt: input.pendingClaimedAt,
+      reviewStartedAt: input.reviewStartedAt,
+      executionStatus: input.executionStatus,
+    })
+    .run();
+  return id;
+}
+
 export function listPerformanceObservations(
   db: DbConn,
   project: string,
@@ -166,6 +328,37 @@ export function listPerformanceObservations(
     )
     .all()
     .map((row) => validateRunInsight(JSON.parse(row.receiptJson)));
+}
+
+export function getPerformanceObservation(db: DbConn, id: string): Receipt | undefined {
+  const row = db
+    .select({ receiptJson: runPerformanceObservations.receiptJson })
+    .from(runPerformanceObservations)
+    .where(eq(runPerformanceObservations.id, id))
+    .get();
+  return row ? validateRunInsight(JSON.parse(row.receiptJson)) : undefined;
+}
+
+export function getPerformanceObservationRecord(db: DbConn, id: string) {
+  const row = db
+    .select({
+      id: runPerformanceObservations.id,
+      project: runPerformanceObservations.project,
+      goalId: runPerformanceObservations.goalId,
+      receiptJson: runPerformanceObservations.receiptJson,
+    })
+    .from(runPerformanceObservations)
+    .where(eq(runPerformanceObservations.id, id))
+    .get();
+  return row ? { ...row, receipt: validateRunInsight(JSON.parse(row.receiptJson)) } : undefined;
+}
+
+export function getIndependentReviewReceipt(db: DbConn, id: string) {
+  return db
+    .select()
+    .from(independentReviewReceipts)
+    .where(eq(independentReviewReceipts.id, id))
+    .get();
 }
 
 function workerKey(receipt: Receipt): string | undefined {

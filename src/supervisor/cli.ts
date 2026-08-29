@@ -34,6 +34,7 @@ import {
   type GoalStatus,
   type WorkerHost,
 } from './state.js';
+import { assessSupervisorAdmissionRisk } from './worker-report.js';
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
@@ -45,8 +46,8 @@ import {
   runGoalCycle,
   routeGoalExecution,
   supervisorSnapshot,
-  tryAcquireRepoCycleLock,
 } from './runtime.js';
+import { tryAcquireRepositoryWriterFence } from './repository-writer-fence.js';
 import { runGatewayCommand, runWorker } from './worker.js';
 import {
   RESOURCE_KINDS,
@@ -62,6 +63,7 @@ import {
 import { assertRemotePreviewUrl } from '../web/remote-preview.js';
 import { redactText } from '../security/redact.js';
 import { openDb } from '../db/client.js';
+import { getIndependentReviewReceipt } from '../insights/performance-history.js';
 import { createDecisionRequest, resolveDecision } from '../domain/decision-service.js';
 import {
   decideProviderAction,
@@ -342,26 +344,28 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     if (!goal) {
       throw new Error(`goal ${goalId} does not belong to project ${project.project}`);
     }
+    const gradeState = openDb();
     const policy = recordShadowGrade({
+      db: gradeState.db,
       project: project.project,
       repoPath: project.repoPath,
       planner,
       provider,
+      providerAccountLabel: requireFlag(args, '--provider-account'),
+      reviewExecutionId: requireFlag(args, '--review-execution-id'),
+      plannerExecutionId: requireFlag(args, '--planner-execution-id'),
       result: resultRaw,
       evidence: requireFlag(args, '--evidence'),
       goalId,
     });
+    gradeState.sqlite.close();
     console.log(JSON.stringify(policy, null, 2));
     return true;
   }
 
   if (command === 'project' && args[1] === 'grade') {
     const project = resolveProject(args[2] ?? 'current');
-    const provider = validHost(requireFlag(args, '--provider'));
-    const resultRaw = requireFlag(args, '--result');
-    if (resultRaw !== 'pass' && resultRaw !== 'fail') {
-      throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
-    }
+    const reviewReceiptId = requireFlag(args, '--review-receipt-id');
     const goalId = requireFlag(args, '--goal-id');
     const goal = bindGoalToProject(goalId, project.project, project.repoPath);
     if (!goal) {
@@ -372,29 +376,38 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         `goal ${goalId} has no recorded builder/coordinator yet; it cannot be independently graded`,
       );
     }
-    if (goal.lastCoordinator === provider) {
-      throw new Error(
-        `independent grade refused: ${provider} was the last coordinator for goal ${goalId}`,
-      );
+    const evidenceState = openDb();
+    const review = getIndependentReviewReceipt(evidenceState.db, reviewReceiptId);
+    if (!review || review.project !== project.project || review.goalId !== goalId) {
+      throw new Error('grade receipt is not bound to this project and goal');
     }
-    const evidence = requireFlag(args, '--evidence');
+    const provider = validHost(review.provider);
+    const resultRaw = review.verdict;
+    const evidence = review.evidence;
+    if (!goal.pendingCompletion) {
+      throw new Error('project grade requires a current pending completion claim');
+    }
+    if (!review.reviewedRunId) {
+      evidenceState.sqlite.close();
+      throw new Error('grade receipt lacks a canonical reviewed execution');
+    }
+    applyIndependentCompletionGrade({ goalId, receiptId: reviewReceiptId });
     const policy = recordIndependentGrade({
+      db: evidenceState.db,
       project: project.project,
       repoPath: project.repoPath,
       provider,
+      providerAccountLabel: review.providerAccountLabel ?? 'default',
+      reviewExecutionId: review.runId,
+      reviewedExecutionId: review.reviewedRunId,
+      reviewedProvider: goal.pendingCompletion.coordinator,
       result: resultRaw,
       evidence,
       goalId,
+      reviewReceiptId,
     });
-    if (goal.pendingCompletion) {
-      applyIndependentCompletionGrade({
-        goalId,
-        provider,
-        result: resultRaw,
-        evidence,
-      });
-    }
-    if (resultRaw === 'pass' && goal.pendingCompletion) {
+    evidenceState.sqlite.close();
+    if (resultRaw === 'pass') {
       applyIndependentSkillValidation({
         project: project.project,
         repoPath: project.repoPath,
@@ -453,6 +466,11 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
           repoPath: project.repoPath,
           goal: requireFlag(args, '--goal'),
           autonomous: requestedAutonomy,
+          admissionRiskAssessment: assessSupervisorAdmissionRisk({
+            outcome: requireFlag(args, '--goal'),
+            requiredOperations,
+            policy,
+          }),
           ...(requiredOperations.length > 0 ? { requiredOperations } : {}),
           ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
         });
@@ -472,7 +490,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       }
       console.log('mode: SHADOW / OBSERVE');
       console.log(
-        `Major will not dispatch workers. In the active agent session, produce a "MAJOR SHADOW PLAN" for this goal, then have a different provider grade that plan against the work actually performed. Three consecutive passing shadow grades are required before assist mode can be enabled unless the owner explicitly fast-tracks the project to build with --owner-approved.`,
+        `Major will not dispatch workers. In the active agent session, produce a "MAJOR SHADOW PLAN" for this goal, then have a separate review execution grade that plan against the work actually performed. Persist distinct planner/reviewer execution IDs plus provider/account provenance with the grade. Three consecutive passing shadow grades are required before assist mode can be enabled unless the owner explicitly fast-tracks the project to build with --owner-approved.`,
       );
       return true;
     }
@@ -586,6 +604,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       project: project.project,
       repoPath: project.repoPath,
       outcome,
+      admissionRiskAssessment: assessSupervisorAdmissionRisk({ outcome, policy }),
+      assessPreservedOutcome: (preservedOutcome) =>
+        assessSupervisorAdmissionRisk({ outcome: preservedOutcome, policy }),
       ...(host ? { preferredCoordinator: host } : {}),
       refine: hasFlag(args, '--refine'),
     });
@@ -780,8 +801,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       }
       console.error(`Major worktree: ${runCwd} (${branch})`);
     }
-    const releaseRepoLock = worktree ? undefined : tryAcquireRepoCycleLock(project.repoPath);
-    if (!worktree && !releaseRepoLock) {
+    const writerFence = worktree ? undefined : tryAcquireRepositoryWriterFence(project.repoPath);
+    if (!worktree && !writerFence) {
       throw new Error(
         `repository ${project.repoPath} already has an active Major integration owner`,
       );
@@ -792,13 +813,14 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         cwd: runCwd,
         prompt,
         approvalAuthority,
+        ...(writerFence ? { writerFence } : {}),
         ...(modelRef ? { modelRef } : {}),
       });
       process.stdout.write(outcome.stdout);
       if (outcome.stderr) process.stderr.write(outcome.stderr);
       if (outcome.status !== 'succeeded') process.exitCode = 1;
     } finally {
-      releaseRepoLock?.();
+      writerFence?.release();
     }
     return true;
   }

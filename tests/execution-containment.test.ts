@@ -18,11 +18,7 @@ import {
   ExecutableTrustError,
   TrustedExecutableRegistry,
 } from '../src/security/trusted-executables.js';
-import {
-  ExecutionGateway,
-  GatewayViolationError,
-  type ExecutionPolicyDecision,
-} from '../src/security/gateway.js';
+import { ExecutionGateway, type ExecutionPolicyDecision } from '../src/security/gateway.js';
 import { trustedExecutableRegistry } from '../src/security/major-gateway.js';
 import { gatewayAllowedRoots } from '../src/supervisor/worker.js';
 import { LimaBackend } from '../src/execution/lima-backend.js';
@@ -165,6 +161,41 @@ describe('containment status is reported honestly', () => {
 });
 
 describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
+  it('keeps an admitted workspace read-only while allowing a separate runtime root', () => {
+    const workspace = tempDir();
+    const runtime = tempDir();
+    const source = join(workspace, 'source.txt');
+    const runtimeMarker = join(runtime, 'runtime.txt');
+    writeFileSync(source, 'frozen');
+    const script = [
+      "const fs=require('node:fs')",
+      `const sourceValue=fs.readFileSync(${JSON.stringify(source)}, 'utf8')`,
+      `let sourceWriteDenied=false; try { fs.writeFileSync(${JSON.stringify(source)}, 'changed') } catch { sourceWriteDenied=true }`,
+      `fs.writeFileSync(${JSON.stringify(runtimeMarker)}, 'ok')`,
+      'process.stdout.write(JSON.stringify({sourceValue,sourceWriteDenied}))',
+    ].join(';');
+    const containment = darwinSeatbeltContainment();
+    const wrapped = containment.wrap({
+      executable: NODE,
+      canonicalExecutable: realpathSync(NODE),
+      args: ['-e', script],
+      allowedRoots: [workspace, runtime],
+      writableRoots: [runtime],
+    });
+    const result = spawnSync(wrapped.executable, wrapped.args, {
+      cwd: workspace,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin' },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({
+      sourceValue: 'frozen',
+      sourceWriteDenied: true,
+    });
+    expect(readFileSync(source, 'utf8')).toBe('frozen');
+    expect(readFileSync(runtimeMarker, 'utf8')).toBe('ok');
+  });
+
   it('allows the declared root and denies sibling reads, writes and descendant escapes', () => {
     const allowed = tempDir();
     const readOnly = tempDir();

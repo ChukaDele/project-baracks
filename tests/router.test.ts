@@ -121,7 +121,7 @@ describe('Codex routing', () => {
     }
   });
 
-  it('records independence loss when only the implementing provider can review', () => {
+  it('allows a separate review execution when only the implementing provider is available', () => {
     const providers = [claude([{ modelRef: 'opus', routingClass: 'opus' }])];
     const decision = route(
       { purpose: 'review', complexity: 'bounded', implementedByProvider: 'claude-code' },
@@ -130,7 +130,7 @@ describe('Codex routing', () => {
     expect(decision.kind).toBe('route');
     if (decision.kind === 'route') {
       expect(decision.provider).toBe('claude-code');
-      expect(decision.independenceLoss).toMatch(/no independent provider/);
+      expect(decision.independenceLoss).toBeUndefined();
     }
   });
 });

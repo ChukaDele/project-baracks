@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { admitGoal, getGoal, updateGoal } from '../src/supervisor/state.js';
+import { assessSupervisorAdmissionRisk } from '../src/supervisor/worker-report.js';
 
 let root = '';
 let priorStatePath: string | undefined;
@@ -30,6 +31,13 @@ function fakeRepo(name = 'jss-tool'): string {
 }
 
 describe('admitGoal', () => {
+  const policy = {
+    projectClass: 'workshop' as const,
+    trust: 'build' as const,
+    allowExternalWrites: false,
+    allowPaidSpend: false,
+  };
+
   it('creates a fresh goal when none exists for the project', () => {
     const repoPath = fakeRepo();
     const { goal, created } = admitGoal({
@@ -62,16 +70,83 @@ describe('admitGoal', () => {
     expect(second.goal.goal).toBe('Ship the MVP');
   });
 
+  it('backfills risk only from the preserved durable outcome', () => {
+    const repoPath = fakeRepo();
+    const first = admitGoal({
+      project: 'jss-tool',
+      repoPath,
+      outcome: 'Repair authentication and session access control',
+      refine: false,
+    });
+    expect(first.goal.admissionRiskAssessment).toBeUndefined();
+    const resumed = admitGoal({
+      project: 'jss-tool',
+      repoPath,
+      outcome: 'ignored low-risk copy edit message',
+      admissionRiskAssessment: assessSupervisorAdmissionRisk({
+        outcome: 'ignored low-risk copy edit message',
+        policy,
+      }),
+      assessPreservedOutcome: (outcome) => assessSupervisorAdmissionRisk({ outcome, policy }),
+      refine: false,
+    });
+    expect(resumed.goal.goal).toBe('Repair authentication and session access control');
+    expect(resumed.goal.admissionRiskAssessment?.classification).toBe('high_consequence');
+    expect(resumed.goal.promotionContract?.review).toBe('independent');
+  });
+
   it('overwrites the outcome only when refine is explicitly set', () => {
     const repoPath = fakeRepo();
-    admitGoal({ project: 'jss-tool', repoPath, outcome: 'Ship the MVP', refine: false });
+    const admitted = admitGoal({
+      project: 'jss-tool',
+      repoPath,
+      outcome: 'Ship the MVP',
+      refine: false,
+    });
+    updateGoal(admitted.goal.id, {
+      status: 'blocked',
+      ownerGate: 'gate from prior objective',
+      retryImmediately: true,
+      activePid: 42,
+      candidate: {
+        resolution: 'no_task',
+        sourceHead: 'a'.repeat(40),
+        sourceTreeDigest: 'b'.repeat(64),
+        frozenAt: '2026-08-29T00:00:00.000Z',
+      },
+      pendingCompletion: {
+        summary: 'old objective complete',
+        coordinator: 'codex',
+        claimedAt: '2026-08-29T00:00:00.000Z',
+        sourceHead: 'a'.repeat(40),
+        sourceTreeDigest: 'b'.repeat(64),
+        reviewDispatch: {
+          id: 'old-objective-review',
+          provider: 'claude',
+          startedAt: '2026-08-29T00:01:00.000Z',
+        },
+      },
+    });
     const refined = admitGoal({
       project: 'jss-tool',
       repoPath,
       outcome: 'Redesign the onboarding flow instead',
+      admissionRiskAssessment: assessSupervisorAdmissionRisk({
+        outcome: 'Redesign the onboarding flow instead',
+        policy,
+      }),
       refine: true,
     });
     expect(refined.goal.goal).toBe('Redesign the onboarding flow instead');
+    expect(refined.goal.admissionRiskAssessment?.classification).toBe('substantive');
+    expect(refined.goal.promotionContract?.review).toBe('focused');
+    expect(refined.goal.pendingCompletion).toBeUndefined();
+    expect(refined.goal.candidate).toBeUndefined();
+    expect(refined.goal.activePid).toBeUndefined();
+    expect(refined.goal.status).toBe('active');
+    expect(refined.goal.ownerGate).toBeUndefined();
+    expect(refined.goal.retryImmediately).toBe(false);
+    expect(refined.goal.nextRunAt).toBeTruthy();
   });
 
   it('never resets status, ownerGate, pendingCompletion, or retryImmediately on reuse', () => {

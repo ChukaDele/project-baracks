@@ -19,7 +19,7 @@ Apply the narrow cross modal review procedure and return evidence, exceptions an
 
 Inputs are the explicit task, bounded project context, source evidence and permission profile. Return a concise result, evidence used, deterministic checks, unresolved exceptions and recommended next action. Never infer missing authority or claim external success.
 
-Run deterministic checks first. Add an independent provider only when the expected value justifies its cost and latency; provider diversity must be real rather than two aliases of one implementation. Preserve disagreements and their evidence instead of averaging them away. The implementer may supply evidence but may not self-certify the result.
+Run deterministic checks first. Add a separate read-only review execution when the expected value justifies its cost and latency. Bind it to the exact candidate and preserve its run, provider and account provenance; provider diversity is optional corroboration, not proof of independence. Reject reused implementer sessions, writable review boundaries, compromised executions, and self-issued verdicts. Preserve disagreements and their evidence instead of averaging them away.
 
 ## Authority boundary
 

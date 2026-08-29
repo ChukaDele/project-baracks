@@ -132,14 +132,11 @@ export function route(
   const ladder: RoutingClass[] = isReview ? ['codex', 'opus', 'fable', 'sonnet'] : LADDERS[target];
 
   let pool = candidates;
-  let independenceLoss: string | undefined;
   if (isReview && request.implementedByProvider) {
     const independent = candidates.filter((c) => c.provider !== request.implementedByProvider);
     const { free } = pickFromLadder(ladder, independent, request, options);
     if (free) {
       pool = independent;
-    } else {
-      independenceLoss = `no independent provider available; review by ${request.implementedByProvider} of its own work`;
     }
   }
 
@@ -158,7 +155,6 @@ export function route(
         `${free.provider}/${free.model.modelRef} (${free.model.routingClass}, ` +
         `${free.model.billingMode})`,
     };
-    if (independenceLoss) decision.independenceLoss = independenceLoss;
     return decision;
   }
 
@@ -180,7 +176,6 @@ export function route(
         `paid usage of ${chosen.provider}/${chosen.model.modelRef} ` +
         `(${chosen.model.billingMode}) approved by ${request.approvedPaidUsage.decisionId}`,
     };
-    if (independenceLoss) decision.independenceLoss = independenceLoss;
     return decision;
   }
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   activeEntries,
@@ -48,5 +49,16 @@ describe('guidance registries', () => {
   it('loads the committed instruction registry', () => {
     const committed = loadGuidanceRegistry('guidance/instructions.registry.json');
     expect(activeEntries(committed).length).toBeGreaterThan(0);
+  });
+
+  it('documents execution-independent review without a provider-name gate', () => {
+    const readiness = readFileSync('guidance/readiness-and-independent-validation.md', 'utf8');
+    const pilot = readFileSync('docs/pilot-deployment.md', 'utf8');
+    expect(readiness).toContain('canonical execution distinct from the substantive');
+    expect(readiness).toContain('provider diversity is useful corroboration');
+    expect(readiness).not.toContain('grader must not be the provider');
+    expect(pilot).toContain('--review-receipt-id <major-owned-review-receipt-id>');
+    expect(pilot).toContain('same-provider grade is accepted');
+    expect(pilot).not.toContain('refuses the grade when the provider matches');
   });
 });
