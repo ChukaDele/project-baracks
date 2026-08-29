@@ -138,6 +138,11 @@ installation and installed behavior proof follow normal merge.
   head. SQLite rejects mutation of `source_head` after insert and completion ignores other heads.
 - Unknown no-task scope freezes as substantive at admission; worker output cannot downgrade it to
   the low-risk fast path, while exact criterion/evidence pairs retain bounded MVP validation.
+- Admission now persists a typed Major assessment derived from the admitted outcome and project
+  policy. Bounded work keeps the fast path, substantive work requires focused review, consequential
+  work requires independent review, and missing classification fails closed at higher risk.
+- After a post-pending provider review returns, Major re-reads repository HEAD immediately before
+  receipt creation/application and reopens the claim on any mismatch or unreadable head.
 - No-task promotion contracts are deterministically classified from Major-owned operation facts
   before dispatch; material-risk proof uses exact structured criterion/evidence records persisted in
   pending completion rather than matching free-text prefixes.
@@ -200,6 +205,11 @@ installation and installed behavior proof follow normal merge.
   joins the exact-head service/SQLite gate and source heads are immutable. The affected gate passed
   90/90 focused tests across five files plus typecheck, targeted lint/format, Major validation, and
   stability validation; the full matrix remains intentionally unrun.
+- Fresh post-review/admission repair: the receipt boundary now performs a second exact-HEAD read and
+  reopens stale claims before authority is recorded. Canonical and ambient admission persist a typed
+  outcome/policy risk assessment with conservative legacy/unavailable migration. The affected gate
+  passed 99/99 focused tests across six files plus typecheck; the full matrix remains intentionally
+  unrun and the account-label IMPORTANT remains non-blocking.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -245,6 +255,9 @@ installation and installed behavior proof follow normal merge.
   post-claim review execution state, allowed stale/self-shaped receipts, omitted verification from
   exact-head enforcement, permitted source-head mutation, and classified unknown supervisor scope
   as low risk. Focused causal, receipt, run-service, and SQLite regressions now protect these seams.
+- Independent review regression: `09a1b313` checked exact HEAD only before provider dispatch and
+  classified admission without typed outcome/project-policy facts. Focused regressions now protect
+  the second pre-receipt HEAD read and bounded/substantive/consequential/unavailable contracts.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

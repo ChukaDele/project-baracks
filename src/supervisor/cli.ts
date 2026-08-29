@@ -34,6 +34,7 @@ import {
   type GoalStatus,
   type WorkerHost,
 } from './state.js';
+import { assessSupervisorAdmissionRisk } from './worker-report.js';
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
@@ -451,6 +452,11 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
           repoPath: project.repoPath,
           goal: requireFlag(args, '--goal'),
           autonomous: requestedAutonomy,
+          admissionRiskAssessment: assessSupervisorAdmissionRisk({
+            outcome: requireFlag(args, '--goal'),
+            requiredOperations,
+            policy,
+          }),
           ...(requiredOperations.length > 0 ? { requiredOperations } : {}),
           ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
         });
@@ -584,6 +590,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       project: project.project,
       repoPath: project.repoPath,
       outcome,
+      admissionRiskAssessment: assessSupervisorAdmissionRisk({ outcome, policy }),
       ...(host ? { preferredCoordinator: host } : {}),
       refine: hasFlag(args, '--refine'),
     });

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { admitGoal, getGoal, updateGoal } from '../src/supervisor/state.js';
+import { assessSupervisorAdmissionRisk } from '../src/supervisor/worker-report.js';
 
 let root = '';
 let priorStatePath: string | undefined;
@@ -30,6 +31,13 @@ function fakeRepo(name = 'jss-tool'): string {
 }
 
 describe('admitGoal', () => {
+  const policy = {
+    projectClass: 'workshop' as const,
+    trust: 'build' as const,
+    allowExternalWrites: false,
+    allowPaidSpend: false,
+  };
+
   it('creates a fresh goal when none exists for the project', () => {
     const repoPath = fakeRepo();
     const { goal, created } = admitGoal({
@@ -69,9 +77,15 @@ describe('admitGoal', () => {
       project: 'jss-tool',
       repoPath,
       outcome: 'Redesign the onboarding flow instead',
+      admissionRiskAssessment: assessSupervisorAdmissionRisk({
+        outcome: 'Redesign the onboarding flow instead',
+        policy,
+      }),
       refine: true,
     });
     expect(refined.goal.goal).toBe('Redesign the onboarding flow instead');
+    expect(refined.goal.admissionRiskAssessment?.classification).toBe('substantive');
+    expect(refined.goal.promotionContract?.review).toBe('focused');
   });
 
   it('never resets status, ownerGate, pendingCompletion, or retryImmediately on reuse', () => {

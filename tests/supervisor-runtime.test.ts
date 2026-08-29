@@ -9,6 +9,7 @@ import {
   coordinatorPrompt,
   modelOutcomeForWorker,
   nonSuccessCyclePatch,
+  postReviewHeadChangePatch,
   parseWorkerReport,
   runForegroundGoal,
   routingDecisionGoalPatch,
@@ -68,6 +69,14 @@ function goal(repoPath: string): SupervisorGoal {
 }
 
 describe('Major coordinator contract', () => {
+  it('reopens post-review completion before receipt authority when exact HEAD is unavailable or changed', () => {
+    expect(postReviewHeadChangePatch('/not/a/repository', 'a'.repeat(40))).toMatchObject({
+      status: 'active',
+      pendingCompletion: undefined,
+      activePid: undefined,
+      lastSummary: expect.stringMatching(/head changed during independent review/i),
+    });
+  });
   it('builds a compact terminal receipt without inventing unavailable evidence', () => {
     const receipt = supervisorRunInsight({
       goal: { id: 'goal-1', goal: 'Ship the accepted Major increment' },

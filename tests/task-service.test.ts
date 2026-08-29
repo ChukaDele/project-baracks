@@ -40,7 +40,10 @@ import {
   transitionTask,
 } from '../src/domain/task-service.js';
 import { coordinatorDonePromotionProof } from '../src/supervisor/runtime.js';
-import { deriveSupervisorPromotionContract } from '../src/supervisor/worker-report.js';
+import {
+  assessSupervisorAdmissionRisk,
+  deriveSupervisorPromotionContract,
+} from '../src/supervisor/worker-report.js';
 import {
   completeTaskProperly,
   ensureObservedModel,
@@ -176,6 +179,61 @@ describe('dependency blocking', () => {
 });
 
 describe('completion proof and guarded completion transition', () => {
+  it('classifies no-task admission from typed outcome and policy facts and fails closed', () => {
+    const workshopPolicy = {
+      projectClass: 'workshop' as const,
+      trust: 'build' as const,
+      allowExternalWrites: false,
+      allowPaidSpend: false,
+    };
+    const bounded = assessSupervisorAdmissionRisk({
+      outcome: 'Fix typo',
+      policy: workshopPolicy,
+    });
+    expect(bounded.classification).toBe('bounded');
+    expect(
+      deriveSupervisorPromotionContract({
+        admissionRiskAssessment: bounded,
+        autonomous: false,
+      }).review,
+    ).toBe('none');
+
+    const substantive = assessSupervisorAdmissionRisk({
+      outcome: 'Build the smallest credible end-to-end onboarding workflow',
+      policy: workshopPolicy,
+    });
+    expect(substantive.classification).toBe('substantive');
+    expect(
+      deriveSupervisorPromotionContract({
+        admissionRiskAssessment: substantive,
+        autonomous: false,
+      }).review,
+    ).toBe('focused');
+
+    const consequential = assessSupervisorAdmissionRisk({
+      outcome: 'Repair completion authority policy',
+      policy: workshopPolicy,
+    });
+    expect(consequential).toMatchObject({
+      classification: 'high_consequence',
+      materialRiskCriteria: ['authority'],
+    });
+    expect(
+      deriveSupervisorPromotionContract({
+        admissionRiskAssessment: consequential,
+        autonomous: false,
+      }).review,
+    ).toBe('independent');
+
+    const unavailable = assessSupervisorAdmissionRisk({ outcome: 'Ship it' });
+    expect(unavailable.classification).toBe('unavailable');
+    expect(
+      deriveSupervisorPromotionContract({
+        admissionRiskAssessment: unavailable,
+        autonomous: false,
+      }),
+    ).toMatchObject({ review: 'independent', broaderValidationTriggers: ['blast_radius'] });
+  });
   it('requires focused task implementation and review runs to use the frozen candidate head', () => {
     const db = testDb();
     const project = seedProject(db);
@@ -295,6 +353,19 @@ describe('completion proof and guarded completion transition', () => {
 
   it('accepts structured supervisor promotion evidence without requiring a task row', () => {
     const db = testDb();
+    const admissionRiskAssessment = assessSupervisorAdmissionRisk({
+      outcome: 'Build the onboarding workflow',
+      policy: {
+        projectClass: 'workshop',
+        trust: 'build',
+        allowExternalWrites: false,
+        allowPaidSpend: false,
+      },
+    });
+    const promotionContract = deriveSupervisorPromotionContract({
+      admissionRiskAssessment,
+      autonomous: false,
+    });
     const promotionEvidence = {
       focusedTests: 'focused changed-behavior tests passed',
       cheapestCompileTypeOrBuild: 'typecheck passed',
@@ -316,14 +387,14 @@ describe('completion proof and guarded completion transition', () => {
     expect(
       coordinatorDonePromotionProof(
         db,
-        { repoPath: '/unregistered/supervisor-repository' },
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
         { status: 'done', summary: 'structured claim', promotionEvidence },
       ),
     ).toMatchObject({ ok: true, taskId: undefined, promotionEvidence });
     expect(
       coordinatorDonePromotionProof(
         db,
-        { repoPath: '/unregistered/supervisor-repository' },
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
         { status: 'done', summary: 'summary only' },
       ),
     ).toMatchObject({
@@ -333,7 +404,7 @@ describe('completion proof and guarded completion transition', () => {
     expect(
       coordinatorDonePromotionProof(
         db,
-        { repoPath: '/unregistered/supervisor-repository' },
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
         {
           status: 'done',
           summary: 'broad proof missing economics',
@@ -351,7 +422,7 @@ describe('completion proof and guarded completion transition', () => {
     expect(
       coordinatorDonePromotionProof(
         db,
-        { repoPath: '/unregistered/supervisor-repository' },
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
         {
           status: 'done',
           summary: 'blocked proof',
@@ -362,7 +433,7 @@ describe('completion proof and guarded completion transition', () => {
     expect(
       coordinatorDonePromotionProof(
         db,
-        { repoPath: '/unregistered/supervisor-repository' },
+        { repoPath: '/unregistered/supervisor-repository', promotionContract },
         {
           status: 'done',
           summary: 'untriggered broad proof',
@@ -384,9 +455,19 @@ describe('completion proof and guarded completion transition', () => {
 
   it('derives no-task risk/review requirements before the report and matches structured evidence', () => {
     const db = testDb();
-    const promotionContract = deriveSupervisorPromotionContract({
-      autonomous: false,
+    const admissionRiskAssessment = assessSupervisorAdmissionRisk({
+      outcome: 'Repair completion authority policy',
       requiredOperations: ['completion_policy'],
+      policy: {
+        projectClass: 'workshop',
+        trust: 'build',
+        allowExternalWrites: false,
+        allowPaidSpend: false,
+      },
+    });
+    const promotionContract = deriveSupervisorPromotionContract({
+      admissionRiskAssessment,
+      autonomous: false,
     });
     expect(promotionContract).toMatchObject({
       review: 'independent',

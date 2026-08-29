@@ -18,6 +18,7 @@ import { openDb, type DbConn } from '../db/client.js';
 import { getIndependentReviewReceipt } from '../insights/performance-history.js';
 import {
   deriveSupervisorPromotionContract,
+  type SupervisorAdmissionRiskAssessment,
   type PrePromotionEvidence,
   type SupervisorPromotionContract,
 } from './worker-report.js';
@@ -100,6 +101,8 @@ export interface SupervisorGoal {
       }
     | undefined;
   requiredOperations?: string[] | undefined;
+  /** Major-owned typed admission assessment, frozen before dispatch. */
+  admissionRiskAssessment?: SupervisorAdmissionRiskAssessment | undefined;
   /** Major-owned no-task completion contract, frozen before worker dispatch. */
   promotionContract?: SupervisorPromotionContract | undefined;
   /** Set by the last cycle when it stopped on an authoritative provider
@@ -245,6 +248,7 @@ export function startGoal(input: {
   autonomous: boolean;
   preferredCoordinator?: WorkerHost;
   requiredOperations?: string[];
+  admissionRiskAssessment?: SupervisorAdmissionRiskAssessment;
 }): SupervisorGoal {
   return mutateSupervisorState((state) => {
     const now = new Date().toISOString();
@@ -261,7 +265,9 @@ export function startGoal(input: {
         existing.repoPath = resolve(input.repoPath);
         existing.autonomous = input.autonomous;
         existing.requiredOperations = input.requiredOperations;
+        existing.admissionRiskAssessment = input.admissionRiskAssessment;
         existing.promotionContract = deriveSupervisorPromotionContract({
+          admissionRiskAssessment: input.admissionRiskAssessment,
           requiredOperations: input.requiredOperations,
           autonomous: input.autonomous,
         });
@@ -288,12 +294,16 @@ export function startGoal(input: {
       ...(input.requiredOperations && input.requiredOperations.length > 0
         ? { requiredOperations: input.requiredOperations }
         : {}),
+      ...(input.admissionRiskAssessment
+        ? { admissionRiskAssessment: input.admissionRiskAssessment }
+        : {}),
       cycle: 0,
       consecutiveFailures: 0,
       createdAt: now,
       updatedAt: now,
       nextRunAt: now,
       promotionContract: deriveSupervisorPromotionContract({
+        admissionRiskAssessment: input.admissionRiskAssessment,
         requiredOperations: input.requiredOperations,
         autonomous: input.autonomous,
       }),
@@ -320,6 +330,7 @@ export function admitGoal(input: {
   repoPath: string;
   outcome: string;
   preferredCoordinator?: WorkerHost;
+  admissionRiskAssessment?: SupervisorAdmissionRiskAssessment;
   refine: boolean;
 }): { goal: SupervisorGoal; created: boolean } {
   return mutateSupervisorState((state) => {
@@ -335,6 +346,18 @@ export function admitGoal(input: {
     if (existing) {
       if (input.refine) {
         existing.goal = input.outcome;
+        existing.admissionRiskAssessment = input.admissionRiskAssessment;
+        existing.promotionContract = deriveSupervisorPromotionContract({
+          admissionRiskAssessment: input.admissionRiskAssessment,
+          autonomous: existing.autonomous,
+        });
+        existing.updatedAt = now;
+      } else if (!existing.admissionRiskAssessment && input.admissionRiskAssessment) {
+        existing.admissionRiskAssessment = input.admissionRiskAssessment;
+        existing.promotionContract = deriveSupervisorPromotionContract({
+          admissionRiskAssessment: input.admissionRiskAssessment,
+          autonomous: existing.autonomous,
+        });
         existing.updatedAt = now;
       }
       return { goal: existing, created: false };
@@ -347,7 +370,13 @@ export function admitGoal(input: {
       autonomous: false,
       status: 'active',
       preferredCoordinator: input.preferredCoordinator ?? 'claude',
-      promotionContract: deriveSupervisorPromotionContract({ autonomous: false }),
+      ...(input.admissionRiskAssessment
+        ? { admissionRiskAssessment: input.admissionRiskAssessment }
+        : {}),
+      promotionContract: deriveSupervisorPromotionContract({
+        admissionRiskAssessment: input.admissionRiskAssessment,
+        autonomous: false,
+      }),
       cycle: 0,
       consecutiveFailures: 0,
       createdAt: now,

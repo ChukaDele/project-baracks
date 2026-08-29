@@ -71,9 +71,13 @@ function lastLog(logs: string[]): unknown {
 }
 
 function resultEnvelope(status: 'done' | 'active', summary: string): string {
+  const promotionEvidence =
+    status === 'done'
+      ? ',"promotionEvidence":{"focusedTests":"focused tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"focused","passed":true},"blockerFindings":0}'
+      : '';
   return JSON.stringify({
     type: 'result',
-    result: `MAJOR_RESULT: {"status":"${status}","summary":"${summary}"}`,
+    result: `MAJOR_RESULT: {"status":"${status}","summary":"${summary}"${promotionEvidence}}`,
   });
 }
 

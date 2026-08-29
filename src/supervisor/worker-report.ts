@@ -38,6 +38,22 @@ export interface SupervisorPromotionContract {
   repositoryPolicyRequiresBroadValidation: boolean;
 }
 
+export interface SupervisorAdmissionRiskAssessment {
+  source: 'major_outcome_policy_v1';
+  classification: 'bounded' | 'substantive' | 'high_consequence' | 'unavailable';
+  estimatedFiles: number;
+  acceptancePaths: number;
+  risk: SdlcRisk;
+  materialRiskCriteria: string[];
+}
+
+export interface AdmissionProjectPolicyFacts {
+  projectClass: 'unknown' | 'workshop' | 'client' | 'knowledge';
+  trust: 'observe' | 'assist' | 'build' | 'unattended';
+  allowExternalWrites: boolean;
+  allowPaidSpend: boolean;
+}
+
 export const DEFAULT_SUPERVISOR_PROMOTION_CONTRACT: SupervisorPromotionContract = {
   review: 'focused',
   materialRiskCriteria: [],
@@ -54,28 +70,75 @@ const RISK_CRITERIA: readonly [keyof SdlcRisk, RegExp, string][] = [
   ['broadBlastRadius', /shared|global|runtime|installer|broad/i, 'blast radius'],
 ];
 
-/** Freeze no-task completion requirements from Major-owned routing facts.
- * Worker prose and the completing report are deliberately absent. */
-export function deriveSupervisorPromotionContract(input: {
+const SUBSTANTIVE_OUTCOME =
+  /\b(build|repair|ship|release|redesign|migrat\w*|integrat\w*|end[- ]to[- ]end|architecture|workflow|runtime|system)\b/i;
+
+/** Major-owned deterministic admission classification. It reads only the
+ * admitted objective, durable routing operations, and project policy. */
+export function assessSupervisorAdmissionRisk(input: {
+  outcome: string;
   requiredOperations?: readonly string[] | undefined;
-  autonomous: boolean;
-}): SupervisorPromotionContract {
+  policy?: AdmissionProjectPolicyFacts | undefined;
+}): SupervisorAdmissionRiskAssessment {
+  const outcome = input.outcome.trim();
   const operations = [...new Set(input.requiredOperations ?? [])];
+  if (!outcome || !input.policy || input.policy.projectClass === 'unknown') {
+    return {
+      source: 'major_outcome_policy_v1',
+      classification: 'unavailable',
+      estimatedFiles: 3,
+      acceptancePaths: 2,
+      risk: { touchesAuthority: true, broadBlastRadius: true },
+      materialRiskCriteria: ['authority', 'blast radius'],
+    };
+  }
+  const facts = [outcome, ...operations];
   const risk: SdlcRisk = {};
   const materialRiskCriteria: string[] = [];
   for (const [field, pattern, criterion] of RISK_CRITERIA) {
-    if (operations.some((operation) => pattern.test(operation))) {
+    if (facts.some((fact) => pattern.test(fact))) {
       risk[field] = true;
       materialRiskCriteria.push(criterion);
     }
   }
+  if (input.policy.trust === 'unattended') {
+    risk.touchesAuthority = true;
+    if (!materialRiskCriteria.includes('authority')) materialRiskCriteria.push('authority');
+  }
+  if (input.policy.projectClass === 'client') {
+    risk.touchesSecurity = true;
+    if (!materialRiskCriteria.includes('security')) materialRiskCriteria.push('security');
+  }
+  const highConsequence = Object.values(risk).some(Boolean);
+  const substantive =
+    SUBSTANTIVE_OUTCOME.test(outcome) || outcome.split(/\s+/).length >= 8 || operations.length >= 2;
+  return {
+    source: 'major_outcome_policy_v1',
+    classification: highConsequence ? 'high_consequence' : substantive ? 'substantive' : 'bounded',
+    estimatedFiles: substantive || highConsequence ? 3 : 1,
+    acceptancePaths: substantive || highConsequence ? 2 : 1,
+    risk,
+    materialRiskCriteria,
+  };
+}
+
+/** Freeze no-task completion requirements from Major-owned routing facts.
+ * Worker prose and the completing report are deliberately absent. */
+export function deriveSupervisorPromotionContract(input: {
+  admissionRiskAssessment?: SupervisorAdmissionRiskAssessment | undefined;
+  requiredOperations?: readonly string[] | undefined;
+  autonomous: boolean;
+}): SupervisorPromotionContract {
+  const assessment =
+    input.admissionRiskAssessment ??
+    assessSupervisorAdmissionRisk({
+      outcome: '',
+      requiredOperations: input.requiredOperations,
+    });
+  const { risk, materialRiskCriteria } = assessment;
   const decision = decideSdlc({
-    // Admission has no worker-authored scope evidence yet. Unknown scope is
-    // therefore frozen as substantive, never silently downgraded to the
-    // low-risk fast path. Explicit bounded task workflows retain their own
-    // deterministic classifier inputs.
-    estimatedFiles: Math.max(3, operations.length),
-    acceptancePaths: Math.max(2, operations.length),
+    estimatedFiles: assessment.estimatedFiles,
+    acceptancePaths: assessment.acceptancePaths,
     risk,
   });
   return {

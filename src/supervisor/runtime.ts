@@ -78,6 +78,7 @@ import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
 import {
   completedWorkflow,
+  assessSupervisorAdmissionRisk,
   deriveSupervisorPromotionContract,
   parseWorkerReport,
   type WorkerReport,
@@ -190,7 +191,7 @@ function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
 }
 
-function exactRepositoryHead(repoPath: string): string | undefined {
+export function exactRepositoryHead(repoPath: string): string | undefined {
   try {
     const marker = join(repoPath, '.git');
     const gitDir = statSync(marker).isDirectory()
@@ -662,7 +663,7 @@ CANONICAL TARGET:
 - repository path: ${goal.repoPath}
 ${hop?.canonicalTask ? `\nQUALIFYING CANONICAL TASK:\n- task id: ${hop.canonicalTask.taskId}\n- frozen completion criteria: ${hop.canonicalTask.frozenCriteriaJson}\nTask workflows may cite this task ID; Major re-resolves it by repository identity.\n` : ''}
 FROZEN NO-TASK PROMOTION CONTRACT:
-${JSON.stringify(goal.promotionContract ?? deriveSupervisorPromotionContract({ requiredOperations: goal.requiredOperations, autonomous: goal.autonomous }))}
+${JSON.stringify(goal.promotionContract ?? deriveSupervisorPromotionContract({ admissionRiskAssessment: goal.admissionRiskAssessment, requiredOperations: goal.requiredOperations, autonomous: goal.autonomous }))}
 This contract is Major-owned and was fixed before this report; report evidence cannot redefine it.
 
 ${workspaceContract}
@@ -1012,6 +1013,11 @@ async function runPendingCompletionReview(
     });
     return;
   }
+  const changedHeadPatch = postReviewHeadChangePatch(goal.repoPath, pending.sourceHead);
+  if (changedHeadPatch) {
+    updateGoal(goal.id, changedHeadPatch);
+    return;
+  }
   const receiptState = openDb();
   let receiptId: string;
   try {
@@ -1031,6 +1037,24 @@ async function runPendingCompletionReview(
   } finally {
     receiptState.sqlite.close();
   }
+}
+
+/** Re-read exact HEAD after the provider returns and fail closed before any
+ * receipt is recorded or applied. Undefined/unreadable HEAD is also stale. */
+export function postReviewHeadChangePatch(
+  repoPath: string,
+  expectedHead: string,
+): Partial<SupervisorGoal> | undefined {
+  if (exactRepositoryHead(repoPath) === expectedHead) return undefined;
+  return {
+    status: 'active',
+    activePid: undefined,
+    pendingCompletion: undefined,
+    lastFinishedAt: new Date().toISOString(),
+    lastSummary:
+      'Pending completion was reopened because the repository head changed during independent review.',
+    nextRunAt: new Date().toISOString(),
+  };
 }
 
 /** Bounded safety net so an authoritative-exhaustion loop can never hot-loop
@@ -1210,12 +1234,21 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(goal.lastSessionRef ? { lastSessionRef: goal.lastSessionRef } : {}),
     ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
   });
-  if (!goal.promotionContract) {
+  if (!goal.admissionRiskAssessment) {
+    goal.admissionRiskAssessment = assessSupervisorAdmissionRisk({
+      outcome: goal.goal,
+      requiredOperations: goal.requiredOperations,
+      policy,
+    });
     goal.promotionContract = deriveSupervisorPromotionContract({
+      admissionRiskAssessment: goal.admissionRiskAssessment,
       requiredOperations: goal.requiredOperations,
       autonomous: goal.autonomous,
     });
-    updateGoal(goal.id, { promotionContract: goal.promotionContract });
+    updateGoal(goal.id, {
+      admissionRiskAssessment: goal.admissionRiskAssessment,
+      promotionContract: goal.promotionContract,
+    });
   }
   const workerStartedAtMs = Date.now();
   let canonicalTask: CanonicalTaskBinding | undefined;
@@ -1424,6 +1457,7 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
           promotionContract: structuredClone(
             goal.promotionContract ??
               deriveSupervisorPromotionContract({
+                admissionRiskAssessment: goal.admissionRiskAssessment,
                 requiredOperations: goal.requiredOperations,
                 autonomous: goal.autonomous,
               }),
