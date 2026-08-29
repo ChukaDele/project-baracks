@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   applyIndependentCompletionGrade,
   readSupervisorState,
@@ -377,7 +377,7 @@ describe('independent goal completion', () => {
     expect(reopened.pendingCompletion).toBeUndefined();
   });
 
-  it('fails closed on a canonical writer attempt after the final identity read but before commit', () => {
+  it('fails closed on a canonical writer after the final fence assertion but before commit', () => {
     const receiptId = reviewReceiptId('claude', 'pass', 'reviewed the fenced source tree');
     let mutationRan = false;
     expect(() =>
@@ -385,7 +385,7 @@ describe('independent goal completion', () => {
         goalId: 'goal-1',
         receiptId,
         db: reviewDb.db,
-        onFinalIdentityReadForTest: () => {
+        onAfterFinalFenceAssertionForTest: () => {
           expect(
             attemptRepositoryMutation(root, () => {
               mutationRan = true;
@@ -394,7 +394,7 @@ describe('independent goal completion', () => {
           ).toBe(false);
         },
       }),
-    ).toThrow(/repository writer contention occurred during completion commit/i);
+    ).toThrow(/repository writer contention occurred at completion commit/i);
     expect(mutationRan).toBe(false);
     expect(reviewDb.db.select().from(supervisorCompletionCommits).all()).toEqual([]);
     const reopened = readSupervisorState().goals[0]!;
@@ -464,12 +464,15 @@ describe('independent goal completion', () => {
   it('serializes a task evidence race before the final done transition', () => {
     const { task, verification } = bindPendingToCanonicalTask();
     const receiptId = reviewReceiptId('claude', 'pass', 'task candidate reviewed');
-    const originalTransaction = reviewDb.db.transaction.bind(reviewDb.db);
-    const transaction = vi
-      .spyOn(reviewDb.db, 'transaction')
-      .mockImplementation((callback, config) =>
-        originalTransaction((tx) => {
-          tx.insert(reviewFindings)
+
+    expect(() =>
+      applyIndependentCompletionGrade({
+        goalId: 'goal-1',
+        receiptId,
+        db: reviewDb.db,
+        onTransactionStartedForTest: () => {
+          reviewDb.db
+            .insert(reviewFindings)
             .values({
               id: newId('rfind'),
               taskId: task.id,
@@ -478,14 +481,9 @@ describe('independent goal completion', () => {
               summary: 'concurrent authority blocker serialized before final proof',
             })
             .run();
-          return callback(tx);
-        }, config),
-      );
-
-    expect(() =>
-      applyIndependentCompletionGrade({ goalId: 'goal-1', receiptId, db: reviewDb.db }),
+        },
+      }),
     ).toThrow(/open BLOCKER review finding/i);
-    expect(transaction).toHaveBeenCalledWith(expect.any(Function), { behavior: 'immediate' });
     const reopened = readSupervisorState().goals[0]!;
     expect(reopened.status).toBe('active');
     expect(reopened.pendingCompletion).toBeUndefined();

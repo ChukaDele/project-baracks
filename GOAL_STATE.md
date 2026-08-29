@@ -265,6 +265,12 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   SQLite completion transaction to roll back and the goal to reopen. The affected gate passed 80/80
   tests across four focused files plus typecheck, targeted lint, and formatting; the full matrix was
   intentionally not run.
+- Commit-boundary fence repair: completion authority now uses an explicit `BEGIN IMMEDIATE` transaction,
+  and the repository writer fence owns the guarded SQLite commit. A deterministic competing writer
+  injected after the fence assertion but before COMMIT records contention; the guard rolls back the
+  authority row and the supervisor goal reopens. The affected gate passed 80/80 tests across four
+  focused files plus typecheck, targeted lint, and formatting. The broad matrix was not run because
+  the requested proportional gate bounded validation to the changed completion path.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
 - Final ordinary gate for `7385b13`: 106/106 files and 910/910 tests passed.
 - Final resource gate for `7385b13`: 139 tests passed with 5 expected skips.
@@ -341,6 +347,10 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   through commit and every supervisor mutation-capable worker entry point. A focused race attempts a
   tree write after that read, proves the writer is excluded, and proves recorded contention rolls back
   the completion commit and reopens the goal.
+- Independent review regression: `899ec55` checked contention in the transaction callback, after which
+  the transaction helper still had to perform COMMIT. Completion now uses a fence-owned explicit commit
+  primitive; a writer injected after its last assertion and before transaction completion prevents the
+  append-only authority row from committing and reopens the pending goal.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

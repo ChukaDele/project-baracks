@@ -11,11 +11,13 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import type Database from 'better-sqlite3';
 
 export interface RepositoryWriterFence {
   readonly repoPath: string;
   readonly token: string;
   assertUncontended(): void;
+  commitSqlite(sqlite: Database.Database, afterAssertionForTest?: () => void): void;
   release(): void;
 }
 
@@ -101,6 +103,14 @@ export function tryAcquireRepositoryWriterFence(
         throw new Error('repository writer fence was lost');
       }
       if (existsSync(contention)) throw new Error('repository writer fence observed contention');
+    },
+    commitSqlite(sqlite, afterAssertionForTest) {
+      this.assertUncontended();
+      afterAssertionForTest?.();
+      if (existsSync(contention)) {
+        throw new Error('repository writer fence observed contention at SQLite commit');
+      }
+      sqlite.exec('COMMIT');
     },
     release() {
       if (!active) return;

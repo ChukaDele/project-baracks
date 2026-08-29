@@ -526,6 +526,11 @@ export function applyIndependentCompletionGrade(input: {
   writerFence?: RepositoryWriterFence;
   /** Deterministic race seam used only by the focused writer-fence regression. */
   onFinalIdentityReadForTest?: () => void;
+  /** Deterministic seam for proving task authority is read inside BEGIN IMMEDIATE. */
+  onTransactionStartedForTest?: () => void;
+  /** Inject contention after the transaction body fence check and before the
+   * explicit commit-boundary guard. */
+  onAfterFinalFenceAssertionForTest?: () => void;
 }): SupervisorGoal {
   const ownedDb = input.db ? undefined : openDb();
   const db = input.db ?? ownedDb!.db;
@@ -549,8 +554,12 @@ export function applyIndependentCompletionGrade(input: {
     applied = withSupervisorStateLock((state) => {
       let result: { goal: SupervisorGoal; authorityRejection?: string };
       try {
-        result = db.transaction(
-          (tx) => {
+        const sqlite = db.$client;
+        sqlite.exec('BEGIN IMMEDIATE');
+        try {
+          input.onTransactionStartedForTest?.();
+          result = (() => {
+            const tx = db;
             const receipt = getIndependentReviewReceipt(tx, input.receiptId);
             if (!receipt) {
               throw new Error('independent completion requires a durable review receipt');
@@ -763,9 +772,18 @@ export function applyIndependentCompletionGrade(input: {
               );
             }
             return { goal };
-          },
-          { behavior: 'immediate' },
-        );
+          })();
+          try {
+            writerFence.commitSqlite(sqlite, input.onAfterFinalFenceAssertionForTest);
+          } catch {
+            throw new CompletionSourceFenceError(
+              'repository writer contention occurred at completion commit',
+            );
+          }
+        } catch (error) {
+          if (sqlite.inTransaction) sqlite.exec('ROLLBACK');
+          throw error;
+        }
       } catch (error) {
         if (!(error instanceof CompletionSourceFenceError)) throw error;
         const goal = state.goals.find((candidate) => candidate.id === input.goalId);
