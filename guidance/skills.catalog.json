@@ -636,7 +636,7 @@
         "cross-modal-review"
       ],
       "triggerConditions": [
-        "cross modal visual document evidence review"
+        "cross modal visual document evidence execution-independent read-only review provenance"
       ],
       "category": "quality",
       "version": "21",
@@ -656,9 +656,11 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 21,
-      "contentSha256": "3bd2ffacea2ab9525c90affa0e99592d7610d978ff5bbae3b0563ffcaa27aa76",
+      "contentSha256": "9cb8f26dc0b44cc9a9c1f1db7207b362b3a36e843b664ccebd5c988efbf16994",
       "triggers": [
-        "cross modal visual document evidence review"
+        "cross modal visual document evidence execution",
+        "independent read",
+        "only review provenance"
       ]
     },
     {
@@ -1850,7 +1852,7 @@
       "shortDescription": "Use whenever Major modifies its own repository, skills, resolver, policies, runtime, installers or learning system. Never leave Major main red. Batch changes on an unopened branch, keep skill registry/evals/catalog atomic, run the complete local gate, use independent review for material behavior changes, and merge only after the exact head is green.",
       "aliases": [],
       "triggerConditions": [
-        "major-self-change-skill-routing-learning-policy-runtime-installer"
+        "major-self-change-skill-routing-learning-policy-runtime-installer-execution-independent-review-provenance"
       ],
       "category": "uncategorized",
       "version": "21",
@@ -1867,7 +1869,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 21,
-      "contentSha256": "eac7daff75f5973230148e4b0ef1ed063ee48cc4a7717308782c5e3711b77c74",
+      "contentSha256": "450b9588acd1a333bdf93d077ee674c2ea33b450b594327074eddc483f0b9904",
       "triggers": [
         "major",
         "self",
@@ -1877,7 +1879,11 @@
         "learning",
         "policy",
         "runtime",
-        "installer"
+        "installer",
+        "execution",
+        "independent",
+        "review",
+        "provenance"
       ]
     },
     {
