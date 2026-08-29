@@ -12,10 +12,18 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
 import { openDb, type DbConn } from '../db/client.js';
 import { getIndependentReviewReceipt } from '../insights/performance-history.js';
+import {
+  gitCommonDir,
+  readSupervisorSourceIdentity,
+  sourceIdentityMatches,
+  type SupervisorSourceIdentity,
+} from './source-identity.js';
+
+export { gitCommonDir } from './source-identity.js';
 import {
   deriveSupervisorPromotionContract,
   type SupervisorAdmissionRiskAssessment,
@@ -105,6 +113,8 @@ export interface SupervisorGoal {
   admissionRiskAssessment?: SupervisorAdmissionRiskAssessment | undefined;
   /** Major-owned no-task completion contract, frozen before worker dispatch. */
   promotionContract?: SupervisorPromotionContract | undefined;
+  /** Major-owned no-task candidate identity, frozen before worker dispatch. */
+  candidateSourceIdentity?: SupervisorSourceIdentity | undefined;
   /** Set by the last cycle when it stopped on an authoritative provider
    * exhaustion/rate-limit (or a selected CLI turning out to be missing)
    * with other capacity still eligible: the foreground continuation loop
@@ -131,6 +141,7 @@ export interface SupervisorGoal {
         promotionEvidence?: PrePromotionEvidence;
         promotionContract?: SupervisorPromotionContract;
         sourceHead?: string;
+        sourceTreeDigest?: string;
         reviewDispatch?: {
           id: string;
           provider: WorkerHost;
@@ -481,7 +492,7 @@ export function applyIndependentCompletionGrade(input: {
   const receipt = getIndependentReviewReceipt(db, input.receiptId);
   ownedDb?.sqlite.close();
   if (!receipt) throw new Error('independent completion requires a durable review receipt');
-  return mutateSupervisorState((state) => {
+  const applied = mutateSupervisorState((state) => {
     const goal = state.goals.find((candidate) => candidate.id === input.goalId);
     if (!goal) throw new Error(`goal not found: ${input.goalId}`);
     const pending = goal.pendingCompletion;
@@ -528,6 +539,23 @@ export function applyIndependentCompletionGrade(input: {
     }
     const evidence = receipt.evidence.trim();
     if (!evidence) throw new Error('independent completion evidence must not be empty');
+    if (
+      !pending.sourceTreeDigest ||
+      !sourceIdentityMatches(
+        { sourceHead: pending.sourceHead, sourceTreeDigest: pending.sourceTreeDigest },
+        readSupervisorSourceIdentity(goal.repoPath),
+      )
+    ) {
+      goal.status = 'active';
+      goal.pendingCompletion = undefined;
+      goal.activePid = undefined;
+      goal.lastFinishedAt = new Date().toISOString();
+      goal.nextRunAt = new Date().toISOString();
+      goal.lastSummary =
+        'Pending completion was reopened because its exact repository or source-tree identity changed before grade application.';
+      goal.updatedAt = new Date().toISOString();
+      return { goal, sourceIdentityRejected: true };
+    }
     goal.pendingCompletion = undefined;
     goal.activePid = undefined;
     goal.lastFinishedAt = new Date().toISOString();
@@ -545,8 +573,14 @@ export function applyIndependentCompletionGrade(input: {
       goal.lastSummary = redactText(`Independent validation rejected completion: ${evidence}`);
     }
     goal.updatedAt = new Date().toISOString();
-    return goal;
+    return { goal, sourceIdentityRejected: false };
   });
+  if (applied.sourceIdentityRejected) {
+    throw new Error(
+      'independent completion grade refused because the candidate source identity changed',
+    );
+  }
+  return applied.goal;
 }
 
 export function getGoal(id: string): SupervisorGoal | undefined {
@@ -738,27 +772,6 @@ export function revokeSessionWorkshop(input: { sessionId?: string; repoPath?: st
     }
     return revoked;
   });
-}
-
-export function gitCommonDir(repoPath: string): string | undefined {
-  const marker = join(repoPath, '.git');
-  if (!existsSync(marker)) return undefined;
-
-  try {
-    if (statSync(marker).isDirectory()) return marker;
-    const text = readFileSync(marker, 'utf8').trim();
-    const match = /^gitdir:\s*(.+)$/i.exec(text);
-    const rawGitDir = match?.[1]?.trim();
-    if (!rawGitDir) return undefined;
-    const gitDir = isAbsolute(rawGitDir) ? rawGitDir : resolve(repoPath, rawGitDir);
-    const commonDirFile = join(gitDir, 'commondir');
-    if (!existsSync(commonDirFile)) return gitDir;
-    const common = readFileSync(commonDirFile, 'utf8').trim();
-    if (!common) return gitDir;
-    return isAbsolute(common) ? common : resolve(gitDir, common);
-  } catch {
-    return undefined;
-  }
 }
 
 function repositoryIdentity(repoPath: string): string {

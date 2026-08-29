@@ -153,6 +153,13 @@ installation and installed behavior proof follow normal merge.
 - Typed risk admission recognizes authentication, sessions, access control, identity, tokens,
   privileges, privacy, and related security objectives as consequential. The independent reviewer
   receives the frozen objective, promotion contract, and structured completion evidence.
+- Genuine no-task cycles now freeze and persist one Major-owned candidate identity (exact HEAD and
+  complete source-tree digest) before dispatch. The worker prompt, structured promotion proof, and
+  pending independent review all remain bound to that identity; a pre-dispatch or post-worker
+  mismatch reopens the cycle instead of accepting completion evidence.
+- Independent grade application performs the final live HEAD/tree read while holding the atomic
+  supervisor-state mutation boundary. A mismatch clears pending completion, reopens the goal, and
+  throws before project-grade projection, closing the prior check-to-apply race.
 - No-task promotion contracts are deterministically classified from Major-owned operation facts
   before dispatch; material-risk proof uses exact structured criterion/evidence records persisted in
   pending completion rather than matching free-text prefixes.
@@ -228,7 +235,13 @@ installation and installed behavior proof follow normal merge.
   lint, formatting, and diff checks. The resource-only containment file passed 6 non-Seatbelt checks;
   its 7 sandbox-dependent checks (including the new read-only regression and six pre-existing checks)
   could not apply nested Seatbelt in the leased sandbox and returned `sandbox_apply: Operation not
-  permitted`, so runtime containment proof remains for the parent exact-head validation boundary.
+permitted`, so runtime containment proof remains for the parent exact-head validation boundary.
+- No-task candidate identity repair: exact HEAD and source-tree digest are frozen durably before the
+  worker runs, disclosed in its prompt, checked before dispatch and after reporting, and persisted in
+  pending review. Final grade application re-reads both identities inside the atomic state boundary;
+  same-HEAD tree mutation and committed-HEAD replacement both reopen without grading. The affected
+  gate passed 100/100 focused tests across five files plus typecheck, targeted lint, formatting, and
+  diff checks; the full matrix remains intentionally unrun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -281,6 +294,10 @@ installation and installed behavior proof follow normal merge.
   source roots, compared only HEAD rather than the source tree, did not align live task HEAD before
   pending completion, allowed closed-claim grade replay, and under-classified common auth/session
   objectives. Focused boundary regressions now protect each causal and read-only seam.
+- Independent review regression: `0c9f16f` sampled no-task source identity only after worker return
+  and performed its last HEAD/tree check before the grade transition, allowing candidate mutation or
+  a check-to-apply race. Focused foreground and grade-boundary regressions now protect durable
+  pre-dispatch identity plus atomic same-tree and changed-HEAD rejection.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,10 +59,23 @@ afterEach(() => {
 
 function repo(name = 'jss-tool'): string {
   const repoPath = join(root, name);
-  mkdirSync(join(repoPath, '.git'), { recursive: true });
-  writeFileSync(
-    join(repoPath, '.git', 'config'),
-    `[remote "origin"]\n\turl = https://github.com/chukadele/${name}.git\n`,
+  mkdirSync(repoPath, { recursive: true });
+  writeFileSync(join(repoPath, 'candidate.txt'), 'frozen\n');
+  const gitOptions = {
+    cwd: repoPath,
+    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' },
+  };
+  execFileSync('/usr/bin/git', ['init'], gitOptions);
+  execFileSync(
+    '/usr/bin/git',
+    ['remote', 'add', 'origin', `https://github.com/chukadele/${name}.git`],
+    gitOptions,
+  );
+  execFileSync('/usr/bin/git', ['add', 'candidate.txt'], gitOptions);
+  execFileSync(
+    '/usr/bin/git',
+    ['-c', 'user.name=Major Test', '-c', 'user.email=major@example.test', 'commit', '-m', 'base'],
+    gitOptions,
   );
   return repoPath;
 }
@@ -126,15 +140,21 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     ]);
     const goalId = (lastLog(logs) as { goalId: string }).goalId;
 
-    runWorkerMock.mockResolvedValueOnce({
-      host: 'codex',
-      status: 'succeeded',
-      exitCode: 0,
-      stdout: resultEnvelope('active', 'making progress'),
-      stderr: '',
-      durationMs: 5,
-      rateLimited: false,
-      exhausted: false,
+    runWorkerMock.mockImplementationOnce(async (input: { prompt: string }) => {
+      const identity = getGoal(goalId)?.candidateSourceIdentity;
+      expect(identity?.sourceHead).toMatch(/^[a-f0-9]{40}$/);
+      expect(identity?.sourceTreeDigest).toMatch(/^[a-f0-9]{64}$/);
+      expect(input.prompt).toContain('FROZEN NO-TASK CANDIDATE SOURCE IDENTITY');
+      return {
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: resultEnvelope('active', 'making progress'),
+        stderr: '',
+        durationMs: 5,
+        rateLimited: false,
+        exhausted: false,
+      };
     });
 
     await runSupervisorCli(['run', 'jss-tool', '--goal-id', goalId, '--foreground']);
@@ -323,7 +343,11 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     // A worker's own "done" claim awaits independent grading -- it does not
     // itself flip status to 'done' -- but it must have gotten there via the
     // SECOND (non-exhausted) provider, with no further dispatch needed.
-    expect(goal.pendingCompletion).toMatchObject({ summary: 'shipped' });
+    expect(goal.pendingCompletion).toMatchObject({
+      summary: 'shipped',
+      sourceHead: goal.candidateSourceIdentity?.sourceHead,
+      sourceTreeDigest: goal.candidateSourceIdentity?.sourceTreeDigest,
+    });
     expect(goal.retryImmediately).toBe(false);
   });
 

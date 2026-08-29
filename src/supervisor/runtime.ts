@@ -63,7 +63,6 @@ import {
   activeGoals,
   applyIndependentCompletionGrade,
   getGoal,
-  gitCommonDir,
   isLiveWorkerFresh,
   majorHome,
   readSupervisorState,
@@ -91,6 +90,14 @@ import {
 } from '../insights/performance-history.js';
 import { configuredExecutionPath, executionPathStatus } from '../execution/path.js';
 import { hashSourceWorkspaceTree } from '../execution/workspace-transfer.js';
+import {
+  exactRepositoryHead,
+  readSupervisorSourceIdentity,
+  sourceIdentityMatches,
+  type SupervisorSourceIdentity,
+} from './source-identity.js';
+
+export { exactRepositoryHead } from './source-identity.js';
 
 export { parseWorkerReport } from './worker-report.js';
 
@@ -206,37 +213,6 @@ export function coordinatorDonePromotionProof(
 
 function trim(text: string, max = 12_000): string {
   return text.length <= max ? text : text.slice(text.length - max);
-}
-
-export function exactRepositoryHead(repoPath: string): string | undefined {
-  try {
-    const marker = join(repoPath, '.git');
-    const gitDir = statSync(marker).isDirectory()
-      ? marker
-      : resolve(repoPath, /^gitdir:\s*(.+)$/i.exec(readFileSync(marker, 'utf8').trim())?.[1] ?? '');
-    const head = readFileSync(join(gitDir, 'HEAD'), 'utf8').trim();
-    if (/^[a-f0-9]{40}$/.test(head)) return head;
-    const ref = /^ref:\s*(.+)$/.exec(head)?.[1];
-    if (!ref) return undefined;
-    const commonDir = gitCommonDir(repoPath);
-    const looseRef = [join(gitDir, ref), ...(commonDir ? [join(commonDir, ref)] : [])].find(
-      existsSync,
-    );
-    if (looseRef) {
-      const sha = readFileSync(looseRef, 'utf8').trim();
-      if (/^[a-f0-9]{40}$/.test(sha)) return sha;
-    }
-    const packed = commonDir ? join(commonDir, 'packed-refs') : undefined;
-    const sha =
-      packed && existsSync(packed)
-        ? new RegExp(`^([a-f0-9]{40}) ${ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').exec(
-            readFileSync(packed, 'utf8'),
-          )?.[1]
-        : undefined;
-    return sha;
-  } catch {
-    return undefined;
-  }
 }
 
 function readProjectContext(repoPath: string): string {
@@ -682,6 +658,7 @@ ${hop?.canonicalTask ? `\nQUALIFYING CANONICAL TASK:\n- task id: ${hop.canonical
 FROZEN NO-TASK PROMOTION CONTRACT:
 ${JSON.stringify(goal.promotionContract ?? deriveSupervisorPromotionContract({ admissionRiskAssessment: goal.admissionRiskAssessment, requiredOperations: goal.requiredOperations, autonomous: goal.autonomous }))}
 This contract is Major-owned and was fixed before this report; report evidence cannot redefine it.
+${goal.candidateSourceIdentity ? `FROZEN NO-TASK CANDIDATE SOURCE IDENTITY:\n${JSON.stringify(goal.candidateSourceIdentity)}\nValidate and report only this exact HEAD and source-tree digest; any mutation requires a new candidate cycle.\n` : ''}
 
 ${workspaceContract}
 
@@ -964,21 +941,27 @@ async function runPendingCompletionReview(
   maxTimeoutMs?: number,
 ): Promise<void> {
   const pending = goal.pendingCompletion;
-  if (!pending?.sourceHead) {
+  if (!pending?.sourceHead || !pending.sourceTreeDigest) {
     updateGoal(goal.id, {
       status: 'active',
       pendingCompletion: undefined,
-      lastSummary: 'Legacy pending completion lacked an exact head and must be revalidated.',
+      lastSummary:
+        'Legacy pending completion lacked an exact source identity and must be revalidated.',
       nextRunAt: new Date().toISOString(),
     });
     return;
   }
-  const currentHead = exactRepositoryHead(goal.repoPath);
-  if (currentHead !== pending.sourceHead) {
+  if (
+    !sourceIdentityMatches(
+      { sourceHead: pending.sourceHead, sourceTreeDigest: pending.sourceTreeDigest },
+      readSupervisorSourceIdentity(goal.repoPath),
+    )
+  ) {
     updateGoal(goal.id, {
       status: 'active',
       pendingCompletion: undefined,
-      lastSummary: 'Pending completion became stale because the repository head changed.',
+      lastSummary:
+        'Pending completion became stale because its repository or source-tree identity changed.',
       nextRunAt: new Date().toISOString(),
     });
     return;
@@ -994,7 +977,7 @@ async function runPendingCompletionReview(
   }
   const reviewStartedAt = new Date().toISOString();
   const dispatchId = randomUUID();
-  const sourceTreeDigest = hashSourceWorkspaceTree(goal.repoPath);
+  const sourceTreeDigest = pending.sourceTreeDigest;
   updateGoal(goal.id, {
     activePid: process.pid,
     lastStartedAt: reviewStartedAt,
@@ -1247,20 +1230,6 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     // The prompt already reports a degraded resolver. Outcome recording must
     // not turn resolver unavailability into a second execution failure.
   }
-  updateGoal(goal.id, {
-    status: 'running',
-    cycle: goal.cycle + 1,
-    lastStartedAt: new Date().toISOString(),
-    activePid: process.pid,
-    lastCoordinator: host,
-    lastAccountLabel: routedSelection.accountLabel,
-    // A new routed cycle is evidence that the prior owner gate has been
-    // superseded. Keep owner gates attached only to the blocked cycle that
-    // actually requires the human action.
-    ownerGate: undefined,
-    pendingCompletion: undefined,
-  });
-
   const continuity = contextContinuity({
     nextHost: host,
     nextAccountLabel: routedSelection.accountLabel,
@@ -1287,12 +1256,61 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
   }
   const workerStartedAtMs = Date.now();
   let canonicalTask: CanonicalTaskBinding | undefined;
+  let noTaskCandidateSourceIdentity: SupervisorSourceIdentity | undefined;
   const taskState = openDb();
   try {
     const resolvedTask = resolveCanonicalTaskBinding(taskState.db, goal.repoPath);
     if (resolvedTask.ok) canonicalTask = resolvedTask.binding;
+    else if (resolvedTask.kind === 'no_task') {
+      noTaskCandidateSourceIdentity = readSupervisorSourceIdentity(goal.repoPath);
+      if (!noTaskCandidateSourceIdentity) {
+        updateGoal(goal.id, {
+          status: 'active',
+          activePid: undefined,
+          lastFinishedAt: new Date().toISOString(),
+          lastSummary: 'No-task candidate source identity could not be frozen before dispatch.',
+          nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+          pendingCompletion: undefined,
+          retryImmediately: false,
+        });
+        return;
+      }
+    }
   } finally {
     taskState.sqlite.close();
+  }
+  updateGoal(goal.id, {
+    status: 'running',
+    cycle: goal.cycle + 1,
+    lastStartedAt: new Date().toISOString(),
+    activePid: process.pid,
+    lastCoordinator: host,
+    lastAccountLabel: routedSelection.accountLabel,
+    // A new routed cycle is evidence that the prior owner gate has been
+    // superseded. Keep owner gates attached only to the blocked cycle that
+    // actually requires the human action.
+    ownerGate: undefined,
+    pendingCompletion: undefined,
+    candidateSourceIdentity: noTaskCandidateSourceIdentity,
+  });
+  goal.candidateSourceIdentity = noTaskCandidateSourceIdentity;
+  if (
+    noTaskCandidateSourceIdentity &&
+    !sourceIdentityMatches(
+      noTaskCandidateSourceIdentity,
+      readSupervisorSourceIdentity(goal.repoPath),
+    )
+  ) {
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: 'No-task candidate source identity changed before worker dispatch.',
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      pendingCompletion: undefined,
+      retryImmediately: false,
+    });
+    return;
   }
   const outcome = await runWorker({
     host,
@@ -1313,7 +1331,8 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
   });
   const workerFinishedAtMs = Date.now();
-  const sourceHead = exactRepositoryHead(goal.repoPath);
+  const finishedSourceIdentity = readSupervisorSourceIdentity(goal.repoPath);
+  const sourceHead = finishedSourceIdentity?.sourceHead;
   let terminalReport: ReturnType<typeof parseWorkerReport> = undefined;
   const recordTerminalObservation = () => {
     const settled = getGoal(goal.id);
@@ -1447,6 +1466,25 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
       return;
     }
     if (report?.status === 'done') {
+      if (
+        noTaskCandidateSourceIdentity &&
+        !sourceIdentityMatches(noTaskCandidateSourceIdentity, finishedSourceIdentity)
+      ) {
+        updateGoal(goal.id, {
+          status: 'active',
+          consecutiveFailures: 0,
+          activePid: undefined,
+          lastFinishedAt: new Date().toISOString(),
+          lastSummary:
+            'Worker done claim refused because the frozen no-task candidate source identity changed during validation.',
+          nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+          pendingCompletion: undefined,
+          retryImmediately: false,
+          ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
+        });
+        recordTerminalObservation();
+        return;
+      }
       const completionState = openDb();
       let promotionProof: ReturnType<typeof coordinatorDonePromotionProof>;
       try {
@@ -1488,6 +1526,9 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
           ...(promotionProof.taskId ? { taskId: promotionProof.taskId } : {}),
           promotionCheckedAt: promotionProof.checkedAt,
           ...(sourceHead ? { sourceHead } : {}),
+          ...(finishedSourceIdentity
+            ? { sourceTreeDigest: finishedSourceIdentity.sourceTreeDigest }
+            : {}),
           ...('promotionEvidence' in promotionProof && promotionProof.promotionEvidence
             ? { promotionEvidence: promotionProof.promotionEvidence }
             : {}),

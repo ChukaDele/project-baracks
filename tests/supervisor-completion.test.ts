@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -21,12 +22,16 @@ import {
   recordIndependentReviewExecution,
   RUN_INSIGHT_SCHEMA,
 } from '../src/insights/performance-history.js';
+import { readSupervisorSourceIdentity } from '../src/supervisor/source-identity.js';
 
 let root: string;
+let controlRoot: string;
 let priorStatePath: string | undefined;
 let reviewDb: ReturnType<typeof openDb>;
 
 function pendingGoal(): SupervisorGoal {
+  const sourceIdentity = readSupervisorSourceIdentity(root);
+  if (!sourceIdentity) throw new Error('test repository source identity unavailable');
   return {
     id: 'goal-1',
     project: 'major',
@@ -46,7 +51,8 @@ function pendingGoal(): SupervisorGoal {
       summary: 'all checks pass',
       coordinator: 'codex',
       claimedAt: '2026-08-11T00:01:00.000Z',
-      sourceHead: 'a'.repeat(40),
+      sourceHead: sourceIdentity.sourceHead,
+      sourceTreeDigest: sourceIdentity.sourceTreeDigest,
       promotionEvidence: {
         focusedTests: 'focused tests passed',
         cheapestCompileTypeOrBuild: 'typecheck passed',
@@ -68,7 +74,7 @@ function reviewReceiptId(
   provider: 'claude' | 'codex',
   verdict: 'pass' | 'fail',
   evidence: string,
-  sourceHead = 'a'.repeat(40),
+  sourceHead = readSupervisorSourceIdentity(root)?.sourceHead ?? 'a'.repeat(40),
   goalId = 'goal-1',
 ) {
   const dispatchId = `dispatch-${provider}-${verdict}-${sourceHead}-${goalId}`;
@@ -107,8 +113,18 @@ function reviewReceiptId(
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-completion-'));
+  controlRoot = mkdtempSync(join(tmpdir(), 'major-completion-control-'));
+  const gitOptions = { cwd: root, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } };
+  writeFileSync(join(root, 'candidate.txt'), 'frozen\n');
+  execFileSync('/usr/bin/git', ['init'], gitOptions);
+  execFileSync('/usr/bin/git', ['add', 'candidate.txt'], gitOptions);
+  execFileSync(
+    '/usr/bin/git',
+    ['-c', 'user.name=Major Test', '-c', 'user.email=major@example.test', 'commit', '-m', 'base'],
+    gitOptions,
+  );
   priorStatePath = process.env.MAJOR_STATE_PATH;
-  process.env.MAJOR_STATE_PATH = join(root, 'supervisor-state.json');
+  process.env.MAJOR_STATE_PATH = join(controlRoot, 'supervisor-state.json');
   reviewDb = openDb(':memory:');
   writeSupervisorState({ version: 1, goals: [pendingGoal()], sessions: [] });
 });
@@ -118,6 +134,7 @@ afterEach(() => {
   else process.env.MAJOR_STATE_PATH = priorStatePath;
   reviewDb.sqlite.close();
   rmSync(root, { recursive: true, force: true });
+  rmSync(controlRoot, { recursive: true, force: true });
 });
 
 describe('independent goal completion', () => {
@@ -227,6 +244,44 @@ describe('independent goal completion', () => {
     expect(result.pendingCompletion).toBeUndefined();
     expect(result.lastSummary).toContain('Independent validation passed');
     expect(readSupervisorState().goals[0]!.status).toBe('done');
+  });
+
+  it('atomically reopens instead of applying a passing grade after source mutation', () => {
+    const receiptId = reviewReceiptId('claude', 'pass', 'reviewed the frozen candidate');
+    writeFileSync(join(root, 'candidate.txt'), 'mutated after review\n');
+    expect(() =>
+      applyIndependentCompletionGrade({
+        goalId: 'goal-1',
+        receiptId,
+        db: reviewDb.db,
+      }),
+    ).toThrow(/candidate source identity changed/i);
+    const reopened = readSupervisorState().goals[0]!;
+    expect(reopened.status).toBe('active');
+    expect(reopened.pendingCompletion).toBeUndefined();
+    expect(reopened.lastSummary).toMatch(/source-tree identity changed/i);
+  });
+
+  it('atomically reopens when repository HEAD changes before grade application', () => {
+    const receiptId = reviewReceiptId('claude', 'pass', 'reviewed the prior exact head');
+    writeFileSync(join(root, 'candidate.txt'), 'new committed candidate\n');
+    const gitOptions = { cwd: root, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } };
+    execFileSync('/usr/bin/git', ['add', 'candidate.txt'], gitOptions);
+    execFileSync(
+      '/usr/bin/git',
+      ['-c', 'user.name=Major Test', '-c', 'user.email=major@example.test', 'commit', '-m', 'next'],
+      gitOptions,
+    );
+    expect(() =>
+      applyIndependentCompletionGrade({
+        goalId: 'goal-1',
+        receiptId,
+        db: reviewDb.db,
+      }),
+    ).toThrow(/candidate source identity changed/i);
+    const reopened = readSupervisorState().goals[0]!;
+    expect(reopened.status).toBe('active');
+    expect(reopened.pendingCompletion).toBeUndefined();
   });
 
   it('reopens work when independent validation rejects the claim', () => {
