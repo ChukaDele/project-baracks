@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -121,6 +122,53 @@ afterEach(() => {
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
+function fixtureInstaller(home: string, majorHome = join(home, '.major')): string {
+  const fixture = join(
+    mkdtempSync(join(tmpdir(), 'major-skills-installer-fixture-')),
+    'install.sh',
+  );
+  roots.push(dirname(fixture));
+  const canonical = majorHome;
+  const source = readFileSync('scripts/install-major-skills.sh', 'utf8');
+  const patched = source
+    .replace(
+      'MAJOR_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"',
+      `MAJOR_ROOT=${JSON.stringify(process.cwd())}`,
+    )
+    .replace(
+      /CANONICAL_MAJOR_HOME="\$\(python3 - <<'PY'\n[\s\S]*?\nPY\n\)"/,
+      `CANONICAL_MAJOR_HOME=${JSON.stringify(canonical)}`,
+    );
+  expect(patched).not.toBe(source);
+  writeFileSync(fixture, patched);
+  chmodSync(fixture, 0o755);
+  return fixture;
+}
+
+function fixtureRuntime(home: string): string {
+  const runtime = mkdtempSync(join(tmpdir(), 'major-runtime-fixture-'));
+  roots.push(runtime);
+  cpSync(resolve('dist'), join(runtime, 'dist'), { recursive: true });
+  for (const directory of ['guidance', 'skills', 'evals', 'adapters', 'templates']) {
+    cpSync(resolve(directory), join(runtime, directory), { recursive: true });
+  }
+  symlinkSync(resolve('node_modules'), join(runtime, 'node_modules'), 'dir');
+  writeFileSync(
+    join(runtime, 'package.json'),
+    JSON.stringify({ type: 'module', imports: { '#trust-roots': './trust-roots.mjs' } }),
+  );
+  writeFileSync(
+    join(runtime, 'trust-roots.mjs'),
+    `import { dirname, join, resolve } from 'node:path';
+export const trustedMajorHome = (env = process.env) => resolve(env.MAJOR_HOME ?? ${JSON.stringify(join(home, '.major'))});
+export const trustedAccountHome = (env = process.env) => env.MAJOR_HOME ? dirname(trustedMajorHome(env)) : resolve(env.HOME ?? ${JSON.stringify(home)});
+export const trustedCodexHome = (env = process.env) => resolve(env.CODEX_HOME ?? join(trustedAccountHome(env), '.codex'));
+export const testFixturePath = (name) => process.env[name];
+`,
+  );
+  return join(runtime, 'dist', 'entry.js');
+}
+
 describe('installed host skill commands', () => {
   it('does not create an absent target when receipt authority preflight fails', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-absent-target-home-'));
@@ -130,15 +178,19 @@ describe('installed host skill commands', () => {
     writeFileSync(join(external, 'sentinel'), 'preserve\n');
     symlinkSync(external, join(home, 'redirected-major-home'));
 
-    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
-      env: {
-        ...process.env,
-        HOME: home,
-        MAJOR_HOME: join(home, 'redirected-major-home'),
-        GIT_CONFIG_GLOBAL: '/dev/null',
+    const result = spawnSync(
+      'bash',
+      [fixtureInstaller(home, join(home, 'redirected-major-home')), target, 'core'],
+      {
+        env: {
+          ...process.env,
+          HOME: home,
+          MAJOR_HOME: join(home, 'redirected-major-home'),
+          GIT_CONFIG_GLOBAL: '/dev/null',
+        },
+        encoding: 'utf8',
       },
-      encoding: 'utf8',
-    });
+    );
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('symlinked MAJOR_HOME');
@@ -162,7 +214,7 @@ describe('installed host skill commands', () => {
     );
     const before = JSON.stringify(snapshotTree(target));
 
-    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+    const result = spawnSync('bash', [fixtureInstaller(home), target, 'core'], {
       env: {
         ...process.env,
         HOME: home,
@@ -190,7 +242,7 @@ describe('installed host skill commands', () => {
     symlinkSync(authority, redirected);
     const before = JSON.stringify(snapshotTree(target));
 
-    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+    const result = spawnSync('bash', [fixtureInstaller(home, redirected), target, 'core'], {
       env: { ...process.env, HOME: home, MAJOR_HOME: redirected, GIT_CONFIG_GLOBAL: '/dev/null' },
       encoding: 'utf8',
     });
@@ -221,7 +273,7 @@ describe('installed host skill commands', () => {
     });
 
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('MAJOR_HOME override is fixture-only');
+    expect(result.stderr).toContain('MAJOR_HOME override is rejected');
     expect(JSON.stringify(snapshotTree(target))).toBe(before);
     expect(readdirSync(forged)).toEqual([]);
   });
@@ -239,7 +291,7 @@ describe('installed host skill commands', () => {
     writeFileSync(join(target, 'owned.txt'), 'preserve target\n');
     const before = JSON.stringify(snapshotTree(target));
 
-    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+    const result = spawnSync('bash', [fixtureInstaller(home), target, 'core'], {
       env: { ...process.env, HOME: home, MAJOR_HOME: majorHome, GIT_CONFIG_GLOBAL: '/dev/null' },
       encoding: 'utf8',
     });
@@ -263,7 +315,7 @@ describe('installed host skill commands', () => {
     writeFileSync(sentinel, 'external sentinel\n');
     symlinkSync(external, join(target, '.codex', 'prompts'));
 
-    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+    const result = spawnSync('bash', [fixtureInstaller(home), target, 'core'], {
       env: {
         ...process.env,
         HOME: home,
@@ -286,18 +338,23 @@ describe('installed host skill commands', () => {
     ['malformed', 'figma,,pdf', 'malformed installer feature'],
   ])('rejects %s installer features without changing the target', (_kind, features, message) => {
     const target = mkdtempSync(join(tmpdir(), 'major-invalid-feature-install-'));
-    roots.push(target);
+    const home = mkdtempSync(join(tmpdir(), 'major-invalid-feature-home-'));
+    roots.push(target, home);
     const owned = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
     mkdirSync(dirname(owned), { recursive: true });
     writeFileSync(owned, '# project owned\n');
     writeFileSync(join(target, 'MAJOR_SKILLS.lock'), 'project-owned lock\n');
 
     const before = JSON.stringify(snapshotTree(target));
-    const result = spawnSync(
-      'bash',
-      ['scripts/install-major-skills.sh', target, 'core', features],
-      { env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' }, encoding: 'utf8' },
-    );
+    const result = spawnSync('bash', [fixtureInstaller(home), target, 'core', features], {
+      env: {
+        ...process.env,
+        HOME: home,
+        MAJOR_HOME: join(home, '.major'),
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      },
+      encoding: 'utf8',
+    });
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(message);
@@ -352,10 +409,8 @@ describe('installed host skill commands', () => {
     const bin = join(home, 'bin');
     mkdirSync(bin, { recursive: true });
     const major = join(bin, 'major');
-    writeFileSync(
-      major,
-      `#!/bin/sh\nexec "${process.execPath}" "${resolve('dist/entry.js')}" "$@"\n`,
-    );
+    const fixtureEntry = fixtureRuntime(home);
+    writeFileSync(major, `#!/bin/sh\nexec "${process.execPath}" "${fixtureEntry}" "$@"\n`);
     chmodSync(major, 0o755);
 
     const staged = spawnSync(
@@ -466,10 +521,8 @@ describe('installed host skill commands', () => {
     const bin = join(home, 'bin');
     mkdirSync(bin, { recursive: true });
     const major = join(bin, 'major');
-    writeFileSync(
-      major,
-      `#!/bin/sh\nexec "${process.execPath}" "${resolve('dist/entry.js')}" "$@"\n`,
-    );
+    const fixtureEntry = fixtureRuntime(home);
+    writeFileSync(major, `#!/bin/sh\nexec "${process.execPath}" "${fixtureEntry}" "$@"\n`);
     chmodSync(major, 0o755);
     const commandEnv = {
       ...process.env,
@@ -480,7 +533,7 @@ describe('installed host skill commands', () => {
     const custom = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
     mkdirSync(dirname(custom), { recursive: true });
     writeFileSync(custom, '# project owned\n');
-    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+    const result = spawnSync('bash', [fixtureInstaller(home), target, 'core'], {
       env: commandEnv,
       encoding: 'utf8',
     });
@@ -575,7 +628,8 @@ describe('installed host skill commands', () => {
       MAJOR_SKILLS_REGISTRY: resolve('guidance/skills.registry.json'),
       GIT_CONFIG_GLOBAL: '/dev/null',
     };
-    const installed = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'full'], {
+    const fixtureEntry = fixtureRuntime(home);
+    const installed = spawnSync('bash', [fixtureInstaller(home), target, 'full'], {
       env,
       encoding: 'utf8',
     });
@@ -603,7 +657,7 @@ describe('installed host skill commands', () => {
       expect(existsSync(join(target, '.gemini', 'commands', 'major', `${id}.toml`))).toBe(true);
     }
     const cli = (args: string[]) =>
-      spawnSync(process.execPath, [resolve('dist/entry.js'), ...args], {
+      spawnSync(process.execPath, [fixtureEntry, ...args], {
         cwd: target,
         env,
         encoding: 'utf8',
@@ -681,9 +735,7 @@ describe('installed host skill commands', () => {
       { cwd: target, env: { ...env, MAJOR_HOME: redirectedMajorHome }, encoding: 'utf8' },
     );
     expect(redirected.status).not.toBe(0);
-    expect(redirected.stderr).toContain(
-      'project installed skill receipt authority must be outside the project tree',
-    );
+    expect(redirected.stderr).toContain('project installed skill receipt is missing');
 
     const relocatedReceipt = join(home, 'relocated-receipt.json');
     writeFileSync(relocatedReceipt, validReceipt);
@@ -829,7 +881,7 @@ describe('installed host skill commands', () => {
     const userCommand = join(target, '.claude', 'commands', 'project-owned.md');
     mkdirSync(dirname(userCommand), { recursive: true });
     writeFileSync(userCommand, '# preserved project command\n');
-    const downgraded = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+    const downgraded = spawnSync('bash', [fixtureInstaller(home), target, 'core'], {
       env,
       encoding: 'utf8',
     });

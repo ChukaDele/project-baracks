@@ -1,4 +1,14 @@
-import { cpSync, existsSync, mkdtempSync, readFileSync, readlinkSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,6 +49,36 @@ function cleanSource(prefix: string): string {
   return source;
 }
 
+function fixtureExecutable(home: string): string {
+  const runtime = mkdtempSync(join(tmpdir(), 'major-shell-runtime-fixture-'));
+  roots.push(runtime);
+  cpSync(join(process.cwd(), 'dist'), join(runtime, 'dist'), { recursive: true });
+  for (const directory of ['guidance', 'skills', 'evals', 'adapters', 'templates']) {
+    cpSync(join(process.cwd(), directory), join(runtime, directory), { recursive: true });
+  }
+  symlinkSync(join(process.cwd(), 'node_modules'), join(runtime, 'node_modules'), 'dir');
+  writeFileSync(
+    join(runtime, 'package.json'),
+    JSON.stringify({ type: 'module', imports: { '#trust-roots': './trust-roots.mjs' } }),
+  );
+  writeFileSync(
+    join(runtime, 'trust-roots.mjs'),
+    `import { dirname, join, resolve } from 'node:path';
+export const trustedMajorHome = (env = process.env) => resolve(env.MAJOR_HOME ?? ${JSON.stringify(join(home, '.major'))});
+export const trustedAccountHome = (env = process.env) => env.MAJOR_HOME ? dirname(trustedMajorHome(env)) : resolve(env.HOME ?? ${JSON.stringify(home)});
+export const trustedCodexHome = (env = process.env) => resolve(env.CODEX_HOME ?? join(trustedAccountHome(env), '.codex'));
+export const testFixturePath = (name) => process.env[name];
+`,
+  );
+  const executable = join(runtime, 'major');
+  writeFileSync(
+    executable,
+    `#!/bin/sh\nexec "${process.execPath}" "${join(runtime, 'dist', 'entry.js')}" "$@"\n`,
+  );
+  chmodSync(executable, 0o755);
+  return executable;
+}
+
 describe('shipped Major skill sync compatibility path', () => {
   it('delegates an idempotent complete-bundle activation to the canonical transaction', () => {
     const homeRoot = mkdtempSync(join(tmpdir(), 'major-shell-sync-home-'));
@@ -49,6 +89,7 @@ describe('shipped Major skill sync compatibility path', () => {
       ...process.env,
       MAJOR_HOME: majorHome,
       NODE_ENV: 'test',
+      MAJOR_SYNC_EXECUTABLE: fixtureExecutable(homeRoot),
       GIT_CONFIG_GLOBAL: '/dev/null',
     };
     const run = () =>

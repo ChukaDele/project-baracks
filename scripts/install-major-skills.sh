@@ -33,18 +33,14 @@ for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
     [ -z "$unsafe_link" ] || { echo "ERROR: refusing symlink below managed project path: $unsafe_link" >&2; exit 2; }
   fi
 done
-if [ "${NODE_ENV:-}" = "test" ]; then
-  CANONICAL_MAJOR_HOME="${HOME:?HOME is required}/.major"
-else
-  CANONICAL_MAJOR_HOME="$(python3 - <<'PY'
+CANONICAL_MAJOR_HOME="$(python3 - <<'PY'
 import os
 import pwd
 print(os.path.join(pwd.getpwuid(os.getuid()).pw_dir, '.major'))
 PY
 )"
-fi
-if [ -n "${MAJOR_HOME:-}" ] && [ "$MAJOR_HOME" != "$CANONICAL_MAJOR_HOME" ] && [ "${NODE_ENV:-}" != "test" ]; then
-  echo "ERROR: MAJOR_HOME override is fixture-only; receipt authority is anchored to $CANONICAL_MAJOR_HOME" >&2
+if [ -n "${MAJOR_HOME:-}" ] && [ "$MAJOR_HOME" != "$CANONICAL_MAJOR_HOME" ]; then
+  echo "ERROR: MAJOR_HOME override is rejected; receipt authority is anchored to $CANONICAL_MAJOR_HOME" >&2
   exit 2
 fi
 MAJOR_HOME="${MAJOR_HOME:-$CANONICAL_MAJOR_HOME}"

@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { trustedMajorHome } from '#trust-roots';
 
 export const EXECUTION_PATHS = ['host', 'lima'] as const;
 export type ExecutionPath = (typeof EXECUTION_PATHS)[number];
@@ -12,7 +12,7 @@ interface ExecutionPathConfig {
 }
 
 function majorHome(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.MAJOR_HOME ?? join(homedir(), '.major'));
+  return trustedMajorHome(env);
 }
 
 export function executionPathConfigPath(env: NodeJS.ProcessEnv = process.env): string {

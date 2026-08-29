@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { trustedAccountHome, trustedMajorHome } from '#trust-roots';
 import type { ProviderCommandHost } from '../providers/commands.js';
 import type { StagedValidationCase } from './staged-validation.js';
 
@@ -25,9 +25,7 @@ export function verifySecureEnclaveStagedValidationAuthority(input: {
 }): VerifiedSecureEnclaveAuthority {
   if (!/^[0-9a-f]{40}$/.test(input.releaseSha))
     throw new Error('Secure Enclave release SHA is invalid');
-  const majorHome = process.env.MAJOR_HOME
-    ? realpathSync(process.env.MAJOR_HOME)
-    : join(homedir(), '.major');
+  const majorHome = realpathSync(trustedMajorHome());
   const authorityRoot = join(majorHome, 'staged-validation', 'authorities', input.releaseSha);
   const executingRoot = realpathSync(resolve(import.meta.dirname, '..', '..'));
   const output = execFileSync(
@@ -42,7 +40,7 @@ export function verifySecureEnclaveStagedValidationAuthority(input: {
     ],
     {
       encoding: 'utf8',
-      env: { HOME: homedir(), PATH: '/usr/bin:/bin' },
+      env: { HOME: trustedAccountHome(), PATH: '/usr/bin:/bin' },
       timeout: 60_000,
       stdio: ['ignore', 'pipe', 'pipe'],
     },

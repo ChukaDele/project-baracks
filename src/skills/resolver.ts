@@ -40,6 +40,7 @@ import {
 } from './vendor.js';
 import { CANONICAL_SKILL_SLUG, containedSkillPath } from './slug.js';
 import { validateRetainedBundle } from './sync.js';
+import { testFixturePath } from '#trust-roots';
 
 const canonicalSkillSlug = z.string().regex(CANONICAL_SKILL_SLUG, 'must be a safe canonical slug');
 
@@ -262,8 +263,8 @@ function readBundleMarkerIdentity(root: string): string {
 }
 
 function canonicalRegistryPath(hotRoot?: string): string {
-  if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILLS_REGISTRY)
-    return resolve(process.env.MAJOR_SKILLS_REGISTRY);
+  const fixture = testFixturePath('MAJOR_SKILLS_REGISTRY');
+  if (fixture) return resolve(fixture);
   return hotRoot
     ? join(hotRoot, 'guidance', 'skills.registry.json')
     : join(runtimeRoot(), 'guidance', 'skills.registry.json');
@@ -452,15 +453,15 @@ function generatedCatalog(cwd?: string, hotRoot?: string): Map<string, SkillCata
 }
 
 function resolverEvalPath(hotRoot?: string): string {
-  if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILLS_EVALS)
-    return resolve(process.env.MAJOR_SKILLS_EVALS);
+  const fixture = testFixturePath('MAJOR_SKILLS_EVALS');
+  if (fixture) return resolve(fixture);
   const hotPath = hotRoot ? join(hotRoot, 'evals', 'skill-resolver') : undefined;
   return hotPath && existsSync(hotPath) ? hotPath : join(runtimeRoot(), 'evals', 'skill-resolver');
 }
 
 function vendorCatalogPath(hotRoot?: string): string {
-  if (process.env.NODE_ENV === 'test' && process.env.MAJOR_VENDOR_SOURCES)
-    return resolve(process.env.MAJOR_VENDOR_SOURCES);
+  const fixture = testFixturePath('MAJOR_VENDOR_SOURCES');
+  if (fixture) return resolve(fixture);
   return join(dirname(canonicalRegistryPath(hotRoot)), 'vendor-sources.json');
 }
 
@@ -749,10 +750,11 @@ function resolveSkillsInternal(input: {
   now?: Date;
   skills?: readonly string[];
 }, hotRoot = hotSkillBundleRoot()): SkillResolution {
-  if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO) {
+  const fixtureSwitch = testFixturePath('MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO');
+  if (fixtureSwitch) {
     const current = join(majorHome(), 'skill-bundles', 'current');
     const replacement = `${current}.resolver-switch-${process.pid}`;
-    symlinkSync(process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO, replacement);
+    symlinkSync(fixtureSwitch, replacement);
     renameSync(replacement, current);
     delete process.env.MAJOR_SKILL_RESOLVER_SWITCH_CURRENT_TO;
   }

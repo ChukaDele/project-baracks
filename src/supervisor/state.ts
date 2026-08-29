@@ -11,10 +11,11 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir, userInfo } from 'node:os';
+import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { desc, eq, sql } from 'drizzle-orm';
 import { redactText } from '../security/redact.js';
+import { trustedMajorHome } from '#trust-roots';
 import { openDb, type Db } from '../db/client.js';
 import { agentProviders, agentRuns, supervisorCompletionCommits, tasks } from '../db/schema.js';
 import { newId } from '../domain/ids.js';
@@ -216,16 +217,7 @@ export interface SupervisorState {
 }
 
 export function majorHome(): string {
-  // MAJOR_HOME is a fixture-isolation hook, not a runtime authority selector.
-  // A project can control its launched process environment, so production must
-  // anchor receipts and hot bundles in the invoking user's Major home.
-  const controlledFixture =
-    process.env.NODE_ENV === 'test' ||
-    process.env.VITEST === 'true' ||
-    process.env.VITEST_WORKER_ID !== undefined;
-  return controlledFixture && process.env.MAJOR_HOME
-    ? resolve(process.env.MAJOR_HOME)
-    : join(userInfo().homedir, '.major');
+  return trustedMajorHome();
 }
 
 export function statePath(): string {

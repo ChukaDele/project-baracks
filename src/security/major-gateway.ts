@@ -27,6 +27,7 @@ import type { ApprovalCategory, ProviderApprovalAuthority } from './provider-app
 import { openDb } from '../db/client.js';
 import { consumeApprovedDecision, isApprovedDecision } from '../domain/decision-service.js';
 import { resolveProjectForCwd } from '../supervisor/state.js';
+import { trustedMajorHome } from '#trust-roots';
 import {
   assertActiveResourceLease,
   assertActiveResourceLeaseForProcess,
@@ -157,7 +158,7 @@ export function verifyProviderDecision(input: {
 
 /** Fixed, read-only host probe used by the global admission guard on macOS. */
 function majorHome(): string {
-  return process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
+  return trustedMajorHome();
 }
 
 /** Give the host Codex CLI a writable, Major-owned home without copying its

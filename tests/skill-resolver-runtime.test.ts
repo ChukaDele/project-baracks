@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { testFixturePath as productionFixturePath } from '../src/security/trust-roots.js';
 import {
   auditSkillReachability,
   discloseSkills,
@@ -172,7 +173,7 @@ describe('runtime skill resolver', () => {
     expect(resolveSkills({ task: 'Use skill-resolver routing.' }).skills).toEqual([]);
   });
 
-  it('ignores registry override hooks outside the test environment', () => {
+  it('does not expose the registry fixture seam from the production trust module', () => {
     const priorNodeEnv = process.env.NODE_ENV;
     const root = mkdtempSync(join(tmpdir(), 'major-production-registry-override-'));
     roots.push(root);
@@ -181,7 +182,7 @@ describe('runtime skill resolver', () => {
     process.env.MAJOR_SKILLS_REGISTRY = registry;
     process.env.NODE_ENV = 'production';
     try {
-      expect(loadSkillRegistry().length).toBeGreaterThan(30);
+      expect(productionFixturePath('MAJOR_SKILLS_REGISTRY')).toBeUndefined();
     } finally {
       process.env.NODE_ENV = priorNodeEnv;
     }

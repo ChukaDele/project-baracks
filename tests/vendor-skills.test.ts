@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { testFixturePath as productionFixturePath } from '../src/security/trust-roots.js';
 import { auditSkillReachability, discloseSkills, resolveSkills } from '../src/skills/resolver.js';
 import {
   clearVendorSectionCache,
@@ -47,19 +48,14 @@ afterEach(() => {
 });
 
 describe('live vendor skill sources', () => {
-  it('does not let a production environment override canonical vendor metadata', () => {
+  it('does not expose the fixture metadata seam from the production trust module', () => {
     const override = join(testMajorHome, 'untrusted-vendor-sources.json');
     writeFileSync(override, JSON.stringify({ version: 1, sources: [] }));
     process.env.MAJOR_VENDOR_SOURCES = override;
     const priorNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
     try {
-      const resolved = resolveSkills({
-        task: 'Use vercel-optimize to investigate current Vercel performance, latency, and cost.',
-        limit: 1,
-      });
-      expect(resolved.skills[0]?.id).toBe('vercel-optimize');
-      expect(resolved.skills[0]?.vendor?.sourceId).toBe('vercel-agent-skills');
+      expect(productionFixturePath('MAJOR_VENDOR_SOURCES')).toBeUndefined();
     } finally {
       if (priorNodeEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = priorNodeEnv;

@@ -14,11 +14,12 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { queryCodexAppServer } from './codex-app-server.js';
 import { codexUsageReport, type CodexUsageAccount, type CodexUsageReport } from './codex-usage.js';
 import { spawnReadOnlyCodexAppServer } from '../security/major-gateway.js';
+import { trustedMajorHome } from '#trust-roots';
 
 interface CodexProfilePolicyRow {
   id: string;
@@ -31,7 +32,7 @@ interface CodexProfilePolicy {
 }
 
 function majorHome(): string {
-  return process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
+  return trustedMajorHome();
 }
 
 export function codexProfilePolicyPath(): string {

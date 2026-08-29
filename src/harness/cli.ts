@@ -1,11 +1,11 @@
 import { constants, accessSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { LimaBackend } from '../execution/lima-backend.js';
 import { loadLimaExecutionConfig } from '../execution/lima-config.js';
 import type { ProviderCommandHost } from '../providers/commands.js';
 import { assertExecutionAllowed, getProjectPolicy } from '../supervisor/policy.js';
 import { getGoal } from '../supervisor/state.js';
+import { trustedMajorHome } from '#trust-roots';
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import {
   CURRENT_HARNESS_MIGRATION_PHASE,
@@ -67,7 +67,7 @@ function isCompleteProfile(dshHome: string, profile: string): boolean {
 }
 
 export function liveDshStatus(env: NodeJS.ProcessEnv = process.env): LiveDshStatus {
-  const majorHome = env.MAJOR_HOME ?? join(homedir(), '.major');
+  const majorHome = trustedMajorHome(env);
   const dshHome = env.MAJOR_DSH_HOME ?? join(majorHome, 'dsh-harness');
   try {
     const record = JSON.parse(readFileSync(join(dshHome, 'major-install.json'), 'utf8')) as {

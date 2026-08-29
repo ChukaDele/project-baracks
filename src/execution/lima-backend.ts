@@ -15,6 +15,7 @@ import {
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
+import { trustedMajorHome } from '#trust-roots';
 import { providerExecutable, type ProviderCommandHost } from '../providers/commands.js';
 import {
   accountAuthStoreRelativePath,
@@ -139,7 +140,7 @@ export function detectProviderOutcomeSignals(
 }
 
 function majorHome(): string {
-  return process.env.MAJOR_HOME ? resolve(process.env.MAJOR_HOME) : join(homedir(), '.major');
+  return trustedMajorHome();
 }
 
 function safeGuestRunPath(root: string, provider: string, runId: string): string {

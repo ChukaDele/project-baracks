@@ -7,6 +7,12 @@
   "bin": {
     "major": "./dist/entry.js"
   },
+  "imports": {
+    "#trust-roots": {
+      "types": "./src/security/trust-roots.ts",
+      "default": "./dist/security/trust-roots.js"
+    }
+  },
   "engines": {
     "node": ">=22"
   },

@@ -17,6 +17,11 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parseDocument } from 'yaml';
 import { majorHome } from '../supervisor/state.js';
+import {
+  testFixturePath,
+  trustedAccountHome,
+  trustedCodexHome,
+} from '#trust-roots';
 import { cloneGitBranch } from '../resources/tools.js';
 import { buildSkillCatalog } from './catalog.js';
 import {
@@ -263,6 +268,7 @@ function validateSource(sourceRoot: string): {
   internalRoot: string;
   evalRoot: string;
   adaptersRoot: string;
+  templatesRoot: string;
   internalIds: string[];
   assetPaths: string[];
 } {
@@ -275,6 +281,7 @@ function validateSource(sourceRoot: string): {
   const internalRoot = join(sourceRoot, 'skills', 'internal');
   const evalRoot = join(sourceRoot, 'evals', 'skill-resolver');
   const adaptersRoot = join(sourceRoot, 'adapters', 'skills');
+  const templatesRoot = join(sourceRoot, 'templates');
   const assetRegistryPath = join(sourceRoot, 'guidance', 'reusable-assets.registry.json');
   for (const path of [
     registryPath,
@@ -287,6 +294,7 @@ function validateSource(sourceRoot: string): {
     internalRoot,
     evalRoot,
     adaptersRoot,
+    templatesRoot,
   ]) {
     if (!existsSync(path)) throw new Error(`required skill-bundle source missing: ${path}`);
     assertSourcePath(sourceRoot, path);
@@ -309,7 +317,11 @@ function validateSource(sourceRoot: string): {
     }
     if (!stat.isFile()) throw new Error(`expected Major skill bundle file: ${path}`);
   }
-  for (const root of [internalRoot, evalRoot, adaptersRoot]) filesBelow(root);
+  for (const root of [internalRoot, evalRoot, adaptersRoot, templatesRoot]) filesBelow(root);
+  const goalStateTemplate = join(templatesRoot, 'project', 'GOAL_STATE.md');
+  if (!existsSync(goalStateTemplate) || !lstatSync(goalStateTemplate).isFile()) {
+    throw new Error(`required skill-bundle template missing: ${goalStateTemplate}`);
+  }
 
   const sourceLedger = JSON.parse(readFileSync(sourceLedgerPath, 'utf8')) as {
     schemaVersion?: unknown;
@@ -459,7 +471,7 @@ function validateSource(sourceRoot: string): {
   }
 
   // Validate every copied/authenticated tree before hashing or cpSync can follow it.
-  for (const root of [internalRoot, evalRoot, adaptersRoot, ...assetPaths]) {
+  for (const root of [internalRoot, evalRoot, adaptersRoot, templatesRoot, ...assetPaths]) {
     if (lstatSync(root).isDirectory()) filesBelow(root);
     else if (lstatSync(root).isSymbolicLink()) {
       throw new Error(`symbolic links are forbidden in Major skill bundles: ${root}`);
@@ -479,6 +491,7 @@ function validateSource(sourceRoot: string): {
     internalRoot,
     evalRoot,
     adaptersRoot,
+    templatesRoot,
     internalIds: installed,
     assetPaths,
   };
@@ -523,16 +536,7 @@ function assertSafeHostPath(anchor: string, target: string, targetKind: 'file' |
 }
 
 function hostRoots(): { home: string; codexHome: string } {
-  const home =
-    process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
-      ? dirname(majorHome())
-      : process.env.HOME;
-  if (!home) throw new Error('HOME is required to activate hot-synced skill host artifacts');
-  const codexHome =
-    process.env.NODE_ENV === 'test' && process.env.MAJOR_HOME
-      ? join(home, '.codex')
-      : (process.env.CODEX_HOME ?? join(home, '.codex'));
-  return { home: resolve(home), codexHome: resolve(codexHome) };
+  return { home: trustedAccountHome(), codexHome: trustedCodexHome() };
 }
 
 function preflightHostSkillArtifacts(): void {
@@ -633,10 +637,7 @@ function commitArtifactTransaction(replacements: ArtifactReplacement[]): void {
         throw error;
       }
       committed.push(replacement);
-      if (
-        process.env.NODE_ENV === 'test' &&
-        Number(process.env.MAJOR_SKILL_SYNC_FAIL_AFTER) === committed.length
-      ) {
+      if (Number(testFixturePath('MAJOR_SKILL_SYNC_FAIL_AFTER')) === committed.length) {
         throw new Error(`injected skill activation failure after ${committed.length} artifacts`);
       }
     }
@@ -761,6 +762,7 @@ function bundleIdentity(sourceRoot: string, validated: ReturnType<typeof validat
     validated.internalRoot,
     validated.evalRoot,
     validated.adaptersRoot,
+    validated.templatesRoot,
     ...validated.assetPaths,
   ]);
 }
@@ -873,6 +875,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   mkdirSync(join(staged, 'skills'), { recursive: true });
   mkdirSync(join(staged, 'evals'), { recursive: true });
   mkdirSync(join(staged, 'adapters'), { recursive: true });
+  mkdirSync(join(staged, 'templates'), { recursive: true });
   cpSync(validated.registryPath, join(staged, 'guidance', 'skills.registry.json'));
   cpSync(validated.catalogPath, join(staged, 'guidance', 'skills.catalog.json'));
   cpSync(
@@ -902,6 +905,7 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   cpSync(validated.internalRoot, join(staged, 'skills', 'internal'), { recursive: true });
   cpSync(validated.evalRoot, join(staged, 'evals', 'skill-resolver'), { recursive: true });
   cpSync(validated.adaptersRoot, join(staged, 'adapters', 'skills'), { recursive: true });
+  cpSync(validated.templatesRoot, join(staged, 'templates'), { recursive: true });
   writeFileSync(
     join(staged, 'bundle.json'),
     `${JSON.stringify(
@@ -919,13 +923,13 @@ function syncFromSource(sourceRootInput: string, sourceLabel?: string): SkillSyn
   );
 
   try {
-    if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILL_SYNC_CORRUPT_STAGED) {
+    if (testFixturePath('MAJOR_SKILL_SYNC_CORRUPT_STAGED')) {
       writeFileSync(join(staged, 'adapters', 'skills', 'CODEX.md'), 'injected staged corruption\n');
     }
     validateCopiedBundle(staged, bundleId);
     rmSync(destination, { recursive: true, force: true });
     renameSync(staged, destination);
-    if (process.env.NODE_ENV === 'test' && process.env.MAJOR_SKILL_SYNC_CORRUPT_DESTINATION) {
+    if (testFixturePath('MAJOR_SKILL_SYNC_CORRUPT_DESTINATION')) {
       writeFileSync(join(destination, 'adapters', 'skills', 'CODEX.md'), 'injected destination corruption\n');
     }
     try {
@@ -1002,10 +1006,10 @@ export function rollbackMajorSkills(): SkillRollbackResult {
  * from any directory and cannot silently reuse a stale local checkout.
  */
 export function syncMajorSkills(input: { sourceRoot?: string } = {}): SkillSyncResult {
-  const explicitSource = input.sourceRoot ?? process.env.MAJOR_SKILLS_SOURCE;
+  const explicitSource = input.sourceRoot;
   if (explicitSource) return syncFromSource(explicitSource);
 
-  const repoUrl = process.env.MAJOR_SKILLS_REPO_URL ?? DEFAULT_SKILLS_REPO_URL;
+  const repoUrl = DEFAULT_SKILLS_REPO_URL;
   const tempRoot = mkdtempSync(join(tmpdir(), 'major-skill-sync-'));
   const checkout = join(tempRoot, 'source');
   try {
