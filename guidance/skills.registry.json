@@ -56,7 +56,7 @@
       "disclosure": "hot",
       "source": "major-internal",
       "availability": "major-repo",
-      "load": "major-self-change-skill-routing-learning-policy-runtime-installer"
+      "load": "major-self-change-skill-routing-learning-policy-runtime-installer-execution-independent-review-provenance"
     },
     {
       "id": "skill-resolver",
@@ -1284,7 +1284,7 @@
       "id": "cross-modal-review",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "cross modal visual document evidence review",
+      "load": "cross modal visual document evidence execution-independent read-only review provenance",
       "aliases": [
         "cross-modal-review"
       ],

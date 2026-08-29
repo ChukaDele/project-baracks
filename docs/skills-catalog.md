@@ -15,7 +15,7 @@ These are canonical Major-owned skills.
 | `workspace-lifecycle-management` | Manage HOT/WARM/COLD local project lifecycle, safe clone parking/deletion, storage pressure, large assets and local-vs-cloud development without losing project truth. |
 | `mvp-speed-prioritisation` | Reduce large briefs to P0 MVP / P1 / P2 and build P0 end to end. |
 | `legacy-cleanup` | Finish migrations with one canonical path and remove stale active artefacts. |
-| `major-self-maintenance` | Keep Major main green; make self-changes atomically through branch/PR/full gate/independent review where consequential. |
+| `major-self-maintenance` | Keep Major main green; make self-changes atomically through branch/PR/full gate and a distinct read-only review execution with durable provenance where consequential. |
 | `skill-resolver` | Select only the small set of task-relevant skills; audit overlap/reachability. |
 | `learning-capture` | Harvest explicit corrections/repeated mistakes after fixing the real task; classify project/global/policy/skill/memory. |
 | `skillify` | Turn a successful reusable procedure into a tested skill pack after the real task works. |

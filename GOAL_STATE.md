@@ -38,6 +38,8 @@ Substantive. Risk: authority/process semantics. Review: independent.
 - Starting candidate `d5735a9` was clean and matched the canonical repository identity.
 - Final-repair starting head `3e94e66` was clean and matched the canonical repository identity.
 - Final implementation head `7385b13` was clean and received the final deterministic gates.
+- Execution-independent trust-policy repair started from clean exact candidate `ece2340` with the
+  frozen complete-tree digest `3f5d01cd0b69e5ea03ee8317094e6a6062764631f6101291a99276b003535c54`.
 
 Delivery evidence:
 
@@ -102,12 +104,13 @@ installation and installed behavior proof follow normal merge.
   accepted read alias so existing records are not discarded.
 - Coordinator `done` claims require a canonical task ID whose frozen evidence is PROMOTABLE;
   installation remains later proof and old pending-completion records remain readable.
-- Independent review requires a succeeded review run without `independenceLoss`; same-provider
-  review evidence cannot silently satisfy that gate.
+- Independent review requires a distinct succeeded review execution without `independenceLoss`;
+  same-provider evidence qualifies only with canonical execution and provider/account provenance.
 - The live coordinator resolves exactly one existing `ready_to_merge` task from repository identity,
   discloses its frozen criteria, and re-resolves it before accepting the cited task ID.
-- Independent review requires durable provider separation from every succeeded implementation or
-  repair run; a missing/compromised marker alone cannot manufacture independence.
+- Independent review requires durable execution separation from implementation or repair work;
+  provider diversity is optional corroboration and a missing/compromised marker cannot manufacture
+  independence.
 - Required decisions are owned by both the canonical task and its project in service and SQLite;
   whitespace-only decision/risk criteria are rejected at both boundaries.
 - Normal supervisor goals carry structured pre-promotion evidence from `WorkerReport` into
@@ -126,14 +129,14 @@ installation and installed behavior proof follow normal merge.
   worker supplies evidence against it but cannot redefine risk, review, or broad-validation need.
 - Independent completion grades derive purpose, project, goal, provider, exact head, verdict, and
   evidence from the succeeded provider-owned durable run receipt; CLI caller labels are not authority.
-- Progressive independent task review freezes `candidateHead`; implementation and review provider
+- Progressive independent task review freezes `candidateHead`; implementation and review execution
   separation is evaluated only among succeeded runs bound to that exact head in service and SQLite.
 - Every progressive task freezes `candidateHead`, including focused review. Run creation and SQLite
   reject implementation, repair, or review runs whose source head is absent or different.
 - Generic performance history remains observational. Only a completed Major provider review run can
   project an append-only independent-review receipt, and only that receipt can grade pending work.
 - Pending completion now creates its own durable Major review-dispatch identity after the claim;
-  only the successful different-provider execution for that dispatch can mint a causally fresh grade.
+  only that successful uncompromised review execution can mint a causally fresh grade.
 - Progressive verification, implementation, repair, and review runs all carry the frozen candidate
   head. SQLite rejects mutation of `source_head` after insert and completion ignores other heads.
 - Unknown no-task scope freezes as substantive at admission; worker output cannot downgrade it to
@@ -287,6 +290,18 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   head, routed provider/account provenance, and no execution-independence loss. The proportional gate
   passed 127/127 tests across seven affected routing, migration, task/SQLite, receipt, runtime, and
   completion files plus typecheck, targeted lint, and formatting; no unrelated full matrix was run.
+- Execution-independent trust-policy/guidance/skill repair: project trust grades now retain distinct
+  reviewed/reviewer execution IDs plus provider/account provenance, reject self-execution and compromised
+  or accountless grades, and permit same-provider review only when those execution predicates hold. The
+  active CLI guidance, capability matrix, skill registry/catalog, prior-art decision, and both review
+  skills now state the same rule. Blast radius justified a bounded broader gate: one 12-file runtime,
+  policy, completion, migration, provenance, guidance, and skill-lifecycle invocation passed 161/161
+  tests in 8.83 seconds; the two resource-config resolver suites passed 99/99 in 3.87 seconds. This
+  approximately 13-second cost had high expected information gain because it covered every changed
+  policy consumer and skill-routing boundary while avoiding the unrelated full matrix. Typecheck,
+  targeted lint, formatting, skill validation, and the primary Major validator passed. The stability
+  validator reached its unchanged frozen-candidate exception: it greps lowercase `commondir` while the
+  worktree-aware implementation uses `commonDir`; this patch changes neither file.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
 - Final ordinary gate for `7385b13`: 106/106 files and 910/910 tests passed.
 - Final resource gate for `7385b13`: 139 tests passed with 5 expected skips.

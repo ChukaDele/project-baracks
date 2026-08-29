@@ -20,6 +20,10 @@ export type TrustLevel = (typeof TRUST_LEVELS)[number];
 
 export interface IndependentGrade {
   provider: WorkerHost;
+  providerAccountLabel: string;
+  reviewExecutionId: string;
+  reviewedExecutionId: string;
+  reviewedProvider?: WorkerHost | undefined;
   result: 'pass' | 'fail';
   evidence: string;
   at: string;
@@ -44,6 +48,15 @@ export interface ProjectPolicy {
   shadowPasses: number;
   updatedAt: string;
   lastGrade?: IndependentGrade | undefined;
+}
+
+function hasExecutionProvenance(grade: IndependentGrade | undefined): boolean {
+  return Boolean(
+    grade?.reviewExecutionId?.trim() &&
+    grade.reviewedExecutionId?.trim() &&
+    grade.reviewExecutionId !== grade.reviewedExecutionId &&
+    grade.providerAccountLabel?.trim(),
+  );
 }
 
 interface PolicyStore {
@@ -210,7 +223,12 @@ export function configureProjectPolicy(input: {
   const ownerApprovedBuild = input.ownerApprovedBuild ?? existing?.ownerApprovedBuild ?? false;
 
   if (input.trust === 'assist') {
-    if (!existing || existing.shadowPasses < 3 || existing.lastGrade?.result !== 'pass') {
+    if (
+      !existing ||
+      existing.shadowPasses < 3 ||
+      existing.lastGrade?.result !== 'pass' ||
+      !hasExecutionProvenance(existing.lastGrade)
+    ) {
       throw new Error(
         `cannot promote ${input.project} to assist: three consecutive independently graded shadow passes are required first`,
       );
@@ -221,7 +239,8 @@ export function configureProjectPolicy(input: {
       existing?.trust !== 'assist' ||
       existing.lastGrade?.kind !== 'execution' ||
       existing.lastGrade.result !== 'pass' ||
-      existing.lastGrade.trustAtGrade !== 'assist'
+      existing.lastGrade.trustAtGrade !== 'assist' ||
+      !hasExecutionProvenance(existing.lastGrade)
     ) {
       throw new Error(
         `cannot promote ${input.project} to build: it must first run at assist and pass an independent execution grade, or the owner must explicitly use --owner-approved`,
@@ -233,7 +252,8 @@ export function configureProjectPolicy(input: {
       existing?.trust !== 'build' ||
       existing.lastGrade?.kind !== 'execution' ||
       existing.lastGrade.result !== 'pass' ||
-      existing.lastGrade.trustAtGrade !== 'build'
+      existing.lastGrade.trustAtGrade !== 'build' ||
+      !hasExecutionProvenance(existing.lastGrade)
     ) {
       throw new Error(
         `cannot promote ${input.project} to unattended: it must first run at build and pass a fresh independent execution grade`,
@@ -276,15 +296,36 @@ function storeGrade(input: {
   provider: WorkerHost;
   result: 'pass' | 'fail';
   evidence: string;
+  providerAccountLabel: string;
+  reviewExecutionId: string;
+  reviewedExecutionId: string;
+  reviewedProvider?: WorkerHost;
+  independenceLoss?: string;
   kind: 'shadow' | 'execution';
   goalId?: string;
 }): ProjectPolicy {
+  if (!input.reviewExecutionId.trim() || !input.reviewedExecutionId.trim()) {
+    throw new Error('independent grade requires durable review and reviewed execution ids');
+  }
+  if (!input.providerAccountLabel.trim()) {
+    throw new Error('independent grade requires durable provider account provenance');
+  }
+  if (input.reviewExecutionId === input.reviewedExecutionId) {
+    throw new Error('independent grade cannot review its own execution');
+  }
+  if (input.independenceLoss?.trim()) {
+    throw new Error(`independent grade execution was compromised: ${input.independenceLoss}`);
+  }
   const store = readStore();
   const index = store.projects.findIndex((candidate) => candidate.project === input.project);
   const current =
     index >= 0 ? store.projects[index]! : defaultProjectPolicy(input.project, input.repoPath);
   const grade: IndependentGrade = {
     provider: input.provider,
+    providerAccountLabel: input.providerAccountLabel.trim(),
+    reviewExecutionId: input.reviewExecutionId.trim(),
+    reviewedExecutionId: input.reviewedExecutionId.trim(),
+    ...(input.reviewedProvider ? { reviewedProvider: input.reviewedProvider } : {}),
     result: input.result,
     evidence: redactText(input.evidence).slice(0, 12_000),
     at: new Date().toISOString(),
@@ -313,22 +354,31 @@ export function recordShadowGrade(input: {
   repoPath: string;
   planner: WorkerHost;
   provider: WorkerHost;
+  providerAccountLabel: string;
+  reviewExecutionId: string;
+  plannerExecutionId: string;
+  independenceLoss?: string;
   result: 'pass' | 'fail';
   evidence: string;
   goalId?: string;
 }): ProjectPolicy {
-  if (input.planner === input.provider) {
-    throw new Error(
-      `shadow grade must be independent: planner and grader are both ${input.provider}`,
-    );
-  }
-  return storeGrade({ ...input, kind: 'shadow' });
+  return storeGrade({
+    ...input,
+    reviewedProvider: input.planner,
+    reviewedExecutionId: input.plannerExecutionId,
+    kind: 'shadow',
+  });
 }
 
 export function recordIndependentGrade(input: {
   project: string;
   repoPath: string;
   provider: WorkerHost;
+  providerAccountLabel: string;
+  reviewExecutionId: string;
+  reviewedExecutionId: string;
+  reviewedProvider?: WorkerHost;
+  independenceLoss?: string;
   result: 'pass' | 'fail';
   evidence: string;
   goalId?: string;

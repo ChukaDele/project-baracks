@@ -23,6 +23,14 @@ import {
   completedWorkflow,
   preserveWorkerReportEnvelope,
 } from '../src/supervisor/worker-report.js';
+
+function shadowProvenance(id: string) {
+  return {
+    providerAccountLabel: 'review',
+    reviewExecutionId: `review-${id}`,
+    plannerExecutionId: `plan-${id}`,
+  };
+}
 import type { ProviderInfo } from '../src/providers/types.js';
 import type { CapabilityRecord } from '../src/capabilities/registry.js';
 import { writeCodexUsageReport } from '../src/providers/codex-usage.js';
@@ -619,6 +627,7 @@ describe('Major coordinator contract', () => {
         repoPath: repo,
         planner: 'codex',
         provider: 'claude',
+        ...shadowProvenance(String(i)),
         result: 'pass',
         evidence: `shadow ${i + 1} matched actual task path`,
         goalId: 'goal-1',

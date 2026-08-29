@@ -30,7 +30,7 @@ For every material Major change:
 6. Run Major validator, format, lint, typecheck, full tests and production build locally when an execution environment is available.
 7. Fix all locally detectable failures **before** opening the PR. GitHub Actions is a release verifier, not the iterative formatter/test runner.
 8. Open the PR only when the batch is coherent. If a deterministic CI defect appears, close the PR before making a repair batch when the workflow triggers on `pull_request` synchronization; reopen only after the complete repair batch is ready.
-9. For changes to authority, routing, learning, project boundaries, installation or external writes, use a different provider for adversarial review.
+9. For changes to authority, routing, learning, project boundaries, installation or external writes, use a separate read-only adversarial review execution. Preserve its exact candidate, run, provider and account provenance; provider diversity is useful when available but is not the independence predicate.
 10. Merge only the exact green head.
 11. Verify the resulting `main` CI after merge.
 12. If `main` is red, repair Major before adding another self-change.
@@ -82,7 +82,7 @@ A skill directory alone is not a promoted skill. A reusable skill is considered 
 
 ## No self-grading shortcut
 
-Builder-authored tests are necessary but not sufficient for consequential Major changes. Use independent provider review and real-project evidence where the change affects orchestration, safety, routing, installation or learning.
+Builder-authored tests are necessary but not sufficient for consequential Major changes. Use a distinct uncompromised review execution and real-project evidence where the change affects orchestration, safety, routing, installation or learning. The implementing execution may supply evidence but may not mint or apply its own verdict.
 
 ## Resolver examples
 

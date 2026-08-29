@@ -17,6 +17,22 @@ let root = '';
 let priorPolicyPath: string | undefined;
 let priorStopPath: string | undefined;
 
+function shadowProvenance(id: string) {
+  return {
+    providerAccountLabel: 'review',
+    reviewExecutionId: `review-${id}`,
+    plannerExecutionId: `plan-${id}`,
+  };
+}
+
+function executionProvenance(id: string) {
+  return {
+    providerAccountLabel: 'review',
+    reviewExecutionId: `review-${id}`,
+    reviewedExecutionId: `work-${id}`,
+  };
+}
+
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-policy-'));
   priorPolicyPath = process.env.MAJOR_POLICY_PATH;
@@ -46,6 +62,7 @@ function earnAssist(project = 'jss-tool', repoPath = '/tmp/jss-tool') {
       repoPath,
       planner: 'codex',
       provider: 'claude',
+      ...shadowProvenance(String(i)),
       result: 'pass',
       evidence: `shadow ${i + 1} matched the real task path`,
       goalId: 'goal-1',
@@ -169,6 +186,7 @@ describe('Major project trust policy', () => {
       project: 'jss-tool',
       repoPath: '/tmp/jss-tool',
       provider: 'codex',
+      ...executionProvenance('unattended'),
       result: 'pass',
       evidence: 'Independent review of a representative build-mode run passed.',
       goalId: 'goal-1',
@@ -200,6 +218,7 @@ describe('Major project trust policy', () => {
       project: 'jss-tool',
       repoPath: '/tmp/jss-tool',
       provider: 'claude',
+      ...executionProvenance('build'),
       result: 'pass',
       evidence: 'Independent review of the representative assist run passed.',
       goalId: 'goal-1',

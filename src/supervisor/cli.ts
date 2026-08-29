@@ -349,6 +349,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       repoPath: project.repoPath,
       planner,
       provider,
+      providerAccountLabel: requireFlag(args, '--provider-account'),
+      reviewExecutionId: requireFlag(args, '--review-execution-id'),
+      plannerExecutionId: requireFlag(args, '--planner-execution-id'),
       result: resultRaw,
       evidence: requireFlag(args, '--evidence'),
       goalId,
@@ -390,6 +393,10 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       project: project.project,
       repoPath: project.repoPath,
       provider,
+      providerAccountLabel: review.providerAccountLabel ?? 'default',
+      reviewExecutionId: review.runId,
+      reviewedExecutionId: `goal:${goalId}:claim:${goal.pendingCompletion.claimedAt}`,
+      reviewedProvider: goal.pendingCompletion.coordinator,
       result: resultRaw,
       evidence,
       goalId,
@@ -477,7 +484,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       }
       console.log('mode: SHADOW / OBSERVE');
       console.log(
-        `Major will not dispatch workers. In the active agent session, produce a "MAJOR SHADOW PLAN" for this goal, then have a different provider grade that plan against the work actually performed. Three consecutive passing shadow grades are required before assist mode can be enabled unless the owner explicitly fast-tracks the project to build with --owner-approved.`,
+        `Major will not dispatch workers. In the active agent session, produce a "MAJOR SHADOW PLAN" for this goal, then have a separate review execution grade that plan against the work actually performed. Persist distinct planner/reviewer execution IDs plus provider/account provenance with the grade. Three consecutive passing shadow grades are required before assist mode can be enabled unless the owner explicitly fast-tracks the project to build with --owner-approved.`,
       );
       return true;
     }

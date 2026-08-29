@@ -26,6 +26,14 @@ let repository: string;
 let project: string;
 const execFileAsync = promisify(execFile);
 
+function executionProvenance(id: string) {
+  return {
+    providerAccountLabel: 'review',
+    reviewExecutionId: `review-${id}`,
+    reviewedExecutionId: `work-${id}`,
+  };
+}
+
 function git(...args: string[]): string {
   return execFileSync('/usr/bin/git', args, { encoding: 'utf8' }).trim();
 }
@@ -57,6 +65,7 @@ function validateGoal(goalId: string) {
     repoPath: repository,
     goalId,
     provider: 'claude',
+    ...executionProvenance(goalId),
     result: 'pass',
     evidence,
   });
@@ -125,6 +134,7 @@ describe('GBrain skill lifecycle', () => {
       repoPath: repository,
       goalId: taskB,
       provider: 'claude',
+      ...executionProvenance(taskB),
       result: 'pass',
       evidence,
     });

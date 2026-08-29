@@ -12,6 +12,22 @@ import {
 let root = '';
 let priorPolicyPath: string | undefined;
 
+function shadowProvenance(id: string) {
+  return {
+    providerAccountLabel: 'review',
+    reviewExecutionId: `review-${id}`,
+    plannerExecutionId: `plan-${id}`,
+  };
+}
+
+function executionProvenance(id: string) {
+  return {
+    providerAccountLabel: 'review',
+    reviewExecutionId: `review-${id}`,
+    reviewedExecutionId: `work-${id}`,
+  };
+}
+
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-policy-'));
   priorPolicyPath = process.env.MAJOR_POLICY_PATH;
@@ -57,6 +73,7 @@ describe('Major trust ramp', () => {
       repoPath: root,
       planner: 'codex',
       provider: 'claude',
+      ...shadowProvenance('first'),
       result: 'pass',
       evidence: 'shadow 1',
     });
@@ -65,6 +82,7 @@ describe('Major trust ramp', () => {
       repoPath: root,
       planner: 'codex',
       provider: 'claude',
+      ...shadowProvenance('second'),
       result: 'pass',
       evidence: 'shadow 2',
     });
@@ -73,6 +91,7 @@ describe('Major trust ramp', () => {
       repoPath: root,
       planner: 'codex',
       provider: 'claude',
+      ...shadowProvenance('failed'),
       result: 'fail',
       evidence: 'shadow 3 found a bad dispatch',
     });
@@ -82,8 +101,9 @@ describe('Major trust ramp', () => {
       recordShadowGrade({
         project: 'jss-tool',
         repoPath: root,
-        planner: 'codex',
+        planner: 'claude',
         provider: 'claude',
+        ...shadowProvenance(`clean-${i}`),
         result: 'pass',
         evidence: `clean shadow ${i + 1}`,
       });
@@ -101,7 +121,7 @@ describe('Major trust ramp', () => {
     expect(assisted.allowPaidSpend).toBe(false);
   });
 
-  it('refuses self-grading and requires independent execution evidence for build', () => {
+  it('refuses self-execution grading and accepts same-provider independent execution', () => {
     configureProjectPolicy({
       project: 'jss-tool',
       repoPath: root,
@@ -114,10 +134,26 @@ describe('Major trust ramp', () => {
         repoPath: root,
         planner: 'claude',
         provider: 'claude',
+        providerAccountLabel: 'review',
+        reviewExecutionId: 'same-execution',
+        plannerExecutionId: 'same-execution',
         result: 'pass',
         evidence: 'self grade',
       }),
     ).toThrow(/independent/);
+    expect(() =>
+      recordShadowGrade({
+        project: 'jss-tool',
+        repoPath: root,
+        planner: 'claude',
+        provider: 'claude',
+        providerAccountLabel: ' ',
+        reviewExecutionId: 'review-accountless',
+        plannerExecutionId: 'plan-accountless',
+        result: 'pass',
+        evidence: 'missing account provenance',
+      }),
+    ).toThrow(/account provenance/);
 
     for (let i = 0; i < 3; i++) {
       recordShadowGrade({
@@ -125,6 +161,7 @@ describe('Major trust ramp', () => {
         repoPath: root,
         planner: 'codex',
         provider: 'claude',
+        ...shadowProvenance(`build-${i}`),
         result: 'pass',
         evidence: `shadow ${i + 1}`,
       });
@@ -148,8 +185,17 @@ describe('Major trust ramp', () => {
       project: 'jss-tool',
       repoPath: root,
       provider: 'claude',
+      reviewedProvider: 'claude',
+      ...executionProvenance('assist'),
       result: 'pass',
       evidence: 'representative assist run passed real-output review',
+    });
+    expect(getProjectPolicy('jss-tool', root).lastGrade).toMatchObject({
+      provider: 'claude',
+      reviewedProvider: 'claude',
+      providerAccountLabel: 'review',
+      reviewExecutionId: 'review-assist',
+      reviewedExecutionId: 'work-assist',
     });
     expect(
       configureProjectPolicy({
