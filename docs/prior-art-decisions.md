@@ -360,3 +360,28 @@ These are independently authored Major workflow contracts, not copied donor impl
 | framework migration discipline | **MERGE DURABLE PATTERN** | Reuse existing Major `migration`, `legacy-cleanup`, and `capability-freshness` controls. |
 
 - **Evidence:** official Vercel Agent Skills documentation at `https://vercel.com/docs/agent-resources/skills`; official skill source at `https://github.com/vercel-labs/agent-skills`; official distribution CLI at `https://github.com/vercel-labs/skills`; Vercel's published retrieval evaluation at `https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals`; existing Major source and test audit on branch `codex/major-vercel-skill-expansion-20260828`.
+
+## 2026-08-30 — enforced writing-system runtime
+
+Detector outputs are diagnostic only; none of these components is used to conceal provenance or optimize for detector evasion.
+
+| Upstream | Decision | License / pin | Major use |
+| --- | --- | --- | --- |
+| `conorbronsdon/avoid-ai-writing` | BORROW | MIT; assessed skill v3.10.0 | Pattern taxonomy, precision-first detect/explain/recheck workflow, context profiles, quote/code exclusions, structural and rhythm checks. Major implements a smaller attributed rule set inside the single `natural-writing-qa` critic; it is not a primary writer. |
+| `blader/humanizer` | BORROW | MIT; assessed skill v2.9.1 | Claim-over-shape preservation, paragraph restructuring permission, writing-sample precedence, no invented personal detail, and a second critique pass. No competing humanizer is installed. |
+| `brandonwise/humanizer` | BORROW | repository advertises MIT; assessed 2026-08-30 | Folder/baseline comparison concepts and the underlying measurements: sentence-length coefficient of variation, paragraph uniformity, trigram repetition, code/quote awareness, and low confidence for short text. Universal “human” ranges and composite AI scores are rejected. |
+| `ngpepin/stylometric-transfer` | BORROW | license not verified from the accessible repository metadata; no code copied | Interpretable JSON fingerprints and deviation reports informed the interface. Major builds a dependency-free, versioned descriptive profile because author transfer is out of scope and unverified-license code cannot be incorporated. |
+| `errata-ai/vale` | WRAP | MIT; external executable, version reported at runtime | Canonical deterministic prose-lint engine when available, configured by Major rule packs. P0’s in-process diagnostics are a compact availability-safe gate, not a replacement parser or detector. Missing Vale is explicitly degraded. |
+| `languagetool-org/languagetool` | WRAP | LGPL-2.1; local service/CLI only | Optional grammar diagnostics. Major does not send private prose to the public API and reports the gate as degraded when no local instance is configured. |
+| Textstat | ADOPT LATER | MIT; version must be pinned before install | Mature readability formulas are preferred for production. P0 includes transparent Flesch diagnostics to keep routing/evaluation testable without adding a dependency; genre targets remain diagnostic. |
+| `confident-ai/deepeval` | WRAP LATER | Apache-2.0; version must be pinned before install | Its independent metric/evaluation pattern informs the evaluator boundary. P0 uses deterministic findings and forbids the evaluator from rewriting. No Python evaluation stack is installed in this worktree. |
+| `liamdugan/raid` | ADOPT LATER | license/version must be verified before use | Candidate benchmark corpus for offline detector comparison only. Not loaded into writing prompts and not a completion oracle. |
+| `ahans30/Binoculars` | ADOPT LATER | license/version/model assets must be verified before use | Candidate offline detector family. Scores must retain detector/model/date/genre and disagreement; no detector is installed for P0. |
+| Major registry, resolver, learning candidates, readiness evidence | ADOPT | repository canonical | Extended directly. No parallel registry, resolver, orchestrator store, memory, learning database, or readiness state is introduced. |
+
+### Capability reconciliation
+
+- EXISTING / KEEP: `academic-verify`, `research-compendium`, `source-ingestion`, `knowledge-work`, `strategic-reading`, `sales-commercial-core`, `website-design-qa`, `learning-capture`, and the canonical resolver/routing receipt.
+- MERGE: generic editing, proofreading, tone, reader-empathy, and “humanizer” behavior live behind `writing-os`, `prose-craft`, and `natural-writing-qa` rather than separate overlapping skills.
+- NEW: `writing-os`, `prose-craft`, genre specialists, `voice-fingerprint`, `prose-lint`, `natural-writing-qa`, `writing-evaluator`, and `writing-red-team`.
+- DEPRECATE: no registered Major skill is removed in P0. Vercel `writing-guidelines` remains scoped to Vercel work and is not the general writing system.

@@ -1,0 +1,9 @@
+extends: existence
+message: "Replace canned transition '%s' only when it adds no meaning."
+level: warning
+ignorecase: true
+tokens:
+  - 'it is important to note'
+  - "in today's rapidly evolving"
+  - "let's dive in"
+  - 'in conclusion'

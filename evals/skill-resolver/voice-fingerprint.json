@@ -1,0 +1,8 @@
+{
+  "skill": "voice-fingerprint",
+  "should_trigger": [
+    "write a LinkedIn post about these notes",
+    "compare this draft with my approved writing corpus voice profile"
+  ],
+  "should_not_trigger": ["make this SOP clearer", "rewrite this email"]
+}

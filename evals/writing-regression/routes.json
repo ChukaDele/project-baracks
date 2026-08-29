@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "academic-summary",
+      "prompt": "do my MBA critical summary from these sources",
+      "genre": "academic",
+      "required": [
+        "writing-os",
+        "academic-writing",
+        "academic-verify",
+        "prose-craft",
+        "natural-writing-qa",
+        "writing-evaluator",
+        "writing-red-team"
+      ],
+      "forbidden": ["direct-response-writing", "asd-ste100"]
+    },
+    {
+      "id": "critical-essay",
+      "prompt": "write this personal critical essay better",
+      "genre": "academic",
+      "required": ["writing-os", "academic-writing"],
+      "forbidden": ["direct-response-writing", "asd-ste100"]
+    },
+    {
+      "id": "strategy-memo",
+      "prompt": "turn these notes into a strategy memo",
+      "genre": "report",
+      "required": [
+        "writing-os",
+        "prose-craft",
+        "prose-lint",
+        "natural-writing-qa",
+        "writing-evaluator"
+      ],
+      "forbidden": ["academic-writing", "asd-ste100", "direct-response-writing"]
+    },
+    {
+      "id": "landing-page",
+      "prompt": "write the homepage for our product",
+      "genre": "brand",
+      "required": ["writing-os", "brand-strategy", "prose-craft", "natural-writing-qa"],
+      "forbidden": ["academic-writing", "asd-ste100", "direct-response-writing"]
+    },
+    {
+      "id": "positioning-copy",
+      "prompt": "rewrite this brand positioning copy",
+      "genre": "brand",
+      "required": ["writing-os", "brand-strategy"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    },
+    {
+      "id": "personal-post",
+      "prompt": "write a LinkedIn post about these notes",
+      "genre": "personal-brand",
+      "required": [
+        "writing-os",
+        "personal-brand-strategy",
+        "voice-fingerprint",
+        "writing-red-team"
+      ],
+      "forbidden": ["academic-writing", "asd-ste100", "direct-response-writing"]
+    },
+    {
+      "id": "client-report",
+      "prompt": "turn these notes into an important client-facing report",
+      "genre": "report",
+      "required": ["writing-os", "writing-red-team", "writing-evaluator"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    },
+    {
+      "id": "technical-sop",
+      "prompt": "make this SOP clearer",
+      "genre": "technical",
+      "required": ["writing-os", "technical-writing", "asd-ste100", "prose-lint"],
+      "forbidden": ["personal-brand-strategy", "direct-response-writing"]
+    },
+    {
+      "id": "email",
+      "prompt": "rewrite this email",
+      "genre": "transactional",
+      "required": ["writing-os", "prose-craft", "natural-writing-qa"],
+      "forbidden": ["writing-evaluator", "writing-red-team", "asd-ste100", "academic-writing"]
+    },
+    {
+      "id": "chat",
+      "prompt": "write this Slack message better",
+      "genre": "transactional",
+      "required": ["writing-os", "prose-craft", "natural-writing-qa"],
+      "forbidden": ["writing-evaluator", "writing-red-team", "asd-ste100"]
+    },
+    {
+      "id": "proposal",
+      "prompt": "prepare a proposal from these notes",
+      "genre": "proposal",
+      "required": ["writing-os", "prose-craft", "writing-evaluator", "writing-red-team"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    },
+    {
+      "id": "commercial-action",
+      "prompt": "write a landing page that gets readers to request a demo",
+      "genre": "direct-response",
+      "required": ["writing-os", "direct-response-writing"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    }
+  ]
+}

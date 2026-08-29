@@ -1,0 +1,7 @@
+extends: existence
+message: "Use prose punctuation intentionally; found '%s'."
+level: warning
+ignorecase: false
+tokens:
+  - ' -- '
+  - '—'

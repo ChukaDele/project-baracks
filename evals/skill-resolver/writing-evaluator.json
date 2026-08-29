@@ -1,0 +1,8 @@
+{
+  "skill": "writing-evaluator",
+  "should_trigger": [
+    "turn these notes into a report",
+    "evaluate this writing for thesis evidence and source fidelity"
+  ],
+  "should_not_trigger": ["rewrite this email", "Fix the TypeScript resolver bug."]
+}

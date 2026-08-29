@@ -1,0 +1,6 @@
+extends: existence
+message: "Academic attribution '%s' requires a traceable citation."
+level: error
+ignorecase: true
+tokens:
+  - 'research suggests'

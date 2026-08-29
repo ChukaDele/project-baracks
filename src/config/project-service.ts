@@ -35,6 +35,24 @@ export function getProjectByRepoPath(db: Db, repoPath: string) {
   return row;
 }
 
+/**
+ * Runtime execution may move between worktrees of one repository identity.
+ * Reuse the existing project row by path first, then by its stable name,
+ * instead of attempting a duplicate insert for every worktree.
+ */
+export function getOrAddProject(db: Db, config: ProjectConfig) {
+  const validated = projectConfigSchema.parse(config);
+  const byPath = listProjects(db).find(
+    (candidate) => resolve(candidate.repoPath) === resolve(validated.repoPath),
+  );
+  if (byPath) return byPath;
+
+  const byName = db.select().from(projects).where(eq(projects.name, validated.name)).get();
+  if (byName) return byName;
+
+  return addProject(db, validated);
+}
+
 export function projectConfig(row: { configJson: string }): ProjectConfig {
   return projectConfigSchema.parse(JSON.parse(row.configJson));
 }

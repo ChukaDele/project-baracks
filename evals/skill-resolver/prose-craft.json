@@ -1,0 +1,5 @@
+{
+  "skill": "prose-craft",
+  "should_trigger": ["rewrite this email", "write the homepage", "make this SOP clearer"],
+  "should_not_trigger": ["Fix the TypeScript resolver bug."]
+}

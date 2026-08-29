@@ -1,0 +1,6 @@
+extends: existence
+message: "Confirm that '%s' preserves the required procedural sequence."
+level: suggestion
+ignorecase: true
+tokens:
+  - 'and then'

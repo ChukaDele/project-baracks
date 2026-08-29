@@ -1,0 +1,9 @@
+{
+  "skill": "natural-writing-qa",
+  "should_trigger": [
+    "write this better",
+    "rewrite this email",
+    "audit this prose for natural writing"
+  ],
+  "should_not_trigger": ["Fix the TypeScript resolver bug.", "Run tests on this code."]
+}

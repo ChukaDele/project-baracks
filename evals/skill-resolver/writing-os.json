@@ -1,0 +1,5 @@
+{
+  "skill": "writing-os",
+  "should_trigger": ["write this better", "turn these notes into a report", "prepare a proposal"],
+  "should_not_trigger": ["Fix the TypeScript resolver bug.", "Calculate the invoice total."]
+}

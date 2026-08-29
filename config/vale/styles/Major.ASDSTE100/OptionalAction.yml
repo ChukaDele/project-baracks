@@ -1,0 +1,6 @@
+extends: existence
+message: "State whether '%s' is optional or required."
+level: warning
+ignorecase: true
+tokens:
+  - 'you may want to'

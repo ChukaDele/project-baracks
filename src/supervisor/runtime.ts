@@ -22,7 +22,7 @@ import {
 import { assessPromotion, planProgressiveValidation } from '../domain/sdlc.js';
 import { addTask } from '../domain/task-service.js';
 import { createRun, setRunStatus } from '../domain/run-service.js';
-import { addProject, getProjectByRepoPath } from '../config/project-service.js';
+import { getOrAddProject, getProjectByRepoPath } from '../config/project-service.js';
 import { projectConfigSchema } from '../config/project-config.js';
 import {
   listCapabilities,
@@ -1495,15 +1495,10 @@ async function runLockedGoalCycle(
     }
     candidate = freezeSupervisorCandidate(resolvedTask, sourceIdentity);
     if (resolvedTask.ok) canonicalTask = resolvedTask.binding;
-    let project;
-    try {
-      project = getProjectByRepoPath(taskState.db, goal.repoPath);
-    } catch {
-      project = addProject(
-        taskState.db,
-        projectConfigSchema.parse({ name: goal.project, repoPath: goal.repoPath }),
-      );
-    }
+    const project = getOrAddProject(
+      taskState.db,
+      projectConfigSchema.parse({ name: goal.project, repoPath: goal.repoPath }),
+    );
     const taskId = resolvedTask.ok
       ? resolvedTask.binding.taskId
       : addTask(taskState.db, {

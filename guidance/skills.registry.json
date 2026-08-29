@@ -1,5 +1,5 @@
 {
-  "version": 21,
+  "version": 22,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -155,6 +155,102 @@
       "source": "major-internal",
       "availability": "all-projects",
       "load": "research-strategy-synthesis-comparison-decision-work"
+    },
+    {
+      "id": "writing-os",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "write-rewrite-draft-prepare-report-essay-homepage-proposal-sop-email-message-copy",
+      "aliases": ["writing-system"],
+      "category": "writing",
+      "dependencies": ["prose-craft", "natural-writing-qa"]
+    },
+    {
+      "id": "prose-craft",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "sentence-paragraph-prose-cadence-diction-edit-rewrite",
+      "category": "writing"
+    },
+    {
+      "id": "academic-writing",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "academic-essay-critical-summary-literature-review-assignment-source-analysis",
+      "category": "writing",
+      "dependencies": ["academic-verify"]
+    },
+    {
+      "id": "brand-strategy",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "brand-product-positioning-messaging-homepage-website-landing-page",
+      "category": "writing"
+    },
+    {
+      "id": "personal-brand-strategy",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "linkedin-thought-leadership-personal-essay-newsletter-authority",
+      "category": "writing"
+    },
+    {
+      "id": "direct-response-writing",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "direct-response-buy-book-register-subscribe-apply-request-demo-conversion",
+      "category": "writing"
+    },
+    {
+      "id": "technical-writing",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "sop-procedure-warning-operating-instruction-controlled-technical-documentation",
+      "category": "writing",
+      "dependencies": ["asd-ste100"]
+    },
+    {
+      "id": "asd-ste100",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "asd-ste100-controlled-technical-sop-procedure-warning-operating-instruction",
+      "category": "writing"
+    },
+    {
+      "id": "voice-fingerprint",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "approved-writing-corpus-voice-style-fingerprint-profile-fidelity",
+      "category": "writing"
+    },
+    {
+      "id": "prose-lint",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "prose-lint-vale-readability-grammar-style-diagnostic",
+      "category": "writing"
+    },
+    {
+      "id": "natural-writing-qa",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "natural-writing-qa-ai-pattern-audit-humanizer-claim-preserving",
+      "aliases": ["humanizer"],
+      "category": "writing"
+    },
+    {
+      "id": "writing-evaluator",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "writing-evaluate-thesis-specificity-evidence-reasoning-genre-source-fidelity",
+      "category": "writing"
+    },
+    {
+      "id": "writing-red-team",
+      "source": "major-internal",
+      "availability": "all-projects",
+      "load": "independent-writing-red-team-academic-client-public-proposal-sensitive",
+      "category": "writing"
     },
     {
       "id": "presentation-storylining",

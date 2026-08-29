@@ -1,0 +1,5 @@
+{
+  "skill": "asd-ste100",
+  "should_trigger": ["make this SOP clearer", "write controlled technical operating instructions"],
+  "should_not_trigger": ["write a personal essay", "turn these notes into a report"]
+}
