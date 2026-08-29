@@ -175,6 +175,69 @@ describe('dependency blocking', () => {
 });
 
 describe('completion proof and guarded completion transition', () => {
+  it('accepts structured supervisor promotion evidence without requiring a task row', () => {
+    const db = testDb();
+    const promotionEvidence = {
+      focusedTests: 'focused changed-behavior tests passed',
+      cheapestCompileTypeOrBuild: 'typecheck passed',
+      criticalPathBehavior: 'completion lifecycle passed',
+      materialRiskChecks: ['summary-only completion rejection passed'],
+      broaderValidation: {
+        triggers: [],
+        repositoryPolicyRequires: false,
+        performed: false,
+      },
+      review: { level: 'focused' as const, passed: true },
+      blockerFindings: 0,
+    };
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository' },
+        { status: 'done', summary: 'structured claim', promotionEvidence },
+      ),
+    ).toMatchObject({ ok: true, taskId: undefined, promotionEvidence });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository' },
+        { status: 'done', summary: 'summary only' },
+      ),
+    ).toMatchObject({
+      ok: false,
+      failures: ['done completion requires structured pre-promotion evidence'],
+    });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository' },
+        {
+          status: 'done',
+          summary: 'broad proof missing economics',
+          promotionEvidence: {
+            ...promotionEvidence,
+            broaderValidation: {
+              triggers: ['promotion_policy'],
+              repositoryPolicyRequires: false,
+              performed: true,
+            },
+          },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: ['required pre-promotion evidence is missing'] });
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '/unregistered/supervisor-repository' },
+        {
+          status: 'done',
+          summary: 'blocked proof',
+          promotionEvidence: { ...promotionEvidence, blockerFindings: 1 },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: ['BLOCKER findings remain'] });
+  });
+
   function taskAtReadyToMerge(db: ReturnType<typeof testDb>) {
     const project = seedProject(db);
     const task = readyTask(db, project.id, 'ship it');
@@ -431,7 +494,7 @@ describe('completion proof and guarded completion transition', () => {
       ),
     ).toMatchObject({
       ok: false,
-      failures: ['done completion must cite the disclosed canonical taskId'],
+      failures: ['done completion requires structured pre-promotion evidence'],
     });
     expect(
       coordinatorDonePromotionProof(

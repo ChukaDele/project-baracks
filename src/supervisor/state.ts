@@ -14,6 +14,7 @@ import {
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
+import type { PrePromotionEvidence } from './worker-report.js';
 
 export interface LiveWorkerClaim {
   host: string;
@@ -116,6 +117,7 @@ export interface SupervisorGoal {
         /** Canonical task whose frozen proof made the claim PROMOTABLE. */
         taskId?: string;
         promotionCheckedAt?: string;
+        promotionEvidence?: PrePromotionEvidence;
       }
     | undefined;
 }

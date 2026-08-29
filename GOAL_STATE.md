@@ -106,6 +106,10 @@ installation and installed behavior proof follow normal merge.
   repair run; a missing/compromised marker alone cannot manufacture independence.
 - Required decisions are owned by both the canonical task and its project in service and SQLite;
   whitespace-only decision/risk criteria are rejected at both boundaries.
+- Normal supervisor goals carry structured pre-promotion evidence from `WorkerReport` into
+  `pendingCompletion`; they do not require a task row that the supervisor lifecycle does not create.
+- Explicit task workflows retain repository-resolved frozen criteria and SQLite completion proof;
+  summary-only supervisor done claims cannot enter pending independent validation.
 
 ## Completed evidence
 
@@ -138,6 +142,12 @@ installation and installed behavior proof follow normal merge.
   separation, and aligns service/SQLite decision ownership and whitespace validation. The proportional
   gate passed 99/99 focused tests across five affected files plus typecheck, targeted lint, and format;
   the full matrix remains intentionally unrun.
+- Supervisor-lifecycle repair: normal goals now assess focused, compile/type/build, critical-path,
+  material-risk, broad-validation economics, review, and BLOCKER evidence directly from the bounded
+  worker report and persist that evidence for independent grading. Explicit task workflows retain the
+  repository/SQLite path. The proportional gate passed 100/100 focused tests across five affected
+  files plus typecheck, targeted lint/format, Major validation, and stability validation; the full
+  matrix remains intentionally unrun.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -171,6 +181,10 @@ installation and installed behavior proof follow normal merge.
   display names instead of repository identity, treated an unmarked same-provider review as independent,
   and differed between service/SQLite on decision ownership and whitespace. Focused parity tests now
   protect those exact boundaries.
+- Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
+  registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
+  Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,
+  broad-validation economics, BLOCKER handling, and legacy pending-completion readability.
 - Repository exception: the final resource gate has one pre-existing skill-reachability failure
   covering 14 orphan writing/brand IDs; the 139 resource tests themselves passed with 5 expected
   skips. The durable record does not recast that exception as candidate success.

@@ -628,9 +628,7 @@ describe('Major coordinator contract', () => {
     expect(prompt).not.toContain('Reserve Major capacity before every worker');
     expect(prompt).not.toContain('Delegate independent work across providers with the Major CLI');
     expect(prompt).toContain('MAJOR_RESULT: {"status":"active"');
-    expect(prompt).toContain(
-      'MAJOR_RESULT: {"status":"done","summary":"objective completion evidence","taskId":"canonical-task-id"}',
-    );
+    expect(prompt).toContain('"promotionEvidence":{"focusedTests"');
     expect(prompt).not.toContain('major goal report');
     expect(prompt).toContain('Do not mark done unless the end-to-end goal is demonstrably true');
     expect(prompt).toContain('source → assess → tailor');
@@ -742,22 +740,11 @@ describe('Major coordinator contract', () => {
       accountLabel: 'work-b',
       continuityBlock:
         'CONTEXT CONTINUITY:\nPrevious account default is no longer the active subscription.\nPrior cycle summary:\nimplemented the quota router',
-      canonicalTask: {
-        ok: true,
-        binding: {
-          taskId: 'task_existing',
-          projectId: 'proj_existing',
-          repoPath: '/tmp/project',
-          frozenCriteriaJson: '{"minPassedVerificationRuns":2}',
-        },
-      },
     });
     expect(prompt).toContain('implemented the quota router');
     expect(prompt).toContain('Active subscription account: work-b');
     expect(prompt).toContain('CONTEXT CONTINUITY:');
-    expect(prompt).toContain('task id: task_existing');
-    expect(prompt).toContain('frozen completion criteria: {"minPassedVerificationRuns":2}');
-    expect(prompt).toContain('must cite exactly this existing task id');
+    expect(prompt).toContain('structured pre-promotion evidence');
   });
 
   it('accepts only a bounded final worker report and requires an owner gate when blocked', () => {
@@ -794,6 +781,21 @@ describe('Major coordinator contract', () => {
         }),
       ),
     ).toEqual({ status: 'done', summary: 'proof passed', taskId: 'task_123' });
+    const structured = parseWorkerReport(
+      JSON.stringify({
+        type: 'result',
+        result:
+          'MAJOR_RESULT: {"status":"done","summary":"supervisor proof passed","promotionEvidence":{"focusedTests":"focused tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"focused","passed":true},"blockerFindings":0}}',
+      }),
+    );
+    expect(structured).toMatchObject({
+      status: 'done',
+      promotionEvidence: {
+        focusedTests: 'focused tests passed',
+        review: { level: 'focused', passed: true },
+        blockerFindings: 0,
+      },
+    });
   });
 
   it('accepts bounded capability-use provenance without treating it as completion authority', () => {

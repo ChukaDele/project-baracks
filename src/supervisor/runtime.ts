@@ -11,11 +11,8 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { openDb, type DbConn } from '../db/client.js';
-import {
-  evaluateTaskPromotionProof,
-  resolveCanonicalTaskBinding,
-  type CanonicalTaskBindingResult,
-} from '../domain/completion.js';
+import { evaluateTaskPromotionProof, resolveCanonicalTaskBinding } from '../domain/completion.js';
+import { assessPromotion, planProgressiveValidation } from '../domain/sdlc.js';
 import { getProjectByRepoPath } from '../config/project-service.js';
 import {
   listCapabilities,
@@ -87,6 +84,47 @@ export function coordinatorDonePromotionProof(
   report: WorkerReport,
 ) {
   if (report.status !== 'done') return undefined;
+  if (!report.taskId) {
+    const evidence = report.promotionEvidence;
+    if (!evidence) {
+      return {
+        taskId: undefined,
+        ok: false,
+        failures: ['done completion requires structured pre-promotion evidence'],
+        checkedAt: new Date().toISOString(),
+      };
+    }
+    const plan = planProgressiveValidation({
+      riskSpecificChecks: evidence.materialRiskChecks,
+      triggers: Object.fromEntries(
+        evidence.broaderValidation.triggers.map((trigger) => [trigger, true]),
+      ),
+      repositoryPolicyRequiresBroadValidation: evidence.broaderValidation.repositoryPolicyRequires,
+    });
+    const broadPassed =
+      !plan.broaderValidationRequired ||
+      (evidence.broaderValidation.performed &&
+        Boolean(evidence.broaderValidation.cost?.trim()) &&
+        Boolean(evidence.broaderValidation.expectedInformationGain?.trim()) &&
+        Boolean(evidence.broaderValidation.evidence?.trim()));
+    const promotion = assessPromotion({
+      prePromotionEvidencePassed:
+        Boolean(evidence.focusedTests.trim()) &&
+        Boolean(evidence.cheapestCompileTypeOrBuild.trim()) &&
+        Boolean(evidence.criticalPathBehavior.trim()) &&
+        broadPassed,
+      review: evidence.review.level,
+      reviewPassed: evidence.review.passed,
+      blockerFindings: evidence.blockerFindings,
+    });
+    return {
+      taskId: undefined,
+      ok: promotion.promotion === 'PROMOTABLE',
+      failures: promotion.blockers,
+      checkedAt: new Date().toISOString(),
+      promotionEvidence: evidence,
+    };
+  }
   const resolved = resolveCanonicalTaskBinding(db, goal.repoPath);
   if (!resolved.ok) {
     return {
@@ -489,7 +527,6 @@ export function coordinatorPrompt(
   hop?: {
     accountLabel: string;
     continuityBlock: string;
-    canonicalTask?: CanonicalTaskBindingResult;
   },
 ): string {
   const context = readProjectContext(goal.repoPath);
@@ -553,13 +590,6 @@ ${goal.goal}
 CANONICAL TARGET:
 - project: ${goal.project}
 - repository path: ${goal.repoPath}
-
-CANONICAL TASK BINDING:
-${
-  hop?.canonicalTask?.ok
-    ? `- task id: ${hop.canonicalTask.binding.taskId}\n- repository identity: ${hop.canonicalTask.binding.repoPath}\n- frozen completion criteria: ${hop.canonicalTask.binding.frozenCriteriaJson}\nA done claim must cite exactly this existing task id; Major re-resolves it from the repository before accepting the claim.`
-    : `- unavailable: ${hop?.canonicalTask && !hop.canonicalTask.ok ? hop.canonicalTask.failure : 'not resolved'}\nDo not claim done until Major can resolve one existing ready_to_merge task with frozen criteria for this repository.`
-}
 
 ${workspaceContract}
 
@@ -629,8 +659,9 @@ Never use these terms interchangeably.
 DURABLE CONTROL:
 You cannot access or mutate Major's global control state. Before ending, emit exactly one final
 single-line result for the parent coordinator to validate and apply:
+Normal supervisor done claims require structured pre-promotion evidence; task workflows may instead cite their canonical task ID for durable database proof.
   MAJOR_RESULT: {"status":"active","summary":"what now works and next critical path","assetCandidate":{"id":"reusable-id","kind":"module","summary":"what it implements","locator":"relative/path","tags":["tag"],"scope":"shared"}}
-  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence","taskId":"canonical-task-id"}
+  MAJOR_RESULT: {"status":"done","summary":"objective completion evidence","promotionEvidence":{"focusedTests":"focused changed-behavior tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"focused","passed":true},"blockerFindings":0}}
   MAJOR_RESULT: {"status":"blocked","summary":"what is complete","ownerGate":"exact owner action"}
 Do not mark done unless the end-to-end goal is demonstrably true. A done claim still requires independent grading before trust promotion.
 
@@ -1007,13 +1038,6 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
   });
   const workerStartedAtMs = Date.now();
-  const taskState = openDb();
-  let canonicalTask: CanonicalTaskBindingResult;
-  try {
-    canonicalTask = resolveCanonicalTaskBinding(taskState.db, goal.repoPath);
-  } finally {
-    taskState.sqlite.close();
-  }
   const outcome = await runWorker({
     host,
     taskId: goal.id,
@@ -1021,7 +1045,6 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
       accountLabel: routedSelection.accountLabel,
       continuityBlock: continuity.promptBlock,
-      canonicalTask,
     }),
     cwd: goal.repoPath,
     // Clamped to whatever foreground continuation budget remains, so a
@@ -1201,8 +1224,11 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
           summary: report.summary,
           coordinator: host,
           claimedAt,
-          taskId: promotionProof.taskId,
+          ...(promotionProof.taskId ? { taskId: promotionProof.taskId } : {}),
           promotionCheckedAt: promotionProof.checkedAt,
+          ...('promotionEvidence' in promotionProof && promotionProof.promotionEvidence
+            ? { promotionEvidence: promotionProof.promotionEvidence }
+            : {}),
         },
         retryImmediately: false,
         ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),

@@ -38,6 +38,19 @@ function pendingGoal(): SupervisorGoal {
       summary: 'all checks pass',
       coordinator: 'codex',
       claimedAt: '2026-08-11T00:01:00.000Z',
+      promotionEvidence: {
+        focusedTests: 'focused tests passed',
+        cheapestCompileTypeOrBuild: 'typecheck passed',
+        criticalPathBehavior: 'critical path passed',
+        materialRiskChecks: [],
+        broaderValidation: {
+          triggers: [],
+          repositoryPolicyRequires: false,
+          performed: false,
+        },
+        review: { level: 'focused', passed: true },
+        blockerFindings: 0,
+      },
     },
   };
 }
@@ -120,6 +133,10 @@ describe('independent goal completion', () => {
   });
 
   it('marks a pending completion done only after a different provider passes it', () => {
+    expect(readSupervisorState().goals[0]!.pendingCompletion?.promotionEvidence).toMatchObject({
+      focusedTests: 'focused tests passed',
+      blockerFindings: 0,
+    });
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',
       provider: 'claude',

@@ -7,11 +7,36 @@ export const AMBIGUOUS_WORKER_REPORT_ENVELOPE = JSON.stringify({
   type: AMBIGUOUS_REPORT_TYPE,
 });
 
+export interface PrePromotionEvidence {
+  focusedTests: string;
+  cheapestCompileTypeOrBuild: string;
+  criticalPathBehavior: string;
+  materialRiskChecks: string[];
+  broaderValidation: {
+    triggers: (
+      | 'blast_radius'
+      | 'shared_dependency'
+      | 'insufficient_evidence'
+      | 'historical_regression'
+      | 'promotion_policy'
+    )[];
+    repositoryPolicyRequires: boolean;
+    performed: boolean;
+    cost?: string;
+    expectedInformationGain?: string;
+    evidence?: string;
+  };
+  review: { level: 'none' | 'focused' | 'independent'; passed: boolean };
+  blockerFindings: number;
+}
+
 export interface WorkerReport {
   status: 'active' | 'blocked' | 'done';
   summary: string;
   /** Canonical task whose durable evidence supports a done claim. */
   taskId?: string;
+  /** Structured PROMOTABLE claim for normal supervisor goals without tasks. */
+  promotionEvidence?: PrePromotionEvidence;
   ownerGate?: string;
   learning?: {
     source: 'user-correction' | 'recurring-failure' | 'successful-procedure' | 'manual';
@@ -119,6 +144,91 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
     const summary = redactText(value.summary.trim()).slice(0, 12_000);
     const taskId = typeof value.taskId === 'string' ? value.taskId.trim() : '';
     if (value.taskId !== undefined && !/^[a-z][a-z0-9_-]{2,127}$/.test(taskId)) return undefined;
+    let promotionEvidence: PrePromotionEvidence | undefined;
+    if (value.promotionEvidence !== undefined) {
+      const candidate = value.promotionEvidence;
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return undefined;
+      const record = candidate as Record<string, unknown>;
+      const textField = (name: string) =>
+        typeof record[name] === 'string' ? redactText(record[name].trim()).slice(0, 4_000) : '';
+      const materialRiskChecks = Array.isArray(record.materialRiskChecks)
+        ? record.materialRiskChecks
+            .filter((item): item is string => typeof item === 'string')
+            .map((item) => redactText(item.trim()).slice(0, 2_000))
+            .filter(Boolean)
+            .slice(0, 24)
+        : undefined;
+      if (
+        !Array.isArray(record.materialRiskChecks) ||
+        record.materialRiskChecks.length > 24 ||
+        record.materialRiskChecks.some(
+          (item) => typeof item !== 'string' || item.trim().length === 0,
+        )
+      )
+        return undefined;
+      const broad = record.broaderValidation;
+      const review = record.review;
+      if (
+        !textField('focusedTests') ||
+        !textField('cheapestCompileTypeOrBuild') ||
+        !textField('criticalPathBehavior') ||
+        !materialRiskChecks ||
+        !broad ||
+        typeof broad !== 'object' ||
+        Array.isArray(broad) ||
+        !review ||
+        typeof review !== 'object' ||
+        Array.isArray(review) ||
+        !Number.isInteger(record.blockerFindings) ||
+        Number(record.blockerFindings) < 0
+      )
+        return undefined;
+      const broadRecord = broad as Record<string, unknown>;
+      const triggers = Array.isArray(broadRecord.triggers) ? broadRecord.triggers : undefined;
+      const allowedTriggers = [
+        'blast_radius',
+        'shared_dependency',
+        'insufficient_evidence',
+        'historical_regression',
+        'promotion_policy',
+      ] as const;
+      const reviewRecord = review as Record<string, unknown>;
+      if (
+        !triggers ||
+        triggers.some((trigger) => !allowedTriggers.includes(trigger as never)) ||
+        typeof broadRecord.repositoryPolicyRequires !== 'boolean' ||
+        typeof broadRecord.performed !== 'boolean' ||
+        !['none', 'focused', 'independent'].includes(String(reviewRecord.level)) ||
+        typeof reviewRecord.passed !== 'boolean'
+      )
+        return undefined;
+      const optionalText = (name: string) =>
+        typeof broadRecord[name] === 'string'
+          ? redactText(broadRecord[name].trim()).slice(0, 4_000)
+          : undefined;
+      const cost = optionalText('cost');
+      const expectedInformationGain = optionalText('expectedInformationGain');
+      const broadEvidence = optionalText('evidence');
+      promotionEvidence = {
+        focusedTests: textField('focusedTests'),
+        cheapestCompileTypeOrBuild: textField('cheapestCompileTypeOrBuild'),
+        criticalPathBehavior: textField('criticalPathBehavior'),
+        materialRiskChecks,
+        broaderValidation: {
+          triggers: [...new Set(triggers)] as PrePromotionEvidence['broaderValidation']['triggers'],
+          repositoryPolicyRequires: broadRecord.repositoryPolicyRequires,
+          performed: broadRecord.performed,
+          ...(cost ? { cost } : {}),
+          ...(expectedInformationGain ? { expectedInformationGain } : {}),
+          ...(broadEvidence ? { evidence: broadEvidence } : {}),
+        },
+        review: {
+          level: reviewRecord.level as PrePromotionEvidence['review']['level'],
+          passed: reviewRecord.passed,
+        },
+        blockerFindings: Number(record.blockerFindings),
+      };
+    }
     const ownerGate =
       typeof value.ownerGate === 'string' ? redactText(value.ownerGate.trim()).slice(0, 4_000) : '';
     if (value.status === 'blocked' && !ownerGate) return undefined;
@@ -248,6 +358,7 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
       status: value.status as WorkerReport['status'],
       summary,
       ...(taskId ? { taskId } : {}),
+      ...(promotionEvidence ? { promotionEvidence } : {}),
       ...(ownerGate ? { ownerGate } : {}),
       ...(learning ? { learning } : {}),
       ...(workflow ? { workflow } : {}),
