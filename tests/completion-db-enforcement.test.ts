@@ -4,7 +4,8 @@ import { agentProviders } from '../src/db/schema.js';
 import { createDecisionRequest, resolveDecision } from '../src/domain/decision-service.js';
 import { newId } from '../src/domain/ids.js';
 import { createRun, recordVerificationRun, setRunStatus } from '../src/domain/run-service.js';
-import { addEvidence, addTask, transitionTask } from '../src/domain/task-service.js';
+import { evaluateCompletionProof, parseCompletionCriteria } from '../src/domain/completion.js';
+import { addEvidence, addTask, getTask, transitionTask } from '../src/domain/task-service.js';
 import { ensureObservedModel, recordQualifyingVerification, seedProject } from './helpers.js';
 
 /**
@@ -71,6 +72,42 @@ function harness() {
 }
 
 describe('P1-3 database-enforced completion criteria', () => {
+  it('rejects untriggered canonical broad-validation proof in service and SQLite', () => {
+    const { db, sqlite } = openDb(':memory:');
+    const project = seedProject(db);
+    const task = addTask(db, {
+      projectId: project.id,
+      title: 'focused candidate',
+      completionCriteriaJson: JSON.stringify({ progressiveValidation: { review: 'none' } }),
+    });
+    for (const status of [
+      'ready',
+      'queued',
+      'running',
+      'verifying',
+      'reviewing',
+      'ready_to_merge',
+    ] as const) {
+      transitionTask(db, task.id, status);
+    }
+    for (const validationSubject of [
+      'focused_tests',
+      'cheapest_compile_type_or_build',
+      'critical_path_behavior',
+      'broader_validation',
+    ])
+      recordQualifyingVerification(db, task.id, { validationSubject });
+    const criteria = parseCompletionCriteria(getTask(db, task.id).completionCriteriaSnapshotJson);
+    expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
+      'untriggered broader validation evidence is not promotable',
+    );
+    expect(() =>
+      sqlite
+        .prepare(`UPDATE tasks SET status = 'completed', version = version + 1 WHERE id = ?`)
+        .run(task.id),
+    ).toThrow(/untriggered broader validation/);
+  });
+
   it('matches the strict service schema for progressive criteria', () => {
     const { db, sqlite } = openDb(':memory:');
     const project = seedProject(db);
@@ -179,6 +216,7 @@ describe('P1-3 database-enforced completion criteria', () => {
 
   it('direct SQL cannot bypass opt-in progressive validation subjects', () => {
     const { db, sqlite } = openDb(':memory:');
+    const candidateHead = 'a'.repeat(40);
     const project = seedProject(db);
     const task = addTask(db, {
       projectId: project.id,
@@ -186,6 +224,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       completionCriteriaJson: JSON.stringify({
         progressiveValidation: {
           review: 'independent',
+          candidateHead,
           riskSpecificChecks: ['authority boundary', 'legacy compatibility'],
         },
       }),
@@ -230,6 +269,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       purpose: 'implementation',
       billingMode: 'subscription_included',
       routingReason: 'implementation',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, implementation.id, 'succeeded');
     const sameProviderAliasId = newId('aprov');
@@ -248,6 +288,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'same canonical provider through another account',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, sameProviderAlias.id, 'succeeded');
     expect(() => forceComplete()).toThrow(/selected review/);
@@ -258,6 +299,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'same-provider review',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, compromised.id, 'succeeded');
     expect(() => forceComplete()).toThrow(/selected review/);
@@ -275,6 +317,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       billingMode: 'subscription_included',
       routingReason: 'compromised review',
       independenceLoss: 'provider separation could not be established',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, compromisedIndependent.id, 'succeeded');
     expect(() => forceComplete()).toThrow(/selected review/);
@@ -289,6 +332,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'independent review',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, independent.id, 'succeeded');
     forceComplete();

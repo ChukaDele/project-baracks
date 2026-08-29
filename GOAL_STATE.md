@@ -27,6 +27,8 @@ Substantive. Risk: authority/process semantics. Review: independent.
 - Keep the strict service and SQLite criteria schemas aligned, including persisted validation cost
   versus expected information gain.
 - Preserve compact state, review semantics, delivery evidence, and READY behavioral proof.
+- Fail closed on qualifying or ambiguous canonical tasks, bind task reviews to their frozen exact
+  head, and accept supervisor completion grades only from Major-owned review receipts.
 - Run focused/risk-specific checks plus the cheapest relevant type check; do not run the full matrix.
 
 ## Evidence
@@ -116,6 +118,14 @@ installation and installed behavior proof follow normal merge.
   head; task review compares canonical provider names, not account-specific provider row IDs.
 - Every material-risk criterion owns a distinct verification subject in service and SQLite. Broad
   validation must be triggered, and any performed broad run records cost, information gain, and proof.
+- Task omission is authoritative only when repository resolution proves there is no canonical task;
+  malformed or ambiguous ready-to-merge task state cannot fall through to supervisor evidence.
+- Normal supervisor goals freeze a Major-owned no-task promotion contract before dispatch. The
+  worker supplies evidence against it but cannot redefine risk, review, or broad-validation need.
+- Independent completion grades derive purpose, project, goal, provider, exact head, verdict, and
+  evidence from the succeeded provider-owned durable run receipt; CLI caller labels are not authority.
+- Progressive independent task review freezes `candidateHead`; implementation and review provider
+  separation is evaluated only among succeeded runs bound to that exact head in service and SQLite.
 
 ## Completed evidence
 
@@ -159,6 +169,11 @@ installation and installed behavior proof follow normal merge.
   task-review independence; and each risk criterion plus broad-validation economics is enforced in
   service and SQLite. The proportional gate passed 101/101 focused tests across five affected files;
   the full matrix remains intentionally unrun.
+- Second-review authority repair: omitted task IDs now fail closed for qualifying, malformed, or
+  ambiguous task workflows; genuine no-task goals use a pre-dispatch frozen contract; provider-owned
+  receipts exclusively supply independent verdicts; task review runs persist and match the frozen
+  candidate head; and untriggered broad proof is rejected by service and SQLite. The affected gate
+  passed 120/120 tests across seven focused files plus typecheck, targeted lint, and formatting.
 - Typecheck, source lint, repository formatting, production build, Major validator, and stability
   validator passed.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
@@ -192,6 +207,10 @@ installation and installed behavior proof follow normal merge.
   display names instead of repository identity, treated an unmarked same-provider review as independent,
   and differed between service/SQLite on decision ownership and whitespace. Focused parity tests now
   protect those exact boundaries.
+- Independent review regression: `9bdde464` allowed task omission to bypass ambiguous canonical
+  state, let callers shape project-grade verdicts, lacked task-run exact-head persistence, derived
+  no-task requirements from the completing report, and accepted untriggered canonical broad proof.
+  Focused authority and parity regressions now protect those seams.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

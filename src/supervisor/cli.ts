@@ -62,7 +62,7 @@ import {
 import { assertRemotePreviewUrl } from '../web/remote-preview.js';
 import { redactText } from '../security/redact.js';
 import { openDb } from '../db/client.js';
-import { getPerformanceObservation } from '../insights/performance-history.js';
+import { getPerformanceObservationRecord } from '../insights/performance-history.js';
 import { createDecisionRequest, resolveDecision } from '../domain/decision-service.js';
 import {
   decideProviderAction,
@@ -359,10 +359,6 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
   if (command === 'project' && args[1] === 'grade') {
     const project = resolveProject(args[2] ?? 'current');
     const evidenceRunId = requireFlag(args, '--run-evidence-id');
-    const resultRaw = requireFlag(args, '--result');
-    if (resultRaw !== 'pass' && resultRaw !== 'fail') {
-      throw new Error(`grade result must be pass or fail, received: ${resultRaw}`);
-    }
     const goalId = requireFlag(args, '--goal-id');
     const goal = bindGoalToProject(goalId, project.project, project.repoPath);
     if (!goal) {
@@ -374,12 +370,38 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       );
     }
     const evidenceState = openDb();
-    const runReceipt = getPerformanceObservation(evidenceState.db, evidenceRunId);
+    const observation = getPerformanceObservationRecord(evidenceState.db, evidenceRunId);
     evidenceState.sqlite.close();
+    if (!observation || observation.project !== project.project || observation.goalId !== goalId) {
+      throw new Error('grade receipt is not bound to this project and goal');
+    }
+    const runReceipt = observation.receipt;
+    if (runReceipt.outcome !== 'completed') {
+      throw new Error('grade requires a succeeded independent-review run receipt');
+    }
     const provider = validHost(String(runReceipt?.worker?.coordinator ?? ''));
     const durableRun = runReceipt?.runEvidence;
     if (!durableRun) throw new Error('grade requires durable exact-head run evidence');
-    const evidence = requireFlag(args, '--evidence');
+    const review = runReceipt.independentReview;
+    if (!review || review.sourceHead !== durableRun.sourceHead || review.goalId !== goalId) {
+      throw new Error('grade requires a provider-owned exact-head independent-review verdict');
+    }
+    const resultRaw = review.verdict;
+    const evidence = review.evidence;
+    if (goal.pendingCompletion) {
+      applyIndependentCompletionGrade({
+        goalId,
+        receipt: {
+          provider,
+          runId: durableRun.runId,
+          sourceHead: durableRun.sourceHead,
+          purpose: review.purpose,
+          goalId: review.goalId,
+          verdict: review.verdict,
+          evidence: review.evidence,
+        },
+      });
+    }
     const policy = recordIndependentGrade({
       project: project.project,
       repoPath: project.repoPath,
@@ -388,14 +410,6 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       evidence,
       goalId,
     });
-    if (goal.pendingCompletion) {
-      applyIndependentCompletionGrade({
-        goalId,
-        runEvidence: { provider, runId: durableRun.runId, sourceHead: durableRun.sourceHead },
-        result: resultRaw,
-        evidence,
-      });
-    }
     if (resultRaw === 'pass' && goal.pendingCompletion) {
       applyIndependentSkillValidation({
         project: project.project,

@@ -74,7 +74,12 @@ import { computeProviderReadiness } from '../doctor/readiness.js';
 import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integration.js';
 import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
-import { completedWorkflow, parseWorkerReport, type WorkerReport } from './worker-report.js';
+import {
+  completedWorkflow,
+  DEFAULT_SUPERVISOR_PROMOTION_CONTRACT,
+  parseWorkerReport,
+  type WorkerReport,
+} from './worker-report.js';
 import {
   RUN_INSIGHT_SCHEMA,
   recordPerformanceObservation,
@@ -85,11 +90,28 @@ export { parseWorkerReport } from './worker-report.js';
 
 export function coordinatorDonePromotionProof(
   db: DbConn,
-  goal: Pick<SupervisorGoal, 'repoPath'>,
+  goal: Pick<SupervisorGoal, 'repoPath' | 'promotionContract'>,
   report: WorkerReport,
 ) {
   if (report.status !== 'done') return undefined;
+  const resolved = resolveCanonicalTaskBinding(db, goal.repoPath);
   if (!report.taskId) {
+    if (!resolved.ok && resolved.kind !== 'no_task') {
+      return {
+        taskId: undefined,
+        ok: false,
+        failures: [resolved.failure],
+        checkedAt: new Date().toISOString(),
+      };
+    }
+    if (resolved.ok) {
+      return {
+        taskId: resolved.binding.taskId,
+        ok: false,
+        failures: ['done completion must cite the disclosed canonical taskId'],
+        checkedAt: new Date().toISOString(),
+      };
+    }
     const evidence = report.promotionEvidence;
     if (!evidence) {
       return {
@@ -99,13 +121,18 @@ export function coordinatorDonePromotionProof(
         checkedAt: new Date().toISOString(),
       };
     }
+    const contract = goal.promotionContract ?? DEFAULT_SUPERVISOR_PROMOTION_CONTRACT;
     const plan = planProgressiveValidation({
-      riskSpecificChecks: evidence.materialRiskChecks,
+      riskSpecificChecks: contract.materialRiskCriteria,
       triggers: Object.fromEntries(
-        evidence.broaderValidation.triggers.map((trigger) => [trigger, true]),
+        contract.broaderValidationTriggers.map((trigger) => [trigger, true]),
       ),
-      repositoryPolicyRequiresBroadValidation: evidence.broaderValidation.repositoryPolicyRequires,
+      repositoryPolicyRequiresBroadValidation: contract.repositoryPolicyRequiresBroadValidation,
     });
+    const missingRiskCriteria = contract.materialRiskCriteria.filter(
+      (criterion) =>
+        !evidence.materialRiskChecks.some((proof) => proof.startsWith(`${criterion}:`)),
+    );
     const broadPassed =
       evidence.broaderValidation.performed === plan.broaderValidationRequired &&
       (!evidence.broaderValidation.performed ||
@@ -117,9 +144,10 @@ export function coordinatorDonePromotionProof(
         Boolean(evidence.focusedTests.trim()) &&
         Boolean(evidence.cheapestCompileTypeOrBuild.trim()) &&
         Boolean(evidence.criticalPathBehavior.trim()) &&
+        missingRiskCriteria.length === 0 &&
         broadPassed,
-      review: evidence.review.level,
-      reviewPassed: evidence.review.passed,
+      review: contract.review,
+      reviewPassed: evidence.review.level === contract.review && evidence.review.passed,
       blockerFindings: evidence.blockerFindings,
     });
     return {
@@ -130,7 +158,6 @@ export function coordinatorDonePromotionProof(
       promotionEvidence: evidence,
     };
   }
-  const resolved = resolveCanonicalTaskBinding(db, goal.repoPath);
   if (!resolved.ok) {
     return {
       taskId: '',
@@ -628,6 +655,9 @@ CANONICAL TARGET:
 - project: ${goal.project}
 - repository path: ${goal.repoPath}
 ${hop?.canonicalTask ? `\nQUALIFYING CANONICAL TASK:\n- task id: ${hop.canonicalTask.taskId}\n- frozen completion criteria: ${hop.canonicalTask.frozenCriteriaJson}\nTask workflows may cite this task ID; Major re-resolves it by repository identity.\n` : ''}
+FROZEN NO-TASK PROMOTION CONTRACT:
+${JSON.stringify(goal.promotionContract ?? DEFAULT_SUPERVISOR_PROMOTION_CONTRACT)}
+This contract is Major-owned and was fixed before this report; report evidence cannot redefine it.
 
 ${workspaceContract}
 
@@ -830,6 +860,9 @@ export function supervisorRunInsight(input: {
     },
     ...(input.outcome.runId && input.sourceHead
       ? { runEvidence: { runId: input.outcome.runId, sourceHead: input.sourceHead } }
+      : {}),
+    ...(input.report?.independentReview
+      ? { independentReview: input.report.independentReview }
       : {}),
     skills: input.skills,
     timing: {
@@ -1079,6 +1112,10 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
     ...(goal.lastSessionRef ? { lastSessionRef: goal.lastSessionRef } : {}),
     ...(goal.lastSummary ? { lastSummary: goal.lastSummary } : {}),
   });
+  if (!goal.promotionContract) {
+    goal.promotionContract = structuredClone(DEFAULT_SUPERVISOR_PROMOTION_CONTRACT);
+    updateGoal(goal.id, { promotionContract: goal.promotionContract });
+  }
   const workerStartedAtMs = Date.now();
   let canonicalTask: CanonicalTaskBinding | undefined;
   const taskState = openDb();
@@ -1283,6 +1320,9 @@ async function runLockedGoalCycle(goal: SupervisorGoal, maxTimeoutMs?: number): 
           ...('promotionEvidence' in promotionProof && promotionProof.promotionEvidence
             ? { promotionEvidence: promotionProof.promotionEvidence }
             : {}),
+          promotionContract: structuredClone(
+            goal.promotionContract ?? DEFAULT_SUPERVISOR_PROMOTION_CONTRACT,
+          ),
         },
         retryImmediately: false,
         ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),

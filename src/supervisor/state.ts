@@ -14,7 +14,11 @@ import {
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { redactText } from '../security/redact.js';
-import type { PrePromotionEvidence } from './worker-report.js';
+import {
+  DEFAULT_SUPERVISOR_PROMOTION_CONTRACT,
+  type PrePromotionEvidence,
+  type SupervisorPromotionContract,
+} from './worker-report.js';
 
 export interface LiveWorkerClaim {
   host: string;
@@ -94,6 +98,8 @@ export interface SupervisorGoal {
       }
     | undefined;
   requiredOperations?: string[] | undefined;
+  /** Major-owned no-task completion contract, frozen before worker dispatch. */
+  promotionContract?: SupervisorPromotionContract | undefined;
   /** Set by the last cycle when it stopped on an authoritative provider
    * exhaustion/rate-limit (or a selected CLI turning out to be missing)
    * with other capacity still eligible: the foreground continuation loop
@@ -118,6 +124,7 @@ export interface SupervisorGoal {
         taskId?: string;
         promotionCheckedAt?: string;
         promotionEvidence?: PrePromotionEvidence;
+        promotionContract?: SupervisorPromotionContract;
         sourceHead?: string;
       }
     | undefined;
@@ -275,6 +282,7 @@ export function startGoal(input: {
       createdAt: now,
       updatedAt: now,
       nextRunAt: now,
+      promotionContract: structuredClone(DEFAULT_SUPERVISOR_PROMOTION_CONTRACT),
     };
     state.goals.push(goal);
     return goal;
@@ -325,6 +333,7 @@ export function admitGoal(input: {
       autonomous: false,
       status: 'active',
       preferredCoordinator: input.preferredCoordinator ?? 'claude',
+      promotionContract: structuredClone(DEFAULT_SUPERVISOR_PROMOTION_CONTRACT),
       cycle: 0,
       consecutiveFailures: 0,
       createdAt: now,
@@ -421,9 +430,15 @@ export function updateGoal(id: string, patch: Partial<Omit<SupervisorGoal, 'id'>
  * claim. A worker claim alone can never mark a goal done. */
 export function applyIndependentCompletionGrade(input: {
   goalId: string;
-  runEvidence: { provider: WorkerHost; runId: string; sourceHead: string };
-  result: 'pass' | 'fail';
-  evidence: string;
+  receipt: {
+    provider: WorkerHost;
+    runId: string;
+    sourceHead: string;
+    purpose: 'independent_completion_review';
+    goalId: string;
+    verdict: 'pass' | 'fail';
+    evidence: string;
+  };
 }): SupervisorGoal {
   return mutateSupervisorState((state) => {
     const goal = state.goals.find((candidate) => candidate.id === input.goalId);
@@ -435,25 +450,31 @@ export function applyIndependentCompletionGrade(input: {
         'pending completion has no exact-head binding; legacy claim requires revalidation',
       );
     }
-    if (pending.sourceHead !== input.runEvidence.sourceHead) {
+    if (input.receipt.purpose !== 'independent_completion_review') {
+      throw new Error('completion grade requires an independent-review receipt');
+    }
+    if (input.receipt.goalId !== input.goalId) {
+      throw new Error('independent-review receipt belongs to a different goal');
+    }
+    if (pending.sourceHead !== input.receipt.sourceHead) {
       throw new Error('independent completion run evidence is for a different exact head');
     }
-    if (!input.runEvidence.runId.trim()) {
+    if (!input.receipt.runId.trim()) {
       throw new Error('independent completion requires a durable run id');
     }
-    if (pending.coordinator === input.runEvidence.provider) {
+    if (pending.coordinator === input.receipt.provider) {
       throw new Error(
-        `independent completion grade refused: ${input.runEvidence.provider} made the completion claim`,
+        `independent completion grade refused: ${input.receipt.provider} made the completion claim`,
       );
     }
-    const evidence = input.evidence.trim();
+    const evidence = input.receipt.evidence.trim();
     if (!evidence) throw new Error('independent completion evidence must not be empty');
     goal.pendingCompletion = undefined;
     goal.activePid = undefined;
     goal.lastFinishedAt = new Date().toISOString();
     goal.ownerGate = undefined;
     goal.consecutiveFailures = 0;
-    if (input.result === 'pass') {
+    if (input.receipt.verdict === 'pass') {
       goal.status = 'done';
       goal.nextRunAt = undefined;
       goal.lastSummary = redactText(

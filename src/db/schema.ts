@@ -517,6 +517,8 @@ export const agentRuns = sqliteTable(
     ),
     /** Non-null when review independence was compromised (same-provider review). */
     independenceLoss: text('independence_loss'),
+    /** Exact repository head evaluated by this run. Nullable for legacy rows. */
+    sourceHead: text('source_head'),
     allowanceState: text('allowance_state'),
     worktreeId: text('worktree_id'),
     /** Execution status of this run — NOT the task's canonical status. */

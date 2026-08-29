@@ -43,6 +43,7 @@ export interface NewRunInput {
    * provider/model. Validated inside the run-creation transaction. */
   paidUsageDecisionId?: string;
   independenceLoss?: string;
+  sourceHead?: string;
   allowanceState?: string;
   worktreeId?: string;
   now?: () => Date;
@@ -76,10 +77,14 @@ export function createRun(db: Db, rawInput: NewRunInput) {
     routingReason: rawInput.routingReason,
     paidUsageDecisionId: rawInput.paidUsageDecisionId,
     independenceLoss: rawInput.independenceLoss,
+    sourceHead: rawInput.sourceHead,
     allowanceState: rawInput.allowanceState,
     worktreeId: rawInput.worktreeId,
     now: rawInput.now,
   });
+  if (input.sourceHead !== undefined && !/^[0-9a-f]{40}$/.test(input.sourceHead)) {
+    throw new RunAuthorisationError('run sourceHead must be an exact 40-character lowercase SHA');
+  }
   if (PAID_BILLING_MODES.includes(input.billingMode)) {
     assertCapabilityAvailable('paid-provider-execution');
   }
@@ -191,6 +196,7 @@ export function createRun(db: Db, rawInput: NewRunInput) {
         routingReason: input.routingReason,
         paidUsageDecisionId: input.paidUsageDecisionId ?? null,
         independenceLoss: input.independenceLoss ?? null,
+        sourceHead: input.sourceHead ?? null,
         allowanceState: input.allowanceState ?? null,
         worktreeId: input.worktreeId ?? null,
         status: 'pending' as const,

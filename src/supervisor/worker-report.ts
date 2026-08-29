@@ -30,6 +30,20 @@ export interface PrePromotionEvidence {
   blockerFindings: number;
 }
 
+export interface SupervisorPromotionContract {
+  review: 'none' | 'focused' | 'independent';
+  materialRiskCriteria: string[];
+  broaderValidationTriggers: PrePromotionEvidence['broaderValidation']['triggers'];
+  repositoryPolicyRequiresBroadValidation: boolean;
+}
+
+export const DEFAULT_SUPERVISOR_PROMOTION_CONTRACT: SupervisorPromotionContract = {
+  review: 'focused',
+  materialRiskCriteria: [],
+  broaderValidationTriggers: [],
+  repositoryPolicyRequiresBroadValidation: false,
+};
+
 export interface WorkerReport {
   status: 'active' | 'blocked' | 'done';
   summary: string;
@@ -37,6 +51,14 @@ export interface WorkerReport {
   taskId?: string;
   /** Structured PROMOTABLE claim for normal supervisor goals without tasks. */
   promotionEvidence?: PrePromotionEvidence;
+  /** Provider-owned verdict emitted by a dedicated completion-review run. */
+  independentReview?: {
+    purpose: 'independent_completion_review';
+    goalId: string;
+    sourceHead: string;
+    verdict: 'pass' | 'fail';
+    evidence: string;
+  };
   ownerGate?: string;
   learning?: {
     source: 'user-correction' | 'recurring-failure' | 'successful-procedure' | 'manual';
@@ -229,6 +251,30 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
         blockerFindings: Number(record.blockerFindings),
       };
     }
+    let independentReview: WorkerReport['independentReview'];
+    if (value.independentReview !== undefined) {
+      const candidate = value.independentReview;
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return undefined;
+      const review = candidate as Record<string, unknown>;
+      if (
+        review.purpose !== 'independent_completion_review' ||
+        typeof review.goalId !== 'string' ||
+        !review.goalId.trim() ||
+        typeof review.sourceHead !== 'string' ||
+        !/^[0-9a-f]{40}$/.test(review.sourceHead) ||
+        !['pass', 'fail'].includes(String(review.verdict)) ||
+        typeof review.evidence !== 'string' ||
+        !review.evidence.trim()
+      )
+        return undefined;
+      independentReview = {
+        purpose: 'independent_completion_review',
+        goalId: review.goalId.trim(),
+        sourceHead: review.sourceHead,
+        verdict: review.verdict as 'pass' | 'fail',
+        evidence: redactText(review.evidence.trim()).slice(0, 4_000),
+      };
+    }
     const ownerGate =
       typeof value.ownerGate === 'string' ? redactText(value.ownerGate.trim()).slice(0, 4_000) : '';
     if (value.status === 'blocked' && !ownerGate) return undefined;
@@ -359,6 +405,7 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
       summary,
       ...(taskId ? { taskId } : {}),
       ...(promotionEvidence ? { promotionEvidence } : {}),
+      ...(independentReview ? { independentReview } : {}),
       ...(ownerGate ? { ownerGate } : {}),
       ...(learning ? { learning } : {}),
       ...(workflow ? { workflow } : {}),

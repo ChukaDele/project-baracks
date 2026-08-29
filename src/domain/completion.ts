@@ -49,6 +49,10 @@ export const completionCriteriaSchema = z
         broaderValidationTriggers: z.enum(BROADER_VALIDATION_TRIGGERS).array().default([]),
         repositoryPolicyRequiresBroadValidation: z.boolean().default(false),
         review: z.enum(REVIEW_LEVELS).default('focused'),
+        candidateHead: z
+          .string()
+          .regex(/^[0-9a-f]{40}$/)
+          .optional(),
         broadValidationJustification: z
           .object({
             cost: z.string().trim().min(1),
@@ -67,6 +71,13 @@ export const completionCriteriaSchema = z
             code: 'custom',
             path: ['broadValidationJustification'],
             message: 'broad validation requires recorded cost and expected information gain',
+          });
+        }
+        if (value.review === 'independent' && !value.candidateHead) {
+          context.addIssue({
+            code: 'custom',
+            path: ['candidateHead'],
+            message: 'independent review requires an exact candidate head',
           });
         }
       })
@@ -97,7 +108,12 @@ export interface CanonicalTaskBinding {
 }
 
 export type CanonicalTaskBindingResult =
-  { ok: true; binding: CanonicalTaskBinding } | { ok: false; failure: string };
+  | { ok: true; binding: CanonicalTaskBinding }
+  | {
+      ok: false;
+      kind: 'no_task' | 'ambiguous' | 'invalid_project' | 'invalid_task';
+      failure: string;
+    };
 
 /** Resolve the one promotable task through the existing project/task store.
  * Repository identity is canonical; project display names and worker-supplied
@@ -113,23 +129,34 @@ export function resolveCanonicalTaskBinding(
     .all()
     .find((candidate) => resolve(candidate.repoPath) === normalizedRepo);
   if (!project)
-    return { ok: false, failure: `project not found for repository: ${normalizedRepo}` };
+    return {
+      ok: false,
+      kind: 'no_task',
+      failure: `project not found for repository: ${normalizedRepo}`,
+    };
   const candidates = db
     .select({ taskId: tasks.id, criteria: tasks.completionCriteriaSnapshotJson })
     .from(tasks)
     .where(and(eq(tasks.projectId, project.id), eq(tasks.status, 'ready_to_merge')))
-    .all()
-    .filter(
-      (candidate): candidate is { taskId: string; criteria: string } => candidate.criteria !== null,
-    );
+    .all();
+  if (candidates.length === 0) {
+    return { ok: false, kind: 'no_task', failure: 'repository has no ready_to_merge task' };
+  }
   if (candidates.length !== 1) {
     return {
       ok: false,
+      kind: 'ambiguous',
       failure: `repository has ${candidates.length} ready_to_merge task(s) with frozen criteria; expected exactly one`,
     };
   }
   const candidate = candidates[0];
-  if (!candidate) return { ok: false, failure: 'canonical task resolution failed' };
+  if (!candidate?.criteria) {
+    return {
+      ok: false,
+      kind: 'invalid_task',
+      failure: 'canonical ready_to_merge task has no frozen completion criteria',
+    };
+  }
   return {
     ok: true,
     binding: {
@@ -249,10 +276,13 @@ export function evaluateCompletionProof(
     if (missingChecks.length > 0) {
       failures.push(`missing required progressive validation: ${missingChecks.join(', ')}`);
     }
+    if (!plan.broaderValidationRequired && provenSubjects.has('broader_validation')) {
+      failures.push('untriggered broader validation evidence is not promotable');
+    }
 
     const implementationProviders = new Set(
       db
-        .select({ providerName: agentProviders.name })
+        .select({ providerName: agentProviders.name, sourceHead: agentRuns.sourceHead })
         .from(agentRuns)
         .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
         .where(
@@ -263,10 +293,15 @@ export function evaluateCompletionProof(
           ),
         )
         .all()
+        .filter((run) => !progressive.candidateHead || run.sourceHead === progressive.candidateHead)
         .map((run) => run.providerName),
     );
     const succeededReviews = db
-      .select({ providerName: agentProviders.name, independenceLoss: agentRuns.independenceLoss })
+      .select({
+        providerName: agentProviders.name,
+        independenceLoss: agentRuns.independenceLoss,
+        sourceHead: agentRuns.sourceHead,
+      })
       .from(agentRuns)
       .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
       .where(
@@ -281,10 +316,11 @@ export function evaluateCompletionProof(
       progressive.review === 'none' ||
       succeededReviews.some(
         (review) =>
-          progressive.review !== 'independent' ||
-          (review.independenceLoss === null &&
-            implementationProviders.size > 0 &&
-            !implementationProviders.has(review.providerName)),
+          (!progressive.candidateHead || review.sourceHead === progressive.candidateHead) &&
+          (progressive.review !== 'independent' ||
+            (review.independenceLoss === null &&
+              implementationProviders.size > 0 &&
+              !implementationProviders.has(review.providerName))),
       );
     const promotion = assessPromotion({
       prePromotionEvidencePassed:

@@ -1,6 +1,8 @@
 -- Keep the SQLite completion boundary aligned with the opt-in progressive
 -- validation contract evaluated by domain/completion.ts. Legacy criteria
 -- without $.progressiveValidation retain the existing proof semantics.
+ALTER TABLE agent_runs ADD COLUMN source_head text;
+--> statement-breakpoint
 DROP TRIGGER IF EXISTS tasks_completion_criteria_valid_insert;
 --> statement-breakpoint
 DROP TRIGGER IF EXISTS tasks_completion_criteria_valid_update;
@@ -27,7 +29,7 @@ WHEN NEW.completion_criteria_json IS NOT NULL AND (
       json_type(NEW.completion_criteria_json, '$.progressiveValidation') <> 'object'
       OR EXISTS (
         SELECT 1 FROM json_each(json_extract(NEW.completion_criteria_json, '$.progressiveValidation'))
-        WHERE key NOT IN ('riskSpecificChecks', 'broaderValidationTriggers', 'repositoryPolicyRequiresBroadValidation', 'review', 'broadValidationJustification')
+        WHERE key NOT IN ('riskSpecificChecks', 'broaderValidationTriggers', 'repositoryPolicyRequiresBroadValidation', 'review', 'candidateHead', 'broadValidationJustification')
       )
       OR COALESCE(json_type(NEW.completion_criteria_json, '$.progressiveValidation.riskSpecificChecks'), 'array') <> 'array'
       OR EXISTS (
@@ -41,6 +43,8 @@ WHEN NEW.completion_criteria_json IS NOT NULL AND (
       )
       OR COALESCE(json_type(NEW.completion_criteria_json, '$.progressiveValidation.repositoryPolicyRequiresBroadValidation'), 'false') NOT IN ('true', 'false')
       OR COALESCE(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.review'), 'focused') NOT IN ('none', 'focused', 'independent')
+      OR (json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NOT NULL AND (json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') <> 'text' OR length(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead')) <> 40 OR json_extract(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') GLOB '*[^0-9a-f]*'))
+      OR (COALESCE(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.review'), 'focused') = 'independent' AND json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NULL)
       OR (
         json_type(NEW.completion_criteria_json, '$.progressiveValidation.broadValidationJustification') IS NOT NULL AND (
           json_type(NEW.completion_criteria_json, '$.progressiveValidation.broadValidationJustification') <> 'object'
@@ -90,7 +94,7 @@ WHEN NEW.completion_criteria_json IS NOT NULL AND (
       json_type(NEW.completion_criteria_json, '$.progressiveValidation') <> 'object'
       OR EXISTS (
         SELECT 1 FROM json_each(json_extract(NEW.completion_criteria_json, '$.progressiveValidation'))
-        WHERE key NOT IN ('riskSpecificChecks', 'broaderValidationTriggers', 'repositoryPolicyRequiresBroadValidation', 'review', 'broadValidationJustification')
+        WHERE key NOT IN ('riskSpecificChecks', 'broaderValidationTriggers', 'repositoryPolicyRequiresBroadValidation', 'review', 'candidateHead', 'broadValidationJustification')
       )
       OR COALESCE(json_type(NEW.completion_criteria_json, '$.progressiveValidation.riskSpecificChecks'), 'array') <> 'array'
       OR EXISTS (
@@ -104,6 +108,8 @@ WHEN NEW.completion_criteria_json IS NOT NULL AND (
       )
       OR COALESCE(json_type(NEW.completion_criteria_json, '$.progressiveValidation.repositoryPolicyRequiresBroadValidation'), 'false') NOT IN ('true', 'false')
       OR COALESCE(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.review'), 'focused') NOT IN ('none', 'focused', 'independent')
+      OR (json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NOT NULL AND (json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') <> 'text' OR length(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead')) <> 40 OR json_extract(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') GLOB '*[^0-9a-f]*'))
+      OR (COALESCE(json_extract(NEW.completion_criteria_json, '$.progressiveValidation.review'), 'focused') = 'independent' AND json_type(NEW.completion_criteria_json, '$.progressiveValidation.candidateHead') IS NULL)
       OR (
         json_type(NEW.completion_criteria_json, '$.progressiveValidation.broadValidationJustification') IS NOT NULL AND (
           json_type(NEW.completion_criteria_json, '$.progressiveValidation.broadValidationJustification') <> 'object'
@@ -201,10 +207,23 @@ BEGIN
     ) THEN RAISE(ABORT, 'completion missing required broader validation')
   END;
   SELECT CASE WHEN json_type(NEW.completion_criteria_snapshot_json, '$.progressiveValidation') = 'object'
+    AND json_array_length(COALESCE(json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.broaderValidationTriggers'), '[]')) = 0
+    AND COALESCE(json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.repositoryPolicyRequiresBroadValidation'), 0) = 0
+    AND EXISTS (
+      SELECT 1 FROM verification_runs v
+      JOIN agent_runs r ON r.id = v.agent_run_id AND r.task_id = v.task_id
+      JOIN evidence e ON e.ref = v.id AND e.kind = 'verification_run' AND e.task_id = v.task_id
+      WHERE v.task_id = NEW.id AND v.validation_subject = 'broader_validation'
+        AND v.status = 'passed' AND v.exit_code = 0
+        AND v.started_at IS NOT NULL AND v.ended_at IS NOT NULL AND r.status = 'succeeded'
+    ) THEN RAISE(ABORT, 'completion rejects untriggered broader validation')
+  END;
+  SELECT CASE WHEN json_type(NEW.completion_criteria_snapshot_json, '$.progressiveValidation') = 'object'
     AND COALESCE(json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.review'), 'focused') <> 'none'
     AND NOT EXISTS (
       SELECT 1 FROM agent_runs r
       WHERE r.task_id = NEW.id AND r.purpose = 'review' AND r.status = 'succeeded'
+        AND (json_type(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead') IS NULL OR r.source_head = json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead'))
         AND (
           COALESCE(json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.review'), 'focused') <> 'independent'
           OR (
@@ -215,6 +234,7 @@ BEGIN
               WHERE implementation.task_id = NEW.id
                 AND implementation.purpose IN ('implementation', 'repair')
                 AND implementation.status = 'succeeded'
+                AND implementation.source_head = json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead')
             )
             AND NOT EXISTS (
               SELECT 1 FROM agent_runs implementation
@@ -223,6 +243,7 @@ BEGIN
               WHERE implementation.task_id = NEW.id
                 AND implementation.purpose IN ('implementation', 'repair')
                 AND implementation.status = 'succeeded'
+                AND implementation.source_head = json_extract(NEW.completion_criteria_snapshot_json, '$.progressiveValidation.candidateHead')
                 AND implementation_provider.name = review_provider.name
             )
           )

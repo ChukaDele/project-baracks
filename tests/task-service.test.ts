@@ -175,6 +175,46 @@ describe('dependency blocking', () => {
 });
 
 describe('completion proof and guarded completion transition', () => {
+  it('fails closed when task omission would hide an ambiguous canonical workflow', () => {
+    const db = testDb();
+    const project = seedProject(db);
+    for (const title of ['candidate one', 'candidate two']) {
+      const task = readyTask(db, project.id, title);
+      for (const status of [
+        'queued',
+        'running',
+        'verifying',
+        'reviewing',
+        'ready_to_merge',
+      ] as const) {
+        transitionTask(db, task.id, status);
+      }
+    }
+    expect(
+      coordinatorDonePromotionProof(
+        db,
+        { repoPath: '~/Projects/demo' },
+        {
+          status: 'done',
+          summary: 'attempted no-task fallback',
+          promotionEvidence: {
+            focusedTests: 'passed',
+            cheapestCompileTypeOrBuild: 'passed',
+            criticalPathBehavior: 'passed',
+            materialRiskChecks: [],
+            broaderValidation: {
+              triggers: [],
+              repositoryPolicyRequires: false,
+              performed: false,
+            },
+            review: { level: 'focused', passed: true },
+            blockerFindings: 0,
+          },
+        },
+      ),
+    ).toMatchObject({ ok: false, failures: [expect.stringMatching(/2 ready_to_merge task/)] });
+  });
+
   it('accepts structured supervisor promotion evidence without requiring a task row', () => {
     const db = testDb();
     const promotionEvidence = {
@@ -403,6 +443,7 @@ describe('completion proof and guarded completion transition', () => {
 
   it('connects progressive proof and PROMOTABLE semantics to durable completion', () => {
     const db = testDb();
+    const candidateHead = 'a'.repeat(40);
     const project = seedProject(db);
     const task = addTask(db, {
       projectId: project.id,
@@ -410,6 +451,7 @@ describe('completion proof and guarded completion transition', () => {
       completionCriteriaJson: JSON.stringify({
         progressiveValidation: {
           review: 'independent',
+          candidateHead,
           riskSpecificChecks: ['authority boundary', 'legacy compatibility'],
         },
       }),
@@ -444,6 +486,7 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'implementation',
       billingMode: 'subscription_included',
       routingReason: 'implementation',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, implementationRun.id, 'succeeded');
     const reviewRun = createRun(db, {
@@ -453,6 +496,7 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'focused review',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, reviewRun.id, 'succeeded');
     const criteria = parseCompletionCriteria(getTask(db, task.id).completionCriteriaSnapshotJson);
@@ -487,6 +531,7 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'same canonical provider through another account',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, sameProviderAliasReview.id, 'succeeded');
     expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
@@ -509,6 +554,7 @@ describe('completion proof and guarded completion transition', () => {
       billingMode: 'subscription_included',
       routingReason: 'compromised review',
       independenceLoss: 'provider separation could not be established',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, compromisedReviewRun.id, 'succeeded');
     expect(evaluateCompletionProof(db, task.id, criteria).failures).toContain(
@@ -526,6 +572,7 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'independent review',
+      sourceHead: candidateHead,
     });
     setRunStatus(db, independentReviewRun.id, 'succeeded');
     expect(evaluateCompletionProof(db, task.id, criteria).ok).toBe(true);
@@ -544,7 +591,7 @@ describe('completion proof and guarded completion transition', () => {
       ),
     ).toMatchObject({
       ok: false,
-      failures: ['done completion requires structured pre-promotion evidence'],
+      failures: ['done completion must cite the disclosed canonical taskId'],
     });
     expect(
       coordinatorDonePromotionProof(

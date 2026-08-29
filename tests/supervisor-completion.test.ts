@@ -56,6 +56,23 @@ function pendingGoal(): SupervisorGoal {
   };
 }
 
+function reviewReceipt(
+  provider: 'claude' | 'codex',
+  verdict: 'pass' | 'fail',
+  evidence: string,
+  sourceHead = 'a'.repeat(40),
+) {
+  return {
+    provider,
+    runId: 'run-review',
+    sourceHead,
+    purpose: 'independent_completion_review' as const,
+    goalId: 'goal-1',
+    verdict,
+    evidence,
+  };
+}
+
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-completion-'));
   priorStatePath = process.env.MAJOR_STATE_PATH;
@@ -140,9 +157,11 @@ describe('independent goal completion', () => {
     });
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',
-      runEvidence: { provider: 'claude', runId: 'run-review', sourceHead: 'a'.repeat(40) },
-      result: 'pass',
-      evidence: 'exact-head tests and representative behavior passed',
+      receipt: reviewReceipt(
+        'claude',
+        'pass',
+        'exact-head tests and representative behavior passed',
+      ),
     });
     expect(result.status).toBe('done');
     expect(result.pendingCompletion).toBeUndefined();
@@ -153,9 +172,11 @@ describe('independent goal completion', () => {
   it('reopens work when independent validation rejects the claim', () => {
     const result = applyIndependentCompletionGrade({
       goalId: 'goal-1',
-      runEvidence: { provider: 'claude', runId: 'run-review', sourceHead: 'a'.repeat(40) },
-      result: 'fail',
-      evidence: 'runtime behavior does not match the completion claim',
+      receipt: reviewReceipt(
+        'claude',
+        'fail',
+        'runtime behavior does not match the completion claim',
+      ),
     });
     expect(result.status).toBe('active');
     expect(result.pendingCompletion).toBeUndefined();
@@ -166,20 +187,26 @@ describe('independent goal completion', () => {
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        runEvidence: { provider: 'claude', runId: 'run-review', sourceHead: 'b'.repeat(40) },
-        result: 'pass',
-        evidence: 'wrong head',
+        receipt: reviewReceipt('claude', 'pass', 'wrong head', 'b'.repeat(40)),
       }),
     ).toThrow(/different exact head/);
+  });
+
+  it('rejects a provider-owned review receipt for a different goal', () => {
+    const receipt = reviewReceipt('claude', 'pass', 'wrong goal');
+    expect(() =>
+      applyIndependentCompletionGrade({
+        goalId: 'goal-1',
+        receipt: { ...receipt, goalId: 'goal-2' },
+      }),
+    ).toThrow(/different goal/);
   });
 
   it('refuses self-grading and goals without a pending completion claim', () => {
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        runEvidence: { provider: 'codex', runId: 'run-review', sourceHead: 'a'.repeat(40) },
-        result: 'pass',
-        evidence: 'self grade',
+        receipt: reviewReceipt('codex', 'pass', 'self grade'),
       }),
     ).toThrow(/made the completion claim/);
 
@@ -189,9 +216,7 @@ describe('independent goal completion', () => {
     expect(() =>
       applyIndependentCompletionGrade({
         goalId: 'goal-1',
-        runEvidence: { provider: 'claude', runId: 'run-review', sourceHead: 'a'.repeat(40) },
-        result: 'pass',
-        evidence: 'no claim',
+        receipt: reviewReceipt('claude', 'pass', 'no claim'),
       }),
     ).toThrow(/no pending completion claim/);
   });

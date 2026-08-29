@@ -11,13 +11,20 @@ export const RUN_INSIGHT_OUTCOMES = ['completed', 'blocked', 'failed', 'cancelle
 export type RunInsightOutcome = (typeof RUN_INSIGHT_OUTCOMES)[number];
 
 type Effect = { subject: string; effect: 'helped' | 'hurt'; evidence: string };
-type Receipt = Record<string, unknown> & {
+export type Receipt = Record<string, unknown> & {
   schema: typeof RUN_INSIGHT_SCHEMA;
   recordedAt: string;
   goalId: string;
   outcome?: RunInsightOutcome;
   worker?: { coordinator?: string | null; provider?: string | null; model?: string | null };
   runEvidence?: { runId: string; sourceHead: string };
+  independentReview?: {
+    purpose: 'independent_completion_review';
+    goalId: string;
+    sourceHead: string;
+    verdict: 'pass' | 'fail';
+    evidence: string;
+  };
   timing?: {
     durationMs?: number | null;
     productiveWorkMs?: number | null;
@@ -61,6 +68,17 @@ export function validateRunInsight(value: unknown): Receipt {
   }
   if (receipt.outcome !== undefined && !isRunInsightOutcome(receipt.outcome)) {
     throw new Error('run insight outcome must be completed, blocked, failed, or cancelled');
+  }
+  const review = receipt.independentReview;
+  if (
+    review !== undefined &&
+    (review.purpose !== 'independent_completion_review' ||
+      !review.goalId?.trim() ||
+      !/^[0-9a-f]{40}$/.test(review.sourceHead) ||
+      !['pass', 'fail'].includes(review.verdict) ||
+      !review.evidence?.trim())
+  ) {
+    throw new Error('run insight independent review receipt is invalid');
   }
   for (const key of ['skills', 'failures', 'humanInterventions'] as const) {
     const field = receipt[key];
@@ -176,6 +194,20 @@ export function getPerformanceObservation(db: DbConn, id: string): Receipt | und
     .where(eq(runPerformanceObservations.id, id))
     .get();
   return row ? validateRunInsight(JSON.parse(row.receiptJson)) : undefined;
+}
+
+export function getPerformanceObservationRecord(db: DbConn, id: string) {
+  const row = db
+    .select({
+      id: runPerformanceObservations.id,
+      project: runPerformanceObservations.project,
+      goalId: runPerformanceObservations.goalId,
+      receiptJson: runPerformanceObservations.receiptJson,
+    })
+    .from(runPerformanceObservations)
+    .where(eq(runPerformanceObservations.id, id))
+    .get();
+  return row ? { ...row, receipt: validateRunInsight(JSON.parse(row.receiptJson)) } : undefined;
 }
 
 function workerKey(receipt: Receipt): string | undefined {
