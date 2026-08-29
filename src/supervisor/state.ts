@@ -613,6 +613,7 @@ export function applyIndependentCompletionGrade(input: {
                 provider: agentProviders.name,
                 accountLabel: agentProviders.accountLabel,
                 purpose: agentRuns.purpose,
+                independenceLoss: agentRuns.independenceLoss,
                 sourceHead: agentRuns.sourceHead,
                 status: agentRuns.status,
               })
@@ -628,6 +629,7 @@ export function applyIndependentCompletionGrade(input: {
                 (receipt.provider === 'claude' ? 'claude-code' : receipt.provider) ||
               canonicalRun.accountLabel !== receipt.providerAccountLabel ||
               canonicalRun.purpose !== 'review' ||
+              canonicalRun.independenceLoss !== null ||
               canonicalRun.sourceHead !== receipt.sourceHead ||
               canonicalRun.status !== 'succeeded'
             ) {
@@ -637,11 +639,6 @@ export function applyIndependentCompletionGrade(input: {
             }
             if (!WORKER_HOSTS.includes(receipt.provider)) {
               throw new Error('independent-review receipt has an unknown provider identity');
-            }
-            if (pending.coordinator === receipt.provider) {
-              throw new Error(
-                `independent completion grade refused: ${receipt.provider} made the completion claim`,
-              );
             }
             const evidence = receipt.evidence.trim();
             if (!evidence) throw new Error('independent completion evidence must not be empty');

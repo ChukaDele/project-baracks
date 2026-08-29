@@ -87,6 +87,7 @@ function reviewReceiptId(
   evidence: string,
   sourceHead = readSupervisorSourceIdentity(root)?.sourceHead ?? 'a'.repeat(40),
   goalId = 'goal-1',
+  independenceLoss?: string,
 ) {
   const dispatchId = `dispatch-${provider}-${verdict}-${sourceHead}-${goalId}`;
   const current = readSupervisorState().goals[0];
@@ -128,6 +129,7 @@ function reviewReceiptId(
     billingMode: 'subscription_included',
     routingReason: 'test independent review',
     sourceHead,
+    ...(independenceLoss ? { independenceLoss } : {}),
   });
   setRunStatus(reviewDb.db, run.id, 'succeeded');
   if (current?.pendingCompletion) {
@@ -312,7 +314,7 @@ describe('independent goal completion', () => {
     ).toBeUndefined();
   });
 
-  it('marks a pending completion done only after a different provider passes it', () => {
+  it('marks a pending completion done only after an independent review execution passes it', () => {
     expect(readSupervisorState().goals[0]!.pendingCompletion?.promotionEvidence).toMatchObject({
       focusedTests: 'focused tests passed',
       blockerFindings: 0,
@@ -536,15 +538,29 @@ describe('independent goal completion', () => {
     ).toThrow(/different project or goal/);
   });
 
-  it('refuses self-grading and goals without a pending completion claim', () => {
-    expect(() =>
-      applyIndependentCompletionGrade({
-        goalId: 'goal-1',
-        receiptId: reviewReceiptId('codex', 'pass', 'self grade'),
-        db: reviewDb.db,
-      }),
-    ).toThrow(/made the completion claim/);
+  it('accepts same-provider review from a separate canonical execution', () => {
+    const result = applyIndependentCompletionGrade({
+      goalId: 'goal-1',
+      receiptId: reviewReceiptId('codex', 'pass', 'separate read-only review execution'),
+      db: reviewDb.db,
+    });
+    expect(result.status).toBe('done');
+  });
 
+  it('rejects a review run whose execution independence was compromised', () => {
+    expect(() =>
+      reviewReceiptId(
+        'codex',
+        'pass',
+        'compromised execution',
+        readSupervisorSourceIdentity(root)!.sourceHead,
+        'goal-1',
+        'review reused the implementer execution context',
+      ),
+    ).toThrow(/canonical succeeded task run/i);
+  });
+
+  it('refuses goals without a pending completion claim', () => {
     const state = readSupervisorState();
     state.goals[0]!.pendingCompletion = undefined;
     writeSupervisorState(state);

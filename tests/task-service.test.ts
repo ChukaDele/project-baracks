@@ -721,6 +721,7 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'focused review',
+      independenceLoss: 'review reused the implementer execution context',
       sourceHead: candidateHead,
     });
     setRunStatus(db, reviewRun.id, 'succeeded');
@@ -757,6 +758,7 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'same canonical provider through another account',
+      independenceLoss: 'review reused the implementer execution context',
       sourceHead: candidateHead,
     });
     setRunStatus(db, sameProviderAliasReview.id, 'succeeded');
@@ -779,7 +781,7 @@ describe('completion proof and guarded completion transition', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'compromised review',
-      independenceLoss: 'provider separation could not be established',
+      independenceLoss: 'review reused the implementer execution context',
       sourceHead: candidateHead,
     });
     setRunStatus(db, compromisedReviewRun.id, 'succeeded');
@@ -788,7 +790,7 @@ describe('completion proof and guarded completion transition', () => {
     );
     const independentProviderId = newId('aprov');
     db.insert(agentProviders)
-      .values({ id: independentProviderId, name: 'independent-reviewer' })
+      .values({ id: independentProviderId, name: 'builder', accountLabel: 'review' })
       .run();
     ensureObservedModel(db, independentProviderId, 'codex');
     const independentReviewRun = createRun(db, {
@@ -797,7 +799,7 @@ describe('completion proof and guarded completion transition', () => {
       modelRef: 'codex',
       purpose: 'review',
       billingMode: 'subscription_included',
-      routingReason: 'independent review',
+      routingReason: 'execution-independent same-provider review',
       sourceHead: candidateHead,
     });
     setRunStatus(db, independentReviewRun.id, 'succeeded');

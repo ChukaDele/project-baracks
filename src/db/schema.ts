@@ -515,7 +515,8 @@ export const agentRuns = sqliteTable(
     paidUsageDecisionId: text('paid_usage_decision_id').references(
       (): AnySQLiteColumn => decisionRequests.id,
     ),
-    /** Non-null when review independence was compromised (same-provider review). */
+    /** Non-null when review execution independence was compromised (for
+     * example implementer-session reuse or a writable review boundary). */
     independenceLoss: text('independence_loss'),
     /** Exact repository head evaluated by this run. Nullable for legacy rows. */
     sourceHead: text('source_head'),

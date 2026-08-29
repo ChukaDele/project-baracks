@@ -73,7 +73,6 @@ import {
   readSupervisorState,
   recoverSupervisorCompletion,
   updateGoal,
-  WORKER_HOSTS,
   type SupervisorGoal,
   type WorkerHost,
 } from './state.js';
@@ -951,11 +950,10 @@ async function runPendingCompletionReview(
     });
     return;
   }
-  const eligibleHosts = WORKER_HOSTS.filter((host) => host !== pending.coordinator);
-  const selection = routeGoalExecution(goal, { eligibleHosts });
+  const selection = routeGoalExecution(goal);
   if (selection.kind === 'checkpoint') {
     updateGoal(goal.id, {
-      lastSummary: `Independent completion review is waiting for different-provider capacity: ${selection.reason}`,
+      lastSummary: `Independent completion review is waiting for execution capacity: ${selection.reason}`,
       nextRunAt: new Date(Date.now() + 10_000).toISOString(),
     });
     return;

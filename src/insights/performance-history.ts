@@ -222,6 +222,7 @@ export function recordIndependentReviewExecution(
       provider: agentProviders.name,
       accountLabel: agentProviders.accountLabel,
       purpose: agentRuns.purpose,
+      independenceLoss: agentRuns.independenceLoss,
       sourceHead: agentRuns.sourceHead,
       status: agentRuns.status,
     })
@@ -236,6 +237,7 @@ export function recordIndependentReviewExecution(
     canonicalRun.provider !== (input.provider === 'claude' ? 'claude-code' : input.provider) ||
     canonicalRun.accountLabel !== input.providerAccountLabel ||
     canonicalRun.purpose !== 'review' ||
+    canonicalRun.independenceLoss !== null ||
     canonicalRun.sourceHead !== input.sourceHead ||
     canonicalRun.status !== 'succeeded'
   ) {

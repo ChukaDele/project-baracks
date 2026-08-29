@@ -299,6 +299,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'same canonical provider through another account',
+      independenceLoss: 'review reused the implementer execution context',
       sourceHead: candidateHead,
     });
     setRunStatus(db, sameProviderAlias.id, 'succeeded');
@@ -310,6 +311,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'same-provider review',
+      independenceLoss: 'review reused the implementer execution context',
       sourceHead: candidateHead,
     });
     setRunStatus(db, compromised.id, 'succeeded');
@@ -327,14 +329,16 @@ describe('P1-3 database-enforced completion criteria', () => {
       purpose: 'review',
       billingMode: 'subscription_included',
       routingReason: 'compromised review',
-      independenceLoss: 'provider separation could not be established',
+      independenceLoss: 'review reused the implementer execution context',
       sourceHead: candidateHead,
     });
     setRunStatus(db, compromisedIndependent.id, 'succeeded');
     expect(() => forceComplete()).toThrow(/selected review/);
 
     const cleanProviderId = newId('aprov');
-    db.insert(agentProviders).values({ id: cleanProviderId, name: 'clean-review-provider' }).run();
+    db.insert(agentProviders)
+      .values({ id: cleanProviderId, name: 'implementation-provider', accountLabel: 'review' })
+      .run();
     ensureObservedModel(db, cleanProviderId, 'review-model');
     const independent = createRun(db, {
       taskId: task.id,
@@ -342,7 +346,7 @@ describe('P1-3 database-enforced completion criteria', () => {
       modelRef: 'review-model',
       purpose: 'review',
       billingMode: 'subscription_included',
-      routingReason: 'independent review',
+      routingReason: 'execution-independent same-provider review',
       sourceHead: candidateHead,
     });
     setRunStatus(db, independent.id, 'succeeded');

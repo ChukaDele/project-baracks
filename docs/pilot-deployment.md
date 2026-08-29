@@ -4,7 +4,7 @@
 
 Deploy Major as an **always-present control plane with scoped execution**, not an always-running autonomous daemon.
 
-The pilot is successful only when Major advances a real JSS outcome correctly and an independent provider grades the result. CLI/attachment health alone is plumbing evidence.
+The pilot is successful only when Major advances a real JSS outcome correctly and an execution-independent reviewer grades the result. CLI/attachment health alone is plumbing evidence.
 
 Normal execution uses the headless Major core, trusted provider CLIs and the
 host Seatbelt boundary. Orca owns the operational workspace, worktrees,
@@ -104,7 +104,7 @@ A run that only proves `major` exists, state persists, or a process starts is a 
 
 The builder/provider that performed the last coordinator pass cannot grade the run.
 
-Use a different provider in read-only/isolated review mode to inspect:
+Use a separately dispatched provider execution in read-only/isolated review mode to inspect (provider diversity is useful provenance, not the independence predicate):
 
 - exact Major head;
 - exact JSS head/PR/output produced;

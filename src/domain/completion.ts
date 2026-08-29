@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import type { DbConn } from '../db/client.js';
 import {
   agentRuns,
-  agentProviders,
   decisionRequests,
   evidence,
   projects,
@@ -286,30 +285,26 @@ export function evaluateCompletionProof(
       failures.push('untriggered broader validation evidence is not promotable');
     }
 
-    const implementationProviders = new Set(
-      db
-        .select({ providerName: agentProviders.name, sourceHead: agentRuns.sourceHead })
-        .from(agentRuns)
-        .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
-        .where(
-          and(
-            eq(agentRuns.taskId, taskId),
-            inArray(agentRuns.purpose, ['implementation', 'repair']),
-            eq(agentRuns.status, 'succeeded'),
-          ),
-        )
-        .all()
-        .filter((run) => !progressive.candidateHead || run.sourceHead === progressive.candidateHead)
-        .map((run) => run.providerName),
-    );
+    const implementationExists = progressive.candidateHead
+      ? db
+          .select({ id: agentRuns.id })
+          .from(agentRuns)
+          .where(
+            and(
+              eq(agentRuns.taskId, taskId),
+              inArray(agentRuns.purpose, ['implementation', 'repair']),
+              eq(agentRuns.status, 'succeeded'),
+              eq(agentRuns.sourceHead, progressive.candidateHead),
+            ),
+          )
+          .get() !== undefined
+      : false;
     const succeededReviews = db
       .select({
-        providerName: agentProviders.name,
         independenceLoss: agentRuns.independenceLoss,
         sourceHead: agentRuns.sourceHead,
       })
       .from(agentRuns)
-      .innerJoin(agentProviders, eq(agentProviders.id, agentRuns.providerId))
       .where(
         and(
           eq(agentRuns.taskId, taskId),
@@ -320,14 +315,12 @@ export function evaluateCompletionProof(
       .all();
     const reviewPassed =
       progressive.review === 'none' ||
-      succeededReviews.some(
+      (succeededReviews.some(
         (review) =>
           (!progressive.candidateHead || review.sourceHead === progressive.candidateHead) &&
-          (progressive.review !== 'independent' ||
-            (review.independenceLoss === null &&
-              implementationProviders.size > 0 &&
-              !implementationProviders.has(review.providerName))),
-      );
+          (progressive.review !== 'independent' || review.independenceLoss === null),
+      ) &&
+        (progressive.review !== 'independent' || implementationExists));
     const promotion = assessPromotion({
       prePromotionEvidencePassed:
         passedVerifications >= criteria.minPassedVerificationRuns &&

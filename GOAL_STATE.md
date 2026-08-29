@@ -157,6 +157,10 @@ installation and installed behavior proof follow normal merge.
   complete source-tree digest) before dispatch. The worker prompt, structured promotion proof, and
   pending independent review all remain bound to that identity; a pre-dispatch or post-worker
   mismatch reopens the cycle instead of accepting completion evidence.
+- Independent review is execution-bound, not provider-name-bound. Major may prefer provider diversity,
+  but promotion accepts a same-provider review only through a distinct canonical review run and
+  Major-owned dispatch with no `independenceLoss`, read-only containment, exact candidate head/tree,
+  and persisted provider/account/run provenance. Compromised execution remains fail-closed.
 - Independent grade application performs the final live HEAD/tree read while holding the atomic
   supervisor-state mutation boundary. A mismatch clears pending completion, reopens the goal, and
   throws before project-grade projection, closing the prior check-to-apply race.
@@ -277,6 +281,12 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   test time); expected information gain was detecting frozen-head fixture drift and authority/schema
   regressions without paying for the unrelated full matrix. After explicitly binding qualifying
   verification fixtures to their frozen candidate head, all 9 files and 138/138 tests passed.
+- Execution-independent-review repair: service and SQLite promotion no longer require provider-name
+  inequality. The supervisor no longer excludes the implementing host, while receipt minting and grade
+  application still require a separate succeeded canonical review run, Major dispatch causality, exact
+  head, routed provider/account provenance, and no execution-independence loss. The proportional gate
+  passed 127/127 tests across seven affected routing, migration, task/SQLite, receipt, runtime, and
+  completion files plus typecheck, targeted lint, and formatting; no unrelated full matrix was run.
 - Final implementation-head gate for `7385b13`: 38/38 focused tests passed.
 - Final ordinary gate for `7385b13`: 106/106 files and 910/910 tests passed.
 - Final resource gate for `7385b13`: 139 tests passed with 5 expected skips.
@@ -361,6 +371,10 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
   enforcement cases used qualifying verification fixtures without the task's frozen candidate head.
   The fixtures now provide that exact head; production `createRun` and SQLite frozen-head enforcement
   remain strict, and the repaired affected broader gate passes 138/138.
+- Release-policy correction: provider-name diversity was previously treated as the independence
+  predicate, blocking a separately dispatched read-only review on the same provider and allowing the
+  provider label to overshadow execution provenance. Independence now derives from the canonical
+  review execution and its uncompromised receipt; provider and account remain durable provenance.
 - Independent review regression: `a5ef4b2` made all supervisor completion depend on exactly one
   registered `ready_to_merge` task even though normal supervisor goals do not create task rows.
   Focused lifecycle regressions now prove structured no-task promotion, summary-only rejection,

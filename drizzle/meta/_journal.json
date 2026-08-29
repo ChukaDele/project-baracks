@@ -169,6 +169,13 @@
       "when": 1788057600000,
       "tag": "0023_supervisor_completion_commit",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1788144000000,
+      "tag": "0024_execution_independent_review",
+      "breakpoints": true
     }
   ]
 }
