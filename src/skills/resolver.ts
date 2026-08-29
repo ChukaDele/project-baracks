@@ -239,7 +239,7 @@ function hotSkillBundleRoot(): string | undefined {
     const root = realpathSync(current);
     if (dirname(root) !== realpathSync(bundlesRoot)) return undefined;
     const validated = validateRetainedBundle(root);
-    return validated.registry.version >= 1 ? current : undefined;
+    return validated.registry.version >= 1 ? root : undefined;
   } catch {
     return undefined;
   }

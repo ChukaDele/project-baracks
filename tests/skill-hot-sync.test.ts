@@ -106,8 +106,28 @@ describe('Major hot skill sync', () => {
     const accounting = resolved.skills.find((skill) => skill.id === 'ar-ap-invoice');
     expect(accounting).toBeDefined();
     expect(accounting?.path).toContain(
-      '/skill-bundles/current/skills/internal/ar-ap-invoice/SKILL.md',
+      `/skill-bundles/${marker.sha}/skills/internal/ar-ap-invoice/SKILL.md`,
     );
+  });
+
+  it('binds resolved reads to the authenticated canonical bundle after current changes', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-skill-binding-home-'));
+    const sourceA = sourceCopy('major-skill-binding-a-');
+    const sourceB = sourceCopy('major-skill-binding-b-');
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'bundle A adapter\n');
+    writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B adapter\n');
+    const first = syncMajorSkills({ sourceRoot: sourceA });
+    const resolved = resolveSkills({ task: 'Use skill-resolver for this task.', limit: 1 });
+    const boundPath = resolved.skills[0]?.path;
+    const boundBody = readFileSync(boundPath!, 'utf8');
+    expect(boundPath).toContain(`/skill-bundles/${first.bundleId}/`);
+
+    const second = syncMajorSkills({ sourceRoot: sourceB });
+    expect(second.bundleId).not.toBe(first.bundleId);
+    expect(readFileSync(boundPath!, 'utf8')).toBe(boundBody);
+    expect(boundPath).not.toContain('/skill-bundles/current/');
   });
 
   it('is idempotent when the content-addressed destination is already active', () => {

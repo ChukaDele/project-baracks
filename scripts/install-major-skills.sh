@@ -18,11 +18,23 @@ for managed in .agents .claude .codex .cursor .gemini MAJOR_SKILLS.lock; do
   fi
 done
 MAJOR_HOME="${MAJOR_HOME:-${HOME:?HOME is required}/.major}"
-mkdir -p "$MAJOR_HOME"
-MAJOR_HOME="$(cd "$MAJOR_HOME" && pwd -P)"
+[ ! -L "$MAJOR_HOME" ] || { echo "ERROR: refusing symlinked MAJOR_HOME receipt authority" >&2; exit 2; }
+[ ! -e "$MAJOR_HOME" ] || [ -d "$MAJOR_HOME" ] || { echo "ERROR: MAJOR_HOME receipt authority must be a directory" >&2; exit 2; }
+MAJOR_HOME="$(python3 - "$MAJOR_HOME" <<'PY'
+import os
+import sys
+print(os.path.realpath(sys.argv[1]))
+PY
+)"
 case "$MAJOR_HOME/" in
   "$INSTALL_TARGET/"*) echo "ERROR: MAJOR_HOME must be outside the project tree for installer-owned receipts" >&2; exit 2 ;;
 esac
+RECEIPT_DIR="$MAJOR_HOME/project-skill-receipts"
+[ ! -L "$RECEIPT_DIR" ] || { echo "ERROR: refusing symlinked project-skill-receipts authority" >&2; exit 2; }
+[ ! -e "$RECEIPT_DIR" ] || [ -d "$RECEIPT_DIR" ] || { echo "ERROR: project-skill-receipts authority must be a directory" >&2; exit 2; }
+if [ -d "$RECEIPT_DIR" ]; then
+  [ "$(cd "$RECEIPT_DIR" && pwd -P)" = "$RECEIPT_DIR" ] || { echo "ERROR: project-skill-receipts authority is relocated or unsafe" >&2; exit 2; }
+fi
 PROFILE="${2:-core}"
 FEATURES="${3:-}"
 
@@ -35,6 +47,35 @@ INTERNAL="$MAJOR_ROOT/skills/internal"
 CATALOG="$MAJOR_ROOT/guidance/skills.catalog.json"
 ADAPTERS="$MAJOR_ROOT/adapters/skills"
 FEATURES="$(node "$MAJOR_ROOT/scripts/materialize-project-skill-registry.mjs" normalize-features "$MAJOR_ROOT" "$INSTALL_TARGET" "$PROFILE" "$FEATURES")"
+
+# Authenticate every project-controlled lock entry before staging or cleanup.
+# The allow-list includes canonical registry ids and declared bundle members so
+# a prior broader profile can be safely removed during a profile downgrade.
+if [ -f "$INSTALL_TARGET/MAJOR_SKILLS.lock" ]; then
+  node - "$MAJOR_ROOT/guidance/skills.registry.json" "$INSTALL_TARGET/MAJOR_SKILLS.lock" <<'JS'
+const fs = require('node:fs');
+const [registryPath, lockPath] = process.argv.slice(2);
+const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+const known = new Set();
+for (const entry of registry.entries ?? []) {
+  if (typeof entry.id === 'string') known.add(entry.id);
+  for (const member of entry.projectInstall?.members ?? []) {
+    if (typeof member === 'string') known.add(member);
+  }
+}
+const lines = fs.readFileSync(lockPath, 'utf8').split(/\r?\n/);
+const marker = lines.indexOf('[skills]');
+if (marker < 0) process.exit(0);
+for (const name of lines.slice(marker + 1).filter(Boolean)) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || !known.has(name)) {
+    console.error(`ERROR: unsafe or unknown managed skill lock entry: ${JSON.stringify(name)}`);
+    process.exit(2);
+  }
+}
+JS
+fi
+
+mkdir -p "$MAJOR_HOME"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/major-skills.XXXXXX")"
 STAGED_TARGET="$TMP/project"
 TARGET="$STAGED_TARGET"
@@ -204,7 +245,6 @@ PY
 rm -f "$TARGET/.agents/managed-external.tsv"
 
 PROJECT_IDENTITY="$(printf '%s' "$INSTALL_TARGET" | shasum -a 256 | awk '{print $1}')"
-RECEIPT_DIR="$MAJOR_HOME/project-skill-receipts"
 RECEIPT="$RECEIPT_DIR/$PROJECT_IDENTITY.json"
 STAGED_RECEIPT="$TMP/project-skill-receipt.json"
 mkdir -p "$RECEIPT_DIR"

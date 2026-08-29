@@ -122,6 +122,85 @@ afterEach(() => {
 });
 
 describe('installed host skill commands', () => {
+  it('rejects escaping lock entries before changing target or external state', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-lock-home-'));
+    const target = mkdtempSync(join(tmpdir(), 'major-lock-target-'));
+    const external = mkdtempSync(join(tmpdir(), 'major-lock-external-'));
+    roots.push(home, target, external);
+    const owned = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
+    const sentinel = join(external, 'sentinel.txt');
+    mkdirSync(dirname(owned), { recursive: true });
+    writeFileSync(owned, '# preserved\n');
+    writeFileSync(sentinel, 'external sentinel\n');
+    writeFileSync(
+      join(target, 'MAJOR_SKILLS.lock'),
+      `# hostile project lock\n[skills]\n../../../../${external.split('/').pop()}\n`,
+    );
+    const before = JSON.stringify(snapshotTree(target));
+
+    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      env: {
+        ...process.env,
+        HOME: home,
+        MAJOR_HOME: join(home, '.major'),
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unsafe or unknown managed skill lock entry');
+    expect(JSON.stringify(snapshotTree(target))).toBe(before);
+    expect(readFileSync(sentinel, 'utf8')).toBe('external sentinel\n');
+  });
+
+  it('rejects MAJOR_HOME symlinked into the target before project mutation', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-authority-home-'));
+    const target = mkdtempSync(join(tmpdir(), 'major-authority-target-'));
+    roots.push(home, target);
+    const authority = join(target, '.project-authority');
+    const sentinel = join(authority, 'sentinel.txt');
+    mkdirSync(authority);
+    writeFileSync(sentinel, 'authority sentinel\n');
+    const redirected = join(home, 'redirected-major-home');
+    symlinkSync(authority, redirected);
+    const before = JSON.stringify(snapshotTree(target));
+
+    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      env: { ...process.env, HOME: home, MAJOR_HOME: redirected, GIT_CONFIG_GLOBAL: '/dev/null' },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('symlinked MAJOR_HOME');
+    expect(JSON.stringify(snapshotTree(target))).toBe(before);
+    expect(readFileSync(sentinel, 'utf8')).toBe('authority sentinel\n');
+  });
+
+  it('rejects a redirected receipt directory before project mutation', () => {
+    const home = mkdtempSync(join(tmpdir(), 'major-receipt-home-'));
+    const target = mkdtempSync(join(tmpdir(), 'major-receipt-target-'));
+    const external = mkdtempSync(join(tmpdir(), 'major-receipt-external-'));
+    roots.push(home, target, external);
+    const majorHome = join(home, '.major');
+    mkdirSync(majorHome);
+    const sentinel = join(external, 'sentinel.txt');
+    writeFileSync(sentinel, 'receipt sentinel\n');
+    symlinkSync(external, join(majorHome, 'project-skill-receipts'));
+    writeFileSync(join(target, 'owned.txt'), 'preserve target\n');
+    const before = JSON.stringify(snapshotTree(target));
+
+    const result = spawnSync('bash', ['scripts/install-major-skills.sh', target, 'core'], {
+      env: { ...process.env, HOME: home, MAJOR_HOME: majorHome, GIT_CONFIG_GLOBAL: '/dev/null' },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('symlinked project-skill-receipts');
+    expect(JSON.stringify(snapshotTree(target))).toBe(before);
+    expect(readFileSync(sentinel, 'utf8')).toBe('receipt sentinel\n');
+  });
+
   it('fails atomically before following a symlink below a managed project root', () => {
     const home = mkdtempSync(join(tmpdir(), 'major-symlink-install-home-'));
     const target = mkdtempSync(join(tmpdir(), 'major-symlink-install-target-'));
