@@ -161,6 +161,7 @@ const GENERIC_REVIEW_WORDS = new Set([
 const normalized = (value: string): string => value.trim().replace(/\s+/gu, ' ').toLowerCase();
 const words = (value: string): string[] =>
   normalized(value).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
+const normalizedWordSequence = (value: string): string => words(value).join(' ');
 const distinctiveWords = (value: string): string[] =>
   words(value).filter((word) => word.length >= 4 && !COMMON_WORDS.has(word));
 const meaningfulShortDraftWords = (value: string): string[] =>
@@ -198,7 +199,12 @@ function materiallyGroundedCheck(
   if (!specificObservation) return false;
   if (shortDraft) {
     const draftVocabulary = new Set(meaningfulShortDraftWords(draft));
-    return observationWords.some((word) => draftVocabulary.has(word));
+    const normalizedDraft = normalizedWordSequence(draft);
+    const normalizedObservation = normalizedWordSequence(check.evidence);
+    return (
+      observationWords.some((word) => draftVocabulary.has(word)) &&
+      ` ${normalizedObservation} `.includes(` ${normalizedDraft} `)
+    );
   }
   const excerptVocabulary = new Set(distinctiveWords(check.draftExcerpt));
   return observationWords.some((word) => excerptVocabulary.has(word));

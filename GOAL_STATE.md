@@ -85,6 +85,11 @@ functions, queries, parsers, migrations, components, and other code artifacts re
 Non-source high-stakes drafts may now enter persisted independent review without semantically empty
 provider evidence; academic and technical routes still require bounded source-preservation evidence
 before pending review is admitted.
+The final edge repair gives explicit prose deliverables precedence over incidental code terms through
+one shared writing-object classification, including API documentation and compiler README requests,
+while contextual `this`/`notes` prompts cannot override code-only artifacts. Short-draft review
+observations must now contain the complete normalized draft word sequence, preventing a repeated
+single token from authorizing unrelated prose.
 
 ## Critical-path dependencies
 

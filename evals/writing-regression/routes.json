@@ -97,7 +97,7 @@
     },
     {
       "id": "compose-documentation",
-      "prompt": "compose the API documentation for this public endpoint",
+      "prompt": "compose the API documentation for this React component",
       "genre": "technical",
       "required": ["writing-os", "technical-writing", "prose-lint"],
       "forbidden": ["academic-writing", "direct-response-writing"]

@@ -66,6 +66,12 @@ describe('canonical writing system', () => {
     expect(
       resolveWritingRoute('Compose a product description for the developer API.'),
     ).toBeDefined();
+    expect(resolveWritingRoute('Write API documentation for this React component.')).toMatchObject({
+      genre: 'technical',
+    });
+    expect(resolveWritingRoute('Revise the README for the TypeScript compiler.')).toMatchObject({
+      genre: 'technical',
+    });
   });
 
   it('routes simple replies transactionally and public web messaging as high-stakes', () => {

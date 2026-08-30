@@ -7,8 +7,15 @@ import {
 
 const directWritingAction =
   /\b(?:write|rewrite|draft|prepare|polish|edit|compose|revise|proofread|summari[sz]e)\b/i;
-const directWritingObject =
-  /\b(?:this|notes?|essay|summary|report|memo|homepage|website|landing page|copy|proposal|post|newsletter|article|press release|case stud(?:y|ies)|cover letter|executive summary|product descriptions?|sop|procedure|warning|instructions?|documentation|docs?|readme|email|message|slack|reply|letter|statement|brief|prose|words|content|headline)\b/i;
+const EXPLICIT_WRITING_OBJECT_PATTERN = String.raw`essay|summary|report|memo|homepage|website|landing page|copy|proposal|post|newsletter|article|press release|case stud(?:y|ies)|cover letter|executive summary|product descriptions?|sop|procedure|warning|instructions?|documentation|docs?|readme|email|message|slack|reply|letter|statement|brief|prose|headline`;
+const directWritingObject = new RegExp(
+  String.raw`\b(?:this|notes?|words|content|${EXPLICIT_WRITING_OBJECT_PATTERN})\b`,
+  'i',
+);
+const explicitWritingObject = new RegExp(
+  String.raw`\b(?:${EXPLICIT_WRITING_OBJECT_PATTERN})\b`,
+  'i',
+);
 const transformWritingAction =
   /\b(?:turn\s+(?:these\s+)?notes?\s+into\s+[^.!?]{0,40}\b(?:report|memo|proposal|post|article)|make\s+this\s+(?:sop|procedure|email|message|copy|prose)\s+(?:clearer|better)|do\s+my\s+(?:mba\s+)?(?:critical\s+)?summary|help\s+(?:me\s+)?with\s+(?:this\s+|an?\s+)?(?:essay|report|proposal))\b/i;
 
@@ -18,11 +25,7 @@ export function resolveWritingRoute(task: string): WritingRoute | undefined {
     /\b(?:code|function|class|typescript|javascript|python|rust|sql|regex|api|bug|test|component|compiler)\b/i.test(
       text,
     );
-  const codeArtifact =
-    /\b(?:function|class|query|parser|implementation|migration|source[- ]map|component|compiler|pseudocode)\b/i.test(
-      text,
-    );
-  const codeOnly = codeTerm && (codeArtifact || !directWritingObject.test(text));
+  const codeOnly = codeTerm && !explicitWritingObject.test(text);
   if (codeOnly) return undefined;
   if (
     !(directWritingAction.test(text) && directWritingObject.test(text)) &&

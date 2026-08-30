@@ -24,7 +24,8 @@ describe('persisted writing review authority', () => {
           {
             dimension: 'source fidelity',
             draftExcerpt: draft,
-            evidence: 'The supported claim retains its careful qualification and source meaning.',
+            evidence:
+              'The complete phrase Carefully supported claim retains its qualification and source meaning.',
           },
         ],
         findings: [],
@@ -212,4 +213,35 @@ describe('persisted writing review authority', () => {
       expect(writingReviewEvidenceMatchesDraft(evidence, draft)).toBe(false);
     },
   );
+
+  it('requires the complete normalized short draft in the substantive observation', () => {
+    const draft = 'Go go';
+    const evidence: WritingReviewEvidence = {
+      writingDraftSha256: writingDraftDigest(draft),
+      assessment: 'The complete short instruction was reviewed for clarity and cadence.',
+      checks: [
+        {
+          dimension: 'clarity',
+          draftExcerpt: draft,
+          evidence: 'The first go creates an appropriately direct instruction for the reader.',
+        },
+      ],
+      findings: [],
+    };
+    expect(writingReviewEvidenceMatchesDraft(evidence, draft)).toBe(false);
+    expect(
+      writingReviewEvidenceMatchesDraft(
+        {
+          ...evidence,
+          checks: [
+            {
+              ...evidence.checks[0]!,
+              evidence: 'The complete Go go repetition creates deliberate urgency for the reader.',
+            },
+          ],
+        },
+        draft,
+      ),
+    ).toBe(true);
+  });
 });
