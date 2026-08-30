@@ -92,6 +92,12 @@ describe('canonical writing system', () => {
     });
   });
 
+  it('keeps a casual summary of academic material on the ordinary writing route', () => {
+    const route = resolveWritingRoute('Summarize this academic abstract for a casual note.');
+    expect(route).toMatchObject({ genre: 'general', risk: 'routine' });
+    expect(route?.skills).not.toContain('academic-verify');
+  });
+
   it('discloses the selected Writing OS bodies, not only registry metadata', () => {
     const disclosure = discloseSkills({
       task: 'write the public homepage for our product',

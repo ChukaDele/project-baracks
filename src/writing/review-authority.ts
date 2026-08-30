@@ -196,7 +196,10 @@ function materiallyGroundedCheck(
     observationWords.filter((word) => word.length >= 4 && !GENERIC_REVIEW_WORDS.has(word)).length >=
       2;
   if (!specificObservation) return false;
-  if (shortDraft) return true;
+  if (shortDraft) {
+    const draftVocabulary = new Set(meaningfulShortDraftWords(draft));
+    return observationWords.some((word) => draftVocabulary.has(word));
+  }
   const excerptVocabulary = new Set(distinctiveWords(check.draftExcerpt));
   return observationWords.some((word) => excerptVocabulary.has(word));
 }

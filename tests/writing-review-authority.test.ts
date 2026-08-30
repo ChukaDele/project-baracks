@@ -166,7 +166,7 @@ describe('persisted writing review authority', () => {
         {
           dimension: 'transactional fit',
           draftExcerpt: draft,
-          evidence: 'The acknowledgment is appropriately concise and courteous for this reply.',
+          evidence: 'The word Thanks is appropriately concise and courteous for this reply.',
         },
       ],
       findings: [],
@@ -175,6 +175,20 @@ describe('persisted writing review authority', () => {
     expect(
       writingReviewEvidenceMatchesDraft(
         { ...evidence, checks: [{ ...evidence.checks[0]!, draftExcerpt: 'T' }] },
+        draft,
+      ),
+    ).toBe(false);
+    expect(
+      writingReviewEvidenceMatchesDraft(
+        {
+          ...evidence,
+          checks: [
+            {
+              ...evidence.checks[0]!,
+              evidence: 'The acknowledgment is appropriately concise and courteous for this reply.',
+            },
+          ],
+        },
         draft,
       ),
     ).toBe(false);

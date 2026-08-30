@@ -74,6 +74,11 @@ The final writing-review edge repair rejects whole short drafts that contain no 
 (including `X`, `The`, and generic `Draft.` placeholders), while retaining meaningful short drafts
 with whole-draft, substantive review evidence. The focused writing/supervisor path passes 146/146
 tests with lint, typecheck, formatting, build, Major validation, and stability validation.
+The subsequent exact-head repair also requires a short-draft observation to share meaningful
+vocabulary with the exact draft and broadens ordinary direct-writing routing to press releases, case
+studies, cover letters, executive summaries, and product descriptions. Code-only and UI exclusions
+remain intact, and casual summaries of academic material do not acquire scholarly verification solely
+because their source is academic.
 
 ## Critical-path dependencies
 

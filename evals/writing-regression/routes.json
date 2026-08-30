@@ -124,6 +124,41 @@
       "forbidden": ["academic-writing", "asd-ste100"]
     },
     {
+      "id": "press-release",
+      "prompt": "write a press release announcing the launch",
+      "genre": "general",
+      "required": ["writing-os", "prose-craft", "writing-evaluator"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    },
+    {
+      "id": "case-study",
+      "prompt": "draft a case study from these interview notes",
+      "genre": "general",
+      "required": ["writing-os", "prose-craft", "writing-evaluator"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    },
+    {
+      "id": "cover-letter",
+      "prompt": "prepare a cover letter for this application",
+      "genre": "general",
+      "required": ["writing-os", "prose-craft", "writing-evaluator"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    },
+    {
+      "id": "executive-summary",
+      "prompt": "revise the executive summary for clarity",
+      "genre": "general",
+      "required": ["writing-os", "prose-craft", "writing-evaluator"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    },
+    {
+      "id": "product-description",
+      "prompt": "compose a product description for the new plan",
+      "genre": "general",
+      "required": ["writing-os", "prose-craft", "writing-evaluator"],
+      "forbidden": ["academic-writing", "asd-ste100"]
+    },
+    {
       "id": "email",
       "prompt": "rewrite this email",
       "genre": "transactional",
