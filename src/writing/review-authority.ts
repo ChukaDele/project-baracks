@@ -107,8 +107,94 @@ export function writingReviewEvidenceMatchesDraft(
 ): boolean {
   return (
     evidence.writingDraftSha256 === createHash('sha256').update(draft).digest('hex') &&
-    evidence.checks.every(({ draftExcerpt }) => draft.includes(draftExcerpt))
+    evidence.checks.every((check) => materiallyGroundedCheck(check, draft))
   );
+}
+
+const COMMON_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'by',
+  'for',
+  'from',
+  'has',
+  'in',
+  'is',
+  'it',
+  'of',
+  'on',
+  'or',
+  'that',
+  'the',
+  'this',
+  'to',
+  'was',
+  'were',
+  'with',
+]);
+const GENERIC_REVIEW_WORDS = new Set([
+  ...COMMON_WORDS,
+  'acceptable',
+  'checked',
+  'digest',
+  'draft',
+  'evidence',
+  'exact',
+  'excerpt',
+  'good',
+  'hash',
+  'match',
+  'matches',
+  'pass',
+  'quality',
+  'review',
+  'reviewed',
+  'text',
+  'verified',
+]);
+
+const normalized = (value: string): string => value.trim().replace(/\s+/gu, ' ').toLowerCase();
+const words = (value: string): string[] =>
+  normalized(value).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
+const distinctiveWords = (value: string): string[] =>
+  words(value).filter((word) => word.length >= 4 && !COMMON_WORDS.has(word));
+
+function materiallyGroundedCheck(
+  check: WritingReviewEvidence['checks'][number],
+  draft: string,
+): boolean {
+  const draftText = normalized(draft);
+  const excerptText = normalized(check.draftExcerpt);
+  const draftWords = words(draft);
+  const shortDraft = draftWords.length <= 4 || draftText.length <= 32;
+  const excerptGrounded = shortDraft
+    ? excerptText === draftText
+    : draft.includes(check.draftExcerpt) &&
+      excerptText.length >= 20 &&
+      words(check.draftExcerpt).length >= 3 &&
+      distinctiveWords(check.draftExcerpt).length > 0;
+  if (!excerptGrounded) return false;
+  if (
+    /\b(?:digest|hash)\b.*\b(?:match(?:es|ed)?|verified)\b|\bmatch(?:es|ed)?\b.*\b(?:draft|digest|hash|excerpt)\b/iu.test(
+      check.evidence,
+    )
+  )
+    return false;
+  const observationWords = words(check.evidence);
+  const specificObservation =
+    normalized(check.evidence).length >= 30 &&
+    observationWords.length >= 6 &&
+    observationWords.filter((word) => word.length >= 4 && !GENERIC_REVIEW_WORDS.has(word)).length >=
+      2;
+  if (!specificObservation) return false;
+  if (shortDraft) return true;
+  const excerptVocabulary = new Set(distinctiveWords(check.draftExcerpt));
+  return observationWords.some((word) => excerptVocabulary.has(word));
 }
 
 /** Resolve writing red-team authority only from Major's append-only review

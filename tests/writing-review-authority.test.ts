@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveWritingReviewAuthority } from '../src/writing/review-authority.js';
+import {
+  resolveWritingReviewAuthority,
+  writingReviewEvidenceMatchesDraft,
+  type WritingReviewEvidence,
+} from '../src/writing/review-authority.js';
 import { writingDraftDigest } from '../src/writing/runtime.js';
 import { canonicalGradeProvenance, testDb } from './helpers.js';
 
@@ -19,8 +23,8 @@ describe('persisted writing review authority', () => {
         checks: [
           {
             dimension: 'source fidelity',
-            draftExcerpt: 'supported claim',
-            evidence: 'The traced claim matches the supplied source.',
+            draftExcerpt: draft,
+            evidence: 'The supported claim retains its careful qualification and source meaning.',
           },
         ],
         findings: [],
@@ -108,5 +112,71 @@ describe('persisted writing review authority', () => {
         draft,
       }),
     ).toBeUndefined();
+  });
+
+  it('rejects one-character, common-word, and generic-match observations', () => {
+    const draft = 'The measured improvement remains limited to the controlled study population.';
+    const base: WritingReviewEvidence = {
+      writingDraftSha256: writingDraftDigest(draft),
+      assessment: 'The draft was reviewed for claim strength and qualification fidelity.',
+      checks: [
+        {
+          dimension: 'claim strength',
+          draftExcerpt: 'measured improvement remains limited',
+          evidence: 'The measured improvement remains explicitly limited to the study population.',
+        },
+      ],
+      findings: [],
+    };
+    expect(writingReviewEvidenceMatchesDraft(base, draft)).toBe(true);
+    expect(
+      writingReviewEvidenceMatchesDraft(
+        { ...base, checks: [{ ...base.checks[0]!, draftExcerpt: 'e' }] },
+        draft,
+      ),
+    ).toBe(false);
+    expect(
+      writingReviewEvidenceMatchesDraft(
+        { ...base, checks: [{ ...base.checks[0]!, draftExcerpt: 'The' }] },
+        draft,
+      ),
+    ).toBe(false);
+    expect(
+      writingReviewEvidenceMatchesDraft(
+        {
+          ...base,
+          checks: [
+            {
+              ...base.checks[0]!,
+              evidence: 'The measured improvement digest matches the exact draft excerpt.',
+            },
+          ],
+        },
+        draft,
+      ),
+    ).toBe(false);
+  });
+
+  it('allows a legitimate short draft only when the whole draft is substantively reviewed', () => {
+    const draft = 'Thanks!';
+    const evidence: WritingReviewEvidence = {
+      writingDraftSha256: writingDraftDigest(draft),
+      assessment: 'The short transactional reply was reviewed in its complete context.',
+      checks: [
+        {
+          dimension: 'transactional fit',
+          draftExcerpt: draft,
+          evidence: 'The acknowledgment is appropriately concise and courteous for this reply.',
+        },
+      ],
+      findings: [],
+    };
+    expect(writingReviewEvidenceMatchesDraft(evidence, draft)).toBe(true);
+    expect(
+      writingReviewEvidenceMatchesDraft(
+        { ...evidence, checks: [{ ...evidence.checks[0]!, draftExcerpt: 'T' }] },
+        draft,
+      ),
+    ).toBe(false);
   });
 });

@@ -356,7 +356,7 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
             {
               dimension: 'source fidelity',
               draftExcerpt: 'The study reports a measured improvement.',
-              evidence: 'The traced claim matches study-1.',
+              evidence: 'The measured improvement claim preserves the wording supplied by study-1.',
             },
           ],
           findings: [],
