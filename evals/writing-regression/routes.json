@@ -1,5 +1,11 @@
 {
   "version": 1,
+  "negativeFixtures": [
+    { "id": "typescript-code", "prompt": "Write a TypeScript function to parse JSON." },
+    { "id": "sql-performance", "prompt": "Rewrite this SQL query for speed." },
+    { "id": "visual-redesign", "prompt": "Make this website Awwwards-level." },
+    { "id": "learning-correction", "prompt": "Stop doing this and learn the correction." }
+  ],
   "fixtures": [
     {
       "id": "academic-summary",

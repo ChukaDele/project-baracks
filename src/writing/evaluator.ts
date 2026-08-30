@@ -24,7 +24,8 @@ export interface ClaimTraceEvidence {
   claim: string;
   sourceId?: string;
   sourceExcerpt?: string;
-  supported: boolean;
+  /** Legacy producer hint; ignored by the evaluator. */
+  supported?: boolean;
 }
 
 export function evaluateWriting(input: {
@@ -90,7 +91,8 @@ export function evaluateWriting(input: {
       ? 'missing'
       : input.claimTrace.every(
             (trace) =>
-              trace.supported &&
+              trace.claim.trim() &&
+              input.draft.includes(trace.claim) &&
               trace.sourceId?.trim() &&
               suppliedSources.has(trace.sourceId) &&
               trace.sourceExcerpt?.trim(),

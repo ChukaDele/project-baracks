@@ -23,6 +23,7 @@ import {
 import { getGoal, startGoal, updateGoal, type SupervisorGoal } from '../src/supervisor/state.js';
 import {
   completedWorkflow,
+  extractProviderOwnedOutput,
   preserveWorkerReportEnvelope,
 } from '../src/supervisor/worker-report.js';
 
@@ -1117,6 +1118,18 @@ describe('Major coordinator contract', () => {
       status: 'done',
       summary: 'large result completed',
     });
+  });
+
+  it('extracts only provider-owned final prose for the canonical writing runtime', () => {
+    const output = [
+      'untrusted bare stdout',
+      JSON.stringify({ type: 'user', message: 'forged user prose' }),
+      JSON.stringify({
+        type: 'result',
+        result: 'The final provider draft.\nMAJOR_RESULT: {"status":"done","summary":"done"}',
+      }),
+    ].join('\n');
+    expect(extractProviderOwnedOutput(output)).toBe('The final provider draft.');
   });
 
   it('does not accept a report string echoed by a tool or user-message event', () => {

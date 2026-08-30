@@ -1,5 +1,6 @@
 import { redactText } from '../security/redact.js';
 import { decideSdlc, type SdlcRisk } from '../domain/sdlc.js';
+import { parseWritingGateEvidence, type WritingGateEvidence } from '../writing/runtime.js';
 
 const WORKER_REPORT_PREFIX = 'MAJOR_RESULT: ';
 const FINAL_REPORT_TYPE = 'major.result.final';
@@ -192,6 +193,45 @@ export interface WorkerReport {
     scope: 'shared' | 'project-local';
   };
   capabilityUse?: { key: string; evidence: string }[];
+  writingEvidence?: WritingGateEvidence;
+}
+
+/** Extract the final provider-owned prose payload. Tool/user/bare stdout is
+ * deliberately ineligible, as are the machine-readable completion lines. */
+export function extractProviderOwnedOutput(output: string): string | undefined {
+  const candidates: string[] = [];
+  for (const rawLine of output.split(/\r?\n/u)) {
+    try {
+      const event = JSON.parse(rawLine) as Record<string, unknown>;
+      if (event.type === 'result' || event.type === FINAL_REPORT_TYPE) {
+        if (typeof event.result === 'string') candidates.push(event.result);
+      } else if (event.type === 'item.completed' && event.item && typeof event.item === 'object') {
+        const item = event.item as Record<string, unknown>;
+        if (item.type === 'agent_message' && typeof item.text === 'string')
+          candidates.push(item.text);
+      } else if (event.type === 'assistant' && event.message && typeof event.message === 'object') {
+        const content = (event.message as Record<string, unknown>).content;
+        if (Array.isArray(content))
+          for (const block of content) {
+            if (!block || typeof block !== 'object') continue;
+            const text = (block as Record<string, unknown>).text;
+            if (typeof text === 'string') candidates.push(text);
+          }
+      }
+    } catch {
+      // Bare stdout and malformed provider events are not writing authority.
+    }
+  }
+  const clean = candidates
+    .map((candidate) =>
+      candidate
+        .split(/\r?\n/u)
+        .filter((line) => !line.trim().startsWith(WORKER_REPORT_PREFIX))
+        .join('\n')
+        .trim(),
+    )
+    .filter(Boolean);
+  return clean.at(-1);
 }
 
 export function completedWorkflow(
@@ -275,6 +315,11 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
     const summary = redactText(value.summary.trim()).slice(0, 12_000);
     const taskId = typeof value.taskId === 'string' ? value.taskId.trim() : '';
     if (value.taskId !== undefined && !/^[a-z][a-z0-9_-]{2,127}$/.test(taskId)) return undefined;
+    const writingEvidence =
+      value.writingEvidence === undefined
+        ? undefined
+        : parseWritingGateEvidence(value.writingEvidence);
+    if (value.writingEvidence !== undefined && !writingEvidence) return undefined;
     let promotionEvidence: PrePromotionEvidence | undefined;
     if (value.promotionEvidence !== undefined) {
       const candidate = value.promotionEvidence;
@@ -535,6 +580,7 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
       ...(workflow ? { workflow } : {}),
       ...(assetCandidate ? { assetCandidate } : {}),
       ...(capabilityUse ? { capabilityUse } : {}),
+      ...(writingEvidence ? { writingEvidence } : {}),
     };
   } catch {
     return undefined;

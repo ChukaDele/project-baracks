@@ -6,7 +6,7 @@ import { discloseSkills, resolveSkills } from '../src/skills/resolver.js';
 import { diagnoseProse } from '../src/writing/diagnostics.js';
 import { evaluateWriting } from '../src/writing/evaluator.js';
 import { resolveWritingRoute } from '../src/writing/routing.js';
-import { inspectWritingDraft } from '../src/writing/runtime.js';
+import { inspectWritingDraft, writingDraftDigest } from '../src/writing/runtime.js';
 import { captureAcceptedWritingEdit } from '../src/writing/learning.js';
 import { observeDetectors } from '../src/writing/detector-observations.js';
 import { runLocalVale, type LocalDiagnosticExecutor } from '../src/writing/vale.js';
@@ -19,6 +19,7 @@ const routeFixtures = JSON.parse(
   readFileSync(join(process.cwd(), 'evals/writing-regression/routes.json'), 'utf8'),
 ) as {
   fixtures: Array<{ prompt: string; genre: string; required: string[]; forbidden: string[] }>;
+  negativeFixtures: Array<{ id: string; prompt: string }>;
 };
 const priorMajorHome = process.env.MAJOR_HOME;
 const testMajorHome = mkdtempSync(join(tmpdir(), 'major-writing-system-'));
@@ -40,6 +41,13 @@ describe('canonical writing system', () => {
     const resolved = resolveSkills({ task: fixture.prompt });
     expect(resolved.receipt.writing?.lifecycle).toBe('RESOLVED_NOT_EXECUTED');
     expect(resolved.skills.map((skill) => skill.id)).toEqual(route.skills);
+  });
+
+  it.each(routeFixtures.negativeFixtures)('does not route negative fixture $id', (fixture) => {
+    expect(resolveWritingRoute(fixture.prompt)).toBeUndefined();
+    expect(
+      resolveSkills({ task: fixture.prompt, limit: 12 }).skills.map((skill) => skill.id),
+    ).not.toContain('writing-os');
   });
 
   it('does not route non-writing or code-only work through Writing OS', () => {
@@ -362,17 +370,55 @@ describe('canonical writing system', () => {
     const report = inspectWritingDraft({
       task: 'prepare an important client-facing proposal',
       draft: 'The proposal makes one careful claim.',
-      independentRedTeam: {
-        reviewerId: 'writer-1',
-        draftAuthorId: 'writer-1',
-        reviewRunId: 'review-run-1',
-        passed: true,
-        findings: [],
+      evidence: {
+        redTeam: {
+          draftSha256: '0'.repeat(64),
+          reviewerRunId: 'writer-1',
+          draftAuthorRunId: 'writer-1',
+          findings: [],
+        },
       },
     });
     expect(report.gates).toContainEqual(
       expect.objectContaining({ gate: 'independent-red-team', state: 'pending' }),
     );
+  });
+
+  it('binds red-team findings and final verification to the exact draft', () => {
+    const draft = 'The proposal makes one careful claim.';
+    const report = inspectWritingDraft({
+      task: 'prepare an important client-facing proposal',
+      draft,
+      evidence: {
+        redTeam: {
+          draftSha256: writingDraftDigest(draft),
+          reviewerRunId: 'review-run-2',
+          draftAuthorRunId: 'draft-run-1',
+          findings: [{ id: 'finding-1', severity: 'BLOCKER', resolved: false }],
+        },
+      },
+    });
+    expect(report.gates).toContainEqual(
+      expect.objectContaining({ gate: 'independent-red-team', state: 'failed' }),
+    );
+    expect(report.gates).toContainEqual(
+      expect.objectContaining({ gate: 'final-verification', state: 'failed' }),
+    );
+  });
+
+  it('fails Vale closed on invalid JSON through the bounded request seam', () => {
+    const requests: Parameters<LocalDiagnosticExecutor>[0][] = [];
+    const report = runLocalVale({ text: 'Plain prose.', profile: 'technical' }, (request) => {
+      requests.push(request);
+      return request.operation === 'version'
+        ? { status: 0, stdout: 'Vale 3.9.0', stderr: '' }
+        : { status: 0, stdout: '{', stderr: '' };
+    });
+    expect(report).toMatchObject({ state: 'degraded', passed: false });
+    expect(requests).toEqual([
+      { operation: 'version' },
+      { operation: 'lint', profile: 'technical', stdin: 'Plain prose.' },
+    ]);
   });
 
   it('captures accepted edits as lifecycle candidates without direct global policy', () => {

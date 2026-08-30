@@ -62,7 +62,7 @@
       ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "4af44b55369d6626722043aa8172c8c58f081aa612b2b7960587c2e1b08cb222",
+      "contentSha256": "fd0e5a177773e6103ec832f59b8487f5573d836af18d38404bb800e753650c75",
       "triggers": [
         "academic",
         "essay",
@@ -276,7 +276,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "1910c5bdf9cb15cd68a48a41f53f2ed42530c58ab097d0c9b8fd244de6feed00",
+      "contentSha256": "fd9ea52a2f347f2ec5f2218a3b15011bb44310b533c600a77dbed597815b76e3",
       "triggers": [
         "asd",
         "ste100",
@@ -383,7 +383,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "97c8b78e6925e0d76b4b028507afa0e01923ee686f5094a2a3be07f85236820b",
+      "contentSha256": "4d2b2163df35cd064f1bb3047604845fea817e50b8cbe0e647aecc5a8b0d8b8a",
       "triggers": [
         "brand",
         "product",
@@ -1149,7 +1149,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "56ab46b482db24c8639b064e7f9b445b3dff8ccfa5c61ad1d8bae00b4c6541b8",
+      "contentSha256": "96aa9fde9f09c7bd8289f411362fe7e9d8dd41c758396b6b55e9ce0cc5eb60e3",
       "triggers": [
         "direct",
         "response",
@@ -2211,7 +2211,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "1418d18460186e17f92ae2e5d04705f00f966838282268c53f4597d399529169",
+      "contentSha256": "1a5f0ae97578d35ebdfb0fe05cd38d887e3438c15fea0cc6ecfb1df6c9f2e2bc",
       "triggers": [
         "natural",
         "writing",
@@ -2519,7 +2519,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "3b012940324e9169d216fde9efaa3dacb1213a75608e7e91bc942591fed4cab1",
+      "contentSha256": "c5426a368a6ab36300b706b8a7b68516711edcb92d4396fb9e6fbdf34ec2e8fb",
       "triggers": [
         "linkedin",
         "thought",
@@ -2828,7 +2828,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "14cb2877f4207b4404ff11665677cf8f37189ca5582748818cc01274ddb22ac6",
+      "contentSha256": "4a3e8c54d9c55b8423bbb5e72e215e0ab65570d9c0c9611b6fb0e295d8a7bcdc",
       "triggers": [
         "sentence",
         "paragraph",
@@ -2864,7 +2864,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "ac406e72759fb0fa1a57ee444cf6d2a09d16591c30c3c8d796c9a274e747765a",
+      "contentSha256": "4eeb30d0ed56373451ef2be82b9fcea0f696ed5d04688f1fa7aea76d1580131d",
       "triggers": [
         "prose",
         "lint",
@@ -3735,7 +3735,7 @@
       ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "0a862cc9284c1f630cba61b9b9622cf98eb7ab39b0000dc138aa9ef0e6ca9181",
+      "contentSha256": "d1232f868af0e5bacee9c70734e01aadd260b8f00aaedc2d93ea8e3ff4ba0c59",
       "triggers": [
         "sop",
         "procedure",
@@ -4308,7 +4308,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "38eab325ea6dd1ecdf127970ba3502ea21275f665a3153f72ac825028d96848e",
+      "contentSha256": "db2ba66be5a3f33e00de7a174a10b6c05abf475dbe96e84fecb283e94d212044",
       "triggers": [
         "approved",
         "writing",
@@ -4559,7 +4559,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "7acd35ee4d764735a2b44308ba5cfcd8c866f8b117392580417b1cb4b8878de9",
+      "contentSha256": "25b6a8fd8675a7a41121ab5bfa6a42d7ecdcd95ae17cd9b96641801125ea0323",
       "triggers": [
         "writing",
         "evaluate",
@@ -4661,7 +4661,7 @@
       ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "8072f07fbc62a863dbde358ed66936b99389bbfff5e3a15daa6e2fe4ff271737",
+      "contentSha256": "d881cdac99224b6b59f647da08231ca38c664c41c0d3566fa04c2be9148d555d",
       "triggers": [
         "write",
         "rewrite",

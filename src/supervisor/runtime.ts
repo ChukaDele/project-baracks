@@ -85,6 +85,7 @@ import {
   completedWorkflow,
   assessSupervisorAdmissionRisk,
   deriveSupervisorPromotionContract,
+  extractProviderOwnedOutput,
   parseWorkerReport,
   type WorkerReport,
 } from './worker-report.js';
@@ -107,6 +108,8 @@ import {
   sourceIdentityMatches,
   type SupervisorCandidateRecord,
 } from './source-identity.js';
+import { resolveWritingRoute } from '../writing/routing.js';
+import { inspectWritingDraft } from '../writing/runtime.js';
 
 export { exactRepositoryHead } from './source-identity.js';
 
@@ -1790,6 +1793,50 @@ async function runLockedGoalCycle(
       return;
     }
     if (report?.status === 'done') {
+      const writingRoute = resolveWritingRoute(goal.goal);
+      if (writingRoute) {
+        const draft = extractProviderOwnedOutput(outcome.stdout);
+        if (!draft) {
+          updateGoal(goal.id, {
+            status: 'active',
+            consecutiveFailures: 0,
+            activePid: undefined,
+            lastFinishedAt: new Date().toISOString(),
+            lastSummary:
+              'Writing completion refused because no provider-owned final draft was found.',
+            nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+            pendingCompletion: undefined,
+            retryImmediately: false,
+            ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
+          });
+          recordTerminalObservation();
+          return;
+        }
+        const writing = inspectWritingDraft({
+          task: goal.goal,
+          draft,
+          ...(report.writingEvidence ? { evidence: report.writingEvidence } : {}),
+        });
+        if (writing.finalState === 'failed') {
+          const failed = writing.gates
+            .filter(({ state }) => state === 'failed' || state === 'pending')
+            .map(({ gate, detail }) => `${gate}: ${detail}`)
+            .join('; ');
+          updateGoal(goal.id, {
+            status: 'active',
+            consecutiveFailures: 0,
+            activePid: undefined,
+            lastFinishedAt: new Date().toISOString(),
+            lastSummary: `Writing completion refused by canonical runtime: ${failed}`,
+            nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+            pendingCompletion: undefined,
+            retryImmediately: false,
+            ...(outcome.sessionRef ? { lastSessionRef: outcome.sessionRef } : {}),
+          });
+          recordTerminalObservation();
+          return;
+        }
+      }
       if (candidate && !sourceIdentityMatches(candidate, finishedSourceIdentity)) {
         updateGoal(goal.id, {
           status: 'active',
