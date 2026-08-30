@@ -90,6 +90,15 @@ one shared writing-object classification, including API documentation and compil
 while contextual `this`/`notes` prompts cannot override code-only artifacts. Short-draft review
 observations must now contain the complete normalized draft word sequence, preventing a repeated
 single token from authorizing unrelated prose.
+The CI resolver repair now admits ASD-STE100 automatically only through the canonical technical-writing
+route, while preserving explicit named invocation. The malicious non-writing upload prompt containing
+only the generic word `instructions` is a negative fixture; controlled technical operating instructions
+and an explicit ASD-STE100 request remain positive fixtures. Focused resolver proof passes 155/155.
+The available validator, stability validator, install-transaction validator, formatting, source lint,
+typecheck, and production compilation gates pass. The full resource matrix runs 233 tests: 219 pass,
+5 skip, and 9 host-bound tests fail because nested Seatbelt is denied and admitted macOS temporary
+paths necessarily contain `/Users/`; both resolver suites pass within that matrix. Provider CLI
+validation reaches Claude and Codex, then the host boundary denies execution of `cursor-agent`.
 
 ## Critical-path dependencies
 
@@ -485,8 +494,9 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
 
 ## Next executable action
 
-Request an independent read-only exact-head review of the repaired SHA. After normal merge,
-install the exact SHA and record installed behavior proof.
+Commit and freeze the resolver repair, then request an independent read-only exact-head review of the
+new SHA. After that review, update the authorized PR and continue through merge, clean literal-main
+installation, strict audit, and installed resolve-load-behavior proof.
 
 ## Owner-only gate
 

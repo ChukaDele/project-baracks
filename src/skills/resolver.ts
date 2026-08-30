@@ -778,6 +778,7 @@ function resolveSkillsInternal(input: {
   const context = projectContext(cwd, task);
   const requested = [...new Set((input.skills ?? []).map((id) => id.trim()).filter(Boolean))];
   const writingRoute = requested.length === 0 ? resolveWritingRoute(task) : undefined;
+  const explicitlyNamesAsdSte100 = /\basd[- ]?ste100\b/i.test(task);
   if (input.skills && requested.length === 0) {
     throw new Error('explicit skill selection requires at least one --skill <id>');
   }
@@ -871,7 +872,12 @@ function resolveSkillsInternal(input: {
                 score: 900 - writingRoute.skills.indexOf(entry.id),
                 reason: writingRoute.reasons[entry.id] ?? 'required by canonical writing route',
               }
-          : scoreEntry(entry, task, examples);
+            : entry.id === 'asd-ste100' && !explicitlyNamesAsdSte100
+              ? {
+                  score: 0,
+                  reason: 'ASD-STE100 requires a canonical technical-writing route',
+                }
+            : scoreEntry(entry, task, examples);
       const sourceKind = generated
         ? 'PROJECT_LOCAL'
         : inferSkillSourceKind(entry.source, entry.sourceKind);
