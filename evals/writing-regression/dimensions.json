@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "dimensions": [
+    "prohibited-pattern-count",
+    "voice-profile-deviation",
+    "substantive-evaluation",
+    "source-fidelity",
+    "factual-preservation",
+    "genre-readability",
+    "detector-diagnostics",
+    "user-preference-compliance"
+  ],
+  "aggregation": "none",
+  "detectorPolicy": "diagnostic-only",
+  "fixtures": [
+    {
+      "id": "vague-attribution",
+      "genre": "report",
+      "text": "Studies show that this approach always works.",
+      "expectedFinding": "vague-attribution"
+    },
+    {
+      "id": "code-preservation",
+      "genre": "technical",
+      "text": "```ts\nconst landscape = 'testament';\n```\nRun the command once.",
+      "expectedFinding": null
+    },
+    {
+      "id": "academic-qualification",
+      "genre": "academic",
+      "text": "The result may reflect sampling error and does not establish causation.",
+      "expectedFinding": null
+    }
+  ]
+}

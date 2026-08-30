@@ -19,7 +19,10 @@ import {
   TrustedExecutableRegistry,
 } from '../src/security/trusted-executables.js';
 import { ExecutionGateway, type ExecutionPolicyDecision } from '../src/security/gateway.js';
-import { trustedExecutableRegistry } from '../src/security/major-gateway.js';
+import {
+  executeLocalDiagnostic,
+  trustedExecutableRegistry,
+} from '../src/security/major-gateway.js';
 import { gatewayAllowedRoots } from '../src/supervisor/worker.js';
 import { LimaBackend } from '../src/execution/lima-backend.js';
 
@@ -134,6 +137,18 @@ describe('production gateway trust composition', () => {
       if (priorPath === undefined) delete process.env.PATH;
       else process.env.PATH = priorPath;
     }
+  });
+
+  it('never promotes or executes an arbitrary diagnostic path', () => {
+    const dir = tempDir();
+    const marker = join(dir, 'executed');
+    const arbitrary = writeExecutable(dir, 'vale', `#!/bin/sh\ntouch ${marker}\n`);
+    const result = executeLocalDiagnostic({
+      operation: 'version',
+      executable: arbitrary,
+    } as Parameters<typeof executeLocalDiagnostic>[0]);
+    expect(result.stdout).not.toContain(arbitrary);
+    expect(existsSync(marker)).toBe(false);
   });
 });
 

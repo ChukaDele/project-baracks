@@ -1,0 +1,7 @@
+extends: existence
+message: "Confirm that '%s' communicates a specific benefit."
+level: warning
+ignorecase: true
+tokens:
+  - 'revolutionary'
+  - 'transformative'

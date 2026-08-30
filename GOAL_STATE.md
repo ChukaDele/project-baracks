@@ -70,6 +70,35 @@ inconclusive attempts produce an availability checkpoint, never an implementatio
 The release stability validator now verifies the real split worktree contract: `state.ts` must integrate
 `gitCommonDir`, and `source-identity.ts` must implement the linked-worktree `commondir` lookup. This
 repairs the obsolete same-file marker without weakening either required side of the invariant.
+The final writing-review edge repair rejects whole short drafts that contain no meaningful token
+(including `X`, `The`, and generic `Draft.` placeholders), while retaining meaningful short drafts
+with whole-draft, substantive review evidence. The focused writing/supervisor path passes 146/146
+tests with lint, typecheck, formatting, build, Major validation, and stability validation.
+The subsequent exact-head repair also requires a short-draft observation to share meaningful
+vocabulary with the exact draft and broadens ordinary direct-writing routing to press releases, case
+studies, cover letters, executive summaries, and product descriptions. Code-only and UI exclusions
+remain intact, and casual summaries of academic material do not acquire scholarly verification solely
+because their source is academic.
+The next exact-head repair reuses the full writing-object predicate when code terms are present, so
+explicit deliverables such as API press releases and product descriptions route to Writing OS while
+functions, queries, parsers, migrations, components, and other code artifacts remain excluded.
+Non-source high-stakes drafts may now enter persisted independent review without semantically empty
+provider evidence; academic and technical routes still require bounded source-preservation evidence
+before pending review is admitted.
+The final edge repair gives explicit prose deliverables precedence over incidental code terms through
+one shared writing-object classification, including API documentation and compiler README requests,
+while contextual `this`/`notes` prompts cannot override code-only artifacts. Short-draft review
+observations must now contain the complete normalized draft word sequence, preventing a repeated
+single token from authorizing unrelated prose.
+The CI resolver repair now admits ASD-STE100 automatically only through the canonical technical-writing
+route, while preserving explicit named invocation. The malicious non-writing upload prompt containing
+only the generic word `instructions` is a negative fixture; controlled technical operating instructions
+and an explicit ASD-STE100 request remain positive fixtures. Focused resolver proof passes 155/155.
+The available validator, stability validator, install-transaction validator, formatting, source lint,
+typecheck, and production compilation gates pass. The full resource matrix runs 233 tests: 219 pass,
+5 skip, and 9 host-bound tests fail because nested Seatbelt is denied and admitted macOS temporary
+paths necessarily contain `/Users/`; both resolver suites pass within that matrix. Provider CLI
+validation reaches Claude and Codex, then the host boundary denies execution of `cursor-agent`.
 
 ## Critical-path dependencies
 
@@ -465,8 +494,9 @@ permitted`, so runtime containment proof remains for the parent exact-head valid
 
 ## Next executable action
 
-Request an independent read-only exact-head review of the repaired SHA. After normal merge,
-install the exact SHA and record installed behavior proof.
+Commit and freeze the resolver repair, then request an independent read-only exact-head review of the
+new SHA. After that review, update the authorized PR and continue through merge, clean literal-main
+installation, strict audit, and installed resolve-load-behavior proof.
 
 ## Owner-only gate
 

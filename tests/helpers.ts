@@ -170,7 +170,13 @@ export function seedProject(db: Db, name = 'demo') {
 /** Canonical distinct succeeded worker/reviewer provenance for policy tests. */
 export function canonicalGradeProvenance(
   db: Db,
-  input: { id: string; project: string; goalId?: string; sourceHead?: string },
+  input: {
+    id: string;
+    project: string;
+    goalId?: string;
+    sourceHead?: string;
+    reviewEvidence?: string;
+  },
 ) {
   const fixtureId = newId('task');
   const sourceHead = input.sourceHead ?? 'a'.repeat(40);
@@ -248,7 +254,7 @@ export function canonicalGradeProvenance(
       goalId,
       sourceHead,
       verdict: 'pass',
-      evidence: 'canonical policy fixture passed',
+      evidence: input.reviewEvidence ?? 'canonical policy fixture passed',
     },
   });
   return {

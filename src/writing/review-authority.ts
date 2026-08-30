@@ -1,0 +1,270 @@
+import { createHash } from 'node:crypto';
+import { and, desc, eq } from 'drizzle-orm';
+import type { DbConn } from '../db/client.js';
+import { independentReviewReceipts } from '../db/schema.js';
+import type { WritingRuntimeAuthority } from './runtime.js';
+
+export interface WritingReviewEvidence {
+  writingDraftSha256: string;
+  assessment: string;
+  checks: Array<{ dimension: string; draftExcerpt: string; evidence: string }>;
+  findings: string[];
+  sourceCoverage?: { sourcesSha256: string; verdict: 'pass' | 'fail' };
+}
+
+/** A digest binds identity but is not a review. Require bounded, substantive
+ * observations so a caller cannot authorize completion with hashes alone. */
+export function parseWritingReviewEvidence(value: string): WritingReviewEvidence | undefined {
+  if (Buffer.byteLength(value, 'utf8') > 4_000) return undefined;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+    if (
+      Object.keys(parsed).some(
+        (key) =>
+          !['writingDraftSha256', 'assessment', 'checks', 'findings', 'sourceCoverage'].includes(
+            key,
+          ),
+      )
+    )
+      return undefined;
+    if (
+      typeof parsed.writingDraftSha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(parsed.writingDraftSha256) ||
+      typeof parsed.assessment !== 'string' ||
+      parsed.assessment.trim().length < 20 ||
+      Buffer.byteLength(parsed.assessment, 'utf8') > 2_000 ||
+      !Array.isArray(parsed.checks) ||
+      parsed.checks.length === 0 ||
+      parsed.checks.length > 20 ||
+      !Array.isArray(parsed.findings) ||
+      parsed.findings.length > 20
+    )
+      return undefined;
+    const bounded = (candidate: unknown, maximum: number): candidate is string =>
+      typeof candidate === 'string' &&
+      Boolean(candidate.trim()) &&
+      Buffer.byteLength(candidate, 'utf8') <= maximum;
+    const checks = parsed.checks.flatMap((item): WritingReviewEvidence['checks'] => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+      const check = item as Record<string, unknown>;
+      if (
+        Object.keys(check).some((key) => !['dimension', 'draftExcerpt', 'evidence'].includes(key))
+      )
+        return [];
+      return bounded(check.dimension, 200) &&
+        bounded(check.draftExcerpt, 1_000) &&
+        bounded(check.evidence, 1_000)
+        ? [
+            {
+              dimension: check.dimension.trim(),
+              draftExcerpt: check.draftExcerpt,
+              evidence: check.evidence.trim(),
+            },
+          ]
+        : [];
+    });
+    const findings = parsed.findings.filter((item): item is string => bounded(item, 1_000));
+    if (checks.length !== parsed.checks.length || findings.length !== parsed.findings.length)
+      return undefined;
+    const source =
+      parsed.sourceCoverage &&
+      typeof parsed.sourceCoverage === 'object' &&
+      !Array.isArray(parsed.sourceCoverage)
+        ? (parsed.sourceCoverage as Record<string, unknown>)
+        : undefined;
+    if (
+      parsed.sourceCoverage !== undefined &&
+      (!source ||
+        Object.keys(source).some((key) => !['sourcesSha256', 'verdict'].includes(key)) ||
+        typeof source.sourcesSha256 !== 'string' ||
+        !/^[a-f0-9]{64}$/u.test(source.sourcesSha256) ||
+        !['pass', 'fail'].includes(String(source.verdict)))
+    )
+      return undefined;
+    return {
+      writingDraftSha256: parsed.writingDraftSha256,
+      assessment: parsed.assessment.trim(),
+      checks,
+      findings,
+      ...(source
+        ? {
+            sourceCoverage: {
+              sourcesSha256: source.sourcesSha256 as string,
+              verdict: source.verdict as 'pass' | 'fail',
+            },
+          }
+        : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+export function writingReviewEvidenceMatchesDraft(
+  evidence: WritingReviewEvidence,
+  draft: string,
+): boolean {
+  return (
+    evidence.writingDraftSha256 === createHash('sha256').update(draft).digest('hex') &&
+    evidence.checks.every((check) => materiallyGroundedCheck(check, draft))
+  );
+}
+
+const COMMON_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'by',
+  'for',
+  'from',
+  'has',
+  'in',
+  'is',
+  'it',
+  'of',
+  'on',
+  'or',
+  'that',
+  'the',
+  'this',
+  'to',
+  'was',
+  'were',
+  'with',
+]);
+const GENERIC_REVIEW_WORDS = new Set([
+  ...COMMON_WORDS,
+  'acceptable',
+  'checked',
+  'digest',
+  'draft',
+  'evidence',
+  'exact',
+  'excerpt',
+  'good',
+  'hash',
+  'match',
+  'matches',
+  'pass',
+  'quality',
+  'review',
+  'reviewed',
+  'text',
+  'verified',
+]);
+
+const normalized = (value: string): string => value.trim().replace(/\s+/gu, ' ').toLowerCase();
+const words = (value: string): string[] =>
+  normalized(value).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
+const normalizedWordSequence = (value: string): string => words(value).join(' ');
+const distinctiveWords = (value: string): string[] =>
+  words(value).filter((word) => word.length >= 4 && !COMMON_WORDS.has(word));
+const meaningfulShortDraftWords = (value: string): string[] =>
+  words(value).filter(
+    (word) => word.length >= 2 && !COMMON_WORDS.has(word) && !GENERIC_REVIEW_WORDS.has(word),
+  );
+
+function materiallyGroundedCheck(
+  check: WritingReviewEvidence['checks'][number],
+  draft: string,
+): boolean {
+  const draftText = normalized(draft);
+  const excerptText = normalized(check.draftExcerpt);
+  const draftWords = words(draft);
+  const shortDraft = draftWords.length <= 4 || draftText.length <= 32;
+  const excerptGrounded = shortDraft
+    ? excerptText === draftText && meaningfulShortDraftWords(draft).length > 0
+    : draft.includes(check.draftExcerpt) &&
+      excerptText.length >= 20 &&
+      words(check.draftExcerpt).length >= 3 &&
+      distinctiveWords(check.draftExcerpt).length > 0;
+  if (!excerptGrounded) return false;
+  if (
+    /\b(?:digest|hash)\b.*\b(?:match(?:es|ed)?|verified)\b|\bmatch(?:es|ed)?\b.*\b(?:draft|digest|hash|excerpt)\b/iu.test(
+      check.evidence,
+    )
+  )
+    return false;
+  const observationWords = words(check.evidence);
+  const specificObservation =
+    normalized(check.evidence).length >= 30 &&
+    observationWords.length >= 6 &&
+    observationWords.filter((word) => word.length >= 4 && !GENERIC_REVIEW_WORDS.has(word)).length >=
+      2;
+  if (!specificObservation) return false;
+  if (shortDraft) {
+    const draftVocabulary = new Set(meaningfulShortDraftWords(draft));
+    const normalizedDraft = normalizedWordSequence(draft);
+    const normalizedObservation = normalizedWordSequence(check.evidence);
+    return (
+      observationWords.some((word) => draftVocabulary.has(word)) &&
+      ` ${normalizedObservation} `.includes(` ${normalizedDraft} `)
+    );
+  }
+  const excerptVocabulary = new Set(distinctiveWords(check.draftExcerpt));
+  return observationWords.some((word) => excerptVocabulary.has(word));
+}
+
+/** Resolve writing red-team authority only from Major's append-only review
+ * receipt. Free-form worker identifiers and verdicts are never consulted. */
+export function resolveWritingReviewAuthority(
+  db: DbConn,
+  input: {
+    project: string;
+    goalId: string;
+    reviewedRunId: string;
+    sourceHead: string;
+    sourceTreeDigest: string;
+    draft: string;
+  },
+): WritingRuntimeAuthority | undefined {
+  const receipts = db
+    .select()
+    .from(independentReviewReceipts)
+    .where(
+      and(
+        eq(independentReviewReceipts.project, input.project),
+        eq(independentReviewReceipts.goalId, input.goalId),
+        eq(independentReviewReceipts.reviewedRunId, input.reviewedRunId),
+        eq(independentReviewReceipts.sourceHead, input.sourceHead),
+        eq(independentReviewReceipts.sourceTreeDigest, input.sourceTreeDigest),
+        eq(independentReviewReceipts.executionStatus, 'succeeded'),
+      ),
+    )
+    .orderBy(desc(independentReviewReceipts.createdAt))
+    .all();
+  for (const receipt of receipts) {
+    try {
+      const evidence = parseWritingReviewEvidence(receipt.evidence);
+      if (!evidence) continue;
+      if (!writingReviewEvidenceMatchesDraft(evidence, input.draft)) continue;
+      const draftSha256 = createHash('sha256').update(input.draft).digest('hex');
+      const sourceCoverage = evidence.sourceCoverage;
+      return {
+        redTeam: {
+          receiptId: receipt.id,
+          draftSha256,
+          verdict: receipt.verdict,
+        },
+        ...(sourceCoverage && sourceCoverage.verdict === receipt.verdict
+          ? {
+              sourceCoverage: {
+                receiptId: receipt.id,
+                draftSha256,
+                sourcesSha256: sourceCoverage.sourcesSha256,
+                verdict: receipt.verdict,
+              },
+            }
+          : {}),
+      };
+    } catch {
+      // Legacy/free-form receipt evidence cannot authorize a writing gate.
+    }
+  }
+  return undefined;
+}

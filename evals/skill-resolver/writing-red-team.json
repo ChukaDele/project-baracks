@@ -1,0 +1,9 @@
+{
+  "skill": "writing-red-team",
+  "should_trigger": [
+    "prepare a proposal",
+    "write a LinkedIn post about these notes",
+    "independently red-team this client-facing draft"
+  ],
+  "should_not_trigger": ["rewrite this email", "write a casual chat message"]
+}

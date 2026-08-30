@@ -8,10 +8,11 @@ import {
   realpathSync,
   symlinkSync,
 } from 'node:fs';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Readable, Writable } from 'node:stream';
 import type { ExecuteHandle, ProviderEvent } from '../providers/types.js';
 import { providerWorkshopArgs } from '../providers/commands.js';
@@ -33,6 +34,74 @@ import {
   assertActiveResourceLeaseForProcess,
 } from '../supervisor/resources.js';
 import { globalStopRequested } from '../supervisor/policy.js';
+
+export type ValeProfile =
+  'general' | 'academic' | 'marketing' | 'technical' | 'asd-ste100' | 'transactional';
+
+export type LocalDiagnosticRequest =
+  { operation: 'version' } | { operation: 'lint'; profile: ValeProfile; stdin: string };
+
+export interface LocalDiagnosticResult {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  error?: { code: 'trusted-vale-unavailable' | 'execution-failed'; message: string };
+}
+
+export function bundledValeProfilePath(profile: ValeProfile): string {
+  return join(
+    dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    'config',
+    'vale',
+    'profiles',
+    `${profile}.ini`,
+  );
+}
+
+/** Bounded, argv-fixed seam for the single production-trusted Vale identity. */
+export function executeLocalDiagnostic(input: LocalDiagnosticRequest): LocalDiagnosticResult {
+  let spawnPath: string;
+  try {
+    spawnPath = trustedExecutableRegistry('vale').verify('vale').spawnPath;
+  } catch (error) {
+    return {
+      status: null,
+      stdout: '',
+      stderr: '',
+      error: {
+        code: 'trusted-vale-unavailable',
+        message: `Pinned Vale executable is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      },
+    };
+  }
+  const args =
+    input.operation === 'version'
+      ? ['--version']
+      : [
+          '--output=JSON',
+          '--no-exit',
+          `--config=${bundledValeProfilePath(input.profile)}`,
+          '--ext=.md',
+          '-',
+        ];
+  const result = spawnSync(spawnPath, args, {
+    encoding: 'utf8',
+    shell: false,
+    timeout: input.operation === 'version' ? 10_000 : 30_000,
+    maxBuffer: 4_000_000,
+    ...(input.operation === 'lint' ? { input: input.stdin } : {}),
+  });
+  return {
+    status: result.status,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+    ...(result.error
+      ? { error: { code: 'execution-failed' as const, message: result.error.message } }
+      : {}),
+  };
+}
 import {
   admitStagedValidationLease,
   assertStagedValidationCaseRequest,

@@ -1,0 +1,8 @@
+{
+  "skill": "personal-brand-strategy",
+  "should_trigger": [
+    "write a LinkedIn post about these notes",
+    "draft a personal brand newsletter"
+  ],
+  "should_not_trigger": ["write an academic essay", "make this SOP clearer"]
+}

@@ -146,6 +146,7 @@ grep -Fq 'pnpm install --prod --frozen-lockfile --dir' scripts/build-major-runti
 grep -Fq 'major_clone_or_copy "$ROOT/drizzle"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits DB migrations"
 grep -Fq 'major_clone_or_copy "$ROOT/scripts"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits helper scripts"
 grep -Fq 'major_clone_or_copy "$ROOT/templates"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits project templates"
+grep -Fq 'major_clone_or_copy "$ROOT/config/vale"' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot omits Vale configuration"
 grep -Fq "return 'agy'" src/providers/commands.ts || fail "supervisor does not use the official Antigravity CLI"
 ! grep -ERq 'google-antigravity|antigravity-venv' src scripts/install-major-runtime.sh scripts/build-major-runtime-snapshot.sh || fail "obsolete Antigravity SDK path returned"
 grep -Fq 'node "$DEST/dist/entry.js" status' scripts/build-major-runtime-snapshot.sh || fail "runtime snapshot lacks executable CLI smoke"

@@ -1,0 +1,5 @@
+{
+  "skill": "technical-writing",
+  "should_trigger": ["make this SOP clearer", "write an operating procedure"],
+  "should_not_trigger": ["write a personal essay", "write the homepage"]
+}

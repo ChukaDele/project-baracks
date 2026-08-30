@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "registryVersion": 21,
+  "registryVersion": 22,
   "entries": [
     {
       "id": "academic-verify",
@@ -16,7 +16,7 @@
         "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -25,14 +25,54 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "99e915b35c946da66c05bb5f3b6ba501096bed346fbc89216c648b2f9ecfe98b",
       "triggers": [
         "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support"
+      ]
+    },
+    {
+      "id": "academic-writing",
+      "name": "academic-writing",
+      "title": "Academic Writing",
+      "description": "Strategy for essays, critical summaries, literature reviews, assignments, academic reports, and source-based analysis with argument, citation, claim-strength, and source fidelity.",
+      "shortDescription": "Strategy for essays, critical summaries, literature reviews, assignments, academic reports, and source-based analysis with argument, citation, claim-strength, and source fidelity.",
+      "aliases": [],
+      "triggerConditions": [
+        "academic-essay-critical-summary-literature-review-assignment-source-analysis"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [
+        "academic-verify"
+      ],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "fd0e5a177773e6103ec832f59b8487f5573d836af18d38404bb800e753650c75",
+      "triggers": [
+        "academic",
+        "essay",
+        "critical",
+        "summary",
+        "literature",
+        "review",
+        "assignment",
+        "source",
+        "analysis"
       ]
     },
     {
@@ -46,7 +86,7 @@
         "generative-art-particles-flow-fields-p5"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "exploratory-ui-projects",
       "applicableProjects": [
@@ -55,11 +95,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "generative",
         "art",
@@ -80,7 +120,7 @@
         "taleshape-shaper-sql-dashboard-analytics-observability-telemetry-csv"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -89,11 +129,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "4fc41b18312d7f03fb9b9b5e387704df985d9468ece058d9f718505e18c8e193",
       "triggers": [
         "taleshape",
@@ -119,7 +159,7 @@
         "api endpoint contract integration"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -135,7 +175,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "c43fd443763e3d71f9d26b20cd40d2626ff4377bcd24f495f88cb771a69594b0",
       "triggers": [
         "api endpoint contract integration"
@@ -154,7 +194,7 @@
         "accounts receivable payable invoice collections"
       ],
       "category": "finance-accounting",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -170,7 +210,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "73f38ae00f3a53f64e822c971d3cd59f78b0dec5420e9623a7686733030a91fc",
       "triggers": [
         "accounts receivable payable invoice collections"
@@ -189,7 +229,7 @@
         "software architecture system design module boundary"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -205,10 +245,48 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "938ff4bb9af35f58830ebe21cebd3760ed8d6a664d033bd5bf091fb7cd7bf3eb",
       "triggers": [
         "software architecture system design module boundary"
+      ]
+    },
+    {
+      "id": "asd-ste100",
+      "name": "asd-ste100",
+      "title": "Asd Ste100",
+      "description": "Context-specific controlled-language pass for SOPs, warnings, procedures, operating instructions, and explicitly requested ASD-STE100-inspired technical documentation.",
+      "shortDescription": "Context-specific controlled-language pass for SOPs, warnings, procedures, operating instructions, and explicitly requested ASD-STE100-inspired technical documentation.",
+      "aliases": [],
+      "triggerConditions": [
+        "asd-ste100-controlled-technical-sop-procedure-warning-operating-instruction"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "fd9ea52a2f347f2ec5f2218a3b15011bb44310b533c600a77dbed597815b76e3",
+      "triggers": [
+        "asd",
+        "ste100",
+        "controlled",
+        "technical",
+        "sop",
+        "procedure",
+        "warning",
+        "operating",
+        "instruction"
       ]
     },
     {
@@ -224,7 +302,7 @@
         "authentication authorization security access"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -240,7 +318,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "6793ab8ca4caea86d7dc81f264559e5016d9d24696a9d23f959840f7b53202d2",
       "triggers": [
         "authentication authorization security access"
@@ -257,7 +335,7 @@
         "autonomous-or-long-running-work"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -266,11 +344,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "195b9c192a84630c0bec7ca94e28580da60ecbd8e1898f20de82a8ccc0e39ac3",
       "triggers": [
         "autonomous",
@@ -278,6 +356,43 @@
         "long",
         "running",
         "work"
+      ]
+    },
+    {
+      "id": "brand-strategy",
+      "name": "brand-strategy",
+      "title": "Brand Strategy",
+      "description": "Decide positioning, messaging hierarchy, audience value, proof, and strategic content for company, product, website, landing-page, and brand communication before Prose Craft writes it.",
+      "shortDescription": "Decide positioning, messaging hierarchy, audience value, proof, and strategic content for company, product, website, landing-page, and brand communication before Prose Craft writes it.",
+      "aliases": [],
+      "triggerConditions": [
+        "brand-product-positioning-messaging-homepage-website-landing-page"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "4d2b2163df35cd064f1bb3047604845fea817e50b8cbe0e647aecc5a8b0d8b8a",
+      "triggers": [
+        "brand",
+        "product",
+        "positioning",
+        "messaging",
+        "homepage",
+        "website",
+        "landing",
+        "page"
       ]
     },
     {
@@ -293,7 +408,7 @@
         "browser release quality assurance acceptance"
       ],
       "category": "quality",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -309,7 +424,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "91cb5a2b88e1558c4542c678fa207b973dc3681bd1af7300c27dcee251459b09",
       "triggers": [
         "browser release quality assurance acceptance"
@@ -328,7 +443,7 @@
         "capability freshness version compatibility evidence"
       ],
       "category": "system",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -344,7 +459,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "d1613aea2540a1dfd49c8b0589ebb66047f6c71f31b208210287ebf744dc7ec3",
       "triggers": [
         "capability freshness version compatibility evidence"
@@ -363,7 +478,7 @@
         "chief of staff strategic coordination executive assistant boundary"
       ],
       "category": "management",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -379,7 +494,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "13a45f3fe3b7d9ad6fa1f84bf58424bb654ce8e2d4881bfa13348b9cbfe681a8",
       "triggers": [
         "chief of staff strategic coordination executive assistant boundary"
@@ -396,7 +511,7 @@
         "ci-github-actions-pr-check-failure"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -405,11 +520,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "c2d79aea6453c8d299fa6439b0b1e31cd3d9200ec985713973576dccaa21bf48",
       "triggers": [
         "ci",
@@ -433,7 +548,7 @@
         "codebase design module ownership boundaries"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -449,7 +564,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "8a1420cba0d0865e578c0578ae07d0788110c846fc7eda8fdad1ead9c8d504ee",
       "triggers": [
         "codebase design module ownership boundaries"
@@ -466,7 +581,7 @@
         "project-start-or-material-product-work"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -475,11 +590,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "ead6f57d152c5170a4542e17b3c366348e4db8ce670eda0bb3c392dd2b02aa87",
       "triggers": [
         "project",
@@ -503,7 +618,7 @@
         "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -512,11 +627,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "5a4bdfb5d3b1c580334981f95ba61f5915d441ee033a5c55ea094c22b9f9e285",
       "triggers": [
         "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise"
@@ -535,7 +650,7 @@
         "concurrency race condition parallel locking"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -551,7 +666,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "a8658aa189a6f1cae53dce54768e2f586b965edc1c2077bf30b8c32ada5fb38b",
       "triggers": [
         "concurrency race condition parallel locking"
@@ -570,7 +685,7 @@
         "bookkeeping ledger journal controller accounting"
       ],
       "category": "finance-accounting",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -586,7 +701,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "75446c6d410a8258fbabee1dddbbf99b3ae67b22a5a33f8a3c81eced07c5ba9d",
       "triggers": [
         "bookkeeping ledger journal controller accounting"
@@ -603,7 +718,7 @@
         "provider-model-browser-infrastructure-cost"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -612,11 +727,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "d3ac07d364b178bbf15179e35c919a9ffecb06a140f0bc29eef26614eb2d07cb",
       "triggers": [
         "provider",
@@ -639,7 +754,7 @@
         "cross modal visual document evidence execution-independent read-only review provenance"
       ],
       "category": "quality",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -655,7 +770,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "9cb8f26dc0b44cc9a9c1f1db7207b362b3a36e843b664ccebd5c988efbf16994",
       "triggers": [
         "cross modal visual document evidence execution",
@@ -674,7 +789,7 @@
         "outcome-data-scoring-learning"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -683,11 +798,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "bd19b04746cd87883a84d80e7b092cfeb93ea4e1b9187718789aeadc8ec81e2f",
       "triggers": [
         "outcome",
@@ -709,7 +824,7 @@
         "database schema query migration"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -725,7 +840,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "ed8312ba05a500e2ab5b7aec75cb8fcb1927c52bd594b8de1cca95f78bbf7fd6",
       "triggers": [
         "database schema query migration"
@@ -744,7 +859,7 @@
         "debug investigate root cause failure"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -760,7 +875,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "fdb37ef54f826d1a8b60a06db09086926c4e01200915e5c76f855de2ab4897d1",
       "triggers": [
         "debug investigate root cause failure"
@@ -779,7 +894,7 @@
         "dependency package upgrade vulnerability"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -795,7 +910,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "712ff2f8070dd56ed6a3ee0528693828d853f0613c5b2ba990027f5793ed0988",
       "triggers": [
         "dependency package upgrade vulnerability"
@@ -854,7 +969,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "c68d870b86cb4e7d4aa18af3a170287ec0a2980f65a53b2eaa426fb20a44918d",
       "triggers": [
         "current Vercel deploy deployment preview claim framework detection guidance"
@@ -873,7 +988,7 @@
         "deployment release rollout rollback"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -889,7 +1004,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "4d1201f0fa5dfd622f2452963f1a318a502da636dcf85a16a73aa8a8705b68d7",
       "triggers": [
         "deployment release rollout rollback"
@@ -906,7 +1021,7 @@
         "substantial-ui-website-creation-redesign-art-direction-generic-ai-design-too-safe-too-loud-taste"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -915,11 +1030,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "3b1cd1f5c8d978fe3fe14ff30cb36d2a9c924612cdc2cc681c23ea953f309a45",
       "triggers": [
         "substantial",
@@ -952,7 +1067,7 @@
         "deterministic accounting arithmetic ledger balances"
       ],
       "category": "finance-accounting",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -968,7 +1083,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "443889fcb395fd811edb39d7481da99686306351646f1295d26d6c9b0cda3c4c",
       "triggers": [
         "deterministic accounting arithmetic ledger balances"
@@ -985,7 +1100,7 @@
         "explicit-owner-approved-localhost-exception-only"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -994,11 +1109,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "bf89604a352477741ca16c436d6674930d6c10dee5b2447244fc06f2a6c536fc",
       "triggers": [
         "explicit",
@@ -1007,6 +1122,45 @@
         "localhost",
         "exception",
         "only"
+      ]
+    },
+    {
+      "id": "direct-response-writing",
+      "name": "direct-response-writing",
+      "title": "Direct Response Writing",
+      "description": "Ethical persuasion strategy only when the reader must buy, book, register, reply, apply, subscribe, or request a demo; never for ordinary academic or explanatory prose.",
+      "shortDescription": "Ethical persuasion strategy only when the reader must buy, book, register, reply, apply, subscribe, or request a demo; never for ordinary academic or explanatory prose.",
+      "aliases": [],
+      "triggerConditions": [
+        "direct-response-buy-book-register-subscribe-apply-request-demo-conversion"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "96aa9fde9f09c7bd8289f411362fe7e9d8dd41c758396b6b55e9ce0cc5eb60e3",
+      "triggers": [
+        "direct",
+        "response",
+        "buy",
+        "book",
+        "register",
+        "subscribe",
+        "apply",
+        "request",
+        "demo",
+        "conversion"
       ]
     },
     {
@@ -1022,7 +1176,7 @@
         "domain model entities business rules"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1038,7 +1192,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "27a3be1d77fe91707f29a652c89de4b25f3d76d20415d8c097bdfc58e70fbf9f",
       "triggers": [
         "domain model entities business rules"
@@ -1055,7 +1209,7 @@
         "task-relevant"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-ui-projects",
       "applicableProjects": [
@@ -1064,11 +1218,11 @@
       "source": "github:emilkowalski/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "task",
         "relevant"
@@ -1087,7 +1241,7 @@
         "engineering design doctrine maintainable modular code"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1103,7 +1257,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "66a2d375aff08308bd4e0222b03ce7ebfe7446e66eb8719dad3c488118c7dbb5",
       "triggers": [
         "engineering design doctrine maintainable modular code"
@@ -1123,7 +1277,7 @@
         "pr-review-or-release"
       ],
       "category": "quality",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1139,7 +1293,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "50bfd8ccbfaaad6a883b406f9252f7c97e0de18b1b29a7e78a3bb94c8a948558",
       "triggers": [
         "pr",
@@ -1161,7 +1315,7 @@
         "executive assistant calendar correspondence meeting preparation"
       ],
       "category": "management",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1177,7 +1331,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "44bf8ee0d7fd29e661c0d8535cbfa8486710e72519b2fffdc46af01b7f2c2d16",
       "triggers": [
         "executive assistant calendar correspondence meeting preparation"
@@ -1194,7 +1348,7 @@
         "exploratory-awwwards-fwa-heavy-motion-immersive-illustrative"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1203,11 +1357,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "0aae7785b0567d43e88a8d1dd152f168d59bf33f417946ba321c2e315c1ff5fb",
       "triggers": [
         "exploratory",
@@ -1230,7 +1384,7 @@
         "create-or-update-figma-screen"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "figma-enabled-projects",
       "applicableProjects": [
@@ -1239,11 +1393,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "create",
         "or",
@@ -1263,7 +1417,7 @@
         "implement-code-from-figma"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "figma-enabled-projects",
       "applicableProjects": [
@@ -1272,11 +1426,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "implement",
         "code",
@@ -1295,7 +1449,7 @@
         "programmatic-figma-read-write"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "figma-enabled-projects",
       "applicableProjects": [
@@ -1304,11 +1458,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "programmatic",
         "figma",
@@ -1329,7 +1483,7 @@
         "financial planning forecast extrapolation budget"
       ],
       "category": "finance-accounting",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1345,7 +1499,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "d5ef270f3c973e8bf0fcd3ed33aa953952ff06db824b44b5512091c18403ba53",
       "triggers": [
         "financial planning forecast extrapolation budget"
@@ -1364,7 +1518,7 @@
         "frontend ui component interface"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1380,7 +1534,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "84dbb80a7e45b1c100ff3b904ff30f4f46b34540e50c949181730d86fb2043d4",
       "triggers": [
         "frontend ui component interface"
@@ -1397,7 +1551,7 @@
         "frontend-design-work"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-ui-projects",
       "applicableProjects": [
@@ -1406,11 +1560,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "frontend",
         "design",
@@ -1428,7 +1582,7 @@
         "3d-gaussian-splatting-spatial-reconstruction-radiance-field-colmap-novel-view-splat"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "spatial-projects",
       "applicableProjects": [
@@ -1437,11 +1591,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "3ee26a2b29bd7766bd6c50326ca05f52be3e1596245adf3b35aa4671eab8ce55",
       "triggers": [
         "3d",
@@ -1468,7 +1622,7 @@
         "deep-graph-orchestration"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1477,11 +1631,11 @@
       "source": "github:codejunkie99/graph-engineering",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "deep",
         "graph",
@@ -1499,7 +1653,7 @@
         "authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1508,11 +1662,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "4f84c39863bb4f4cdfdb672097698413951f20bc14e373ba91e51697131f11d8",
       "triggers": [
         "authentication",
@@ -1541,7 +1695,7 @@
         "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1550,11 +1704,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "a73e4523bc031f48109184327116e1428b81a6a5b1b9599f1e460375204b2397",
       "triggers": [
         "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view"
@@ -1573,7 +1727,7 @@
         "production incident outage recovery"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1589,7 +1743,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "35eac013c91841f66a665b98bc47a15952d7139b29ea22d91a098c60067a0e59",
       "triggers": [
         "production incident outage recovery"
@@ -1608,7 +1762,7 @@
         "third party integration adapter connector"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1624,7 +1778,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "86aa985f78d21750193e89aa6f8b9b52567a20761f616587d5ce737a1c373f89",
       "triggers": [
         "third party integration adapter connector"
@@ -1643,7 +1797,7 @@
         "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1652,11 +1806,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "2d6897d9767ef81560a869c1b496ec21579ccc6d30f4f76fae48c095cc5954b8",
       "triggers": [
         "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability"
@@ -1673,7 +1827,7 @@
         "research-strategy-synthesis-comparison-decision-work"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1682,11 +1836,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "ae8a0f1a5daf6757e778a6f698ae79cf95708daf5e961bee41ae1ccf38132038",
       "triggers": [
         "research",
@@ -1708,7 +1862,7 @@
         "complex-autonomous-or-parallel-work"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1717,11 +1871,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "4ab2a81c53c998a60b672fc8d48f44665c484dadf4f7152a78f49335c2b9a2df",
       "triggers": [
         "complex",
@@ -1745,7 +1899,7 @@
         "test-strategy-verification-release-confidence"
       ],
       "category": "quality",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1761,7 +1915,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "22b698eb349f7ef10cc7e0f19c0928a73f9416c99fe1e9d2d9d3e0c9178e8811",
       "triggers": [
         "test",
@@ -1782,7 +1936,7 @@
         "explicit-user-correction-repeated-mistake-recurring-failure-reusable-success"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1791,11 +1945,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "e10bcda8ccbd9e3b5696a3877caa0c73f3268c130f579acd232ed9d6d35fbea5",
       "triggers": [
         "explicit",
@@ -1820,7 +1974,7 @@
         "rename-migration-provider-swap-architecture-replacement"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1829,11 +1983,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "55cea083641968cdde74a1c3016245043c26557c851d8cf9cbc0d3f4c3ca618e",
       "triggers": [
         "rename",
@@ -1855,7 +2009,7 @@
         "major-self-change-skill-routing-learning-policy-runtime-installer-execution-independent-review-provenance"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "major-repo",
       "applicableProjects": [
@@ -1864,11 +2018,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "450b9588acd1a333bdf93d077ee674c2ea33b450b594327074eddc483f0b9904",
       "triggers": [
         "major",
@@ -1897,7 +2051,7 @@
         "build-or-improve-mcp-server"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1906,11 +2060,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "build",
         "or",
@@ -1930,7 +2084,7 @@
         "mcp-connector-plugin-integration-authentication-tool-exposure-reconnect-permission-provider-operation"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1939,11 +2093,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "06bab0e3f1d24fa4aefb518f8cdaacccb5d22abbe9febf0e1fd12727d3748dff",
       "triggers": [
         "mcp",
@@ -1972,7 +2126,7 @@
         "data schema platform migration"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1988,7 +2142,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "47d7e41aeb232bc3f1c4bef82903aebf78d177fca17845e261457b4104c45662",
       "triggers": [
         "data schema platform migration"
@@ -2005,7 +2159,7 @@
         "always-on-project-and-large-feature-planning"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2014,11 +2168,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "f2e0e9793639987d40c9bb70e633586712effcbfe666b31a20c2cfbf8a56baec",
       "triggers": [
         "always",
@@ -2028,6 +2182,46 @@
         "large",
         "feature",
         "planning"
+      ]
+    },
+    {
+      "id": "natural-writing-qa",
+      "name": "natural-writing-qa",
+      "title": "Natural Writing Qa",
+      "description": "Provenance-aware post-draft critic that detects and explains recurring model-like prose patterns, preserves claims and voice, and requests only targeted revisions before a second audit.",
+      "shortDescription": "Provenance-aware post-draft critic that detects and explains recurring model-like prose patterns, preserves claims and voice, and requests only targeted revisions before a second audit.",
+      "aliases": [
+        "humanizer"
+      ],
+      "triggerConditions": [
+        "natural-writing-qa-ai-pattern-audit-humanizer-claim-preserving"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "1a5f0ae97578d35ebdfb0fe05cd38d887e3438c15fea0cc6ecfb1df6c9f2e2bc",
+      "triggers": [
+        "natural",
+        "writing",
+        "qa",
+        "ai",
+        "pattern",
+        "audit",
+        "humanizer",
+        "claim",
+        "preserving"
       ]
     },
     {
@@ -2041,7 +2235,7 @@
         "operator-or-user-workflow"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-product-projects",
       "applicableProjects": [
@@ -2050,11 +2244,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "c4b81201ed5eff9d54fb8d2b2350600534fe95a1582ab56cb29575f5498e26df",
       "triggers": [
         "operator",
@@ -2076,7 +2270,7 @@
         "logging metrics tracing observability"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2092,7 +2286,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "0fda860b56a7bf35d4003e0a158f9ed4789e7887890a0c84f1edd4ae395eb19b",
       "triggers": [
         "logging metrics tracing observability"
@@ -2109,7 +2303,7 @@
         "project-start-or-commodity-build"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2118,11 +2312,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "d2c5db532ed2cec1041e280a593e0693eeae3b4b35d6a21803875cb656150784",
       "triggers": [
         "project",
@@ -2145,7 +2339,7 @@
         "operations process improvement workflow efficiency"
       ],
       "category": "operations",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2161,7 +2355,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "e9596e7931a1420cfb011a74f3ca22dc46f3373f1a6f4dc809172cf9bb4f93fb",
       "triggers": [
         "operations process improvement workflow efficiency"
@@ -2178,7 +2372,7 @@
         "pdf-task"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2187,11 +2381,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "pdf",
         "task"
@@ -2208,7 +2402,7 @@
         "generated-pdf-reporting"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2217,11 +2411,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "14f4b23a56ee0179fe078dab6870fc4ae742f7bba4e3cbf36aac2b5b4f80be0e",
       "triggers": [
         "generated",
@@ -2242,7 +2436,7 @@
         "performance latency throughput optimize"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2258,7 +2452,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "8ffe590b4f29273cf4c0aa6549821faacd07add0c52647cb7d797a07e09bed80",
       "triggers": [
         "performance latency throughput optimize"
@@ -2275,7 +2469,7 @@
         "measured-slow-workflow-page-query-build-integration"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2284,11 +2478,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "ad07ddcd2a2569bed4e5886f843cc1cd74d061c0bfda358471e63c9ae3b77d0e",
       "triggers": [
         "measured",
@@ -2298,6 +2492,42 @@
         "query",
         "build",
         "integration"
+      ]
+    },
+    {
+      "id": "personal-brand-strategy",
+      "name": "personal-brand-strategy",
+      "title": "Personal Brand Strategy",
+      "description": "Shape the authority theme, useful insight, honest perspective, and positioning for personal essays, LinkedIn posts, newsletters, and public thought leadership.",
+      "shortDescription": "Shape the authority theme, useful insight, honest perspective, and positioning for personal essays, LinkedIn posts, newsletters, and public thought leadership.",
+      "aliases": [],
+      "triggerConditions": [
+        "linkedin-thought-leadership-personal-essay-newsletter-authority"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "c5426a368a6ab36300b706b8a7b68516711edcb92d4396fb9e6fbdf34ec2e8fb",
+      "triggers": [
+        "linkedin",
+        "thought",
+        "leadership",
+        "personal",
+        "essay",
+        "newsletter",
+        "authority"
       ]
     },
     {
@@ -2313,7 +2543,7 @@
         "engineering implementation planning task breakdown"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2329,7 +2559,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "393d15ab1f6a863f4f42ce07b9dc2eab47f179811139604794e65b9cdfdec51f",
       "triggers": [
         "engineering implementation planning task breakdown"
@@ -2346,7 +2576,7 @@
         "real-browser-automation-debugging-qa"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -2355,11 +2585,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "real",
         "browser",
@@ -2379,7 +2609,7 @@
         "presentation-slide-deck-board-deck-strategy-deck-consulting-deck-investor-deck-sales-deck-proposal-executive-update-pitch-storyline-action-title-ghost-deck"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2388,11 +2618,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "4a5f476c91e1abaa3f2f3192c434d20d1c39b70712eed87bfd097eb7c0f8c61c",
       "triggers": [
         "presentation",
@@ -2430,7 +2660,7 @@
         "new-subsystem-provider-integration-agent-runtime-sandbox-router-memory-auth-scraper-workflow-engine-browser-mcp-installation-deployment-major-dependency"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2439,11 +2669,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "0aad51fd5528ec867a0d452978ccad188d82a8b0ad529768e5da51ed0b2893de",
       "triggers": [
         "new",
@@ -2480,7 +2710,7 @@
         "product management discovery roadmap prioritisation"
       ],
       "category": "product",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2496,7 +2726,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "2b55a0b626a3a5857be71c2a81638fcb92619f837b8f1c504944106a07a3a8f9",
       "triggers": [
         "product management discovery roadmap prioritisation"
@@ -2513,7 +2743,7 @@
         "named-project-repository-path-cross-project-edit-handoff-migration-wrong-project"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2522,11 +2752,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "93df50e5ae6dbb205bcd3b8564fb62264ddb11878f34a57356364a7b60145e66",
       "triggers": [
         "named",
@@ -2553,7 +2783,7 @@
         "project-start"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2562,15 +2792,87 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "b471181bbc7e479f22dd7493bf5e32a1d0d4d00a6c6db32b0fce33b27fe3f2f5",
       "triggers": [
         "project",
         "start"
+      ]
+    },
+    {
+      "id": "prose-craft",
+      "name": "prose-craft",
+      "title": "Prose Craft",
+      "description": "Construct and destructively edit substantive sentences and paragraphs after Writing OS has established the ideas, evidence, audience, genre, structure, and intended voice.",
+      "shortDescription": "Construct and destructively edit substantive sentences and paragraphs after Writing OS has established the ideas, evidence, audience, genre, structure, and intended voice.",
+      "aliases": [],
+      "triggerConditions": [
+        "sentence-paragraph-prose-cadence-diction-edit-rewrite"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "4a3e8c54d9c55b8423bbb5e72e215e0ab65570d9c0c9611b6fb0e295d8a7bcdc",
+      "triggers": [
+        "sentence",
+        "paragraph",
+        "prose",
+        "cadence",
+        "diction",
+        "edit",
+        "rewrite"
+      ]
+    },
+    {
+      "id": "prose-lint",
+      "name": "prose-lint",
+      "title": "Prose Lint",
+      "description": "Run contextual deterministic prose and readability diagnostics with Major rule profiles, using Vale when available and reporting degraded gates when mature external tooling is unavailable.",
+      "shortDescription": "Run contextual deterministic prose and readability diagnostics with Major rule profiles, using Vale when available and reporting degraded gates when mature external tooling is unavailable.",
+      "aliases": [],
+      "triggerConditions": [
+        "prose-lint-vale-readability-grammar-style-diagnostic"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "4eeb30d0ed56373451ef2be82b9fcea0f696ed5d04688f1fa7aea76d1580131d",
+      "triggers": [
+        "prose",
+        "lint",
+        "vale",
+        "readability",
+        "grammar",
+        "style",
+        "diagnostic"
       ]
     },
     {
@@ -2584,7 +2886,7 @@
         "multiple-credible-ui-options"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -2593,11 +2895,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "c30a39d7464a9e78a764fd755235aefc73c63d15ac6229e88d81862ca4f4fc40",
       "triggers": [
         "multiple",
@@ -2619,7 +2921,7 @@
         "account reconciliation close financial statements"
       ],
       "category": "finance-accounting",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2635,7 +2937,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "419f1725d2df08819bb28338a04ad2d033889182dcb5f2c076f4741eb557d218",
       "triggers": [
         "account reconciliation close financial statements"
@@ -2652,7 +2954,7 @@
         "all-web-project-ui-work-browser-preview-visual-qa-acceptance"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -2661,11 +2963,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "44d6b983aa08e6a49117cbadfafa1f7bedd4024116851edfcc5025201e731e1c",
       "triggers": [
         "all",
@@ -2693,7 +2995,7 @@
         "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2702,11 +3004,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "2064277af81ad0f72fc8104be0631035f9de2fc378392931131024f4689451db",
       "triggers": [
         "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness"
@@ -2723,7 +3025,7 @@
         "gsap-scrolltrigger-sticky-pinned-scrollytelling-card-stacking-hero-video-parallax-threejs-zoom-motion"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -2732,11 +3034,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "c86cf077b78ee5b32a92ebc114dd1014908d68789de48c9ab4d5150894bfccce",
       "triggers": [
         "gsap",
@@ -2767,7 +3069,7 @@
         "reusable asset component template package discovery reuse"
       ],
       "category": "system",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2783,7 +3085,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "582f47594b1b4e1ba33f8b9f166a70b0b9795e4aebcc6de708547f57590f9863",
       "triggers": [
         "reusable asset component template package discovery reuse"
@@ -2802,7 +3104,7 @@
         "code review implementation review"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2818,7 +3120,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "a0b47b99d0337c6d95cbe9df58e1e42f1adbfd8b2b50def820f9082c7ad18e2c",
       "triggers": [
         "code review implementation review"
@@ -2838,7 +3140,7 @@
         "bug-failure-regression"
       ],
       "category": "quality",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2854,7 +3156,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "919216b1235d0ebebe50e72ae26b3065cbab23e31352504407edb8c5b8e60494",
       "triggers": [
         "bug",
@@ -2875,7 +3177,7 @@
         "sales commercial pipeline customer revenue"
       ],
       "category": "sales",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2891,7 +3193,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "f2ab6231938a9c1c316ff27f6c27183affed667cfd9d7626cd15c830e7b116e2",
       "triggers": [
         "sales commercial pipeline customer revenue"
@@ -2910,7 +3212,7 @@
         "security audit vulnerability review"
       ],
       "category": "quality",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2926,7 +3228,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "25b8ccdecddb2ca4d9968da61f668174d8679ad4db426187bb7435851335da81",
       "triggers": [
         "security audit vulnerability review"
@@ -2943,7 +3245,7 @@
         "material-security-risk"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2952,11 +3254,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "material",
         "security",
@@ -2974,7 +3276,7 @@
         "seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -2983,11 +3285,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "b20e0b0355bd512440f116611e8c7bf06ac6409035a967569a526d8b16def230",
       "triggers": [
         "seo",
@@ -3038,7 +3340,7 @@
         "architecture-or-implementation"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3047,11 +3349,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "2796b79bb9217078da14648f6007fc97393fdde80356d633fe9f64d71eb07f05",
       "triggers": [
         "architecture",
@@ -3070,7 +3372,7 @@
         "create-evaluate-or-improve-persistent-skill"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3079,11 +3381,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "create",
         "evaluate",
@@ -3107,7 +3409,7 @@
         "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3116,11 +3418,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "0beaaada6bf7cd167871ae16cfbfdfbcdaf5e485425724b7bac410c2cf246fa0",
       "triggers": [
         "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
@@ -3137,7 +3439,7 @@
         "start-of-substantive-work-select-relevant-skills"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3146,11 +3448,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "5c751f66e011b59f7c872cd91fb7dc1ddd69cdcf398b04cab9fb2cd177495dae",
       "triggers": [
         "start",
@@ -3173,7 +3475,7 @@
         "reusable-successful-procedure-or-recurring-solved-failure"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3182,11 +3484,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "5d2c0f7e2a7d2d19b779788fc741e7e9e54e41e90d5c8483506a4cea1458c831",
       "triggers": [
         "reusable",
@@ -3211,7 +3513,7 @@
         "software implementation feature bug code engineering"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3227,7 +3529,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "2e58c8047f23e6bc21f1de0c3e8f6aa49c38a97a8122cbca0cf0950fecde0906",
       "triggers": [
         "software implementation feature bug code engineering"
@@ -3244,7 +3546,7 @@
         "api-scraping-feed-external-data"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3253,11 +3555,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "b4e9a03052478484df757a3b5e0af9566da17d43514716937abe69454846d9f6",
       "triggers": [
         "api",
@@ -3278,7 +3580,7 @@
         "named-url-file-video-audio-document-primary-source"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3287,11 +3589,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "49b0bd95bf0b1289d09e512959201a10e03105675b3b378fe364f25ee122c6c8",
       "triggers": [
         "named",
@@ -3317,7 +3619,7 @@
         "quality gate staged validation release controls"
       ],
       "category": "quality",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3333,7 +3635,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "c889ea1cde4b97feeed9312a6f3bc48cd5f0c7a70e68fbc49a973bb2171ca856",
       "triggers": [
         "quality gate staged validation release controls"
@@ -3352,7 +3654,7 @@
         "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3361,11 +3663,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "f4f9d6ed4549a19f40da77ab777d457d42085edf41b23de4b0ad3bdf910ab496",
       "triggers": [
         "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators"
@@ -3384,7 +3686,7 @@
         "test driven development regression test"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3400,10 +3702,49 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "789c412b3699f74710643340886aa6023a8a5f7d773d247d87d70631d5d224e8",
       "triggers": [
         "test driven development regression test"
+      ]
+    },
+    {
+      "id": "technical-writing",
+      "name": "technical-writing",
+      "title": "Technical Writing",
+      "description": "Plan and verify SOPs, procedures, warnings, operating instructions, and controlled technical documents while preserving procedural meaning and safety.",
+      "shortDescription": "Plan and verify SOPs, procedures, warnings, operating instructions, and controlled technical documents while preserving procedural meaning and safety.",
+      "aliases": [],
+      "triggerConditions": [
+        "sop-procedure-warning-operating-instruction-controlled-technical-documentation"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [
+        "asd-ste100"
+      ],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "d1232f868af0e5bacee9c70734e01aadd260b8f00aaedc2d93ea8e3ff4ba0c59",
+      "triggers": [
+        "sop",
+        "procedure",
+        "warning",
+        "operating",
+        "instruction",
+        "controlled",
+        "technical",
+        "documentation"
       ]
     },
     {
@@ -3417,7 +3758,7 @@
         "repeated-retrieval-filter-dedupe-rank-transform-tool-composition"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3426,11 +3767,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "5b85fd0fcb033b91d56e6580afc3036e9217f04d2817a52b4891b399b828adf4",
       "triggers": [
         "repeated",
@@ -3456,7 +3797,7 @@
         "valuation investment merger acquisition financial model"
       ],
       "category": "finance-accounting",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3472,7 +3813,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "13828d64bbf51971a4055953a56e652f7db870e2e246cf1d6228c1099096d8dc",
       "triggers": [
         "valuation investment merger acquisition financial model"
@@ -3532,7 +3873,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "d684e18ec4d72f17df0c6e9a514962718534f4fd3e5b31cd38cdd31d193b2421",
       "triggers": [
         "current Vercel CLI token authentication project environment deployment configuration guidance"
@@ -3591,7 +3932,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "6a950d834ba8069caac0a57b03e1647093033f87fa645a82c08ffdb0c6add319",
       "triggers": [
         "current React component composition compound components state props guidance"
@@ -3608,7 +3949,7 @@
         "preview-or-production-vercel-deployment"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -3617,11 +3958,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "preview",
         "or",
@@ -3685,7 +4026,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "197f895fa3a4c99de3403a42c8c2663e9286f863710c8e1f8d40ac4799737b61",
       "triggers": [
         "vercel",
@@ -3751,7 +4092,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "e4c5c6230b80f47f465ec72951e26fcfbcaf5c81cb1816260b374ff12c2302a8",
       "triggers": [
         "current React Next.js performance rendering bundle server guidance"
@@ -3810,7 +4151,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "4bfa3dfb14d0d9ddc48da2192cff70ee3827e6fa506bf439628882bcb5ee43de",
       "triggers": [
         "current React Native mobile list navigation animation guidance"
@@ -3869,7 +4210,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "cf28cb585a530c884104a8dcba7f7532e0f1d41eac804fb9c9568a36cd2f22aa",
       "triggers": [
         "current React view transitions animation navigation guidance"
@@ -3888,7 +4229,7 @@
         "verify validate acceptance evidence"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3904,7 +4245,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "8a48436f57e48a8c5af4d497abb27c0a2ff1715639e4623743d5f5acb173a10d",
       "triggers": [
         "verify validate acceptance evidence"
@@ -3921,7 +4262,7 @@
         "planning-or-implementation"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3930,16 +4271,53 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "73fb1fe80ccdbabea16805024fccf5f7183b2a6e9c4b12fbe8d4e8bfed00fa2b",
       "triggers": [
         "planning",
         "or",
         "implementation"
+      ]
+    },
+    {
+      "id": "voice-fingerprint",
+      "name": "voice-fingerprint",
+      "title": "Voice Fingerprint",
+      "description": "Build or compare versioned measurable style profiles from sufficiently large approved corpora and report deviations without impersonation or invented personal details.",
+      "shortDescription": "Build or compare versioned measurable style profiles from sufficiently large approved corpora and report deviations without impersonation or invented personal details.",
+      "aliases": [],
+      "triggerConditions": [
+        "approved-writing-corpus-voice-style-fingerprint-profile-fidelity"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "db2ba66be5a3f33e00de7a174a10b6c05abf475dbe96e84fecb283e94d212044",
+      "triggers": [
+        "approved",
+        "writing",
+        "corpus",
+        "voice",
+        "style",
+        "fingerprint",
+        "profile",
+        "fidelity"
       ]
     },
     {
@@ -3996,7 +4374,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "9728bd3d4b3823a3e80deec1c116b370323c5cc652150f6372edb421ea0750e0",
       "triggers": [
         "current web design accessibility UX performance guidance"
@@ -4013,7 +4391,7 @@
         "browser-or-webapp-qa"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -4022,11 +4400,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "triggers": [
         "browser",
         "or",
@@ -4045,7 +4423,7 @@
         "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -4054,11 +4432,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "08457f8b070e37ee8c47a8c625e43ff0c25920eecf4b664fe06ae77208f3cb45",
       "triggers": [
         "website",
@@ -4086,7 +4464,7 @@
         "project-create-clone-locate-move-park-delete-archive-storage-disk-pressure-duplicate-repo-large-assets-local-cloud"
       ],
       "category": "uncategorized",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4095,11 +4473,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 21
+        "registryVersion": 22
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "b2b658b50129821f884be057401c8fa1469dbd20fc8c095c0c83117c5f5c8a23",
       "triggers": [
         "project",
@@ -4134,7 +4512,7 @@
         "git worktree isolated concurrent writer branch"
       ],
       "category": "engineering",
-      "version": "21",
+      "version": "22",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4150,10 +4528,48 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "contentSha256": "f6ea785d30d8b19be5be63db10fbda8eaa30afc4d78cf0e0d76427cd465f36bf",
       "triggers": [
         "git worktree isolated concurrent writer branch"
+      ]
+    },
+    {
+      "id": "writing-evaluator",
+      "name": "writing-evaluator",
+      "title": "Writing Evaluator",
+      "description": "Independent critic-only evaluation of thesis, specificity, evidence, claim strength, reasoning, redundancy, abstraction, reader value, genre, voice, naturalness, instructions, and source fidelity.",
+      "shortDescription": "Independent critic-only evaluation of thesis, specificity, evidence, claim strength, reasoning, redundancy, abstraction, reader value, genre, voice, naturalness, instructions, and source fidelity.",
+      "aliases": [],
+      "triggerConditions": [
+        "writing-evaluate-thesis-specificity-evidence-reasoning-genre-source-fidelity"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "25b6a8fd8675a7a41121ab5bfa6a42d7ecdcd95ae17cd9b96641801125ea0323",
+      "triggers": [
+        "writing",
+        "evaluate",
+        "thesis",
+        "specificity",
+        "evidence",
+        "reasoning",
+        "genre",
+        "source",
+        "fidelity"
       ]
     },
     {
@@ -4209,10 +4625,94 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 21,
+      "registryVersion": 22,
       "metadataSha256": "5849b0c4a6fe74fc697c81d848e0c877572386cde3de084cbbbbbb834ca0692a",
       "triggers": [
         "current Vercel writing copy content clarity voice structure guidance"
+      ]
+    },
+    {
+      "id": "writing-os",
+      "name": "writing-os",
+      "title": "Writing Os",
+      "description": "Mandatory canonical orchestrator for ordinary substantive writing and rewriting; routes genre strategy, evidence, prose, voice, deterministic QA, evaluation, red-team review, verification, and accepted-edit learning.",
+      "shortDescription": "Mandatory canonical orchestrator for ordinary substantive writing and rewriting; routes genre strategy, evidence, prose, voice, deterministic QA, evaluation, red-team review, verification, and accepted-edit learning.",
+      "aliases": [
+        "writing-system"
+      ],
+      "triggerConditions": [
+        "write-rewrite-draft-prepare-report-essay-homepage-proposal-sop-email-message-copy"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [
+        "natural-writing-qa",
+        "prose-craft"
+      ],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "d881cdac99224b6b59f647da08231ca38c664c41c0d3566fa04c2be9148d555d",
+      "triggers": [
+        "write",
+        "rewrite",
+        "draft",
+        "prepare",
+        "report",
+        "essay",
+        "homepage",
+        "proposal",
+        "sop",
+        "email",
+        "message",
+        "copy"
+      ]
+    },
+    {
+      "id": "writing-red-team",
+      "name": "writing-red-team",
+      "title": "Writing Red Team",
+      "description": "Independent adversarial review for academic submissions, important client work, public thought leadership, proposals, major website messaging, and sensitive professional writing.",
+      "shortDescription": "Independent adversarial review for academic submissions, important client work, public thought leadership, proposals, major website messaging, and sensitive professional writing.",
+      "aliases": [],
+      "triggerConditions": [
+        "independent-writing-red-team-academic-client-public-proposal-sensitive"
+      ],
+      "category": "writing",
+      "version": "22",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "major-internal",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 22
+      },
+      "dependencies": [],
+      "sourceKind": "INTERNAL_DURABLE",
+      "registryVersion": 22,
+      "contentSha256": "fd72f429368c45ac75efa4332a0e1b42fdc1ed84c6c7334f4965ebb83d663168",
+      "triggers": [
+        "independent",
+        "writing",
+        "red",
+        "team",
+        "academic",
+        "client",
+        "public",
+        "proposal",
+        "sensitive"
       ]
     }
   ]

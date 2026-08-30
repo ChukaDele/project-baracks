@@ -1,0 +1,8 @@
+{
+  "skill": "direct-response-writing",
+  "should_trigger": [
+    "write a landing page that gets readers to request a demo",
+    "draft direct response copy asking readers to subscribe"
+  ],
+  "should_not_trigger": ["write the homepage", "do my critical summary"]
+}

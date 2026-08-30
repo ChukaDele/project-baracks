@@ -41,6 +41,8 @@ import {
 import { CANONICAL_SKILL_SLUG, containedSkillPath } from './slug.js';
 import { validateRetainedBundle } from './sync.js';
 import { testFixturePath } from '#trust-roots';
+import { resolveWritingRoute } from '../writing/routing.js';
+import type { WritingRoute } from '../writing/types.js';
 
 const canonicalSkillSlug = z.string().regex(CANONICAL_SKILL_SLUG, 'must be a safe canonical slug');
 
@@ -133,6 +135,10 @@ export interface SkillResolutionReceipt {
     };
   }>;
   rejected: Array<{ id: string; reason: string; score: number }>;
+  writing?: WritingRoute & {
+    gateState: Record<string, 'required'>;
+    lifecycle: 'RESOLVED_NOT_EXECUTED';
+  };
 }
 
 export type SkillDisclosureState = 'HOT' | 'ACTIVE' | 'DORMANT';
@@ -771,6 +777,8 @@ function resolveSkillsInternal(input: {
   const registry = readRegistry(registryPath(cwd, hotRoot)).entries;
   const context = projectContext(cwd, task);
   const requested = [...new Set((input.skills ?? []).map((id) => id.trim()).filter(Boolean))];
+  const writingRoute = requested.length === 0 ? resolveWritingRoute(task) : undefined;
+  const explicitlyNamesAsdSte100 = /\basd[- ]?ste100\b/i.test(task);
   if (input.skills && requested.length === 0) {
     throw new Error('explicit skill selection requires at least one --skill <id>');
   }
@@ -859,7 +867,17 @@ function resolveSkillsInternal(input: {
       const scored =
         requested.length > 0
           ? { score: 1_000, reason: `explicit skill selection: ${entry.id}` }
-          : scoreEntry(entry, task, examples);
+          : writingRoute?.skills.includes(entry.id)
+            ? {
+                score: 900 - writingRoute.skills.indexOf(entry.id),
+                reason: writingRoute.reasons[entry.id] ?? 'required by canonical writing route',
+              }
+            : entry.id === 'asd-ste100' && !explicitlyNamesAsdSte100
+              ? {
+                  score: 0,
+                  reason: 'ASD-STE100 requires a canonical technical-writing route',
+                }
+            : scoreEntry(entry, task, examples);
       const sourceKind = generated
         ? 'PROJECT_LOCAL'
         : inferSkillSourceKind(entry.source, entry.sourceKind);
@@ -891,6 +909,9 @@ function resolveSkillsInternal(input: {
   );
 
   const skills: ResolvedSkill[] = [];
+  const selectionLimit = writingRoute
+    ? writingRoute.skills.length
+    : (input.limit ?? (explicitEntries.length || 6));
   for (const match of matches) {
     if (
       match.sourceKind === 'VENDOR_LIVE' &&
@@ -919,7 +940,7 @@ function resolveSkillsInternal(input: {
         ? `${match.reason}; live vendor source ${match.vendor.sourceId} (${match.vendor.state})`
         : match.reason,
     });
-    if (skills.length >= (input.limit ?? (explicitEntries.length || 6))) break;
+    if (skills.length >= selectionLimit) break;
   }
   if (requested.length > 0 && skills.length !== explicitEntries.length) {
     const selected = new Set(skills.map((skill) => skill.id));
@@ -1017,6 +1038,15 @@ function resolveSkillsInternal(input: {
         .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
         .slice(0, 16)
         ,
+      ...(writingRoute
+        ? {
+            writing: {
+              ...writingRoute,
+              gateState: Object.fromEntries(writingRoute.gates.map((gate) => [gate, 'required' as const])),
+              lifecycle: 'RESOLVED_NOT_EXECUTED' as const,
+            },
+          }
+        : {}),
     },
   };
 }

@@ -1,0 +1,5 @@
+{
+  "skill": "brand-strategy",
+  "should_trigger": ["write the homepage", "rewrite this brand positioning copy"],
+  "should_not_trigger": ["do my critical summary", "make this SOP clearer"]
+}

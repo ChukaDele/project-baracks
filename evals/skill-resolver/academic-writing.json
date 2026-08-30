@@ -1,0 +1,5 @@
+{
+  "skill": "academic-writing",
+  "should_trigger": ["do my critical summary", "write this academic essay"],
+  "should_not_trigger": ["write the homepage", "rewrite this email"]
+}

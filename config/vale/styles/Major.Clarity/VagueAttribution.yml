@@ -1,0 +1,7 @@
+extends: existence
+message: "Trace vague attribution '%s' to a source."
+level: error
+ignorecase: true
+tokens:
+  - 'studies show'
+  - 'experts believe'
