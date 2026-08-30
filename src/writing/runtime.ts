@@ -74,6 +74,8 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
     return undefined;
   }
   const record = value as Record<string, unknown>;
+  if (Object.keys(record).some((key) => !['revision', 'sourcePreservation'].includes(key)))
+    return undefined;
   const hash = (candidate: unknown): candidate is string =>
     typeof candidate === 'string' && /^[a-f0-9]{64}$/u.test(candidate);
   const boundedText = (candidate: unknown, maximum: number): candidate is string =>
@@ -86,6 +88,12 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
     if (!record.revision || typeof record.revision !== 'object' || Array.isArray(record.revision))
       return undefined;
     const item = record.revision as Record<string, unknown>;
+    if (
+      Object.keys(item).some(
+        (key) => !['beforeDraftSha256', 'afterDraftSha256', 'addressedFindingIds'].includes(key),
+      )
+    )
+      return undefined;
     if (
       !hash(item.beforeDraftSha256) ||
       !hash(item.afterDraftSha256) ||
@@ -110,6 +118,19 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
     )
       return undefined;
     const item = record.sourcePreservation as Record<string, unknown>;
+    if (
+      Object.keys(item).some(
+        (key) =>
+          ![
+            'draftSha256',
+            'sourcesSha256',
+            'sources',
+            'claimTrace',
+            'protectedStatements',
+          ].includes(key),
+      )
+    )
+      return undefined;
     if (!hash(item.draftSha256) || !hash(item.sourcesSha256)) return undefined;
     const sourceInput = Array.isArray(item.sources) ? item.sources : undefined;
     const claimTraceInput = Array.isArray(item.claimTrace) ? item.claimTrace : undefined;
@@ -126,6 +147,7 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
       ? sourceInput.flatMap((source): WritingSourceEvidence[] => {
           if (!source || typeof source !== 'object' || Array.isArray(source)) return [];
           const candidate = source as Record<string, unknown>;
+          if (Object.keys(candidate).some((key) => !['id', 'content'].includes(key))) return [];
           return boundedText(candidate.id, 500) && boundedText(candidate.content, 100_000)
             ? [{ id: candidate.id.trim(), content: candidate.content }]
             : [];
@@ -138,6 +160,12 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
       ? claimTraceInput.flatMap((trace): ClaimTraceEvidence[] => {
           if (!trace || typeof trace !== 'object' || Array.isArray(trace)) return [];
           const candidate = trace as Record<string, unknown>;
+          if (
+            Object.keys(candidate).some(
+              (key) => !['claim', 'sourceId', 'sourceExcerpt'].includes(key),
+            )
+          )
+            return [];
           return boundedText(candidate.claim, 10_000) &&
             boundedText(candidate.sourceId, 500) &&
             boundedText(candidate.sourceExcerpt, 20_000)

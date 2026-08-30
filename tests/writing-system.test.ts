@@ -290,6 +290,33 @@ describe('canonical writing system', () => {
       qualityGate: false,
       evasionTrigger: false,
     });
+    expect(() =>
+      observeDetectors(
+        Array.from({ length: 33 }, (_, index) => ({
+          detector: `detector-${index}`,
+          version: '1',
+          score: 0.5,
+          genre: 'report',
+          model: 'model',
+          observedAt: '2026-08-30',
+          limitations: ['diagnostic only'],
+        })),
+      ),
+    ).toThrow(/bounded limit/);
+    expect(() =>
+      observeDetectors([
+        {
+          detector: 'one',
+          version: '1',
+          score: 0.5,
+          genre: 'report',
+          model: 'model',
+          observedAt: '2026-08-30',
+          limitations: ['x'.repeat(1_001)],
+          authority: true,
+        } as never,
+      ]),
+    ).toThrow(/unknown fields/);
   });
 
   it('requires trace evidence and preserves technical qualifications and procedure text', () => {
@@ -490,6 +517,27 @@ describe('canonical writing system', () => {
           beforeDraftSha256: 'a'.repeat(64),
           afterDraftSha256: 'b'.repeat(64),
           addressedFindingIds: ['x'.repeat(501)],
+        },
+      }),
+    ).toBeUndefined();
+    expect(
+      parseWritingGateEvidence({
+        revision: {
+          beforeDraftSha256: 'a'.repeat(64),
+          afterDraftSha256: 'b'.repeat(64),
+          addressedFindingIds: ['finding-1'],
+          reviewerApproved: true,
+        },
+      }),
+    ).toBeUndefined();
+    expect(
+      parseWritingGateEvidence({
+        sourcePreservation: {
+          draftSha256: 'a'.repeat(64),
+          sourcesSha256: 'b'.repeat(64),
+          sources: [{ id: 'source', content: 'text', complete: true }],
+          claimTrace: [],
+          protectedStatements: [],
         },
       }),
     ).toBeUndefined();

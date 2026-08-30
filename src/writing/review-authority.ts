@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import type { DbConn } from '../db/client.js';
 import { independentReviewReceipts } from '../db/schema.js';
@@ -6,7 +7,7 @@ import type { WritingRuntimeAuthority } from './runtime.js';
 export interface WritingReviewEvidence {
   writingDraftSha256: string;
   assessment: string;
-  checks: Array<{ dimension: string; evidence: string }>;
+  checks: Array<{ dimension: string; draftExcerpt: string; evidence: string }>;
   findings: string[];
   sourceCoverage?: { sourcesSha256: string; verdict: 'pass' | 'fail' };
 }
@@ -18,6 +19,15 @@ export function parseWritingReviewEvidence(value: string): WritingReviewEvidence
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+    if (
+      Object.keys(parsed).some(
+        (key) =>
+          !['writingDraftSha256', 'assessment', 'checks', 'findings', 'sourceCoverage'].includes(
+            key,
+          ),
+      )
+    )
+      return undefined;
     if (
       typeof parsed.writingDraftSha256 !== 'string' ||
       !/^[a-f0-9]{64}$/u.test(parsed.writingDraftSha256) ||
@@ -38,8 +48,20 @@ export function parseWritingReviewEvidence(value: string): WritingReviewEvidence
     const checks = parsed.checks.flatMap((item): WritingReviewEvidence['checks'] => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
       const check = item as Record<string, unknown>;
-      return bounded(check.dimension, 200) && bounded(check.evidence, 1_000)
-        ? [{ dimension: check.dimension.trim(), evidence: check.evidence.trim() }]
+      if (
+        Object.keys(check).some((key) => !['dimension', 'draftExcerpt', 'evidence'].includes(key))
+      )
+        return [];
+      return bounded(check.dimension, 200) &&
+        bounded(check.draftExcerpt, 1_000) &&
+        bounded(check.evidence, 1_000)
+        ? [
+            {
+              dimension: check.dimension.trim(),
+              draftExcerpt: check.draftExcerpt,
+              evidence: check.evidence.trim(),
+            },
+          ]
         : [];
     });
     const findings = parsed.findings.filter((item): item is string => bounded(item, 1_000));
@@ -54,6 +76,7 @@ export function parseWritingReviewEvidence(value: string): WritingReviewEvidence
     if (
       parsed.sourceCoverage !== undefined &&
       (!source ||
+        Object.keys(source).some((key) => !['sourcesSha256', 'verdict'].includes(key)) ||
         typeof source.sourcesSha256 !== 'string' ||
         !/^[a-f0-9]{64}$/u.test(source.sourcesSha256) ||
         !['pass', 'fail'].includes(String(source.verdict)))
@@ -78,6 +101,16 @@ export function parseWritingReviewEvidence(value: string): WritingReviewEvidence
   }
 }
 
+export function writingReviewEvidenceMatchesDraft(
+  evidence: WritingReviewEvidence,
+  draft: string,
+): boolean {
+  return (
+    evidence.writingDraftSha256 === createHash('sha256').update(draft).digest('hex') &&
+    evidence.checks.every(({ draftExcerpt }) => draft.includes(draftExcerpt))
+  );
+}
+
 /** Resolve writing red-team authority only from Major's append-only review
  * receipt. Free-form worker identifiers and verdicts are never consulted. */
 export function resolveWritingReviewAuthority(
@@ -88,7 +121,7 @@ export function resolveWritingReviewAuthority(
     reviewedRunId: string;
     sourceHead: string;
     sourceTreeDigest: string;
-    draftSha256: string;
+    draft: string;
   },
 ): WritingRuntimeAuthority | undefined {
   const receipts = db
@@ -110,19 +143,20 @@ export function resolveWritingReviewAuthority(
     try {
       const evidence = parseWritingReviewEvidence(receipt.evidence);
       if (!evidence) continue;
-      if (evidence.writingDraftSha256 !== input.draftSha256) continue;
+      if (!writingReviewEvidenceMatchesDraft(evidence, input.draft)) continue;
+      const draftSha256 = createHash('sha256').update(input.draft).digest('hex');
       const sourceCoverage = evidence.sourceCoverage;
       return {
         redTeam: {
           receiptId: receipt.id,
-          draftSha256: input.draftSha256,
+          draftSha256,
           verdict: receipt.verdict,
         },
         ...(sourceCoverage && sourceCoverage.verdict === receipt.verdict
           ? {
               sourceCoverage: {
                 receiptId: receipt.id,
-                draftSha256: input.draftSha256,
+                draftSha256,
                 sourcesSha256: sourceCoverage.sourcesSha256,
                 verdict: receipt.verdict,
               },

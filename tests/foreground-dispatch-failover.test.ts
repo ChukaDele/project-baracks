@@ -352,12 +352,33 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
         evidence: JSON.stringify({
           writingDraftSha256: draftSha256,
           assessment: 'The draft accurately preserves the supplied study statement.',
-          checks: [{ dimension: 'source fidelity', evidence: 'The traced claim matches study-1.' }],
+          checks: [
+            {
+              dimension: 'source fidelity',
+              draftExcerpt: 'The study reports a measured improvement.',
+              evidence: 'The traced claim matches study-1.',
+            },
+          ],
           findings: [],
           sourceCoverage: { sourcesSha256, verdict: 'pass' },
         }),
       },
     };
+    const genericReview = structuredClone(review);
+    genericReview.summary = 'generic review attempted';
+    genericReview.independentReview.evidence = JSON.stringify({
+      writingDraftSha256: draftSha256,
+      assessment: 'The draft appears acceptable after a general quality review.',
+      checks: [
+        {
+          dimension: 'quality',
+          draftExcerpt: 'This excerpt does not occur in the draft.',
+          evidence: 'A generic quality check was asserted.',
+        },
+      ],
+      findings: [],
+      sourceCoverage: { sourcesSha256, verdict: 'pass' },
+    });
     runWorkerMock
       .mockResolvedValueOnce({
         host: 'codex',
@@ -372,6 +393,20 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
         rateLimited: false,
         exhausted: false,
         sessionRef: 'writing-implementation-session',
+      })
+      .mockResolvedValueOnce({
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: JSON.stringify({
+          type: 'result',
+          result: `MAJOR_RESULT: ${JSON.stringify(genericReview)}`,
+        }),
+        stderr: '',
+        durationMs: 5,
+        rateLimited: false,
+        exhausted: false,
+        sessionRef: 'generic-writing-review-session',
       })
       .mockResolvedValueOnce({
         host: 'codex',
@@ -405,6 +440,11 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     expect(String((runWorkerMock.mock.calls[1]?.[0] as { prompt: string }).prompt)).toContain(
       JSON.stringify(draft),
     );
+    expect(getGoal(goalId)?.pendingCompletion).toBeDefined();
+    expect(getGoal(goalId)?.lastSummary).toMatch(/not bound/);
+
+    await runSupervisorCli(['run', 'reviewed-writing-tool', '--goal-id', goalId, '--foreground']);
+
     expect(runValeMock).toHaveBeenCalledTimes(2);
     expect(getGoal(goalId)?.status).toBe('done');
     expect(getGoal(goalId)?.pendingCompletion).toBeUndefined();
