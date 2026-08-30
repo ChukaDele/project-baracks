@@ -303,7 +303,7 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
       'thread-reviewed-writing',
     ]);
     const goalId = (lastLog(logs) as { goalId: string }).goalId;
-    const draft = 'The study reports a measured improvement.';
+    const draft = '  The study reports a measured improvement.  \n';
     const draftSha256 = writingDraftDigest(draft);
     const sources = [{ id: 'study-1', content: draft }];
     const sourcesSha256 = writingSourcesDigest(
@@ -351,6 +351,8 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
         verdict: 'pass',
         evidence: JSON.stringify({
           writingDraftSha256: draftSha256,
+          assessment: 'The draft accurately preserves the supplied study statement.',
+          checks: [{ dimension: 'source fidelity', evidence: 'The traced claim matches study-1.' }],
           findings: [],
           sourceCoverage: { sourcesSha256, verdict: 'pass' },
         }),
@@ -401,7 +403,7 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
 
     expect(runWorkerMock.mock.calls[1]?.[0]).toMatchObject({ readOnly: true });
     expect(String((runWorkerMock.mock.calls[1]?.[0] as { prompt: string }).prompt)).toContain(
-      draft,
+      JSON.stringify(draft),
     );
     expect(runValeMock).toHaveBeenCalledTimes(2);
     expect(getGoal(goalId)?.status).toBe('done');

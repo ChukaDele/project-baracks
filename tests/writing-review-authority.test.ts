@@ -13,6 +13,8 @@ describe('persisted writing review authority', () => {
       goalId: 'goal-writing',
       reviewEvidence: JSON.stringify({
         writingDraftSha256: digest,
+        assessment: 'The exact draft preserves its supported claims and qualifications.',
+        checks: [{ dimension: 'source fidelity', evidence: 'Every traced claim matches source.' }],
         findings: [],
         sourceCoverage: { sourcesSha256: sourcesDigest, verdict: 'pass' },
       }),
@@ -42,6 +44,27 @@ describe('persisted writing review authority', () => {
         sourceHead: 'a'.repeat(40),
         sourceTreeDigest: 'b'.repeat(64),
         draftSha256: 'd'.repeat(64),
+      }),
+    ).toBeUndefined();
+  });
+
+  it('rejects digest-only receipts without substantive reviewer observations', () => {
+    const db = testDb();
+    const digest = 'c'.repeat(64);
+    const fixture = canonicalGradeProvenance(db, {
+      id: 'digest-only-writing-review',
+      project: 'project-baracks',
+      goalId: 'goal-digest-only',
+      reviewEvidence: JSON.stringify({ writingDraftSha256: digest, findings: [] }),
+    });
+    expect(
+      resolveWritingReviewAuthority(db, {
+        project: 'project-baracks',
+        goalId: 'goal-digest-only',
+        reviewedRunId: fixture.reviewedExecutionId,
+        sourceHead: 'a'.repeat(40),
+        sourceTreeDigest: 'b'.repeat(64),
+        draftSha256: digest,
       }),
     ).toBeUndefined();
   });

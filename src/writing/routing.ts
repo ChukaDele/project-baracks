@@ -5,9 +5,10 @@ import {
   type WritingRoute,
 } from './types.js';
 
-const directWritingAction = /\b(?:write|rewrite|draft|prepare|polish|edit)\b/i;
+const directWritingAction =
+  /\b(?:write|rewrite|draft|prepare|polish|edit|compose|revise|proofread|summari[sz]e)\b/i;
 const directWritingObject =
-  /\b(?:this|notes?|essay|summary|report|memo|homepage|website|landing page|copy|proposal|post|newsletter|article|sop|procedure|warning|instructions?|email|message|slack|reply|letter|statement|brief|prose|words|content|headline)\b/i;
+  /\b(?:this|notes?|essay|summary|report|memo|homepage|website|landing page|copy|proposal|post|newsletter|article|sop|procedure|warning|instructions?|documentation|docs?|readme|email|message|slack|reply|letter|statement|brief|prose|words|content|headline)\b/i;
 const transformWritingAction =
   /\b(?:turn\s+(?:these\s+)?notes?\s+into\s+[^.!?]{0,40}\b(?:report|memo|proposal|post|article)|make\s+this\s+(?:sop|procedure|email|message|copy|prose)\s+(?:clearer|better)|do\s+my\s+(?:mba\s+)?(?:critical\s+)?summary|help\s+(?:me\s+)?with\s+(?:this\s+|an?\s+)?(?:essay|report|proposal))\b/i;
 
@@ -47,7 +48,7 @@ export function resolveWritingRoute(task: string): WritingRoute | undefined {
       text,
     );
   const technical =
-    /\b(?:sop|procedure|warning|operating instructions?|controlled technical|asd[- ]?ste100)\b/i.test(
+    /\b(?:sop|procedure|warning|operating instructions?|controlled technical|asd[- ]?ste100|documentation|docs?|readme)\b/i.test(
       text,
     );
   const personal =

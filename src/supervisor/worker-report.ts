@@ -277,11 +277,10 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
     if (!['active', 'blocked', 'done'].includes(String(value.status))) return undefined;
     if (typeof value.summary !== 'string' || value.summary.trim().length === 0) return undefined;
     const summary = redactText(value.summary.trim()).slice(0, 12_000);
-    const writingDraft =
-      typeof value.writingDraft === 'string' ? value.writingDraft.trim() : undefined;
+    const writingDraft = typeof value.writingDraft === 'string' ? value.writingDraft : undefined;
     if (
       value.writingDraft !== undefined &&
-      (!writingDraft || Buffer.byteLength(writingDraft, 'utf8') > 100_000)
+      (!writingDraft?.trim() || Buffer.byteLength(writingDraft, 'utf8') > 100_000)
     )
       return undefined;
     const taskId = typeof value.taskId === 'string' ? value.taskId.trim() : '';
@@ -404,7 +403,8 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
         !/^[0-9a-f]{40}$/.test(review.sourceHead) ||
         !['pass', 'fail'].includes(String(review.verdict)) ||
         typeof review.evidence !== 'string' ||
-        !review.evidence.trim()
+        !review.evidence.trim() ||
+        Buffer.byteLength(review.evidence, 'utf8') > 4_000
       )
         return undefined;
       independentReview = {
@@ -412,7 +412,7 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
         goalId: review.goalId.trim(),
         sourceHead: review.sourceHead,
         verdict: review.verdict as 'pass' | 'fail',
-        evidence: redactText(review.evidence.trim()).slice(0, 4_000),
+        evidence: redactText(review.evidence.trim()),
       };
     }
     const ownerGate =

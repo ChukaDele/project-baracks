@@ -7,7 +7,10 @@
     { "id": "learning-correction", "prompt": "Stop doing this and learn the correction." },
     { "id": "database-migration", "prompt": "Draft a database migration for the new schema." },
     { "id": "parser-rewrite", "prompt": "Rewrite the parser implementation for speed." },
-    { "id": "source-map-code", "prompt": "Write a TypeScript source-map parser." }
+    { "id": "source-map-code", "prompt": "Write a TypeScript source-map parser." },
+    { "id": "compose-component", "prompt": "Compose a React component for the settings page." },
+    { "id": "revise-sql", "prompt": "Revise this SQL query to remove the full table scan." },
+    { "id": "summarize-function", "prompt": "Summarize this Python function into pseudocode." }
   ],
   "fixtures": [
     {
@@ -91,6 +94,34 @@
       "genre": "technical",
       "required": ["writing-os", "technical-writing", "asd-ste100", "writing-evaluator"],
       "forbidden": ["academic-writing", "direct-response-writing"]
+    },
+    {
+      "id": "compose-documentation",
+      "prompt": "compose the API documentation for this public endpoint",
+      "genre": "technical",
+      "required": ["writing-os", "technical-writing", "prose-lint"],
+      "forbidden": ["academic-writing", "direct-response-writing"]
+    },
+    {
+      "id": "revise-readme",
+      "prompt": "revise the README installation instructions",
+      "genre": "technical",
+      "required": ["writing-os", "technical-writing", "asd-ste100"],
+      "forbidden": ["academic-writing", "direct-response-writing"]
+    },
+    {
+      "id": "proofread-docs",
+      "prompt": "proofread these docs for clarity",
+      "genre": "technical",
+      "required": ["writing-os", "technical-writing", "natural-writing-qa"],
+      "forbidden": ["academic-writing", "direct-response-writing"]
+    },
+    {
+      "id": "summarize-report",
+      "prompt": "summarize this report for the leadership team",
+      "genre": "report",
+      "required": ["writing-os", "writing-evaluator"],
+      "forbidden": ["academic-writing", "asd-ste100"]
     },
     {
       "id": "email",

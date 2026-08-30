@@ -1128,6 +1128,18 @@ describe('Major coordinator contract', () => {
       }),
     );
     expect(report?.writingDraft).toBe('The bounded draft.');
+    const exactDraft = '  First line.\n\nSecond line.  \n';
+    const exact = parseWorkerReport(
+      JSON.stringify({
+        type: 'result',
+        result: `MAJOR_RESULT: ${JSON.stringify({
+          status: 'active',
+          summary: 'exact draft',
+          writingDraft: exactDraft,
+        })}`,
+      }),
+    );
+    expect(exact?.writingDraft).toBe(exactDraft);
     const oversized = 'x'.repeat(100_001);
     expect(
       parseWorkerReport(
