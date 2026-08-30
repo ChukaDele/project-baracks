@@ -179,4 +179,23 @@ describe('persisted writing review authority', () => {
       ),
     ).toBe(false);
   });
+
+  it.each(['X', 'The', 'Draft.'])(
+    'rejects the trivial whole short draft %j despite substantive-shaped review evidence',
+    (draft) => {
+      const evidence: WritingReviewEvidence = {
+        writingDraftSha256: writingDraftDigest(draft),
+        assessment: 'The short response was reviewed in its complete transactional context.',
+        checks: [
+          {
+            dimension: 'transactional fit',
+            draftExcerpt: draft,
+            evidence: 'The response appears concise and courteous for the intended recipient.',
+          },
+        ],
+        findings: [],
+      };
+      expect(writingReviewEvidenceMatchesDraft(evidence, draft)).toBe(false);
+    },
+  );
 });

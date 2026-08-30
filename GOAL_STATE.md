@@ -70,6 +70,10 @@ inconclusive attempts produce an availability checkpoint, never an implementatio
 The release stability validator now verifies the real split worktree contract: `state.ts` must integrate
 `gitCommonDir`, and `source-identity.ts` must implement the linked-worktree `commondir` lookup. This
 repairs the obsolete same-file marker without weakening either required side of the invariant.
+The final writing-review edge repair rejects whole short drafts that contain no meaningful token
+(including `X`, `The`, and generic `Draft.` placeholders), while retaining meaningful short drafts
+with whole-draft, substantive review evidence. The focused writing/supervisor path passes 146/146
+tests with lint, typecheck, formatting, build, Major validation, and stability validation.
 
 ## Critical-path dependencies
 

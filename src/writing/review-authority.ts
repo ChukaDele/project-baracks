@@ -163,6 +163,10 @@ const words = (value: string): string[] =>
   normalized(value).match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
 const distinctiveWords = (value: string): string[] =>
   words(value).filter((word) => word.length >= 4 && !COMMON_WORDS.has(word));
+const meaningfulShortDraftWords = (value: string): string[] =>
+  words(value).filter(
+    (word) => word.length >= 2 && !COMMON_WORDS.has(word) && !GENERIC_REVIEW_WORDS.has(word),
+  );
 
 function materiallyGroundedCheck(
   check: WritingReviewEvidence['checks'][number],
@@ -173,7 +177,7 @@ function materiallyGroundedCheck(
   const draftWords = words(draft);
   const shortDraft = draftWords.length <= 4 || draftText.length <= 32;
   const excerptGrounded = shortDraft
-    ? excerptText === draftText
+    ? excerptText === draftText && meaningfulShortDraftWords(draft).length > 0
     : draft.includes(check.draftExcerpt) &&
       excerptText.length >= 20 &&
       words(check.draftExcerpt).length >= 3 &&
