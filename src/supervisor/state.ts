@@ -169,7 +169,7 @@ export interface SupervisorGoal {
         writing?: {
           draft: string;
           draftSha256: string;
-          evidence: import('../writing/runtime.js').WritingGateEvidence;
+          evidence?: import('../writing/runtime.js').WritingGateEvidence;
           redTeamRequired: boolean;
           sourceCoverageRequired: boolean;
         };

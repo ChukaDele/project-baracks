@@ -259,6 +259,59 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     await runSupervisorCli(['run', 'writing-tool', '--goal-id', goalId, '--foreground']);
 
     expect(getGoal(goalId)?.pendingCompletion).toMatchObject({ summary: 'reply drafted' });
+
+    const publicRepoPath = repo('public-writing-tool');
+    configureProjectPolicy({
+      project: 'public-writing-tool',
+      repoPath: publicRepoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    await runSupervisorCli([
+      'goal',
+      'admit',
+      '--cwd',
+      publicRepoPath,
+      '--host',
+      'codex',
+      '--outcome',
+      'write an important public press release about our API launch',
+      '--session-id',
+      'thread-public-writing',
+    ]);
+    const publicGoalId = (lastLog(logs) as { goalId: string }).goalId;
+    runWorkerMock.mockResolvedValueOnce({
+      host: 'codex',
+      status: 'succeeded',
+      exitCode: 0,
+      stdout: resultEnvelope(
+        'done',
+        'public release drafted',
+        'Atlas API launches today. It helps operations teams coordinate verified updates.',
+      ),
+      stderr: '',
+      durationMs: 5,
+      rateLimited: false,
+      exhausted: false,
+      sessionRef: 'public-writing-session',
+    });
+
+    await runSupervisorCli([
+      'run',
+      'public-writing-tool',
+      '--goal-id',
+      publicGoalId,
+      '--foreground',
+    ]);
+
+    expect(getGoal(publicGoalId)?.pendingCompletion).toMatchObject({
+      writing: {
+        sourceCoverageRequired: false,
+        redTeamRequired: true,
+      },
+    });
+    expect(getGoal(publicGoalId)?.pendingCompletion?.writing).not.toHaveProperty('evidence');
   });
 
   it('persists exact writing context and reruns final verification after persisted review', async () => {
@@ -336,6 +389,8 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
         blockerFindings: 0,
       },
     };
+    const implementationWithoutSourceEvidence = structuredClone(implementation);
+    delete (implementationWithoutSourceEvidence as { writingEvidence?: unknown }).writingEvidence;
     const sourceHead = execFileSync('/usr/bin/git', ['rev-parse', 'HEAD'], {
       cwd: repoPath,
       encoding: 'utf8',
@@ -386,6 +441,20 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
         exitCode: 0,
         stdout: JSON.stringify({
           type: 'result',
+          result: `MAJOR_RESULT: ${JSON.stringify(implementationWithoutSourceEvidence)}`,
+        }),
+        stderr: '',
+        durationMs: 5,
+        rateLimited: false,
+        exhausted: false,
+        sessionRef: 'writing-missing-source-evidence-session',
+      })
+      .mockResolvedValueOnce({
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: JSON.stringify({
+          type: 'result',
           result: `MAJOR_RESULT: ${JSON.stringify(implementation)}`,
         }),
         stderr: '',
@@ -424,6 +493,10 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
       });
 
     await runSupervisorCli(['run', 'reviewed-writing-tool', '--goal-id', goalId, '--foreground']);
+    expect(getGoal(goalId)?.pendingCompletion).toBeUndefined();
+    expect(getGoal(goalId)?.lastSummary).toMatch(/source-claim-check/);
+
+    await runSupervisorCli(['run', 'reviewed-writing-tool', '--goal-id', goalId, '--foreground']);
     const pending = getGoal(goalId)?.pendingCompletion;
     expect({ writing: pending?.writing }).toMatchObject({
       writing: {
@@ -436,8 +509,8 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
 
     await runSupervisorCli(['run', 'reviewed-writing-tool', '--goal-id', goalId, '--foreground']);
 
-    expect(runWorkerMock.mock.calls[1]?.[0]).toMatchObject({ readOnly: true });
-    expect(String((runWorkerMock.mock.calls[1]?.[0] as { prompt: string }).prompt)).toContain(
+    expect(runWorkerMock.mock.calls[2]?.[0]).toMatchObject({ readOnly: true });
+    expect(String((runWorkerMock.mock.calls[2]?.[0] as { prompt: string }).prompt)).toContain(
       JSON.stringify(draft),
     );
     expect(getGoal(goalId)?.pendingCompletion).toBeDefined();
@@ -445,7 +518,7 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
 
     await runSupervisorCli(['run', 'reviewed-writing-tool', '--goal-id', goalId, '--foreground']);
 
-    expect(runValeMock).toHaveBeenCalledTimes(2);
+    expect(runValeMock).toHaveBeenCalledTimes(3);
     expect(getGoal(goalId)?.status).toBe('done');
     expect(getGoal(goalId)?.pendingCompletion).toBeUndefined();
   });

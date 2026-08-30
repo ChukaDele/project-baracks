@@ -62,6 +62,10 @@ describe('canonical writing system', () => {
     ).not.toContain('writing-os');
     expect(resolveWritingRoute('Write a TypeScript function to parse JSON.')).toBeUndefined();
     expect(resolveWritingRoute('Rewrite this SQL query for speed.')).toBeUndefined();
+    expect(resolveWritingRoute('Write a press release about our API launch.')).toBeDefined();
+    expect(
+      resolveWritingRoute('Compose a product description for the developer API.'),
+    ).toBeDefined();
   });
 
   it('routes simple replies transactionally and public web messaging as high-stakes', () => {

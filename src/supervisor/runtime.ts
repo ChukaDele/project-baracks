@@ -966,7 +966,9 @@ async function runPendingCompletionReview(
     pending.writing &&
     (!pending.writing.draft ||
       writingDraftDigest(pending.writing.draft) !== pending.writing.draftSha256 ||
-      !parseWritingGateEvidence(pending.writing.evidence))
+      (pending.writing.evidence !== undefined &&
+        !parseWritingGateEvidence(pending.writing.evidence)) ||
+      (pending.writing.sourceCoverageRequired && !pending.writing.evidence?.sourcePreservation))
   ) {
     updateGoal(goal.id, {
       status: 'active',
@@ -1154,7 +1156,7 @@ async function runPendingCompletionReview(
     try {
       const evidence = parseWritingReviewEvidence(report.independentReview.evidence);
       const coverage = evidence?.sourceCoverage;
-      const expectedSourcesSha256 = pending.writing.evidence.sourcePreservation?.sourcesSha256;
+      const expectedSourcesSha256 = pending.writing.evidence?.sourcePreservation?.sourcesSha256;
       bound =
         Boolean(evidence && writingReviewEvidenceMatchesDraft(evidence, pending.writing.draft)) &&
         (!pending.writing.sourceCoverageRequired ||
@@ -1219,7 +1221,7 @@ async function runPendingCompletionReview(
       const finalWriting = inspectWritingDraft({
         task: goal.goal,
         draft: pending.writing.draft,
-        evidence: pending.writing.evidence,
+        ...(pending.writing.evidence ? { evidence: pending.writing.evidence } : {}),
         ...(authority ? { authority } : {}),
       });
       if (finalWriting.finalState !== 'passed') {
@@ -1887,7 +1889,7 @@ async function runLockedGoalCycle(
         | {
             draft: string;
             draftSha256: string;
-            evidence: WritingGateEvidence;
+            evidence?: WritingGateEvidence;
             redTeamRequired: boolean;
             sourceCoverageRequired: boolean;
           }
@@ -1936,7 +1938,6 @@ async function runLockedGoalCycle(
         const outstanding = writing.gates.filter(({ state }) => state !== 'passed');
         const authorityGates = new Set(['independent-red-team', 'source-claim-check']);
         const canAwaitPersistedReview =
-          Boolean(report.writingEvidence) &&
           outstanding.some(({ gate, state }) => authorityGates.has(gate) && state === 'pending') &&
           outstanding.every(
             ({ gate, state }) =>
@@ -1947,7 +1948,9 @@ async function runLockedGoalCycle(
           writingPendingReview = {
             draft,
             draftSha256: writingDraftDigest(draft),
-            evidence: structuredClone(report.writingEvidence!),
+            ...(report.writingEvidence
+              ? { evidence: structuredClone(report.writingEvidence) }
+              : {}),
             redTeamRequired: writing.route.risk === 'high-stakes',
             sourceCoverageRequired:
               writing.route.genre === 'academic' || writing.route.genre === 'technical',

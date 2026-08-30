@@ -79,6 +79,12 @@ vocabulary with the exact draft and broadens ordinary direct-writing routing to 
 studies, cover letters, executive summaries, and product descriptions. Code-only and UI exclusions
 remain intact, and casual summaries of academic material do not acquire scholarly verification solely
 because their source is academic.
+The next exact-head repair reuses the full writing-object predicate when code terms are present, so
+explicit deliverables such as API press releases and product descriptions route to Writing OS while
+functions, queries, parsers, migrations, components, and other code artifacts remain excluded.
+Non-source high-stakes drafts may now enter persisted independent review without semantically empty
+provider evidence; academic and technical routes still require bounded source-preservation evidence
+before pending review is admitted.
 
 ## Critical-path dependencies
 

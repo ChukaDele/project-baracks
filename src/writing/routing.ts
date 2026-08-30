@@ -14,13 +14,15 @@ const transformWritingAction =
 
 export function resolveWritingRoute(task: string): WritingRoute | undefined {
   const text = task.trim();
-  const codeOnly =
+  const codeTerm =
     /\b(?:code|function|class|typescript|javascript|python|rust|sql|regex|api|bug|test|component|compiler)\b/i.test(
       text,
-    ) &&
-    !/\b(?:prose|copy|documentation|docs?|readme|commentary|explanation|email|message|report|essay|website|homepage|landing|proposal|sop)\b/i.test(
+    );
+  const codeArtifact =
+    /\b(?:function|class|query|parser|implementation|migration|source[- ]map|component|compiler|pseudocode)\b/i.test(
       text,
     );
+  const codeOnly = codeTerm && (codeArtifact || !directWritingObject.test(text));
   if (codeOnly) return undefined;
   if (
     !(directWritingAction.test(text) && directWritingObject.test(text)) &&
