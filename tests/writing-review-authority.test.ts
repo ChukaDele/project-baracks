@@ -6,11 +6,16 @@ describe('persisted writing review authority', () => {
   it('accepts only the exact draft digest on the canonical append-only receipt', () => {
     const db = testDb();
     const digest = 'c'.repeat(64);
+    const sourcesDigest = 'e'.repeat(64);
     const fixture = canonicalGradeProvenance(db, {
       id: 'writing-review',
       project: 'project-baracks',
       goalId: 'goal-writing',
-      reviewEvidence: JSON.stringify({ writingDraftSha256: digest, findings: [] }),
+      reviewEvidence: JSON.stringify({
+        writingDraftSha256: digest,
+        findings: [],
+        sourceCoverage: { sourcesSha256: sourcesDigest, verdict: 'pass' },
+      }),
     });
     expect(
       resolveWritingReviewAuthority(db, {
@@ -21,7 +26,14 @@ describe('persisted writing review authority', () => {
         sourceTreeDigest: 'b'.repeat(64),
         draftSha256: digest,
       }),
-    ).toMatchObject({ redTeam: { receiptId: fixture.reviewReceiptId, verdict: 'pass' } });
+    ).toMatchObject({
+      redTeam: { receiptId: fixture.reviewReceiptId, verdict: 'pass' },
+      sourceCoverage: {
+        receiptId: fixture.reviewReceiptId,
+        sourcesSha256: sourcesDigest,
+        verdict: 'pass',
+      },
+    });
     expect(
       resolveWritingReviewAuthority(db, {
         project: 'project-baracks',

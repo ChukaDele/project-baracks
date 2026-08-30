@@ -35,12 +35,30 @@ export function resolveWritingReviewAuthority(
     try {
       const evidence = JSON.parse(receipt.evidence) as Record<string, unknown>;
       if (evidence.writingDraftSha256 !== input.draftSha256) continue;
+      const sourceCoverage = evidence.sourceCoverage;
+      const coverage =
+        sourceCoverage && typeof sourceCoverage === 'object' && !Array.isArray(sourceCoverage)
+          ? (sourceCoverage as Record<string, unknown>)
+          : undefined;
       return {
         redTeam: {
           receiptId: receipt.id,
           draftSha256: input.draftSha256,
           verdict: receipt.verdict,
         },
+        ...(coverage &&
+        typeof coverage.sourcesSha256 === 'string' &&
+        /^[a-f0-9]{64}$/u.test(coverage.sourcesSha256) &&
+        coverage.verdict === receipt.verdict
+          ? {
+              sourceCoverage: {
+                receiptId: receipt.id,
+                draftSha256: input.draftSha256,
+                sourcesSha256: coverage.sourcesSha256,
+                verdict: receipt.verdict,
+              },
+            }
+          : {}),
       };
     } catch {
       // Legacy/free-form receipt evidence cannot authorize a writing gate.

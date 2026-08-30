@@ -6,7 +6,8 @@
     { "id": "visual-redesign", "prompt": "Make this website Awwwards-level." },
     { "id": "learning-correction", "prompt": "Stop doing this and learn the correction." },
     { "id": "database-migration", "prompt": "Draft a database migration for the new schema." },
-    { "id": "parser-rewrite", "prompt": "Rewrite the parser implementation for speed." }
+    { "id": "parser-rewrite", "prompt": "Rewrite the parser implementation for speed." },
+    { "id": "source-map-code", "prompt": "Write a TypeScript source-map parser." }
   ],
   "fixtures": [
     {
@@ -83,6 +84,13 @@
       "genre": "technical",
       "required": ["writing-os", "technical-writing", "asd-ste100", "prose-lint"],
       "forbidden": ["personal-brand-strategy", "direct-response-writing"]
+    },
+    {
+      "id": "source-dependent-procedure",
+      "prompt": "write a controlled operating procedure from the supplied maintenance manual",
+      "genre": "technical",
+      "required": ["writing-os", "technical-writing", "asd-ste100", "writing-evaluator"],
+      "forbidden": ["academic-writing", "direct-response-writing"]
     },
     {
       "id": "email",

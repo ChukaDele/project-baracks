@@ -58,13 +58,28 @@ export interface WritingRuntimeAuthority {
     draftSha256: string;
     verdict: 'pass' | 'fail';
   };
+  sourceCoverage?: {
+    receiptId: string;
+    draftSha256: string;
+    sourcesSha256: string;
+    verdict: 'pass' | 'fail';
+  };
 }
 
 export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  try {
+    if (Buffer.byteLength(JSON.stringify(value), 'utf8') > 500_000) return undefined;
+  } catch {
+    return undefined;
+  }
   const record = value as Record<string, unknown>;
   const hash = (candidate: unknown): candidate is string =>
     typeof candidate === 'string' && /^[a-f0-9]{64}$/u.test(candidate);
+  const boundedText = (candidate: unknown, maximum: number): candidate is string =>
+    typeof candidate === 'string' &&
+    Boolean(candidate.trim()) &&
+    Buffer.byteLength(candidate, 'utf8') <= maximum;
   const output: WritingGateEvidence = {};
   if (record.redTeam !== undefined) return undefined;
   if (record.revision !== undefined) {
@@ -75,7 +90,8 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
       !hash(item.beforeDraftSha256) ||
       !hash(item.afterDraftSha256) ||
       !Array.isArray(item.addressedFindingIds) ||
-      !item.addressedFindingIds.every((id) => typeof id === 'string' && id.trim())
+      item.addressedFindingIds.length > 256 ||
+      !item.addressedFindingIds.every((id) => boundedText(id, 500))
     )
       return undefined;
     output.revision = {
@@ -110,30 +126,21 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
       ? sourceInput.flatMap((source): WritingSourceEvidence[] => {
           if (!source || typeof source !== 'object' || Array.isArray(source)) return [];
           const candidate = source as Record<string, unknown>;
-          return typeof candidate.id === 'string' &&
-            Boolean(candidate.id.trim()) &&
-            typeof candidate.content === 'string' &&
-            Boolean(candidate.content.trim()) &&
-            Buffer.byteLength(candidate.content, 'utf8') <= 100_000
+          return boundedText(candidate.id, 500) && boundedText(candidate.content, 100_000)
             ? [{ id: candidate.id.trim(), content: candidate.content }]
             : [];
         })
       : undefined;
     const protectedStatements = protectedInput
-      ? protectedInput.filter(
-          (statement): statement is string =>
-            typeof statement === 'string' && Boolean(statement.trim()),
-        )
+      ? protectedInput.filter((statement): statement is string => boundedText(statement, 10_000))
       : undefined;
     const claimTrace = claimTraceInput
       ? claimTraceInput.flatMap((trace): ClaimTraceEvidence[] => {
           if (!trace || typeof trace !== 'object' || Array.isArray(trace)) return [];
           const candidate = trace as Record<string, unknown>;
-          return typeof candidate.claim === 'string' &&
-            typeof candidate.sourceId === 'string' &&
-            typeof candidate.sourceExcerpt === 'string' &&
-            Buffer.byteLength(candidate.claim, 'utf8') <= 10_000 &&
-            Buffer.byteLength(candidate.sourceExcerpt, 'utf8') <= 20_000
+          return boundedText(candidate.claim, 10_000) &&
+            boundedText(candidate.sourceId, 500) &&
+            boundedText(candidate.sourceExcerpt, 20_000)
             ? [
                 {
                   claim: candidate.claim,
@@ -275,22 +282,36 @@ export function inspectWritingDraft(input: {
             };
     } else if (gate === 'source-claim-check') {
       const sourceEvidence = input.evidence?.sourcePreservation;
-      result =
+      const sourcesSha256 = sourceEvidence
+        ? writingSourcesDigest(sourceEvidence.sources.map(({ id, content }) => `${id}\0${content}`))
+        : undefined;
+      const coverage = input.authority?.sourceCoverage;
+      const deterministicEvidencePassed =
         evaluation.claimTrace.state === 'supported' &&
         evaluation.factualPreservation.state === 'preserved' &&
         sourceEvidence?.draftSha256 === draftSha256 &&
-        sourceEvidence.sourcesSha256 ===
-          writingSourcesDigest(sourceEvidence.sources.map(({ id, content }) => `${id}\0${content}`))
+        sourceEvidence.sourcesSha256 === sourcesSha256;
+      result =
+        deterministicEvidencePassed &&
+        coverage?.draftSha256 === draftSha256 &&
+        coverage.sourcesSha256 === sourcesSha256 &&
+        coverage.receiptId.trim()
           ? {
               gate,
-              state: 'passed',
-              detail: `${evaluation.claimTrace.evidence.length} bounded claim trace(s) matched supplied source content; supplied qualifications and procedures preserved`,
+              state: coverage.verdict === 'pass' ? 'passed' : 'failed',
+              detail: `persisted source-coverage receipt ${coverage.receiptId}; ${evaluation.claimTrace.evidence.length} bounded claim trace(s) matched supplied source content`,
             }
-          : {
-              gate,
-              state: 'failed',
-              detail: `claim trace ${evaluation.claimTrace.state}; factual preservation ${evaluation.factualPreservation.state}`,
-            };
+          : deterministicEvidencePassed
+            ? {
+                gate,
+                state: 'pending',
+                detail: 'Major persisted exact-draft and exact-sources coverage receipt required',
+              }
+            : {
+                gate,
+                state: 'failed',
+                detail: `claim trace ${evaluation.claimTrace.state}; factual preservation ${evaluation.factualPreservation.state}`,
+              };
     } else {
       const priorGatesSha256 = gateDigest(gates);
       result = gates.some(({ state }) => state !== 'passed')

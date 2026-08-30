@@ -5,6 +5,16 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runWorkerMock = vi.fn();
+const runValeMock = vi.fn(() => ({
+  state: 'available' as const,
+  passed: true,
+  engine: 'vale' as const,
+  version: 'Vale test',
+  profile: 'academic' as const,
+  findings: [],
+  suppressions: [],
+  detail: 'bounded test seam',
+}));
 
 // Safely simulates provider exhaustion/failover WITHOUT spawning any real
 // process or consuming any real quota: only the OS-subprocess boundary
@@ -17,6 +27,10 @@ vi.mock('../src/supervisor/worker.js', () => ({
   runWorker: (input: unknown) => runWorkerMock(input),
 }));
 
+vi.mock('../src/writing/vale.js', () => ({
+  runLocalVale: () => runValeMock(),
+}));
+
 import { openDb } from '../src/db/client.js';
 import {
   persistProviderDiscovery,
@@ -26,6 +40,7 @@ import { runSupervisorCli } from '../src/supervisor/cli.js';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
 import { tryAcquireRepoCycleLock } from '../src/supervisor/runtime.js';
 import { getGoal } from '../src/supervisor/state.js';
+import { writingDraftDigest, writingSourcesDigest } from '../src/writing/runtime.js';
 import { model } from './helpers.js';
 
 let root = '';
@@ -42,6 +57,7 @@ beforeEach(() => {
   process.env.MAJOR_POLICY_PATH = join(root, 'policies.json');
   process.env.MAJOR_DB_PATH = join(root, 'major.db');
   runWorkerMock.mockReset();
+  runValeMock.mockClear();
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -243,6 +259,153 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     await runSupervisorCli(['run', 'writing-tool', '--goal-id', goalId, '--foreground']);
 
     expect(getGoal(goalId)?.pendingCompletion).toMatchObject({ summary: 'reply drafted' });
+  });
+
+  it('persists exact writing context and reruns final verification after persisted review', async () => {
+    const repoPath = repo('reviewed-writing-tool');
+    configureProjectPolicy({
+      project: 'reviewed-writing-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const { db, sqlite } = openDb(process.env.MAJOR_DB_PATH);
+    persistProviderDiscovery(
+      db,
+      {
+        name: 'codex',
+        installed: true,
+        authenticated: true,
+        models: [model({ modelRef: 'gpt-codex', routingClass: 'codex' })],
+      },
+      { source: 'cli' },
+    );
+    recordBillingObservation(db, {
+      providerName: 'codex',
+      modelRef: 'gpt-codex',
+      billingMode: 'subscription_included',
+      source: 'human',
+    });
+    sqlite.close();
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => logs.push(String(value)));
+    await runSupervisorCli([
+      'goal',
+      'admit',
+      '--cwd',
+      repoPath,
+      '--host',
+      'codex',
+      '--outcome',
+      'write an academic critical summary from these supplied sources',
+      '--session-id',
+      'thread-reviewed-writing',
+    ]);
+    const goalId = (lastLog(logs) as { goalId: string }).goalId;
+    const draft = 'The study reports a measured improvement.';
+    const draftSha256 = writingDraftDigest(draft);
+    const sources = [{ id: 'study-1', content: draft }];
+    const sourcesSha256 = writingSourcesDigest(
+      sources.map(({ id, content }) => `${id}\0${content}`),
+    );
+    const implementation = {
+      status: 'done',
+      summary: 'proposal drafted',
+      writingDraft: draft,
+      writingEvidence: {
+        sourcePreservation: {
+          draftSha256,
+          sourcesSha256,
+          sources,
+          claimTrace: [{ claim: draft, sourceId: 'study-1', sourceExcerpt: draft }],
+          protectedStatements: [draft],
+        },
+      },
+      promotionEvidence: {
+        focusedTests: 'focused tests passed',
+        cheapestCompileTypeOrBuild: 'typecheck passed',
+        criticalPathBehavior: 'critical path passed',
+        materialRiskChecks: [],
+        broaderValidation: {
+          triggers: [],
+          repositoryPolicyRequires: false,
+          performed: false,
+        },
+        review: { level: 'focused', passed: true },
+        blockerFindings: 0,
+      },
+    };
+    const sourceHead = execFileSync('/usr/bin/git', ['rev-parse', 'HEAD'], {
+      cwd: repoPath,
+      encoding: 'utf8',
+      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' },
+    }).trim();
+    const review = {
+      status: 'active',
+      summary: 'exact draft passed independent review',
+      independentReview: {
+        purpose: 'independent_completion_review',
+        goalId,
+        sourceHead,
+        verdict: 'pass',
+        evidence: JSON.stringify({
+          writingDraftSha256: draftSha256,
+          findings: [],
+          sourceCoverage: { sourcesSha256, verdict: 'pass' },
+        }),
+      },
+    };
+    runWorkerMock
+      .mockResolvedValueOnce({
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: JSON.stringify({
+          type: 'result',
+          result: `MAJOR_RESULT: ${JSON.stringify(implementation)}`,
+        }),
+        stderr: '',
+        durationMs: 5,
+        rateLimited: false,
+        exhausted: false,
+        sessionRef: 'writing-implementation-session',
+      })
+      .mockResolvedValueOnce({
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: JSON.stringify({
+          type: 'result',
+          result: `MAJOR_RESULT: ${JSON.stringify(review)}`,
+        }),
+        stderr: '',
+        durationMs: 5,
+        rateLimited: false,
+        exhausted: false,
+        sessionRef: 'writing-review-session',
+      });
+
+    await runSupervisorCli(['run', 'reviewed-writing-tool', '--goal-id', goalId, '--foreground']);
+    const pending = getGoal(goalId)?.pendingCompletion;
+    expect({ writing: pending?.writing }).toMatchObject({
+      writing: {
+        draft,
+        draftSha256,
+        sourceCoverageRequired: true,
+        evidence: { sourcePreservation: { sources, sourcesSha256 } },
+      },
+    });
+
+    await runSupervisorCli(['run', 'reviewed-writing-tool', '--goal-id', goalId, '--foreground']);
+
+    expect(runWorkerMock.mock.calls[1]?.[0]).toMatchObject({ readOnly: true });
+    expect(String((runWorkerMock.mock.calls[1]?.[0] as { prompt: string }).prompt)).toContain(
+      draft,
+    );
+    expect(runValeMock).toHaveBeenCalledTimes(2);
+    expect(getGoal(goalId)?.status).toBe('done');
+    expect(getGoal(goalId)?.pendingCompletion).toBeUndefined();
   });
 
   it('rejects a nonexistent goal id without dispatching anything', async () => {

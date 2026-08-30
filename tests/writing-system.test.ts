@@ -440,6 +440,14 @@ describe('canonical writing system', () => {
       task: 'make this SOP clearer',
       draft: statement,
       evidence,
+      authority: {
+        sourceCoverage: {
+          receiptId: 'coverage-receipt',
+          draftSha256,
+          sourcesSha256: evidence.sourcePreservation.sourcesSha256,
+          verdict: 'pass',
+        },
+      },
     });
     expect(valid.gates).toContainEqual(
       expect.objectContaining({ gate: 'source-claim-check', state: 'passed' }),
@@ -473,6 +481,15 @@ describe('canonical writing system', () => {
           sources: [{ id: 'source', content: 'x'.repeat(100_001) }],
           claimTrace: [],
           protectedStatements: [],
+        },
+      }),
+    ).toBeUndefined();
+    expect(
+      parseWritingGateEvidence({
+        revision: {
+          beforeDraftSha256: 'a'.repeat(64),
+          afterDraftSha256: 'b'.repeat(64),
+          addressedFindingIds: ['x'.repeat(501)],
         },
       }),
     ).toBeUndefined();
