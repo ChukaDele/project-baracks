@@ -28,11 +28,16 @@ export interface ClaimTraceEvidence {
   supported?: boolean;
 }
 
+export interface WritingSourceEvidence {
+  id: string;
+  content: string;
+}
+
 export function evaluateWriting(input: {
   draft: string;
   brief: string;
   genre: WritingGenre;
-  sources?: readonly string[];
+  sources?: readonly WritingSourceEvidence[];
   claimTrace?: readonly ClaimTraceEvidence[];
   protectedStatements?: readonly string[];
 }): WritingEvaluation {
@@ -84,7 +89,9 @@ export function evaluateWriting(input: {
       message: 'Strong universal claim has no supplied source.',
     });
   const sourceDependent = input.genre === 'academic' || input.genre === 'technical';
-  const suppliedSources = new Set(input.sources ?? []);
+  const suppliedSources = new Map(
+    (input.sources ?? []).map((source) => [source.id, source.content]),
+  );
   const claimTraceState = !sourceDependent
     ? 'not-applicable'
     : !input.claimTrace?.length
@@ -95,7 +102,8 @@ export function evaluateWriting(input: {
               input.draft.includes(trace.claim) &&
               trace.sourceId?.trim() &&
               suppliedSources.has(trace.sourceId) &&
-              trace.sourceExcerpt?.trim(),
+              trace.sourceExcerpt?.trim() &&
+              suppliedSources.get(trace.sourceId)?.includes(trace.sourceExcerpt),
           )
         ? 'supported'
         : 'unsupported';
@@ -110,7 +118,9 @@ export function evaluateWriting(input: {
     });
   const preservationEvidence = (input.protectedStatements ?? []).map((text) => ({
     text,
-    preserved: input.draft.includes(text),
+    preserved:
+      input.draft.includes(text) &&
+      [...suppliedSources.values()].some((content) => content.includes(text)),
   }));
   const preservationState = !sourceDependent
     ? 'not-applicable'

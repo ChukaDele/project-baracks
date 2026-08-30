@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { diagnoseProse, type ProseDiagnostics } from './diagnostics.js';
-import { evaluateWriting, type ClaimTraceEvidence, type WritingEvaluation } from './evaluator.js';
+import {
+  evaluateWriting,
+  type ClaimTraceEvidence,
+  type WritingEvaluation,
+  type WritingSourceEvidence,
+} from './evaluator.js';
 import { resolveWritingRoute } from './routing.js';
 import type { WritingGate, WritingPipelineStage, WritingRoute } from './types.js';
 import { runLocalVale, type ValeEvidence } from './vale.js';
@@ -31,12 +36,6 @@ export interface WritingRuntimeReport {
 }
 
 export interface WritingGateEvidence {
-  redTeam?: {
-    draftSha256: string;
-    reviewerRunId: string;
-    draftAuthorRunId: string;
-    findings: Array<{ id: string; severity: 'BLOCKER' | 'IMPORTANT' | 'NIT'; resolved: boolean }>;
-  };
   revision?: {
     beforeDraftSha256: string;
     afterDraftSha256: string;
@@ -45,9 +44,19 @@ export interface WritingGateEvidence {
   sourcePreservation?: {
     draftSha256: string;
     sourcesSha256: string;
-    sources: string[];
+    sources: WritingSourceEvidence[];
     claimTrace: ClaimTraceEvidence[];
     protectedStatements: string[];
+  };
+}
+
+/** Trusted runtime authority resolved from Major's persisted review receipt.
+ * This is deliberately not part of the provider-owned worker report. */
+export interface WritingRuntimeAuthority {
+  redTeam?: {
+    receiptId: string;
+    draftSha256: string;
+    verdict: 'pass' | 'fail';
   };
 }
 
@@ -57,39 +66,7 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
   const hash = (candidate: unknown): candidate is string =>
     typeof candidate === 'string' && /^[a-f0-9]{64}$/u.test(candidate);
   const output: WritingGateEvidence = {};
-  if (record.redTeam !== undefined) {
-    if (!record.redTeam || typeof record.redTeam !== 'object' || Array.isArray(record.redTeam))
-      return undefined;
-    const item = record.redTeam as Record<string, unknown>;
-    if (
-      !hash(item.draftSha256) ||
-      typeof item.reviewerRunId !== 'string' ||
-      !item.reviewerRunId.trim() ||
-      typeof item.draftAuthorRunId !== 'string' ||
-      !item.draftAuthorRunId.trim() ||
-      !Array.isArray(item.findings)
-    )
-      return undefined;
-    const findings = item.findings.filter(
-      (finding): finding is NonNullable<WritingGateEvidence['redTeam']>['findings'][number] => {
-        if (!finding || typeof finding !== 'object' || Array.isArray(finding)) return false;
-        const findingRecord = finding as Record<string, unknown>;
-        return (
-          typeof findingRecord.id === 'string' &&
-          Boolean(findingRecord.id.trim()) &&
-          ['BLOCKER', 'IMPORTANT', 'NIT'].includes(String(findingRecord.severity)) &&
-          typeof findingRecord.resolved === 'boolean'
-        );
-      },
-    );
-    if (findings.length !== item.findings.length) return undefined;
-    output.redTeam = {
-      draftSha256: item.draftSha256,
-      reviewerRunId: item.reviewerRunId.trim(),
-      draftAuthorRunId: item.draftAuthorRunId.trim(),
-      findings,
-    };
-  }
+  if (record.redTeam !== undefined) return undefined;
   if (record.revision !== undefined) {
     if (!record.revision || typeof record.revision !== 'object' || Array.isArray(record.revision))
       return undefined;
@@ -123,10 +100,24 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
     const protectedInput = Array.isArray(item.protectedStatements)
       ? item.protectedStatements
       : undefined;
+    if (
+      (sourceInput?.length ?? 0) > 32 ||
+      (claimTraceInput?.length ?? 0) > 256 ||
+      (protectedInput?.length ?? 0) > 256
+    )
+      return undefined;
     const sources = sourceInput
-      ? sourceInput.filter(
-          (source): source is string => typeof source === 'string' && Boolean(source.trim()),
-        )
+      ? sourceInput.flatMap((source): WritingSourceEvidence[] => {
+          if (!source || typeof source !== 'object' || Array.isArray(source)) return [];
+          const candidate = source as Record<string, unknown>;
+          return typeof candidate.id === 'string' &&
+            Boolean(candidate.id.trim()) &&
+            typeof candidate.content === 'string' &&
+            Boolean(candidate.content.trim()) &&
+            Buffer.byteLength(candidate.content, 'utf8') <= 100_000
+            ? [{ id: candidate.id.trim(), content: candidate.content }]
+            : [];
+        })
       : undefined;
     const protectedStatements = protectedInput
       ? protectedInput.filter(
@@ -140,7 +131,9 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
           const candidate = trace as Record<string, unknown>;
           return typeof candidate.claim === 'string' &&
             typeof candidate.sourceId === 'string' &&
-            typeof candidate.sourceExcerpt === 'string'
+            typeof candidate.sourceExcerpt === 'string' &&
+            Buffer.byteLength(candidate.claim, 'utf8') <= 10_000 &&
+            Buffer.byteLength(candidate.sourceExcerpt, 'utf8') <= 20_000
             ? [
                 {
                   claim: candidate.claim,
@@ -184,11 +177,12 @@ function gateDigest(gates: readonly WritingGateResult[]): string {
 export function inspectWritingDraft(input: {
   task: string;
   draft: string;
-  sources?: readonly string[];
+  sources?: readonly WritingSourceEvidence[];
   claimTrace?: readonly ClaimTraceEvidence[];
   protectedStatements?: readonly string[];
   detectorObservations?: readonly DetectorObservation[];
   evidence?: WritingGateEvidence;
+  authority?: WritingRuntimeAuthority;
 }): WritingRuntimeReport {
   const route = resolveWritingRoute(input.task);
   if (!route) throw new Error('task does not resolve to the canonical writing route');
@@ -251,26 +245,18 @@ export function inspectWritingDraft(input: {
         detail: 'critic-only multidimensional evaluation complete',
       };
     else if (gate === 'independent-red-team') {
-      const evidence = input.evidence?.redTeam;
+      const evidence = input.authority?.redTeam;
       result =
-        evidence &&
-        evidence.draftSha256 === draftSha256 &&
-        evidence.reviewerRunId.trim() &&
-        evidence.draftAuthorRunId.trim() &&
-        evidence.reviewerRunId !== evidence.draftAuthorRunId
+        evidence && evidence.draftSha256 === draftSha256 && evidence.receiptId.trim()
           ? {
               gate,
-              state: evidence.findings.some((finding) =>
-                finding.severity === 'BLOCKER' ? !finding.resolved : false,
-              )
-                ? 'failed'
-                : 'passed',
-              detail: `exact-draft review ${evidence.reviewerRunId}; ${evidence.findings.length} finding(s)`,
+              state: evidence.verdict === 'pass' ? 'passed' : 'failed',
+              detail: `persisted independent-review receipt ${evidence.receiptId}`,
             }
           : {
               gate,
               state: 'pending',
-              detail: 'distinct run identities and exact-draft red-team evidence required',
+              detail: 'Major persisted exact-draft independent-review receipt required',
             };
     } else if (gate === 'revision') {
       const evidence = input.evidence?.revision;
@@ -293,11 +279,12 @@ export function inspectWritingDraft(input: {
         evaluation.claimTrace.state === 'supported' &&
         evaluation.factualPreservation.state === 'preserved' &&
         sourceEvidence?.draftSha256 === draftSha256 &&
-        sourceEvidence.sourcesSha256 === writingSourcesDigest(sourceEvidence.sources)
+        sourceEvidence.sourcesSha256 ===
+          writingSourcesDigest(sourceEvidence.sources.map(({ id, content }) => `${id}\0${content}`))
           ? {
               gate,
               state: 'passed',
-              detail: `${evaluation.claimTrace.evidence.length} claim trace(s) supported; qualifications and procedures preserved`,
+              detail: `${evaluation.claimTrace.evidence.length} bounded claim trace(s) matched supplied source content; supplied qualifications and procedures preserved`,
             }
           : {
               gate,
@@ -306,7 +293,7 @@ export function inspectWritingDraft(input: {
             };
     } else {
       const priorGatesSha256 = gateDigest(gates);
-      result = gates.some(({ state }) => state === 'failed' || state === 'pending')
+      result = gates.some(({ state }) => state !== 'passed')
         ? { gate, state: 'failed', detail: `prior gate failure; evidence ${priorGatesSha256}` }
         : {
             gate,

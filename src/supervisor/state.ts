@@ -164,6 +164,9 @@ export interface SupervisorGoal {
           providerId: string;
           providerAccountLabel: string;
         };
+        /** Writing completion may enter the existing independent-review phase
+         * only after every non-red-team gate passed for this exact draft. */
+        writing?: { draftSha256: string; redTeamRequired: true };
         reviewDispatch?: {
           id: string;
           provider: WorkerHost;

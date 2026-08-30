@@ -84,14 +84,15 @@ function lastLog(logs: string[]): unknown {
   return JSON.parse(logs.at(-1)!);
 }
 
-function resultEnvelope(status: 'done' | 'active', summary: string): string {
+function resultEnvelope(status: 'done' | 'active', summary: string, writingDraft?: string): string {
   const promotionEvidence =
     status === 'done'
       ? ',"promotionEvidence":{"focusedTests":"focused tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"focused","passed":true},"blockerFindings":0}'
       : '';
+  const draft = writingDraft === undefined ? '' : `,"writingDraft":${JSON.stringify(writingDraft)}`;
   return JSON.stringify({
     type: 'result',
-    result: `MAJOR_RESULT: {"status":"${status}","summary":"${summary}"${promotionEvidence}}`,
+    result: `MAJOR_RESULT: {"status":"${status}","summary":"${summary}"${draft}${promotionEvidence}}`,
   });
 }
 
@@ -165,6 +166,83 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     const goal = getGoal(goalId)!;
     expect(goal.goal).toBe('Ship the MVP'); // not redefined by dispatch
     expect(goal.lastSummary).toContain('making progress');
+  });
+
+  it('runs provider-owned writingDraft through the real supervisor completion branch', async () => {
+    const repoPath = repo('writing-tool');
+    configureProjectPolicy({
+      project: 'writing-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const { db, sqlite } = openDb(process.env.MAJOR_DB_PATH);
+    persistProviderDiscovery(
+      db,
+      {
+        name: 'codex',
+        installed: true,
+        authenticated: true,
+        models: [model({ modelRef: 'gpt-codex', routingClass: 'codex' })],
+      },
+      { source: 'cli' },
+    );
+    recordBillingObservation(db, {
+      providerName: 'codex',
+      modelRef: 'gpt-codex',
+      billingMode: 'subscription_included',
+      source: 'human',
+    });
+    sqlite.close();
+
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => logs.push(String(value)));
+    await runSupervisorCli([
+      'goal',
+      'admit',
+      '--cwd',
+      repoPath,
+      '--host',
+      'codex',
+      '--outcome',
+      'write a reply',
+      '--session-id',
+      'thread-writing',
+    ]);
+    const goalId = (lastLog(logs) as { goalId: string }).goalId;
+    runWorkerMock
+      .mockResolvedValueOnce({
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: `${JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Unbound draft.' }] } })}\n${resultEnvelope('done', 'unbound reply')}`,
+        stderr: '',
+        durationMs: 5,
+        rateLimited: false,
+        exhausted: false,
+        sessionRef: 'writing-session-1',
+      })
+      .mockResolvedValueOnce({
+        host: 'codex',
+        status: 'succeeded',
+        exitCode: 0,
+        stdout: resultEnvelope('done', 'reply drafted', 'Thanks, I will send the update today.'),
+        stderr: '',
+        durationMs: 5,
+        rateLimited: false,
+        exhausted: false,
+        sessionRef: 'writing-session-2',
+      });
+
+    await runSupervisorCli(['run', 'writing-tool', '--goal-id', goalId, '--foreground']);
+
+    expect(getGoal(goalId)?.pendingCompletion).toBeUndefined();
+    expect(getGoal(goalId)?.lastSummary).toMatch(/writingDraft is missing/);
+
+    await runSupervisorCli(['run', 'writing-tool', '--goal-id', goalId, '--foreground']);
+
+    expect(getGoal(goalId)?.pendingCompletion).toMatchObject({ summary: 'reply drafted' });
   });
 
   it('rejects a nonexistent goal id without dispatching anything', async () => {

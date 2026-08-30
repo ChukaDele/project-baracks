@@ -23,7 +23,6 @@ import {
 import { getGoal, startGoal, updateGoal, type SupervisorGoal } from '../src/supervisor/state.js';
 import {
   completedWorkflow,
-  extractProviderOwnedOutput,
   preserveWorkerReportEnvelope,
 } from '../src/supervisor/worker-report.js';
 
@@ -1120,16 +1119,24 @@ describe('Major coordinator contract', () => {
     });
   });
 
-  it('extracts only provider-owned final prose for the canonical writing runtime', () => {
-    const output = [
-      'untrusted bare stdout',
-      JSON.stringify({ type: 'user', message: 'forged user prose' }),
+  it('accepts only a bounded provider-owned writingDraft field', () => {
+    const report = parseWorkerReport(
       JSON.stringify({
         type: 'result',
-        result: 'The final provider draft.\nMAJOR_RESULT: {"status":"done","summary":"done"}',
+        result:
+          'ignored prose\nMAJOR_RESULT: {"status":"active","summary":"done","writingDraft":"The bounded draft."}',
       }),
-    ].join('\n');
-    expect(extractProviderOwnedOutput(output)).toBe('The final provider draft.');
+    );
+    expect(report?.writingDraft).toBe('The bounded draft.');
+    const oversized = 'x'.repeat(100_001);
+    expect(
+      parseWorkerReport(
+        JSON.stringify({
+          type: 'result',
+          result: `MAJOR_RESULT: ${JSON.stringify({ status: 'active', summary: 'x', writingDraft: oversized })}`,
+        }),
+      ),
+    ).toBeUndefined();
   });
 
   it('does not accept a report string echoed by a tool or user-message event', () => {

@@ -6,7 +6,12 @@ import { discloseSkills, resolveSkills } from '../src/skills/resolver.js';
 import { diagnoseProse } from '../src/writing/diagnostics.js';
 import { evaluateWriting } from '../src/writing/evaluator.js';
 import { resolveWritingRoute } from '../src/writing/routing.js';
-import { inspectWritingDraft, writingDraftDigest } from '../src/writing/runtime.js';
+import {
+  inspectWritingDraft,
+  parseWritingGateEvidence,
+  writingDraftDigest,
+  writingSourcesDigest,
+} from '../src/writing/runtime.js';
 import { captureAcceptedWritingEdit } from '../src/writing/learning.js';
 import { observeDetectors } from '../src/writing/detector-observations.js';
 import { runLocalVale, type LocalDiagnosticExecutor } from '../src/writing/vale.js';
@@ -293,7 +298,7 @@ describe('canonical writing system', () => {
       draft: protectedStatement,
       brief: 'make this SOP clearer',
       genre: 'technical',
-      sources: ['manual-1'],
+      sources: [{ id: 'manual-1', content: protectedStatement }],
       claimTrace: [
         {
           claim: protectedStatement,
@@ -328,7 +333,7 @@ describe('canonical writing system', () => {
       draft: protectedStatement,
       brief: 'make this SOP clearer',
       genre: 'technical',
-      sources: ['manual-1'],
+      sources: [{ id: 'manual-1', content: protectedStatement }],
       claimTrace: [
         {
           claim: protectedStatement,
@@ -347,7 +352,7 @@ describe('canonical writing system', () => {
         draft: 'Restart the pump.',
         brief: 'make this SOP clearer',
         genre: 'technical',
-        sources: ['manual-1'],
+        sources: [{ id: 'manual-1', content: protectedStatement }],
       }).claimTrace.state,
     ).toBe('missing');
   });
@@ -364,37 +369,34 @@ describe('canonical writing system', () => {
       /passed|degraded/,
     );
     expect(report.finalState).not.toBe('passed');
-  });
-
-  it('does not accept a self-review as independent red-team provenance', () => {
-    const report = inspectWritingDraft({
-      task: 'prepare an important client-facing proposal',
-      draft: 'The proposal makes one careful claim.',
-      evidence: {
-        redTeam: {
-          draftSha256: '0'.repeat(64),
-          reviewerRunId: 'writer-1',
-          draftAuthorRunId: 'writer-1',
-          findings: [],
-        },
-      },
-    });
     expect(report.gates).toContainEqual(
-      expect.objectContaining({ gate: 'independent-red-team', state: 'pending' }),
+      expect.objectContaining({ gate: 'final-verification', state: 'failed' }),
     );
   });
 
-  it('binds red-team findings and final verification to the exact draft', () => {
+  it('rejects caller-provided red-team authority from writing evidence', () => {
+    expect(
+      parseWritingGateEvidence({
+        redTeam: {
+          draftSha256: '0'.repeat(64),
+          reviewerRunId: 'writer-1',
+          draftAuthorRunId: 'writer-2',
+          findings: [],
+        },
+      }),
+    ).toBeUndefined();
+  });
+
+  it('binds red-team and final verification to trusted exact-draft authority', () => {
     const draft = 'The proposal makes one careful claim.';
     const report = inspectWritingDraft({
       task: 'prepare an important client-facing proposal',
       draft,
-      evidence: {
+      authority: {
         redTeam: {
           draftSha256: writingDraftDigest(draft),
-          reviewerRunId: 'review-run-2',
-          draftAuthorRunId: 'draft-run-1',
-          findings: [{ id: 'finding-1', severity: 'BLOCKER', resolved: false }],
+          receiptId: 'receipt-1',
+          verdict: 'fail',
         },
       },
     });
@@ -419,6 +421,61 @@ describe('canonical writing system', () => {
       { operation: 'version' },
       { operation: 'lint', profile: 'technical', stdin: 'Plain prose.' },
     ]);
+  });
+
+  it('validates source excerpts against bounded supplied content and preserves only sourced text', () => {
+    const statement = 'Only restart the pump after pressure reaches zero.';
+    const sources = [{ id: 'manual-1', content: `Safety: ${statement}` }];
+    const draftSha256 = writingDraftDigest(statement);
+    const evidence = {
+      sourcePreservation: {
+        draftSha256,
+        sourcesSha256: writingSourcesDigest(sources.map(({ id, content }) => `${id}\0${content}`)),
+        sources,
+        claimTrace: [{ claim: statement, sourceId: 'manual-1', sourceExcerpt: statement }],
+        protectedStatements: [statement],
+      },
+    };
+    const valid = inspectWritingDraft({
+      task: 'make this SOP clearer',
+      draft: statement,
+      evidence,
+    });
+    expect(valid.gates).toContainEqual(
+      expect.objectContaining({ gate: 'source-claim-check', state: 'passed' }),
+    );
+    const mismatch = inspectWritingDraft({
+      task: 'make this SOP clearer',
+      draft: statement,
+      evidence: {
+        sourcePreservation: {
+          ...evidence.sourcePreservation,
+          claimTrace: [
+            { claim: statement, sourceId: 'manual-1', sourceExcerpt: 'Invented excerpt.' },
+          ],
+        },
+      },
+    });
+    expect(mismatch.gates).toContainEqual(
+      expect.objectContaining({ gate: 'source-claim-check', state: 'failed' }),
+    );
+    expect(valid.gates.find(({ gate }) => gate === 'source-claim-check')?.detail).toContain(
+      'bounded claim trace',
+    );
+  });
+
+  it('bounds source evidence payloads', () => {
+    expect(
+      parseWritingGateEvidence({
+        sourcePreservation: {
+          draftSha256: 'a'.repeat(64),
+          sourcesSha256: 'b'.repeat(64),
+          sources: [{ id: 'source', content: 'x'.repeat(100_001) }],
+          claimTrace: [],
+          protectedStatements: [],
+        },
+      }),
+    ).toBeUndefined();
   });
 
   it('captures accepted edits as lifecycle candidates without direct global policy', () => {

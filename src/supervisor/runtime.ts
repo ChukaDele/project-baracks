@@ -85,7 +85,6 @@ import {
   completedWorkflow,
   assessSupervisorAdmissionRisk,
   deriveSupervisorPromotionContract,
-  extractProviderOwnedOutput,
   parseWorkerReport,
   type WorkerReport,
 } from './worker-report.js';
@@ -109,7 +108,8 @@ import {
   type SupervisorCandidateRecord,
 } from './source-identity.js';
 import { resolveWritingRoute } from '../writing/routing.js';
-import { inspectWritingDraft } from '../writing/runtime.js';
+import { inspectWritingDraft, writingDraftDigest } from '../writing/runtime.js';
+import { resolveWritingReviewAuthority } from '../writing/review-authority.js';
 
 export { exactRepositoryHead } from './source-identity.js';
 
@@ -646,6 +646,9 @@ export function coordinatorPrompt(
       'REUSABLE ASSET DISCOVERY (degraded): the metadata index is unavailable. Do not treat a repository search as the default reuse mechanism; report this degradation in MAJOR_RESULT if it materially affects work.';
   }
   const policy = getProjectPolicy(goal.project, goal.repoPath);
+  const writingOutputContract = resolveWritingRoute(goal.goal)
+    ? `\nCANONICAL WRITING OUTPUT CONTRACT:\n- Put the complete final deliverable only in MAJOR_RESULT.writingDraft (UTF-8, maximum 100000 bytes). Prose elsewhere in provider output is ignored.\n- writingEvidence may carry bounded revision and source-preservation evidence, but never red-team authority.\n- Source evidence must supply {id,content}; claim excerpts must occur in that content and protected statements must occur in both source content and the final draft.\n- High-stakes completion remains pending until Major's separate persisted independent review binds the exact writingDraft digest.\n`
+    : '';
   const workerLanguage = `The project policy permits up to ${policy.maxWorkers} independent workers. Major's live resource ledger may lower that ceiling when CPU or memory is constrained. This leased worker must request additional capacity in its final report rather than nesting workers itself. Serialize only real write, interface, ordering, or scarce-resource conflicts.`;
   const workspaceContract =
     configuredExecutionPath() === 'host'
@@ -701,6 +704,7 @@ Use this exact optional field for that evidence:
 "capabilityUse":[{"key":"capability-key","evidence":"specific operation and observed result"}].
 
 ${formatCodexCapacityOverview(readCodexUsageReport())}
+${writingOutputContract}
 
 Before any substantive mutation, confirm the embedded CANONICAL TARGET and the source tree in your current cwd describe the same project. Do not treat a provider-boundary restriction as identity failure. If the task clearly belongs to another known project, do not patch the current worktree. Use project-context-integrity and reroute when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong project is a failed task.
 
@@ -1077,6 +1081,9 @@ async function runPendingCompletionReview(
       `Frozen objective: ${goal.goal}\n` +
       `Frozen promotion contract: ${JSON.stringify(pending.promotionContract)}\n` +
       `Structured completion evidence: ${JSON.stringify({ taskId: pending.taskId, promotionCheckedAt: pending.promotionCheckedAt, promotionEvidence: pending.promotionEvidence })}\n` +
+      (pending.writing
+        ? `Writing red-team target digest: ${pending.writing.draftSha256}\nA pass verdict must set independentReview.evidence to a JSON string containing exactly this writingDraftSha256 plus concise findings.\n`
+        : '') +
       `Canonical task ID: ${pending.taskId ?? 'none'}\nClaim: ${pending.summary}\n` +
       `Use read-only exact-head checks. Do not implement, merge, install, or trust the completing worker's conclusion.\n` +
       `End with exactly one provider-owned line: MAJOR_RESULT: {"status":"active","summary":"review summary","independentReview":{"purpose":"independent_completion_review","goalId":"${goal.id}","sourceHead":"${pending.sourceHead}","verdict":"pass|fail","evidence":"specific evidence"}}`,
@@ -1118,6 +1125,29 @@ async function runPendingCompletionReview(
   }
   if (!report?.independentReview) {
     throw new Error('conclusive independent review unexpectedly lacked a verdict');
+  }
+  if (pending.writing && report.independentReview.verdict === 'pass') {
+    let bound = false;
+    try {
+      const evidence = JSON.parse(report.independentReview.evidence) as Record<string, unknown>;
+      bound = evidence.writingDraftSha256 === pending.writing.draftSha256;
+    } catch {
+      bound = false;
+    }
+    if (!bound) {
+      const pendingWithoutDispatch = structuredClone(pending);
+      delete pendingWithoutDispatch.reviewDispatch;
+      updateGoal(goal.id, {
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary:
+          'Independent writing review remained pending because its pass verdict was not bound to the frozen writingDraft digest.',
+        pendingCompletion: pendingWithoutDispatch,
+        nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+        retryImmediately: false,
+      });
+      return;
+    }
   }
   const changedHeadPatch = postReviewSourceChangePatch(
     goal.repoPath,
@@ -1793,9 +1823,10 @@ async function runLockedGoalCycle(
       return;
     }
     if (report?.status === 'done') {
+      let writingPendingReview: { draftSha256: string; redTeamRequired: true } | undefined;
       const writingRoute = resolveWritingRoute(goal.goal);
       if (writingRoute) {
-        const draft = extractProviderOwnedOutput(outcome.stdout);
+        const draft = report.writingDraft;
         if (!draft) {
           updateGoal(goal.id, {
             status: 'active',
@@ -1803,7 +1834,7 @@ async function runLockedGoalCycle(
             activePid: undefined,
             lastFinishedAt: new Date().toISOString(),
             lastSummary:
-              'Writing completion refused because no provider-owned final draft was found.',
+              'Writing completion refused because bounded provider-owned writingDraft is missing.',
             nextRunAt: new Date(Date.now() + 10_000).toISOString(),
             pendingCompletion: undefined,
             retryImmediately: false,
@@ -1812,12 +1843,44 @@ async function runLockedGoalCycle(
           recordTerminalObservation();
           return;
         }
+        let authority;
+        if (canonicalWorker && candidate) {
+          const authorityState = openDb();
+          try {
+            authority = resolveWritingReviewAuthority(authorityState.db, {
+              project: goal.project,
+              goalId: goal.id,
+              reviewedRunId: canonicalWorker.runId,
+              sourceHead: candidate.sourceHead,
+              sourceTreeDigest: candidate.sourceTreeDigest,
+              draftSha256: writingDraftDigest(draft),
+            });
+          } finally {
+            authorityState.sqlite.close();
+          }
+        }
         const writing = inspectWritingDraft({
           task: goal.goal,
           draft,
           ...(report.writingEvidence ? { evidence: report.writingEvidence } : {}),
+          ...(authority ? { authority } : {}),
         });
-        if (writing.finalState === 'failed') {
+        const outstanding = writing.gates.filter(({ state }) => state !== 'passed');
+        const canAwaitPersistedReview =
+          writing.route.risk === 'high-stakes' &&
+          outstanding.length === 2 &&
+          outstanding.some(
+            ({ gate, state }) => gate === 'independent-red-team' && state === 'pending',
+          ) &&
+          outstanding.some(
+            ({ gate, state }) => gate === 'final-verification' && state === 'failed',
+          );
+        if (canAwaitPersistedReview) {
+          writingPendingReview = {
+            draftSha256: writingDraftDigest(draft),
+            redTeamRequired: true,
+          };
+        } else if (writing.finalState !== 'passed') {
           const failed = writing.gates
             .filter(({ state }) => state === 'failed' || state === 'pending')
             .map(({ gate, detail }) => `${gate}: ${detail}`)
@@ -1906,6 +1969,7 @@ async function runLockedGoalCycle(
                 },
               }
             : {}),
+          ...(writingPendingReview ? { writing: writingPendingReview } : {}),
           ...('promotionEvidence' in promotionProof && promotionProof.promotionEvidence
             ? { promotionEvidence: promotionProof.promotionEvidence }
             : {}),
