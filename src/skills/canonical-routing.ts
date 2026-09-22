@@ -34,10 +34,15 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
     text,
     /\b(?:website|web app|webapp|landing page|frontend|front-end|ui|user interface|next\.?js|react app|dashboard)\b/u,
   );
-  const visualDesign = matches(
+  const visualDesignNegated = matches(
     text,
-    /\b(?:design|redesign|visual|layout|hierarchy|spacing|premium|minimalist|generic|boxy|responsive|art direction|polish|overlap(?:ping)?)\b/u,
+    /\b(?:do not|don't|not|without)\b.{0,48}\b(?:visual|design|redesign|layout|ui|ux|user experience)\b/u,
   );
+  const visualDesign =
+    matches(
+      text,
+      /\b(?:design|redesign|visual|layout|hierarchy|spacing|premium|minimalist|generic|boxy|responsive|art direction|polish|overlap(?:ping)?)\b/u,
+    ) && !visualDesignNegated;
   const browserQa = matches(
     text,
     /\b(?:browser|qa|acceptance|staging|preview|production|breakpoint|viewport|responsive test|e2e|end[- ]to[- ]end)\b/u,
@@ -90,7 +95,7 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
   const competitor = matches(text, /\b(?:competitors?|competitive|best[- ]in[- ]class|market alternatives)\b/u);
   const productDecision = matches(
     text,
-    /\b(?:product opportunity|product strategy|roadmap|prioriti[sz]ation|discovery|requirements?|scope decision|mvp)\b/u,
+    /\b(?:product opportunity|product strategy|product decision|roadmap|prioriti[sz]ation|discovery|requirements?|scope decision|mvp)\b/u,
   );
   const technicalWriting = matches(
     text,
@@ -123,12 +128,17 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
     text,
     /\b(?:valuation|merger|acquisition|m&a|comparable compan(?:y|ies)|comps\b|precedent transaction|dcf\b|leveraged buyout|lbo\b|investment analysis)\b/u,
   );
+  const pdfOutputNegated = matches(
+    text,
+    /\b(?:do not|don't|not|without)\b.{0,48}\b(?:create|generate|export|render|make|convert|produce|deliver|write|prepare|format)\b.{0,24}\bpdf\b/u,
+  );
   const pdfOutput =
     matches(text, /\bpdf\b/u) &&
     matches(
       text,
       /\b(?:create|generate|export|render|make|convert|produce|deliver|write|prepare|format)\b/u,
-    );
+    ) &&
+    !pdfOutputNegated;
   const operationsContext = matches(
     text,
     /\b(?:operations?|operating|process|workflow|capacity|team|business|service delivery)\b/u,
@@ -148,6 +158,10 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
       text,
       /\b(?:code review|review this (?:pull request|pr|diff|implementation)|review (?:this )?(?:frontend|backend|typescript|javascript|python|react|next\.?js)? ?code)\b/u,
     ) || pr;
+  const performanceConcern = matches(
+    text,
+    /\b(?:performance|latency|throughput|optimi[sz]e|optimization|slow|slowness)\b/u,
+  );
   const humanBlocker = matches(
     text,
     /\b(?:oauth|2fa|mfa|captcha|consent|human approval|manual approval|payment authorization|payment authorisation)\b/u,
@@ -183,7 +197,10 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
     add('web-design', ['design-direction-and-taste', 'remote-first-web-development']);
   }
 
-  if (web && matches(text, /\b(?:build|implement|create|develop|redesign)\b/u)) {
+  const webBuildAction =
+    matches(text, /\b(?:build|implement|create|develop)\b/u) ||
+    (matches(text, /\bredesign\b/u) && !visualDesignNegated);
+  if (web && webBuildAction) {
     add('web-build', ['remote-first-web-development']);
   }
 
@@ -274,7 +291,11 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
   }
 
   if (codeReview) {
-    add('code-review', ['review', ...(pr ? ['exact-head-pr-review'] : [])]);
+    add('code-review', [
+      'review',
+      ...(performanceConcern ? ['performance'] : []),
+      ...(pr ? ['exact-head-pr-review'] : []),
+    ]);
   }
 
   if (legacyCleanup) add('legacy-cleanup', ['legacy-cleanup']);

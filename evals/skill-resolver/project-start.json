@@ -5,7 +5,5 @@
     "I have a new product idea. Set up the repository shape, pick the first vertical slice, and get us to a credible MVP quickly.",
     "Start this new SaaS project with the minimum project truth, reusable assets, and fastest end-to-end slice."
   ],
-  "should_not_trigger": [
-    "This unrelated request must not activate project start workflow."
-  ]
+  "should_not_trigger": ["This unrelated request must not activate project start workflow."]
 }

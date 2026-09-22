@@ -214,6 +214,12 @@ const cases: Case[] = [
     exclude: ['pdf-reporting-qa'],
   },
   {
+    name: 'explicitly negated PDF output stays source analysis',
+    task: 'Read this PDF and explain the argument. Do not create a PDF.',
+    include: ['source-ingestion', 'strategic-reading'],
+    exclude: ['pdf-reporting-qa'],
+  },
+  {
     name: 'filesystem permissions are not auth',
     task: 'Review file permissions on this folder.',
     include: [],
@@ -248,6 +254,12 @@ const cases: Case[] = [
     task: 'Review this frontend code for correctness.',
     include: ['review'],
     exclude: ['website-design-qa'],
+  },
+  {
+    name: 'negated redesign keeps code review focused and preserves performance specialist',
+    task: 'Review this frontend code for correctness and performance. I am not asking for a visual redesign.',
+    include: ['review', 'performance'],
+    exclude: ['website-design-qa', 'design-direction-and-taste'],
   },
   {
     name: 'visual browser QA stays remote first',

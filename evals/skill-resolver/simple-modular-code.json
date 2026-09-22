@@ -5,7 +5,5 @@
     "Implement this feature with the simplest correct modular design and keep the abstraction surface small.",
     "Refactor this code so the implementation is reusable and replaceable without adding moving parts."
   ],
-  "should_not_trigger": [
-    "This unrelated request must not activate simple modular code workflow."
-  ]
+  "should_not_trigger": ["This unrelated request must not activate simple modular code workflow."]
 }

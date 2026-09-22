@@ -5,7 +5,5 @@
     "This page is measurably slow. Profile the dominant bottleneck and apply the smallest high-leverage performance fix.",
     "The build and data fetch are too slow. Measure where time is going before changing the architecture."
   ],
-  "should_not_trigger": [
-    "This unrelated request must not activate performance caching workflow."
-  ]
+  "should_not_trigger": ["This unrelated request must not activate performance caching workflow."]
 }

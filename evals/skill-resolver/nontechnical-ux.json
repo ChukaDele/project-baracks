@@ -5,7 +5,5 @@
     "Design this recruiter workflow for a non-technical operator with plain language, safe defaults, visible status, and guided recovery.",
     "Make this admin flow usable without technical knowledge and prevent users from needing to understand the underlying system."
   ],
-  "should_not_trigger": [
-    "This unrelated request must not activate nontechnical ux workflow."
-  ]
+  "should_not_trigger": ["This unrelated request must not activate nontechnical ux workflow."]
 }

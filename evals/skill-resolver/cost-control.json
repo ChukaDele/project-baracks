@@ -5,7 +5,5 @@
     "Audit our model, browser, API, and infrastructure usage so we keep throughput high without wasting spend.",
     "We are burning too much provider quota and GitHub Actions budget. Find the highest-leverage cost controls."
   ],
-  "should_not_trigger": [
-    "This unrelated request must not activate cost control workflow."
-  ]
+  "should_not_trigger": ["This unrelated request must not activate cost control workflow."]
 }

@@ -5,7 +5,5 @@
     "Design a feedback loop that learns from outcome data without leakage, false causality, or unsafe self-modification.",
     "Use real placement outcomes to improve ranking over time, with safeguards against training on contaminated feedback."
   ],
-  "should_not_trigger": [
-    "This unrelated request must not activate data learning loop workflow."
-  ]
+  "should_not_trigger": ["This unrelated request must not activate data learning loop workflow."]
 }

@@ -5,7 +5,5 @@
     "The new provider path is verified. Remove the obsolete implementation, stale config, old names, and duplicate runtime paths.",
     "Finish this migration by deleting the verified-dead legacy path and cleaning references that could cause regressions."
   ],
-  "should_not_trigger": [
-    "This unrelated request must not activate legacy cleanup workflow."
-  ]
+  "should_not_trigger": ["This unrelated request must not activate legacy cleanup workflow."]
 }

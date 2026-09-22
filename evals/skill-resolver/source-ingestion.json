@@ -5,7 +5,5 @@
     "Read this uploaded document, preserve provenance, and extract the evidence I need from the actual source.",
     "Analyze this URL and use the primary source itself rather than reconstructing it from summaries."
   ],
-  "should_not_trigger": [
-    "This unrelated request must not activate source ingestion workflow."
-  ]
+  "should_not_trigger": ["This unrelated request must not activate source ingestion workflow."]
 }
