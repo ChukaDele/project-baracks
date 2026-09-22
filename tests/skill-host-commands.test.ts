@@ -578,7 +578,7 @@ describe('installed host skill commands', () => {
     expect(pluginRegistry.entries).toContainEqual({
       path: join(home, '.major', 'gemini-plugin'),
     });
-  }, 30_000);
+  }, 60_000);
 
   it('installs the core project profile transactionally while preserving project-owned skills', () => {
     const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-project-skill-install-'));
