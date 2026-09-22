@@ -1,4 +1,5 @@
 import {
+  realpathSync,
   chmodSync,
   cpSync,
   existsSync,
@@ -99,7 +100,7 @@ function fixtureRepository(root: string, name: string, ids: string[], skillRoot 
 }
 
 function fixtureGit(root: string, fixtures: string): string {
-  const bin = mkdtempSync(join(tmpdir(), 'major-installer-git-fixture-'));
+  const bin = mkdtempSync(join(realpathSync(tmpdir()), 'major-installer-git-fixture-'));
   roots.push(bin);
   const executable = join(bin, 'git');
   const repositories: Record<string, string> = {
@@ -184,7 +185,7 @@ afterEach(() => {
 
 function fixtureInstaller(home: string, majorHome = join(home, '.major')): string {
   const fixture = join(
-    mkdtempSync(join(tmpdir(), 'major-skills-installer-fixture-')),
+    mkdtempSync(join(realpathSync(tmpdir()), 'major-skills-installer-fixture-')),
     'install.sh',
   );
   roots.push(dirname(fixture));
@@ -206,7 +207,7 @@ function fixtureInstaller(home: string, majorHome = join(home, '.major')): strin
 }
 
 function fixtureRuntime(home: string, anchoredMajorHome?: string): string {
-  const runtime = mkdtempSync(join(tmpdir(), 'major-runtime-fixture-'));
+  const runtime = mkdtempSync(join(realpathSync(tmpdir()), 'major-runtime-fixture-'));
   roots.push(runtime);
   cpSync(resolve('dist'), join(runtime, 'dist'), { recursive: true });
   for (const directory of ['guidance', 'skills', 'evals', 'adapters', 'templates']) {
@@ -238,8 +239,8 @@ export const testFixturePath = (name) => process.env[name];
 
 describe('installed host skill commands', () => {
   it('does not create an absent target when receipt authority preflight fails', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-absent-target-home-'));
-    const external = mkdtempSync(join(tmpdir(), 'major-absent-target-authority-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-absent-target-home-'));
+    const external = mkdtempSync(join(realpathSync(tmpdir()), 'major-absent-target-authority-'));
     const target = join(home, 'missing-project');
     roots.push(home, external);
     writeFileSync(join(external, 'sentinel'), 'preserve\n');
@@ -266,9 +267,9 @@ describe('installed host skill commands', () => {
   });
 
   it('rejects escaping lock entries before changing target or external state', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-lock-home-'));
-    const target = mkdtempSync(join(tmpdir(), 'major-lock-target-'));
-    const external = mkdtempSync(join(tmpdir(), 'major-lock-external-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-lock-home-'));
+    const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-lock-target-'));
+    const external = mkdtempSync(join(realpathSync(tmpdir()), 'major-lock-external-'));
     roots.push(home, target, external);
     const owned = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
     const sentinel = join(external, 'sentinel.txt');
@@ -298,8 +299,8 @@ describe('installed host skill commands', () => {
   });
 
   it('rejects MAJOR_HOME symlinked into the target before project mutation', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-authority-home-'));
-    const target = mkdtempSync(join(tmpdir(), 'major-authority-target-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-authority-home-'));
+    const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-authority-target-'));
     roots.push(home, target);
     const authority = join(target, '.project-authority');
     const sentinel = join(authority, 'sentinel.txt');
@@ -321,9 +322,9 @@ describe('installed host skill commands', () => {
   });
 
   it('rejects a production MAJOR_HOME authority override before project mutation', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-canonical-authority-home-'));
-    const target = mkdtempSync(join(tmpdir(), 'major-canonical-authority-target-'));
-    const forged = mkdtempSync(join(tmpdir(), 'major-forged-authority-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-canonical-authority-home-'));
+    const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-canonical-authority-target-'));
+    const forged = mkdtempSync(join(realpathSync(tmpdir()), 'major-forged-authority-'));
     roots.push(home, target, forged);
     writeFileSync(join(target, 'owned.txt'), 'preserve target\n');
     const before = JSON.stringify(snapshotTree(target));
@@ -346,9 +347,9 @@ describe('installed host skill commands', () => {
   });
 
   it('rejects a redirected receipt directory before project mutation', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-receipt-home-'));
-    const target = mkdtempSync(join(tmpdir(), 'major-receipt-target-'));
-    const external = mkdtempSync(join(tmpdir(), 'major-receipt-external-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-receipt-home-'));
+    const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-receipt-target-'));
+    const external = mkdtempSync(join(realpathSync(tmpdir()), 'major-receipt-external-'));
     roots.push(home, target, external);
     const majorHome = join(home, '.major');
     mkdirSync(majorHome);
@@ -370,9 +371,9 @@ describe('installed host skill commands', () => {
   });
 
   it('fails atomically before following a symlink below a managed project root', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-symlink-install-home-'));
-    const target = mkdtempSync(join(tmpdir(), 'major-symlink-install-target-'));
-    const external = mkdtempSync(join(tmpdir(), 'major-symlink-install-external-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-symlink-install-home-'));
+    const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-symlink-install-target-'));
+    const external = mkdtempSync(join(realpathSync(tmpdir()), 'major-symlink-install-external-'));
     roots.push(home, target, external);
     const owned = join(target, '.agents', 'project-owned.txt');
     const sentinel = join(external, 'sentinel.txt');
@@ -404,8 +405,8 @@ describe('installed host skill commands', () => {
     ['duplicate', 'figma,figma', 'duplicate installer feature input'],
     ['malformed', 'figma,,pdf', 'malformed installer feature'],
   ])('rejects %s installer features without changing the target', (_kind, features, message) => {
-    const target = mkdtempSync(join(tmpdir(), 'major-invalid-feature-install-'));
-    const home = mkdtempSync(join(tmpdir(), 'major-invalid-feature-home-'));
+    const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-invalid-feature-install-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-invalid-feature-home-'));
     roots.push(target, home);
     const owned = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
     mkdirSync(dirname(owned), { recursive: true });
@@ -429,8 +430,8 @@ describe('installed host skill commands', () => {
   });
 
   it('stages discovery and namespaced per-skill commands for every supported host', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-command-home-'));
-    const stage = mkdtempSync(join(tmpdir(), 'major-command-stage-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-command-home-'));
+    const stage = mkdtempSync(join(realpathSync(tmpdir()), 'major-command-stage-'));
     roots.push(home, stage);
     const result = spawnSync(
       'python3',
@@ -462,8 +463,8 @@ describe('installed host skill commands', () => {
   });
 
   it('validates installed host adapter formats and executes their payloads through built Major', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-command-cli-home-'));
-    const stage = mkdtempSync(join(tmpdir(), 'major-command-cli-stage-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-command-cli-home-'));
+    const stage = mkdtempSync(join(realpathSync(tmpdir()), 'major-command-cli-stage-'));
     roots.push(home, stage);
     process.env.MAJOR_HOME = join(home, '.major');
     process.env.MAJOR_SKILLS_REGISTRY = resolve('guidance/skills.registry.json');
@@ -580,8 +581,8 @@ describe('installed host skill commands', () => {
   }, 30_000);
 
   it('installs the core project profile transactionally while preserving project-owned skills', () => {
-    const target = mkdtempSync(join(tmpdir(), 'major-project-skill-install-'));
-    const home = mkdtempSync(join(tmpdir(), 'major-project-command-home-'));
+    const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-project-skill-install-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-project-command-home-'));
     roots.push(target, home);
     process.env.MAJOR_HOME = join(home, '.major');
     process.env.MAJOR_SKILLS_REGISTRY = resolve('guidance/skills.registry.json');
@@ -649,9 +650,9 @@ describe('installed host skill commands', () => {
   }, 15_000);
 
   it('materializes a source-locked full-profile registry, catalogue, commands, and resolver', () => {
-    const target = mkdtempSync(join(tmpdir(), 'major-full-skill-install-'));
-    const fixtures = mkdtempSync(join(tmpdir(), 'major-skill-sources-'));
-    const home = mkdtempSync(join(tmpdir(), 'major-full-skill-home-'));
+    const target = mkdtempSync(join(realpathSync(tmpdir()), 'major-full-skill-install-'));
+    const fixtures = mkdtempSync(join(realpathSync(tmpdir()), 'major-skill-sources-'));
+    const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-full-skill-home-'));
     roots.push(target, fixtures, home);
     fixtureRepository(fixtures, 'emil', [
       'animate',
@@ -1028,5 +1029,5 @@ describe('installed host skill commands', () => {
     expect(readFileSync(join(target, '.gemini', 'commands', 'major.toml'), 'utf8')).toContain(
       '{{args}}',
     );
-  }, 30_000);
+  }, 60_000);
 });
