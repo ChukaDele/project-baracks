@@ -1,6 +1,10 @@
 {
   "skill": "behavior-reward-system",
-  "should_trigger": ["Use behavior-reward-system for this task."],
+  "should_trigger": [
+    "Use behavior-reward-system for this task.",
+    "Keep this long-running autonomous build focused on verified product progress instead of activity metrics.",
+    "Design the reward signals so agents optimize for durable shipped outcomes, not visible busyness."
+  ],
   "should_not_trigger": [
     "This unrelated request must not activate behavior reward system workflow."
   ]

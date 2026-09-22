@@ -1,6 +1,10 @@
 {
   "skill": "competitive-product-audit",
-  "should_trigger": ["Use competitive-product-audit for this task."],
+  "should_trigger": [
+    "Use competitive-product-audit for this task.",
+    "Review the strongest competing products and extract workflow patterns that should change our product decisions.",
+    "Compare best-in-class alternatives before we settle this product flow and identify what they do materially better."
+  ],
   "should_not_trigger": [
     "This unrelated request must not activate competitive product audit workflow."
   ]

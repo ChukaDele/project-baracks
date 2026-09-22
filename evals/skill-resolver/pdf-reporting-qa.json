@@ -1,5 +1,11 @@
 {
   "skill": "pdf-reporting-qa",
-  "should_trigger": ["Use pdf-reporting-qa for this task."],
-  "should_not_trigger": ["This unrelated request must not activate pdf reporting qa workflow."]
+  "should_trigger": [
+    "Use pdf-reporting-qa for this task.",
+    "Produce a client-ready PDF report and verify pagination, hierarchy, clipping, and orphaned content.",
+    "Export this analysis to PDF and inspect the rendered pages for layout and readability defects."
+  ],
+  "should_not_trigger": [
+    "This unrelated request must not activate pdf reporting qa workflow."
+  ]
 }

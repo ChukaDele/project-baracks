@@ -17,7 +17,7 @@ const explicitWritingObject = new RegExp(
   'i',
 );
 const transformWritingAction =
-  /\b(?:turn\s+(?:these\s+)?notes?\s+into\s+[^.!?]{0,40}\b(?:report|memo|proposal|post|article)|make\s+this\s+(?:sop|procedure|email|message|copy|prose)\s+(?:clearer|better)|do\s+my\s+(?:mba\s+)?(?:critical\s+)?summary|help\s+(?:me\s+)?with\s+(?:this\s+|an?\s+)?(?:essay|report|proposal))\b/i;
+  /\b(?:turn\s+(?:these\s+)?(?:(?:rough|operating|raw|draft)\s+){0,3}(?:notes?|ideas?|points?|thoughts?)\s+into\s+[^.!?]{0,60}\b(?:report|memo|proposal|post|article|sop|procedure|email|message|newsletter|linkedin post)|make\s+this\s+(?:sop|procedure|email|message|copy|prose|post|article)\s+(?:clearer|better|stronger|more natural)|do\s+my\s+(?:mba\s+)?(?:critical\s+)?summary|help\s+(?:me\s+)?with\s+(?:this\s+|an?\s+)?(?:essay|report|proposal|post|article))\b/i;
 
 export function resolveWritingRoute(task: string): WritingRoute | undefined {
   const text = task.trim();

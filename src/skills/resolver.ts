@@ -43,6 +43,7 @@ import { validateRetainedBundle } from './sync.js';
 import { testFixturePath } from '#trust-roots';
 import { resolveWritingRoute } from '../writing/routing.js';
 import type { WritingRoute } from '../writing/types.js';
+import { resolveCanonicalSkillRoute } from './canonical-routing.js';
 
 const canonicalSkillSlug = z.string().regex(CANONICAL_SKILL_SLUG, 'must be a safe canonical slug');
 
@@ -135,6 +136,11 @@ export interface SkillResolutionReceipt {
     };
   }>;
   rejected: Array<{ id: string; reason: string; score: number }>;
+  canonical?: {
+    routeIds: string[];
+    skills: string[];
+    lifecycle: 'RESOLVED_NOT_EXECUTED';
+  };
   writing?: WritingRoute & {
     gateState: Record<string, 'required'>;
     lifecycle: 'RESOLVED_NOT_EXECUTED';
@@ -542,6 +548,36 @@ function includesPhrase(text: string, phrase: string): boolean {
   return ` ${text} `.includes(` ${normalizedPhrase} `);
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
+}
+
+function explicitlyInvokesSkill(task: string, term: string): boolean {
+  const normalizedTask = normalizedText(task);
+  const normalizedTerm = normalizedText(term);
+  if (!normalizedTerm || normalizedTask === normalizedTerm) return normalizedTask === normalizedTerm;
+
+  const termPattern = escapeRegex(normalizedTerm).replace(/ /g, '\\s+');
+  const invocation = new RegExp(
+    `(?:^|\\b)(?:use|invoke|load|apply|route through)\\s+(?:the\\s+)?${termPattern}(?:\\s+(?:skill|workflow|route))?(?:\\b|$)`,
+    'u',
+  );
+  const leadingInvocation = new RegExp(
+    `^(?:please\\s+)?(?:run|using)\\s+(?:the\\s+)?${termPattern}(?:\\s+(?:skill|workflow|route))?(?:\\b|$)`,
+    'u',
+  );
+  return invocation.test(normalizedTask) || leadingInvocation.test(normalizedTask);
+}
+
+function matchesNegativeExample(task: string, example: string): boolean {
+  if (normalizedText(example) === normalizedText(task)) return true;
+  const taskWords = new Set(words(task));
+  const exampleWords = [...new Set(words(example))];
+  if (exampleWords.length < 3 || taskWords.size < 3) return false;
+  const overlap = exampleWords.filter((word) => taskWords.has(word)).length;
+  return overlap >= 3 && overlap / exampleWords.length >= 0.75 && overlap / taskWords.size >= 0.45;
+}
+
 function vendorMatchAllowed(entry: SkillRegistryEntry, task: string): boolean {
   const normalized = normalizedText(task);
   if ([entry.id, ...entry.aliases].some((term) => includesPhrase(normalized, term))) {
@@ -623,13 +659,20 @@ function projectContext(cwd: string, task: string): {
         return false;
       }
     })();
-  const web = ['package.json', 'vite.config.ts', 'next.config.js', 'index.html'].some((name) =>
+  const webFiles = ['package.json', 'vite.config.ts', 'next.config.js', 'index.html'].some((name) =>
     existsSync(join(cwd, name)),
   );
+  const taskWeb =
+    /\b(?:website|web app|webapp|landing page|frontend|front-end|next\.?(?:js)?|react app|browser|gsap|scrolltrigger)\b/iu.test(
+      task,
+    ) ||
+    (/\bpage\b/iu.test(task) &&
+      /\b(?:layout|zoom|viewport|browser|responsive|laptop|mobile|desktop)\b/iu.test(task));
+  const web = webFiles || taskWeb;
   const spatial = /\b(?:3d|spatial|splat|colmap|reconstruction)\b/iu.test(task);
   const vercel = /\b(?:vercel|next\.?(?:js)?)\b/iu.test(task);
   const figma = /\bfigma\b/iu.test(task);
-  const ui = web || /\b(?:ui|frontend|website|design)\b/iu.test(task);
+  const ui = web || /\b(?:ui|frontend|website|design|presentation|slide|deck)\b/iu.test(task);
   return {
     kind: isMajor ? 'major-repo' : web ? 'web-project' : spatial ? 'spatial-project' : 'project',
     availableScopes: [
@@ -700,7 +743,34 @@ function integrationDisambiguation(entryId: string, task: string): string | unde
   ) {
     return 'disambiguated a non-reconstruction Gaussian meaning';
   }
+  if (
+    entryId === 'operations-improvement-core' &&
+    /\b(?:sql|database|query|code|api|render|build|compiler|network)\b/u.test(task) &&
+    !/\b(?:operations?|operating|process|workflow|capacity|team|business|service delivery)\b/u.test(task)
+  ) {
+    return 'disambiguated a technical bottleneck from an operations workflow';
+  }
   return undefined;
+}
+
+function scoreCatalogDescription(
+  entryId: string,
+  task: string,
+  catalog: Map<string, SkillCatalogEntry>,
+): { score: number; reason: string } {
+  const metadata = catalog.get(entryId);
+  if (!metadata) return { score: 0, reason: 'no installed catalog description' };
+  const taskWords = new Set(words(task));
+  const descriptionWords = [
+    ...new Set(words(`${metadata.description} ${metadata.shortDescription}`)),
+  ];
+  const overlap = descriptionWords.filter((word) => taskWords.has(word));
+  if (overlap.length < 2) return { score: 0, reason: 'catalog description overlap below threshold' };
+  const rareOverlap = overlap.filter((word) => word.length >= 8);
+  return {
+    score: overlap.length * 4 + rareOverlap.length,
+    reason: `matched installed skill description: ${overlap.join(', ')}`,
+  };
 }
 
 function scoreEntry(
@@ -712,19 +782,22 @@ function scoreEntry(
   const fixtures = examples.get(entry.id);
   const disambiguation = integrationDisambiguation(entry.id, normalized);
   if (disambiguation) return { score: 0, reason: disambiguation };
-  if (fixtures?.negative.some((example) => normalizedText(example) === normalizedText(task))) {
+  if (fixtures?.negative.some((example) => matchesNegativeExample(task, example))) {
     return { score: 0, reason: 'matched a negative trigger example' };
   }
   const explicitTerm = [entry.id, ...entry.aliases].find((term) =>
-    includesPhrase(normalizedText(task), term),
+    explicitlyInvokesSkill(task, term),
   );
   if (explicitTerm) {
     // A short id can be a substring of a more specific explicit id, such as
-    // `integration` in `mcp-integration-ops`. Prefer the longer named skill.
+    // `performance` in `performance-caching`. Prefer the longer named skill.
     return {
-      score: 100 + words(explicitTerm).length * 100,
+      score: 1_100 + words(explicitTerm).length * 100,
       reason: `explicit skill ${explicitTerm === entry.id ? 'id' : 'alias'}: ${explicitTerm}`,
     };
+  }
+  if (fixtures?.positive.some((example) => normalizedText(example) === normalizedText(task))) {
+    return { score: 1_050, reason: 'matched an exact positive trigger example' };
   }
   const taskWords = new Set(words(task));
   const idMatches = words(entry.id).filter((word) => taskWords.has(word));
@@ -737,7 +810,7 @@ function scoreEntry(
     const exampleWords = new Set(words(example));
     const overlap = [...exampleWords].filter((word) => taskWords.has(word));
     const rareOverlap = overlap.filter((word) => word.length >= 8);
-    if (overlap.length < 2 && rareOverlap.length === 0) continue;
+    if (overlap.length < 2) continue;
     const exampleScore = overlap.length * 3 + rareOverlap.length * 2;
     if (exampleScore > score) {
       score = exampleScore;
@@ -778,6 +851,23 @@ function resolveSkillsInternal(input: {
   const context = projectContext(cwd, task);
   const requested = [...new Set((input.skills ?? []).map((id) => id.trim()).filter(Boolean))];
   const writingRoute = requested.length === 0 ? resolveWritingRoute(task) : undefined;
+  const naturalExplicitIds =
+    requested.length === 0
+      ? [
+          ...registry
+            .filter((entry) =>
+              [entry.id, ...entry.aliases].some((term) => explicitlyInvokesSkill(task, term)),
+            )
+            .map((entry) => entry.id),
+          ...generated
+            .filter((entry) => explicitlyInvokesSkill(task, entry.skillId))
+            .map((entry) => entry.skillId),
+        ]
+      : [];
+  const canonicalRoute =
+    requested.length === 0 && naturalExplicitIds.length === 0
+      ? resolveCanonicalSkillRoute(task)
+      : undefined;
   const explicitlyNamesAsdSte100 = /\basd[- ]?ste100\b/i.test(task);
   if (input.skills && requested.length === 0) {
     throw new Error('explicit skill selection requires at least one --skill <id>');
@@ -864,23 +954,49 @@ function resolveSkillsInternal(input: {
   ];
   const matches = candidates
     .map(({ entry, generated }) => {
-      const scored =
-        requested.length > 0
-          ? { score: 1_000, reason: `explicit skill selection: ${entry.id}` }
-          : writingRoute?.skills.includes(entry.id)
-            ? {
-                score: 900 - writingRoute.skills.indexOf(entry.id),
-                reason: writingRoute.reasons[entry.id] ?? 'required by canonical writing route',
-              }
-            : entry.id === 'asd-ste100' && !explicitlyNamesAsdSte100
-              ? {
-                  score: 0,
-                  reason: 'ASD-STE100 requires a canonical technical-writing route',
-                }
-            : scoreEntry(entry, task, examples);
       const sourceKind = generated
         ? 'PROJECT_LOCAL'
         : inferSkillSourceKind(entry.source, entry.sourceKind);
+      const baseGenericScore = scoreEntry(entry, task, examples);
+      const catalogScore =
+        sourceKind === 'PROJECT_LOCAL' && entry.source !== 'gbrain-generated'
+          ? scoreCatalogDescription(entry.id, task, catalog)
+          : { score: 0, reason: 'catalog description routing not applicable' };
+      const genericScore =
+        baseGenericScore.score >= 1_000 || baseGenericScore.score >= catalogScore.score
+          ? baseGenericScore
+          : catalogScore;
+      const negativeFixture = baseGenericScore.reason === 'matched a negative trigger example';
+      const scored =
+        requested.length > 0
+          ? { score: 1_000, reason: `explicit skill selection: ${entry.id}` }
+          : negativeFixture
+            ? baseGenericScore
+            : writingRoute?.skills.includes(entry.id)
+              ? {
+                  score: 1_500 - writingRoute.skills.indexOf(entry.id),
+                  reason: writingRoute.reasons[entry.id] ?? 'required by canonical writing route',
+                }
+              : genericScore.score >= 1_000
+                ? genericScore
+                : canonicalRoute?.skills.includes(entry.id)
+                  ? {
+                      score: 900 - canonicalRoute.skills.indexOf(entry.id),
+                      reason: canonicalRoute.reasons[entry.id] ?? 'required by canonical task route',
+                    }
+                  : entry.id === 'asd-ste100' && !explicitlyNamesAsdSte100
+                    ? {
+                        score: 0,
+                        reason: 'ASD-STE100 requires a canonical technical-writing route',
+                      }
+                    : canonicalRoute &&
+                        sourceKind === 'INTERNAL_DURABLE' &&
+                        genericScore.score < 100
+                      ? {
+                          score: 0,
+                          reason: `excluded by canonical route: ${canonicalRoute.routeIds.join(', ')}`,
+                        }
+                      : genericScore;
       const vendor = generated
         ? undefined
         : vendorSelectionForEntry(entry, task, vendorCatalog, now);
@@ -909,9 +1025,27 @@ function resolveSkillsInternal(input: {
   );
 
   const skills: ResolvedSkill[] = [];
-  const selectionLimit = writingRoute
-    ? writingRoute.skills.length
-    : (input.limit ?? (explicitEntries.length || 6));
+  const canonicalSkillIds = new Set([
+    ...(writingRoute?.skills ?? []),
+    ...(canonicalRoute?.skills ?? []),
+  ]);
+  const canonicalSelectionCount = canonicalSkillIds.size;
+  const strongAdditionalCount = matches.filter(
+    (match) => match.score >= 1_000 && !canonicalSkillIds.has(match.entry.id),
+  ).length;
+  const externalAdditionalCount = matches.filter(
+    (match) =>
+      match.sourceKind !== 'INTERNAL_DURABLE' &&
+      match.score >= 5 &&
+      !canonicalSkillIds.has(match.entry.id) &&
+      match.score < 1_000,
+  ).length;
+  const selectionLimit =
+    canonicalSelectionCount > 0
+      ? canonicalSelectionCount + strongAdditionalCount + externalAdditionalCount
+      : naturalExplicitIds.length > 0
+        ? naturalExplicitIds.length
+        : (input.limit ?? (explicitEntries.length || 6));
   for (const match of matches) {
     if (
       match.sourceKind === 'VENDOR_LIVE' &&
@@ -1038,6 +1172,15 @@ function resolveSkillsInternal(input: {
         .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
         .slice(0, 16)
         ,
+      ...(canonicalRoute
+        ? {
+            canonical: {
+              routeIds: canonicalRoute.routeIds,
+              skills: canonicalRoute.skills,
+              lifecycle: 'RESOLVED_NOT_EXECUTED' as const,
+            },
+          }
+        : {}),
       ...(writingRoute
         ? {
             writing: {

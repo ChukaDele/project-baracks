@@ -1,5 +1,11 @@
 {
   "skill": "data-learning-loop",
-  "should_trigger": ["Use data-learning-loop for this task."],
-  "should_not_trigger": ["This unrelated request must not activate data learning loop workflow."]
+  "should_trigger": [
+    "Use data-learning-loop for this task.",
+    "Design a feedback loop that learns from outcome data without leakage, false causality, or unsafe self-modification.",
+    "Use real placement outcomes to improve ranking over time, with safeguards against training on contaminated feedback."
+  ],
+  "should_not_trigger": [
+    "This unrelated request must not activate data learning loop workflow."
+  ]
 }
