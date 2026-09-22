@@ -140,7 +140,8 @@ export function diagnoseProse(text: string, genre: WritingGenre = 'general'): Pr
   }
   const overloadedSentence = sentenceTexts.find((sentence) => {
     const wordCount = sentence.match(/[A-Za-z]+/g)?.length ?? 0;
-    const joins = sentence.match(/[,;]|\b(?:and|but|which|while|because|although|whereas)\b/giu)?.length ?? 0;
+    const joins =
+      sentence.match(/[,;]|\b(?:and|but|which|while|because|although|whereas)\b/giu)?.length ?? 0;
     return wordCount >= 26 && joins >= 3;
   });
   if (overloadedSentence)

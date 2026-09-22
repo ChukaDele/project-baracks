@@ -7,7 +7,12 @@ import {
   type WritingSourceEvidence,
 } from './evaluator.js';
 import { resolveWritingRoute } from './routing.js';
-import type { WritingGate, WritingPipelineStage, WritingRoute, WritingSourcePacket } from './types.js';
+import type {
+  WritingGate,
+  WritingPipelineStage,
+  WritingRoute,
+  WritingSourcePacket,
+} from './types.js';
 import { runLocalVale, type ValeEvidence } from './vale.js';
 import {
   observeDetectors,
@@ -222,9 +227,7 @@ export function parseWritingSourcePacket(value: unknown): WritingSourcePacket | 
     Buffer.byteLength(candidate, 'utf8') <= maximum;
   const boundedList = (candidate: unknown, maximumItems: number, maximumBytes: number) => {
     if (!Array.isArray(candidate) || candidate.length > maximumItems) return undefined;
-    const items = candidate.filter(
-      (item): item is string => boundedText(item, maximumBytes),
-    );
+    const items = candidate.filter((item): item is string => boundedText(item, maximumBytes));
     return items.length === candidate.length ? items.map((item) => item.trim()) : undefined;
   };
   if (
@@ -241,9 +244,7 @@ export function parseWritingSourcePacket(value: unknown): WritingSourcePacket | 
       : boundedList(record.approvedLanguage, 32, 2_000);
   if (record.approvedLanguage !== undefined && !approvedLanguage) return undefined;
   const unresolvedGaps =
-    record.unresolvedGaps === undefined
-      ? undefined
-      : boundedList(record.unresolvedGaps, 32, 2_000);
+    record.unresolvedGaps === undefined ? undefined : boundedList(record.unresolvedGaps, 32, 2_000);
   if (record.unresolvedGaps !== undefined && !unresolvedGaps) return undefined;
   return {
     centralClaim: record.centralClaim.trim(),

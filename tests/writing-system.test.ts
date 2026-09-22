@@ -175,19 +175,25 @@ describe('canonical writing system', () => {
       'utf8',
     );
 
-    expect(authorityMap).toContain('Robert Greene: investigation, contradiction, and layered case construction');
+    expect(authorityMap).toContain(
+      'Robert Greene: investigation, contradiction, and layered case construction',
+    );
     expect(authorityMap).toContain('Use his thinking process more often than his language.');
     expect(authorityMap).toContain('Paul Graham: simplicity as a thinking instrument');
     expect(authorityMap).toContain('David Perell: write from abundance, test ideas, then compress');
     expect(authorityMap).toContain('Scott Adams: business-writing mechanics');
-    expect(authorityMap).toContain('Alex Hormozi: utility, narrow scope, and business-writing simplification');
+    expect(authorityMap).toContain(
+      'Alex Hormozi: utility, narrow scope, and business-writing simplification',
+    );
     expect(examplesCorpus).toContain('form should match meaning, reader, and purpose');
     expect(examplesCorpus).toContain('Always use short sentences');
     expect(examplesCorpus).toContain('Cross-genre QA');
     expect(proseCraft).toContain('Friction:');
     expect(proseCraft).toContain('Business-writing pass');
     expect(proseCraft).toContain('Commodity insight');
-    expect(proseCraft).toContain('awkward rhythm can be evidence that the thinking is still unresolved');
+    expect(proseCraft).toContain(
+      'awkward rhythm can be evidence that the thinking is still unresolved',
+    );
     expect(writingOs).toContain('Do not blend famous writers into a synthetic house voice.');
   });
 

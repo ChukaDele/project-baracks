@@ -37,7 +37,12 @@ export function buildVoiceFingerprint(
   const words = approvedSamples.join(' ').match(/[A-Za-z]+/g)?.length ?? 0;
   if (approvedSamples.length < 3 || words < 300)
     throw new Error('voice fingerprint requires at least 3 approved samples and 300 words');
-  return fingerprint(profileId, approvedSamples.length, approvedSamples.join('\n\n'), approvedSamples);
+  return fingerprint(
+    profileId,
+    approvedSamples.length,
+    approvedSamples.join('\n\n'),
+    approvedSamples,
+  );
 }
 function fingerprint(
   profileId: string,
