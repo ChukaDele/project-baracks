@@ -101,6 +101,12 @@ for (const name of lines.slice(marker + 1).filter(Boolean)) {
 JS
 fi
 
+case "${4:-}" in
+  "") ;;
+  --preflight-only) exit 0 ;;
+  *) echo "ERROR: unknown installer mode: ${4}" >&2; exit 2 ;;
+esac
+
 mkdir -p "$INSTALL_TARGET"
 mkdir -p "$MAJOR_HOME"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/major-skills.XXXXXX")"

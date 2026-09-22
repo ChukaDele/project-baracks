@@ -1,0 +1,1489 @@
+{
+  "version": 1,
+  "operatingCore": [
+    "project-context-integrity",
+    "source-priority",
+    "reuse-first",
+    "minimal-implementation",
+    "evidence-before-ready",
+    "exact-head-review-for-release",
+    "secret-safety"
+  ],
+  "archetypes": {
+    "webapp": {
+      "packs": [
+        "accessibility",
+        "testing-release",
+        "operations"
+      ],
+      "defaultDeliverables": [
+        "app"
+      ],
+      "majorProfile": "web-ui",
+      "majorFeatures": [
+        "security"
+      ]
+    },
+    "marketing-site": {
+      "packs": [
+        "public-web",
+        "accessibility",
+        "testing-release"
+      ],
+      "defaultDeliverables": [
+        "website"
+      ],
+      "majorProfile": "web-ui",
+      "majorFeatures": []
+    },
+    "experience-site": {
+      "packs": [
+        "public-web",
+        "accessibility",
+        "testing-release",
+        "experience-quality"
+      ],
+      "defaultDeliverables": [
+        "website"
+      ],
+      "majorProfile": "exploratory",
+      "majorFeatures": []
+    },
+    "mobile-native": {
+      "packs": [
+        "accessibility",
+        "testing-release",
+        "operations",
+        "mobile-release"
+      ],
+      "defaultDeliverables": [
+        "mobile-app"
+      ],
+      "majorProfile": "web-ui",
+      "majorFeatures": []
+    },
+    "backend-service": {
+      "packs": [
+        "security",
+        "operations",
+        "testing-release",
+        "integrations"
+      ],
+      "defaultDeliverables": [
+        "service"
+      ],
+      "majorProfile": "core",
+      "majorFeatures": [
+        "security"
+      ]
+    },
+    "automation-agent": {
+      "packs": [
+        "security",
+        "operations",
+        "testing-release",
+        "integrations"
+      ],
+      "defaultDeliverables": [
+        "automation"
+      ],
+      "majorProfile": "core",
+      "majorFeatures": [
+        "security",
+        "mcp"
+      ]
+    },
+    "data-product": {
+      "packs": [
+        "data",
+        "security",
+        "operations",
+        "testing-release"
+      ],
+      "defaultDeliverables": [
+        "data-product"
+      ],
+      "majorProfile": "core",
+      "majorFeatures": [
+        "security"
+      ]
+    },
+    "library-cli-sdk": {
+      "packs": [
+        "testing-release",
+        "developer-product"
+      ],
+      "defaultDeliverables": [
+        "package"
+      ],
+      "majorProfile": "core",
+      "majorFeatures": []
+    },
+    "content-media": {
+      "packs": [
+        "public-web",
+        "accessibility",
+        "communications",
+        "analytics",
+        "testing-release"
+      ],
+      "defaultDeliverables": [
+        "content-product"
+      ],
+      "majorProfile": "web-ui",
+      "majorFeatures": []
+    },
+    "knowledge-work": {
+      "packs": [
+        "research-provenance",
+        "independent-review"
+      ],
+      "defaultDeliverables": [],
+      "majorProfile": "knowledge",
+      "majorFeatures": []
+    }
+  },
+  "packs": {
+    "identity": {
+      "baselineModules": [
+        "auth",
+        "sessions",
+        "signup-policy",
+        "password-reset",
+        "deprovisioning"
+      ],
+      "availableModules": [
+        "email-verification",
+        "oauth",
+        "sso",
+        "mfa",
+        "passkeys",
+        "organisations",
+        "membership",
+        "rbac",
+        "admin",
+        "tenant-isolation"
+      ],
+      "baselineArtifacts": [],
+      "availableArtifacts": [
+        "document.auth-model",
+        "runbook.account-recovery"
+      ]
+    },
+    "privacy": {
+      "baselineModules": [
+        "data-inventory",
+        "retention",
+        "export",
+        "rectification",
+        "deletion",
+        "breach-response"
+      ],
+      "availableModules": [
+        "purpose-basis-map",
+        "sar-dsar",
+        "consent",
+        "processor-register",
+        "automated-decision-disclosure"
+      ],
+      "baselineArtifacts": [
+        "document.privacy-notice",
+        "document.data-inventory",
+        "document.retention-schedule"
+      ],
+      "availableArtifacts": [
+        "runbook.data-rights",
+        "runbook.breach-response"
+      ]
+    },
+    "legal": {
+      "baselineModules": [
+        "terms",
+        "acceptable-use"
+      ],
+      "availableModules": [
+        "cookie-policy",
+        "dpa",
+        "subprocessor-list",
+        "accessibility-statement",
+        "commercial-disclosures"
+      ],
+      "baselineArtifacts": [
+        "document.terms",
+        "document.acceptable-use"
+      ],
+      "availableArtifacts": [
+        "document.cookie-policy",
+        "document.dpa",
+        "document.subprocessors"
+      ]
+    },
+    "commercial": {
+      "baselineModules": [],
+      "availableModules": [
+        "pricing",
+        "plans",
+        "trial",
+        "subscriptions",
+        "usage-billing",
+        "entitlements",
+        "invoices",
+        "tax",
+        "customer-portal",
+        "cancellation",
+        "refunds",
+        "dunning",
+        "coupons",
+        "payments"
+      ],
+      "baselineArtifacts": [],
+      "availableArtifacts": [
+        "document.billing-policy",
+        "runbook.billing-operations"
+      ]
+    },
+    "communications": {
+      "baselineModules": [
+        "transactional-email",
+        "email-preferences"
+      ],
+      "availableModules": [
+        "invites",
+        "verification",
+        "password-reset",
+        "billing-email",
+        "digests",
+        "in-app-notifications",
+        "webhooks",
+        "sms",
+        "push"
+      ],
+      "baselineArtifacts": [],
+      "availableArtifacts": [
+        "email-system"
+      ]
+    },
+    "analytics": {
+      "baselineModules": [
+        "event-schema",
+        "identity-strategy",
+        "consent"
+      ],
+      "availableModules": [
+        "funnels",
+        "attribution",
+        "feature-flags",
+        "experiments",
+        "session-replay",
+        "feedback"
+      ],
+      "baselineArtifacts": [
+        "document.analytics-plan"
+      ],
+      "availableArtifacts": []
+    },
+    "operations": {
+      "baselineModules": [
+        "structured-logs",
+        "error-monitoring",
+        "health"
+      ],
+      "availableModules": [
+        "uptime",
+        "status-page",
+        "metrics",
+        "alerts",
+        "backups",
+        "restore-drill",
+        "audit-log",
+        "rate-limits",
+        "retries",
+        "idempotency",
+        "queues",
+        "cron"
+      ],
+      "baselineArtifacts": [],
+      "availableArtifacts": [
+        "runbook.operations",
+        "runbook.incident-response"
+      ]
+    },
+    "public-web": {
+      "baselineModules": [
+        "metadata",
+        "canonical-urls",
+        "sitemap",
+        "robots",
+        "open-graph",
+        "404",
+        "500"
+      ],
+      "availableModules": [
+        "structured-data",
+        "favicon",
+        "contact",
+        "newsletter",
+        "cms",
+        "blog",
+        "docs",
+        "changelog"
+      ],
+      "baselineArtifacts": [],
+      "availableArtifacts": [
+        "public-web-surface"
+      ]
+    },
+    "security": {
+      "baselineModules": [
+        "secrets",
+        "security-headers",
+        "dependency-audit"
+      ],
+      "availableModules": [
+        "csp",
+        "csrf",
+        "cors",
+        "rate-limits",
+        "upload-validation",
+        "sbom",
+        "security-txt",
+        "abuse-protection",
+        "admin-hardening",
+        "audit-log",
+        "threat-model"
+      ],
+      "baselineArtifacts": [],
+      "availableArtifacts": [
+        "document.threat-model",
+        "runbook.security"
+      ]
+    },
+    "data": {
+      "baselineModules": [
+        "data-dictionary",
+        "provenance",
+        "schema-evolution",
+        "reconciliation"
+      ],
+      "availableModules": [
+        "migrations",
+        "seed-data",
+        "demo-fixtures",
+        "import",
+        "export",
+        "backup",
+        "retention",
+        "lineage"
+      ],
+      "baselineArtifacts": [
+        "document.data-dictionary",
+        "document.data-lineage"
+      ],
+      "availableArtifacts": []
+    },
+    "integrations": {
+      "baselineModules": [
+        "provider-adapter",
+        "idempotency",
+        "retry",
+        "rate-limit-handling",
+        "health-check"
+      ],
+      "availableModules": [
+        "oauth-connection",
+        "api-key",
+        "webhook-in",
+        "webhook-out",
+        "sync-state",
+        "checkpoint",
+        "disconnect-revoke"
+      ],
+      "baselineArtifacts": [
+        "document.integration-contract"
+      ],
+      "availableArtifacts": []
+    },
+    "ai": {
+      "baselineModules": [
+        "prompt-registry",
+        "prompt-versioning",
+        "evals",
+        "cost-budgets"
+      ],
+      "availableModules": [
+        "model-routing",
+        "confidence",
+        "fallbacks",
+        "human-approval",
+        "rag-provenance",
+        "tool-permissions",
+        "trace-replay",
+        "kill-switch"
+      ],
+      "baselineArtifacts": [
+        "document.ai-system-card",
+        "document.eval-plan"
+      ],
+      "availableArtifacts": []
+    },
+    "accessibility": {
+      "baselineModules": [
+        "wcag-target",
+        "keyboard",
+        "focus",
+        "names",
+        "contrast",
+        "reduced-motion",
+        "automated-a11y",
+        "manual-a11y"
+      ],
+      "availableModules": [
+        "media-alternatives"
+      ],
+      "baselineArtifacts": [],
+      "availableArtifacts": [
+        "document.accessibility-check"
+      ]
+    },
+    "testing-release": {
+      "baselineModules": [
+        "focused-tests",
+        "acceptance-path",
+        "independent-review",
+        "release-evidence"
+      ],
+      "availableModules": [
+        "browser-qa",
+        "performance-budget",
+        "dependency-audit",
+        "preview",
+        "observability-check"
+      ],
+      "baselineArtifacts": [
+        "document.release-evidence"
+      ],
+      "availableArtifacts": []
+    },
+    "experience-quality": {
+      "baselineModules": [
+        "art-direction",
+        "signature-interaction",
+        "motion-system",
+        "visual-regression",
+        "responsive-craft",
+        "performance-budget"
+      ],
+      "availableModules": [
+        "lapse-motion-review"
+      ],
+      "baselineArtifacts": [
+        "document.design-direction"
+      ],
+      "availableArtifacts": []
+    },
+    "mobile-release": {
+      "baselineModules": [
+        "safe-areas",
+        "virtual-keyboard",
+        "touch-targets",
+        "deep-links",
+        "permissions",
+        "device-testing",
+        "signing",
+        "store-metadata"
+      ],
+      "availableModules": [
+        "offline-network",
+        "testflight-play-console"
+      ],
+      "baselineArtifacts": [
+        "runbook.mobile-release"
+      ],
+      "availableArtifacts": []
+    },
+    "developer-product": {
+      "baselineModules": [
+        "public-api",
+        "semver",
+        "compatibility-matrix",
+        "clean-install",
+        "upgrade",
+        "uninstall",
+        "docs",
+        "examples",
+        "package-publish"
+      ],
+      "availableModules": [],
+      "baselineArtifacts": [
+        "document.api-contract",
+        "document.release-notes"
+      ],
+      "availableArtifacts": []
+    },
+    "research-provenance": {
+      "baselineModules": [
+        "source-hierarchy",
+        "claim-provenance",
+        "freshness",
+        "contradictory-evidence",
+        "uncertainty",
+        "primary-source-check"
+      ],
+      "availableModules": [],
+      "baselineArtifacts": [
+        "document.source-map"
+      ],
+      "availableArtifacts": []
+    },
+    "independent-review": {
+      "baselineModules": [
+        "skeptic-review",
+        "claim-audit",
+        "artifact-qa"
+      ],
+      "availableModules": [],
+      "baselineArtifacts": [
+        "document.review-evidence"
+      ],
+      "availableArtifacts": []
+    },
+    "commerce": {
+      "baselineModules": [
+        "catalog",
+        "product-variants",
+        "cart",
+        "checkout",
+        "orders",
+        "returns",
+        "fulfilment",
+        "tax",
+        "payments",
+        "commerce-analytics"
+      ],
+      "availableModules": [
+        "customer-accounts",
+        "discounts"
+      ],
+      "baselineArtifacts": [],
+      "availableArtifacts": [
+        "commerce-surface"
+      ]
+    }
+  },
+  "jurisdictions": [
+    "uk",
+    "eu-eea",
+    "nigeria",
+    "ghana",
+    "us-general",
+    "california",
+    "canada"
+  ],
+  "stylePresets": {
+    "minimal-system": {
+      "density": "sparse",
+      "language": "minimal",
+      "layout": "strict-grid",
+      "imagery": "product-ui",
+      "motion": "subtle",
+      "colour": "neutral-accent",
+      "voice": "plainspoken"
+    },
+    "consulting-executive": {
+      "density": "balanced",
+      "language": "consulting",
+      "layout": "strict-grid",
+      "imagery": "diagram",
+      "motion": "none",
+      "colour": "restrained",
+      "voice": "executive"
+    },
+    "editorial-premium": {
+      "density": "balanced",
+      "language": "editorial",
+      "layout": "asymmetric",
+      "imagery": "photography",
+      "motion": "subtle",
+      "colour": "restrained",
+      "voice": "analytical"
+    },
+    "cinematic-experience": {
+      "density": "sparse",
+      "language": "cinematic",
+      "layout": "full-bleed",
+      "imagery": "mixed-media",
+      "motion": "immersive",
+      "colour": "brand-heavy",
+      "voice": "persuasive"
+    },
+    "luxury-restraint": {
+      "density": "sparse",
+      "language": "luxury",
+      "layout": "asymmetric",
+      "imagery": "photography",
+      "motion": "subtle",
+      "colour": "monochrome",
+      "voice": "warm"
+    },
+    "institutional-trust": {
+      "density": "balanced",
+      "language": "institutional",
+      "layout": "strict-grid",
+      "imagery": "diagram",
+      "motion": "functional",
+      "colour": "restrained",
+      "voice": "executive"
+    },
+    "technical-mono": {
+      "density": "dense",
+      "language": "technical",
+      "layout": "modular",
+      "imagery": "diagram",
+      "motion": "functional",
+      "colour": "monochrome",
+      "voice": "analytical"
+    },
+    "bold-startup": {
+      "density": "balanced",
+      "language": "playful",
+      "layout": "modular",
+      "imagery": "mixed-media",
+      "motion": "expressive",
+      "colour": "vibrant",
+      "voice": "persuasive"
+    },
+    "data-dense": {
+      "density": "dense",
+      "language": "consulting",
+      "layout": "strict-grid",
+      "imagery": "diagram",
+      "motion": "none",
+      "colour": "restrained",
+      "voice": "analytical"
+    }
+  },
+  "deliverableProfiles": {
+    "deck.investor-pitch": {
+      "purpose": "Convince investors that the company is worth funding now.",
+      "sections": [
+        "company-purpose",
+        "problem",
+        "solution",
+        "why-now",
+        "market",
+        "competition",
+        "business-model",
+        "traction",
+        "team",
+        "financials",
+        "vision",
+        "ask"
+      ],
+      "qualityChecks": [
+        "one-primary-idea-per-slide",
+        "evidence-for-material-claims",
+        "clear-fundraise-ask",
+        "coherent-narrative-arc",
+        "rendered-slide-qa"
+      ],
+      "defaultStyle": "bold-startup"
+    },
+    "deck.sales": {
+      "purpose": "Move a specific buyer from current pain toward purchase.",
+      "sections": [
+        "buyer-context",
+        "pain",
+        "cost-of-status-quo",
+        "desired-outcome",
+        "solution",
+        "how-it-works",
+        "proof",
+        "roi",
+        "implementation",
+        "commercials",
+        "next-step"
+      ],
+      "qualityChecks": [
+        "buyer-specific-language",
+        "proof-before-claims",
+        "clear-roi-logic",
+        "clear-next-action",
+        "rendered-slide-qa"
+      ],
+      "defaultStyle": "consulting-executive"
+    },
+    "deck.proposal": {
+      "purpose": "Win approval for a defined engagement or solution.",
+      "sections": [
+        "client-context",
+        "what-we-heard",
+        "problem-opportunity",
+        "desired-outcome",
+        "approach",
+        "workstreams",
+        "deliverables",
+        "timeline",
+        "team",
+        "proof",
+        "commercials",
+        "risks-assumptions",
+        "next-step"
+      ],
+      "qualityChecks": [
+        "client-specific-not-generic",
+        "scope-and-deliverables-align",
+        "commercials-match-scope",
+        "proof-is-relevant",
+        "rendered-slide-qa"
+      ],
+      "defaultStyle": "consulting-executive"
+    },
+    "deck.sponsorship": {
+      "purpose": "Exchange audience, brand and activation value for sponsorship support.",
+      "sections": [
+        "property-event",
+        "audience",
+        "demographics",
+        "reach",
+        "track-record",
+        "brand-fit",
+        "activation-options",
+        "deliverables",
+        "measurement",
+        "packages",
+        "exclusivity",
+        "timeline",
+        "ask"
+      ],
+      "qualityChecks": [
+        "audience-metrics-sourced",
+        "sponsor-value-explicit",
+        "deliverables-measurable",
+        "packages-comparable",
+        "clear-ask"
+      ],
+      "defaultStyle": "editorial-premium"
+    },
+    "deck.bid-rfp": {
+      "purpose": "Score strongly against explicit tender or RFP evaluation criteria.",
+      "sections": [
+        "compliance-matrix",
+        "executive-summary",
+        "understanding",
+        "methodology",
+        "delivery-plan",
+        "team",
+        "evidence",
+        "governance",
+        "risk",
+        "commercials",
+        "mandatory-appendices"
+      ],
+      "qualityChecks": [
+        "every-mandatory-criterion-covered",
+        "evidence-traceable",
+        "no-unsupported-claims",
+        "page-slide-limits-met",
+        "submission-format-qa"
+      ],
+      "defaultStyle": "institutional-trust"
+    },
+    "deck.strategy": {
+      "purpose": "Support a strategic decision with diagnosis, options and recommendation.",
+      "sections": [
+        "executive-summary",
+        "context",
+        "diagnosis",
+        "insights",
+        "options",
+        "evaluation",
+        "recommendation",
+        "roadmap",
+        "risks",
+        "decisions-required"
+      ],
+      "qualityChecks": [
+        "facts-vs-interpretation-separated",
+        "alternatives-compared",
+        "recommendation-evidence-linked",
+        "decision-request-explicit",
+        "rendered-slide-qa"
+      ],
+      "defaultStyle": "consulting-executive"
+    },
+    "deck.board": {
+      "purpose": "Enable governance, performance review and board decisions.",
+      "sections": [
+        "executive-summary",
+        "prior-actions",
+        "kpi-scorecard",
+        "variance",
+        "financials",
+        "customer-product",
+        "people",
+        "risks",
+        "strategic-choices",
+        "decisions-required"
+      ],
+      "qualityChecks": [
+        "variance-explained",
+        "decision-items-distinct",
+        "metrics-consistent",
+        "risks-owned",
+        "appendix-separates-detail"
+      ],
+      "defaultStyle": "institutional-trust"
+    },
+    "deck.investment-committee": {
+      "purpose": "Support an explicit investment decision.",
+      "sections": [
+        "investment-thesis",
+        "asset-company",
+        "market",
+        "performance",
+        "valuation",
+        "deal-structure",
+        "returns",
+        "risks",
+        "downside",
+        "exit",
+        "decision"
+      ],
+      "qualityChecks": [
+        "base-bull-bear-visible",
+        "assumptions-traceable",
+        "returns-reconcile",
+        "downside-not-buried",
+        "decision-criteria-explicit"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "deck.investor-update": {
+      "purpose": "Report progress, explain variance and make clear asks of investors.",
+      "sections": [
+        "headline",
+        "wins",
+        "misses",
+        "metrics",
+        "financials",
+        "product",
+        "go-to-market",
+        "team",
+        "risks",
+        "asks",
+        "next-period-priorities"
+      ],
+      "qualityChecks": [
+        "same-metrics-over-time",
+        "bad-news-not-hidden",
+        "asks-actionable",
+        "cash-runway-consistent"
+      ],
+      "defaultStyle": "minimal-system"
+    },
+    "deck.research-readout": {
+      "purpose": "Communicate evidence, findings, implications and next decisions.",
+      "sections": [
+        "question",
+        "method",
+        "evidence-base",
+        "findings",
+        "contradictions",
+        "implications",
+        "recommendations",
+        "limitations",
+        "next-steps"
+      ],
+      "qualityChecks": [
+        "source-provenance",
+        "uncertainty-visible",
+        "findings-vs-recommendations-separated",
+        "limitations-not-buried"
+      ],
+      "defaultStyle": "editorial-premium"
+    },
+    "deck.case-study": {
+      "purpose": "Demonstrate how a problem was solved and what changed.",
+      "sections": [
+        "context",
+        "problem",
+        "constraints",
+        "diagnosis",
+        "intervention",
+        "implementation",
+        "outcome",
+        "evidence",
+        "lessons"
+      ],
+      "qualityChecks": [
+        "before-after-comparable",
+        "causality-not-overclaimed",
+        "metrics-sourced",
+        "lessons-transferable"
+      ],
+      "defaultStyle": "editorial-premium"
+    },
+    "deck.training": {
+      "purpose": "Teach a repeatable competency or process.",
+      "sections": [
+        "learning-objectives",
+        "mental-model",
+        "concepts",
+        "worked-example",
+        "practice",
+        "common-errors",
+        "checklist",
+        "recap"
+      ],
+      "qualityChecks": [
+        "learning-objectives-tested",
+        "examples-representative",
+        "practice-included",
+        "density-supports-live-delivery"
+      ],
+      "defaultStyle": "minimal-system"
+    },
+    "deck.keynote": {
+      "purpose": "Create a memorable live narrative with a clear thesis.",
+      "sections": [
+        "hook",
+        "tension",
+        "thesis",
+        "chapters",
+        "stories-evidence",
+        "turn",
+        "memorable-close"
+      ],
+      "qualityChecks": [
+        "spoken-story-not-report",
+        "low-slide-density",
+        "visuals-carry-meaning",
+        "close-reinforces-thesis"
+      ],
+      "defaultStyle": "cinematic-experience"
+    },
+    "deck.academic-mba": {
+      "purpose": "Demonstrate rigorous analysis, synthesis, recommendation and reflection.",
+      "sections": [
+        "question",
+        "framework",
+        "evidence",
+        "analysis",
+        "alternatives-reversal",
+        "recommendation",
+        "implementation",
+        "reflection",
+        "citations"
+      ],
+      "qualityChecks": [
+        "rubric-mapped",
+        "framework-applied-not-described",
+        "counterargument-addressed",
+        "citations-complete",
+        "limits-respected"
+      ],
+      "defaultStyle": "consulting-executive"
+    },
+    "deck.portfolio": {
+      "purpose": "Demonstrate quality of work, thinking and outcomes.",
+      "sections": [
+        "positioning",
+        "selected-work",
+        "case-study-context",
+        "process",
+        "craft",
+        "outcome",
+        "lessons",
+        "contact"
+      ],
+      "qualityChecks": [
+        "selection-over-volume",
+        "role-contribution-clear",
+        "outcomes-evidenced",
+        "visual-consistency"
+      ],
+      "defaultStyle": "editorial-premium"
+    },
+    "document.proposal": {
+      "purpose": "Define a persuasive engagement, scope and commercial offer.",
+      "sections": [
+        "executive-summary",
+        "context",
+        "objectives",
+        "scope",
+        "approach",
+        "deliverables",
+        "timeline",
+        "team",
+        "proof",
+        "commercials",
+        "assumptions",
+        "terms",
+        "next-step"
+      ],
+      "qualityChecks": [
+        "scope-consistency",
+        "client-specificity",
+        "commercial-reconciliation",
+        "editable-artifact-qa"
+      ],
+      "defaultStyle": "consulting-executive"
+    },
+    "document.bid": {
+      "purpose": "Answer evaluation criteria completely and compliantly.",
+      "sections": [
+        "compliance-matrix",
+        "executive-summary",
+        "response-by-criterion",
+        "delivery",
+        "team",
+        "evidence",
+        "risk",
+        "commercials",
+        "appendices"
+      ],
+      "qualityChecks": [
+        "criterion-coverage",
+        "word-page-limit",
+        "mandatory-attachment-check",
+        "claim-evidence"
+      ],
+      "defaultStyle": "institutional-trust"
+    },
+    "document.report": {
+      "purpose": "Present evidence, analysis, conclusions and recommended action.",
+      "sections": [
+        "executive-summary",
+        "question",
+        "method",
+        "findings",
+        "analysis",
+        "recommendations",
+        "limitations",
+        "appendices"
+      ],
+      "qualityChecks": [
+        "source-provenance",
+        "analysis-vs-fact",
+        "recommendation-traceability",
+        "layout-qa"
+      ],
+      "defaultStyle": "editorial-premium"
+    },
+    "document.memo": {
+      "purpose": "Enable a fast decision in a concise written format.",
+      "sections": [
+        "decision",
+        "context",
+        "evidence",
+        "options",
+        "recommendation",
+        "risks",
+        "next-actions"
+      ],
+      "qualityChecks": [
+        "bluf",
+        "decision-specific",
+        "bounded-length",
+        "assumptions-explicit"
+      ],
+      "defaultStyle": "minimal-system"
+    },
+    "document.prd": {
+      "purpose": "Define product outcome, users, scope and acceptance without dictating unnecessary implementation.",
+      "sections": [
+        "problem",
+        "users",
+        "outcome",
+        "non-goals",
+        "flows",
+        "requirements",
+        "acceptance",
+        "analytics",
+        "risks",
+        "open-questions"
+      ],
+      "qualityChecks": [
+        "outcome-over-feature-list",
+        "acceptance-testable",
+        "non-goals-present",
+        "edge-cases-material-only"
+      ],
+      "defaultStyle": "technical-mono"
+    },
+    "document.tech-spec": {
+      "purpose": "Define a technical change, interfaces, trade-offs, migration and verification.",
+      "sections": [
+        "context",
+        "goals",
+        "non-goals",
+        "current-state",
+        "design",
+        "interfaces",
+        "data",
+        "security",
+        "migration",
+        "failure-modes",
+        "verification",
+        "rollout"
+      ],
+      "qualityChecks": [
+        "alternatives-considered",
+        "interfaces-explicit",
+        "rollback-defined",
+        "verification-maps-to-risk"
+      ],
+      "defaultStyle": "technical-mono"
+    },
+    "document.whitepaper": {
+      "purpose": "Build authority around a well-evidenced thesis or technical position.",
+      "sections": [
+        "abstract",
+        "problem",
+        "background",
+        "thesis",
+        "evidence",
+        "method",
+        "implications",
+        "limitations",
+        "references"
+      ],
+      "qualityChecks": [
+        "source-quality",
+        "claim-provenance",
+        "limitations",
+        "citation-completeness"
+      ],
+      "defaultStyle": "editorial-premium"
+    },
+    "document.policy": {
+      "purpose": "Define binding rules, scope, responsibilities and exceptions.",
+      "sections": [
+        "purpose",
+        "scope",
+        "definitions",
+        "policy",
+        "roles",
+        "procedures",
+        "exceptions",
+        "evidence",
+        "review-cycle"
+      ],
+      "qualityChecks": [
+        "enforceable-language",
+        "owner-defined",
+        "exception-path",
+        "review-date"
+      ],
+      "defaultStyle": "institutional-trust"
+    },
+    "document.runbook": {
+      "purpose": "Enable a human/operator to execute and recover a repeatable process.",
+      "sections": [
+        "purpose",
+        "preconditions",
+        "steps",
+        "verification",
+        "failure-modes",
+        "rollback",
+        "escalation",
+        "evidence"
+      ],
+      "qualityChecks": [
+        "tested-steps",
+        "rollback-real",
+        "permissions-explicit",
+        "no-hidden-prerequisites"
+      ],
+      "defaultStyle": "technical-mono"
+    },
+    "document.board-paper": {
+      "purpose": "Prepare a formal board decision or governance record.",
+      "sections": [
+        "decision-request",
+        "executive-summary",
+        "background",
+        "analysis",
+        "financial-impact",
+        "risk",
+        "recommendation",
+        "resolution"
+      ],
+      "qualityChecks": [
+        "decision-clear",
+        "material-risks",
+        "financial-consistency",
+        "formal-resolution-ready"
+      ],
+      "defaultStyle": "institutional-trust"
+    },
+    "document.academic": {
+      "purpose": "Demonstrate rigorous analysis within academic requirements.",
+      "sections": [
+        "question",
+        "literature-framework",
+        "method",
+        "analysis",
+        "discussion",
+        "counterargument",
+        "conclusion",
+        "references"
+      ],
+      "qualityChecks": [
+        "rubric-coverage",
+        "citation-integrity",
+        "word-limit",
+        "original-analysis"
+      ],
+      "defaultStyle": "consulting-executive"
+    },
+    "document.contract-draft": {
+      "purpose": "Create a structured first draft for qualified legal review.",
+      "sections": [
+        "parties",
+        "definitions",
+        "scope",
+        "obligations",
+        "fees",
+        "ip",
+        "confidentiality",
+        "data",
+        "warranties",
+        "liability",
+        "termination",
+        "law-disputes",
+        "notices"
+      ],
+      "qualityChecks": [
+        "facts-from-manifest",
+        "jurisdiction-explicit",
+        "open-legal-questions-flagged",
+        "qualified-review-required"
+      ],
+      "defaultStyle": "institutional-trust"
+    },
+    "sheet.financial-model": {
+      "purpose": "Model linked operating, financial and valuation assumptions.",
+      "sections": [
+        "assumptions",
+        "drivers",
+        "income-statement",
+        "cashflow",
+        "balance-sheet-if-needed",
+        "valuation",
+        "scenarios",
+        "checks"
+      ],
+      "qualityChecks": [
+        "formula-integrity",
+        "assumptions-separated",
+        "cash-reconciles",
+        "scenario-switches",
+        "no-unexplained-hardcodes"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.forecast": {
+      "purpose": "Project operational or financial outcomes from explicit drivers.",
+      "sections": [
+        "assumptions",
+        "historical",
+        "drivers",
+        "forecast",
+        "variance",
+        "scenarios"
+      ],
+      "qualityChecks": [
+        "historical-ties",
+        "driver-traceability",
+        "date-consistency",
+        "scenario-recalc"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.cashflow": {
+      "purpose": "Track and forecast cash movements and liquidity.",
+      "sections": [
+        "opening-cash",
+        "inflows",
+        "outflows",
+        "net-cash",
+        "closing-cash",
+        "forecast",
+        "alerts"
+      ],
+      "qualityChecks": [
+        "opening-plus-net-equals-closing",
+        "bank-reconciliation",
+        "timing-consistency"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.reconciliation": {
+      "purpose": "Prove two systems or ledgers agree and surface exceptions.",
+      "sections": [
+        "source-a",
+        "source-b",
+        "matching",
+        "exceptions",
+        "resolution",
+        "summary"
+      ],
+      "qualityChecks": [
+        "totals-tie",
+        "duplicate-detection",
+        "unmatched-items-visible",
+        "resolution-audit"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.pricing": {
+      "purpose": "Compare pricing options, economics and customer impact.",
+      "sections": [
+        "inputs",
+        "segments",
+        "price-options",
+        "unit-economics",
+        "sensitivity",
+        "recommendation"
+      ],
+      "qualityChecks": [
+        "unit-consistency",
+        "margin-visible",
+        "sensitivity",
+        "assumptions-explicit"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.unit-economics": {
+      "purpose": "Model contribution economics and payback by customer/unit.",
+      "sections": [
+        "revenue",
+        "variable-cost",
+        "contribution",
+        "cac",
+        "ltv",
+        "payback",
+        "sensitivity"
+      ],
+      "qualityChecks": [
+        "cohort-definition",
+        "gross-vs-contribution-clear",
+        "cac-source",
+        "ltv-assumptions"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.cap-table": {
+      "purpose": "Track ownership and dilution through financing events.",
+      "sections": [
+        "holders",
+        "securities",
+        "current-ownership",
+        "round",
+        "option-pool",
+        "post-money",
+        "scenarios"
+      ],
+      "qualityChecks": [
+        "ownership-sums-100",
+        "fully-diluted-clear",
+        "round-math-reconciles",
+        "scenario-copy-protected"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.pipeline": {
+      "purpose": "Track entities through a staged commercial or operating process.",
+      "sections": [
+        "records",
+        "stages",
+        "owners",
+        "dates",
+        "value",
+        "probability",
+        "next-action",
+        "summary"
+      ],
+      "qualityChecks": [
+        "stage-definitions",
+        "owner-present",
+        "stale-items-visible",
+        "weighted-value-consistent"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.tracker": {
+      "purpose": "Maintain a reliable operational source of truth.",
+      "sections": [
+        "records",
+        "status",
+        "owner",
+        "dates",
+        "notes",
+        "summary"
+      ],
+      "qualityChecks": [
+        "stable-id",
+        "validation",
+        "no-ambiguous-status",
+        "auditability"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.dashboard": {
+      "purpose": "Present decision-relevant metrics from a canonical data source.",
+      "sections": [
+        "inputs",
+        "metric-definitions",
+        "calculations",
+        "dashboard",
+        "exceptions"
+      ],
+      "qualityChecks": [
+        "metric-definition",
+        "source-provenance",
+        "refresh-date",
+        "totals-reconcile"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.budget": {
+      "purpose": "Allocate and monitor spend against plan.",
+      "sections": [
+        "assumptions",
+        "budget",
+        "actuals",
+        "variance",
+        "forecast",
+        "owners"
+      ],
+      "qualityChecks": [
+        "period-consistency",
+        "variance-formula",
+        "ownership",
+        "total-reconciliation"
+      ],
+      "defaultStyle": "data-dense"
+    },
+    "sheet.scenario-analysis": {
+      "purpose": "Compare outcomes under controlled assumption changes.",
+      "sections": [
+        "base-inputs",
+        "scenario-controls",
+        "base",
+        "upside",
+        "downside",
+        "comparison",
+        "decision"
+      ],
+      "qualityChecks": [
+        "single-source-assumptions",
+        "scenario-isolation",
+        "outputs-comparable",
+        "decision-thresholds"
+      ],
+      "defaultStyle": "data-dense"
+    }
+  }
+}

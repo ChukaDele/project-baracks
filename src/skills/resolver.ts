@@ -313,7 +313,7 @@ function validatedProjectRegistryPath(cwd: string, hotRoot?: string): string | u
     const ids = contract.mode === 'bundle' ? contract.members ?? [] : [entry.id];
     for (const id of ids) {
       const skillPath = contract.mode === 'bundle' ? contract.skillPathPattern?.replace('{id}', id) : contract.skillPath;
-      if (!skillPath || skillPath !== `skills/${id}` || expectedExternal.has(id))
+      if (!skillPath || ![ `skills/${id}`, `skills/.curated/${id}`, id ].includes(skillPath) || expectedExternal.has(id))
         throw new Error(`canonical project install contract is invalid: ${id}`);
       expectedExternal.set(id, { entry, contract, skillPath });
     }

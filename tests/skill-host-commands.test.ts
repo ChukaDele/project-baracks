@@ -42,11 +42,11 @@ type CommandAdapter = {
   explicitDescription?: string;
 };
 
-function fixtureRepository(root: string, name: string, ids: string[]): void {
+function fixtureRepository(root: string, name: string, ids: string[], skillRoot = 'skills'): void {
   const repository = join(root, name);
   mkdirSync(repository, { recursive: true });
   for (const id of ids) {
-    const body = join(repository, 'skills', id, 'SKILL.md');
+    const body = join(repository, skillRoot, id, 'SKILL.md');
     mkdirSync(dirname(body), { recursive: true });
     writeFileSync(
       body,
@@ -182,7 +182,7 @@ function fixtureInstaller(home: string, majorHome = join(home, '.major')): strin
   return fixture;
 }
 
-function fixtureRuntime(home: string): string {
+function fixtureRuntime(home: string, anchoredMajorHome?: string): string {
   const runtime = mkdtempSync(join(tmpdir(), 'major-runtime-fixture-'));
   roots.push(runtime);
   cpSync(resolve('dist'), join(runtime, 'dist'), { recursive: true });
@@ -194,11 +194,18 @@ function fixtureRuntime(home: string): string {
     join(runtime, 'package.json'),
     JSON.stringify({ type: 'module', imports: { '#trust-roots': './trust-roots.mjs' } }),
   );
+  if (anchoredMajorHome) mkdirSync(anchoredMajorHome, { recursive: true });
+  const majorHomeExpression = anchoredMajorHome
+    ? `resolve(${JSON.stringify(anchoredMajorHome)})`
+    : `resolve(env.MAJOR_HOME ?? ${JSON.stringify(join(home, '.major'))})`;
+  const accountHomeExpression = anchoredMajorHome
+    ? `resolve(${JSON.stringify(home)})`
+    : `env.MAJOR_HOME ? dirname(trustedMajorHome(env)) : resolve(env.HOME ?? ${JSON.stringify(home)})`;
   writeFileSync(
     join(runtime, 'trust-roots.mjs'),
     `import { dirname, join, resolve } from 'node:path';
-export const trustedMajorHome = (env = process.env) => resolve(env.MAJOR_HOME ?? ${JSON.stringify(join(home, '.major'))});
-export const trustedAccountHome = (env = process.env) => env.MAJOR_HOME ? dirname(trustedMajorHome(env)) : resolve(env.HOME ?? ${JSON.stringify(home)});
+export const trustedMajorHome = (env = process.env) => ${majorHomeExpression};
+export const trustedAccountHome = (env = process.env) => ${accountHomeExpression};
 export const trustedCodexHome = (env = process.env) => resolve(env.CODEX_HOME ?? join(trustedAccountHome(env), '.codex'));
 export const testFixturePath = (name) => process.env[name];
 `,
@@ -642,16 +649,21 @@ describe('installed host skill commands', () => {
       'mcp-builder',
       'skill-creator',
     ]);
-    fixtureRepository(fixtures, 'openai', [
-      'playwright',
-      'vercel-deploy',
-      'figma-use',
-      'figma-implement-design',
-      'figma-generate-design',
-      'security-threat-model',
-      'pdf',
-    ]);
-    fixtureRepository(fixtures, 'graph', ['graph-engineering']);
+    fixtureRepository(
+      fixtures,
+      'openai',
+      [
+        'playwright',
+        'vercel-deploy',
+        'figma-use',
+        'figma-implement-design',
+        'figma-generate-design',
+        'security-threat-model',
+        'pdf',
+      ],
+      'skills/.curated',
+    );
+    fixtureRepository(fixtures, 'graph', ['graph-engineering'], '.');
     writeFileSync(join(target, 'package.json'), '{"name":"fixture-web"}\n');
     const custom = join(target, '.agents', 'skills', 'project-owned', 'SKILL.md');
     mkdirSync(dirname(custom), { recursive: true });
@@ -666,6 +678,7 @@ describe('installed host skill commands', () => {
       PATH: `${fixtureGit('/usr/bin/git', fixtures)}:${process.env.PATH ?? ''}`,
     };
     const fixtureEntry = fixtureRuntime(home);
+    const productionTrustEntry = fixtureRuntime(home, join(home, '.production-major'));
     const installed = spawnSync('bash', [fixtureInstaller(home), target, 'full'], {
       env,
       encoding: 'utf8',
@@ -723,7 +736,7 @@ describe('installed host skill commands', () => {
     const forgedReceipt = spawnSync(
       process.execPath,
       [
-        resolve('dist/entry.js'),
+        productionTrustEntry,
         'skill',
         'resolve',
         '--task',
@@ -760,7 +773,7 @@ describe('installed host skill commands', () => {
     const redirected = spawnSync(
       process.execPath,
       [
-        resolve('dist/entry.js'),
+        productionTrustEntry,
         'skill',
         'resolve',
         '--task',

@@ -26,6 +26,12 @@ Apply these defaults across projects unless a project/user instruction is more s
 
 For owner-approved build projects, do not re-introduce shadow runs, repeated permission prompts, or ceremonial review loops that block ordinary reversible engineering.
 
+## Foundry project intake
+
+- A genuinely new project or request to establish a new project shape loads `project-start`, which owns the adaptive Foundry intake and resolver workflow.
+- Infer from the brief, current context, repositories, connected sources and references before asking the user; do not retemplate a healthy existing project.
+- Foundry may strengthen project requirements but may not silently weaken protected archetype baselines. Legal/privacy outputs must reflect actual product facts and applicable jurisdictions.
+
 ## Operating principle
 
 - Start with the smallest credible end-to-end MVP that proves the value loop. Make it work, make it useful, then improve or harden it.

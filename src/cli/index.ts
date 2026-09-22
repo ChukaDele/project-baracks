@@ -65,6 +65,7 @@ import {
   performanceHistoryReport,
   recordPerformanceObservation,
 } from '../insights/performance-history.js';
+import { loadFoundryCatalog, resolveFoundryPlan } from '../foundry/resolver.js';
 
 /**
  * Exit codes (stable, documented in docs/architecture.md):
@@ -623,6 +624,67 @@ program
       }
     }
     console.log('\n(share this output, or --json for the full sanitized bundle)');
+  });
+
+const foundry = program
+  .command('foundry')
+  .description('Resolve headless Foundry archetypes, packs, deliverables and intake questions');
+
+foundry
+  .command('catalog')
+  .description('List the current Foundry archetypes, packs, deliverable families and styles')
+  .option('--json', 'emit versioned JSON')
+  .action((opts: { json?: boolean }) => {
+    const catalog = loadFoundryCatalog();
+    const summary = {
+      version: catalog.version,
+      operatingCore: catalog.operatingCore,
+      archetypes: Object.keys(catalog.archetypes),
+      packs: Object.keys(catalog.packs),
+      jurisdictions: catalog.jurisdictions,
+      deliverableProfiles: Object.keys(catalog.deliverableProfiles),
+      stylePresets: catalog.stylePresets,
+    };
+    if (opts.json) return emitJson('foundry-catalog', summary);
+    console.log(JSON.stringify(summary, null, 2));
+  });
+
+foundry
+  .command('plan <manifestPath>')
+  .description('Resolve one Foundry project manifest into packs, outputs and decision questions')
+  .option('--json', 'emit versioned JSON')
+  .option('--all-questions', 'print every unresolved question, not only the first batch')
+  .action((manifestPath: string, opts: { json?: boolean; allQuestions?: boolean }) => {
+    if (!existsSync(manifestPath)) fail(`manifest file not found: ${manifestPath}`, EXIT.usage);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    } catch {
+      return fail(`manifest is not valid JSON: ${manifestPath}`, EXIT.usage);
+    }
+    const plan = resolveFoundryPlan(raw, loadFoundryCatalog());
+    if (opts.json) return emitJson('foundry-plan', plan);
+
+    console.log(`archetype: ${plan.archetype ?? 'unresolved'}`);
+    console.log(
+      `major install: ${plan.majorProfile ?? 'unresolved'}${plan.majorFeatures.length ? ` + ${plan.majorFeatures.join(', ')}` : ''}`,
+    );
+    console.log(`style: ${plan.stylePreset}`);
+    console.log(`packs: ${plan.packs.join(', ') || 'none'}`);
+    console.log(`required modules: ${plan.modules.join(', ') || 'none'}`);
+    console.log(`deliverables: ${plan.deliverables.join(', ') || 'none'}`);
+    console.log(`required artifacts: ${plan.artifacts.join(', ') || 'none'}`);
+
+    const questions = opts.allQuestions ? plan.questions : plan.firstQuestionBatch;
+    if (questions.length === 0) {
+      console.log('questions: none');
+      return;
+    }
+    console.log('questions:');
+    questions.forEach((question, index) => {
+      console.log(`  ${index + 1}. [${question.priority}] ${question.question}`);
+      console.log(`     why: ${question.why}`);
+    });
   });
 
 const project = program.command('project').description('Manage supervised projects');

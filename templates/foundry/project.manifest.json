@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "project": {
+    "name": "PROJECT_NAME"
+  },
+  "jurisdictions": [],
+  "domains": [],
+  "risk": {
+    "regulated": false,
+    "payments": false,
+    "irreversibleWrites": false
+  },
+  "capabilities": {
+    "required": [],
+    "optional": [],
+    "excluded": [],
+    "requiredModules": [],
+    "excludedModules": []
+  },
+  "deliverables": [],
+  "style": {},
+  "deployment": {},
+  "assumptions": []
+}

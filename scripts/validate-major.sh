@@ -147,6 +147,10 @@ if grep -E -n "Surface Talent|spreadsheetId|Google Sheets for" guidance/roadmap-
 fi
 
 [ -f templates/project/major-core.md ] || fail "project core template missing"
+[ -f guidance/foundry/catalog.json ] || fail "Foundry catalog missing"
+[ -f templates/foundry/project.manifest.json ] || fail "Foundry manifest template missing"
+[ -f src/foundry/schema.ts ] || fail "Foundry manifest schema missing"
+[ -f src/foundry/resolver.ts ] || fail "Foundry resolver missing"
 [ -f scripts/bootstrap-major-project.sh ] || fail "project bootstrap missing"
 grep -Fq "AGENTS.md" scripts/bootstrap-major-project.sh || fail "provider-neutral AGENTS bootstrap missing"
 grep -Fq "install-major-skills.sh" scripts/bootstrap-major-project.sh || fail "skill-profile bootstrap missing"

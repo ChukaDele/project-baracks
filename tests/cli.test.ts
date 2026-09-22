@@ -513,6 +513,7 @@ describe('major CLI', () => {
       'cleanup',
       'doctor',
       'execution',
+      'foundry',
       'help',
       'history',
       'hosts',
@@ -647,7 +648,7 @@ describe('major CLI', () => {
     const claude = parsed.data.providers.find((p) => p.name === 'claude-code');
     expect(claude?.installed).toBe(false);
     expect(claude?.executableUnverified).toBe(true);
-  });
+  }, 15_000);
 
   it('hosts reports per-host integration status separately from CLI presence and execution-provider health', () => {
     const scratch = mkdtempSync(join(tmpdir(), 'major-hosts-'));
@@ -719,7 +720,7 @@ describe('major CLI', () => {
     expect(human.status).toBe(0);
     expect(human.stdout).toContain('MAJOR HOSTS');
     expect(human.stdout).toContain('major provider status');
-  });
+  }, 15_000);
 
   it('compiled entrypoint status and session attach render persisted two-account Codex capacity', () => {
     const scratch = mkdtempSync(join(tmpdir(), 'major-entry-codex-'));

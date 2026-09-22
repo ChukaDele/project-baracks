@@ -2776,8 +2776,8 @@
       "id": "project-start",
       "name": "project-start",
       "title": "Project Start",
-      "description": "Prepare a new repository quickly by clarifying the outcome, inspecting related assets, installing skills, selecting the first vertical slice and establishing concise project truth.",
-      "shortDescription": "Prepare a new repository quickly by clarifying the outcome, inspecting related assets, installing skills, selecting the first vertical slice and establishing concise project truth.",
+      "description": "Prepare a new repository quickly by resolving the Foundry project shape, asking only material questions, inspecting related assets, selecting the first vertical slice and establishing concise project truth.",
+      "shortDescription": "Prepare a new repository quickly by resolving the Foundry project shape, asking only material questions, inspecting related assets, selecting the first vertical slice and establishing concise project truth.",
       "aliases": [],
       "triggerConditions": [
         "project-start"
@@ -2797,7 +2797,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "b471181bbc7e479f22dd7493bf5e32a1d0d4d00a6c6db32b0fce33b27fe3f2f5",
+      "contentSha256": "c50aced7f243bda2184eccfbf7dbec3729f62a2893497ed6c36d11f26cb1fb8e",
       "triggers": [
         "project",
         "start"
