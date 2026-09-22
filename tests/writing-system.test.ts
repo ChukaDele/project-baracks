@@ -174,6 +174,10 @@ describe('canonical writing system', () => {
       join(process.cwd(), 'skills/internal/writing-os/references/writing-examples-corpus.md'),
       'utf8',
     );
+    const hormozi = readFileSync(
+      join(process.cwd(), 'skills/internal/writing-os/references/alex-hormozi.md'),
+      'utf8',
+    );
 
     expect(authorityMap).toContain(
       'Robert Greene: investigation, contradiction, and layered case construction',
@@ -188,6 +192,10 @@ describe('canonical writing system', () => {
     expect(examplesCorpus).toContain('form should match meaning, reader, and purpose');
     expect(examplesCorpus).toContain('Always use short sentences');
     expect(examplesCorpus).toContain('Cross-genre QA');
+    expect(hormozi).toContain('Writing is discovery, not transcription');
+    expect(hormozi).toContain('Break the model before teaching it');
+    expect(hormozi).toContain('Test packaging without worshipping concision');
+    expect(hormozi).toContain('Authorship boundary');
     expect(proseCraft).toContain('Friction:');
     expect(proseCraft).toContain('Business-writing pass');
     expect(proseCraft).toContain('Commodity insight');

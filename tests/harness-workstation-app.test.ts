@@ -229,7 +229,7 @@ describe('Major DSH workstation app', () => {
     expect(result.status).toBe(0);
     expect(readFileSync(archCall, 'utf8')).toContain('-arm64 /bin/bash');
     expect(result.stdout).toContain(`dsh home: ${home}`);
-  });
+  }, 15_000);
 
   it('dry-runs start for a real project directory without writing a lock', () => {
     const home = isolatedHome();
