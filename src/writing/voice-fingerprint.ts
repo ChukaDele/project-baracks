@@ -8,6 +8,7 @@ export interface VoiceFingerprint {
   corpusSha256: string;
   sampleCount: number;
   wordCount: number;
+  approvedSnippets: Array<{ text: string; sampleIndex: number }>;
   features: Record<string, number | null>;
   featureEvidence: Record<string, Evidence>;
   distributions: Record<string, number[] | Record<string, number>>;
@@ -36,9 +37,14 @@ export function buildVoiceFingerprint(
   const words = approvedSamples.join(' ').match(/[A-Za-z]+/g)?.length ?? 0;
   if (approvedSamples.length < 3 || words < 300)
     throw new Error('voice fingerprint requires at least 3 approved samples and 300 words');
-  return fingerprint(profileId, approvedSamples.length, approvedSamples.join('\n\n'));
+  return fingerprint(profileId, approvedSamples.length, approvedSamples.join('\n\n'), approvedSamples);
 }
-function fingerprint(profileId: string, sampleCount: number, corpus: string): VoiceFingerprint {
+function fingerprint(
+  profileId: string,
+  sampleCount: number,
+  corpus: string,
+  approvedSamples?: readonly string[],
+): VoiceFingerprint {
   const d = diagnoseProse(corpus);
   const words = corpus.toLowerCase().match(/\b[a-z]+(?:'[a-z]+)?\b/g) ?? [];
   const sentences = corpus.split(/(?<=[.!?])\s+/u).filter((v) => v.trim());
@@ -77,6 +83,19 @@ function fingerprint(profileId: string, sampleCount: number, corpus: string): Vo
     const phrase = words.slice(i, i + 3).join(' ');
     phrases.set(phrase, (phrases.get(phrase) ?? 0) + 1);
   }
+  const approvedSnippets = (approvedSamples ?? [])
+    .flatMap((sample, sampleIndex) =>
+      sample
+        .split(/(?<=[.!?])\s+/u)
+        .map((text) => text.trim())
+        .filter((text) => {
+          const wordCount = text.match(/[A-Za-z]+/g)?.length ?? 0;
+          return wordCount >= 6 && wordCount <= 35;
+        })
+        .slice(0, 3)
+        .map((text) => ({ text, sampleIndex })),
+    )
+    .slice(0, 12);
   const repeatedPhrases = [...phrases]
     .filter(([, n]) => n > 1)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
@@ -124,6 +143,7 @@ function fingerprint(profileId: string, sampleCount: number, corpus: string): Vo
     corpusSha256: createHash('sha256').update(corpus).digest('hex'),
     sampleCount,
     wordCount: words.length,
+    approvedSnippets,
     features,
     featureEvidence: Object.fromEntries(
       Object.entries(features).map(([key, value]) => [

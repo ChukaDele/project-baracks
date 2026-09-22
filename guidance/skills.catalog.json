@@ -2188,8 +2188,8 @@
       "id": "natural-writing-qa",
       "name": "natural-writing-qa",
       "title": "Natural Writing Qa",
-      "description": "Provenance-aware post-draft critic that detects and explains recurring model-like prose patterns, preserves claims and voice, and requests only targeted revisions before a second audit.",
-      "shortDescription": "Provenance-aware post-draft critic that detects and explains recurring model-like prose patterns, preserves claims and voice, and requests only targeted revisions before a second audit.",
+      "description": "Provenance-aware post-draft critic that detects generic, model-like, or source-detached prose and requests targeted revisions without inventing personality or evidence.",
+      "shortDescription": "Provenance-aware post-draft critic that detects generic, model-like, or source-detached prose and requests targeted revisions without inventing personality or evidence.",
       "aliases": [
         "humanizer"
       ],
@@ -2211,7 +2211,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "1a5f0ae97578d35ebdfb0fe05cd38d887e3438c15fea0cc6ecfb1df6c9f2e2bc",
+      "contentSha256": "eae6bce2d77a8eed23ffe3b72cdceb3bb00a668ac351f701fab14b74c9110d49",
       "triggers": [
         "natural",
         "writing",
@@ -2519,7 +2519,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "c5426a368a6ab36300b706b8a7b68516711edcb92d4396fb9e6fbdf34ec2e8fb",
+      "contentSha256": "63b07461fca317a80c87b2e2db6e551a9298286cc28c64e71ef1cfa25387e775",
       "triggers": [
         "linkedin",
         "thought",
@@ -2807,8 +2807,8 @@
       "id": "prose-craft",
       "name": "prose-craft",
       "title": "Prose Craft",
-      "description": "Construct and destructively edit substantive sentences and paragraphs after Writing OS has established the ideas, evidence, audience, genre, structure, and intended voice.",
-      "shortDescription": "Construct and destructively edit substantive sentences and paragraphs after Writing OS has established the ideas, evidence, audience, genre, structure, and intended voice.",
+      "description": "Construct and destructively edit substantive sentences and paragraphs after Writing OS has grounded the claim, evidence, point of view, structure, and approved language.",
+      "shortDescription": "Construct and destructively edit substantive sentences and paragraphs after Writing OS has grounded the claim, evidence, point of view, structure, and approved language.",
       "aliases": [],
       "triggerConditions": [
         "sentence-paragraph-prose-cadence-diction-edit-rewrite"
@@ -2828,7 +2828,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "4a3e8c54d9c55b8423bbb5e72e215e0ab65570d9c0c9611b6fb0e295d8a7bcdc",
+      "contentSha256": "6e562bd77de3542e783811f75f65594f02bcf3fd24b1e1c24b4c447619ea0664",
       "triggers": [
         "sentence",
         "paragraph",
@@ -4287,8 +4287,8 @@
       "id": "voice-fingerprint",
       "name": "voice-fingerprint",
       "title": "Voice Fingerprint",
-      "description": "Build or compare versioned measurable style profiles from sufficiently large approved corpora and report deviations without impersonation or invented personal details.",
-      "shortDescription": "Build or compare versioned measurable style profiles from sufficiently large approved corpora and report deviations without impersonation or invented personal details.",
+      "description": "Build or compare versioned voice profiles from approved corpora, retaining both measurable features and a small set of approved language examples without impersonation or invented personal details.",
+      "shortDescription": "Build or compare versioned voice profiles from approved corpora, retaining both measurable features and a small set of approved language examples without impersonation or invented personal details.",
       "aliases": [],
       "triggerConditions": [
         "approved-writing-corpus-voice-style-fingerprint-profile-fidelity"
@@ -4308,7 +4308,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "db2ba66be5a3f33e00de7a174a10b6c05abf475dbe96e84fecb283e94d212044",
+      "contentSha256": "1e11247035ced8f228ee3c2ff12fa29feb3436c9b4ea6c5964fce155525a555a",
       "triggers": [
         "approved",
         "writing",
@@ -4635,8 +4635,8 @@
       "id": "writing-os",
       "name": "writing-os",
       "title": "Writing Os",
-      "description": "Mandatory canonical orchestrator for ordinary substantive writing and rewriting; routes genre strategy, evidence, prose, voice, deterministic QA, evaluation, red-team review, verification, and accepted-edit learning.",
-      "shortDescription": "Mandatory canonical orchestrator for ordinary substantive writing and rewriting; routes genre strategy, evidence, prose, voice, deterministic QA, evaluation, red-team review, verification, and accepted-edit learning.",
+      "description": "Mandatory orchestrator for substantive writing and rewriting. It grounds the thinking before drafting, separates thought process from voice, routes specialist skills, and enforces evidence, language, QA, and learning gates.",
+      "shortDescription": "Mandatory orchestrator for substantive writing and rewriting. It grounds the thinking before drafting, separates thought process from voice, routes specialist skills, and enforces evidence, language, QA, and learning gates.",
       "aliases": [
         "writing-system"
       ],
@@ -4661,7 +4661,7 @@
       ],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "d881cdac99224b6b59f647da08231ca38c664c41c0d3566fa04c2be9148d555d",
+      "contentSha256": "e7bb5613bedcbe7c4be55bd23e90fc22a7c5d14867ec3d27eadc62f502ea24f9",
       "triggers": [
         "write",
         "rewrite",
@@ -4681,8 +4681,8 @@
       "id": "writing-red-team",
       "name": "writing-red-team",
       "title": "Writing Red Team",
-      "description": "Independent adversarial review for academic submissions, important client work, public thought leadership, proposals, major website messaging, and sensitive professional writing.",
-      "shortDescription": "Independent adversarial review for academic submissions, important client work, public thought leadership, proposals, major website messaging, and sensitive professional writing.",
+      "description": "Independent adversarial review for high-stakes writing, focused on the quality of the thought, evidence, distinctiveness, source fidelity, and final prose.",
+      "shortDescription": "Independent adversarial review for high-stakes writing, focused on the quality of the thought, evidence, distinctiveness, source fidelity, and final prose.",
       "aliases": [],
       "triggerConditions": [
         "independent-writing-red-team-academic-client-public-proposal-sensitive"
@@ -4702,7 +4702,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 22,
-      "contentSha256": "fd72f429368c45ac75efa4332a0e1b42fdc1ed84c6c7334f4965ebb83d663168",
+      "contentSha256": "5f2d0c5d07d4b54d3c53db7f9332a672f81be30118aa4777ced432430e9e4f2a",
       "triggers": [
         "independent",
         "writing",

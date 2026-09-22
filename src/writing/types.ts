@@ -14,6 +14,7 @@ export type WritingRisk = 'routine' | 'high-stakes';
 export const CANONICAL_WRITING_PIPELINE = [
   'brief',
   'writing-os',
+  'source-grounding',
   'specialist-strategy',
   'research-evidence',
   'prose-craft',
@@ -41,6 +42,7 @@ export const TRANSACTIONAL_WRITING_PIPELINE = [
 export type WritingPipelineStage = (typeof CANONICAL_WRITING_PIPELINE)[number];
 export type WritingGate =
   | 'route'
+  | 'source-grounding'
   | 'draft'
   | 'prose-lint'
   | 'natural-writing-qa'
@@ -61,6 +63,15 @@ export interface WritingRoute {
   gates: WritingGate[];
   lintProfile: 'general' | 'academic' | 'marketing' | 'technical' | 'asd-ste100' | 'transactional';
   voiceProfile?: string;
+}
+
+export interface WritingSourcePacket {
+  centralClaim: string;
+  support: readonly string[];
+  pointOfViewStatus: 'explicit' | 'inferred' | 'neutral';
+  evidenceBoundary: string;
+  approvedLanguage?: readonly string[];
+  unresolvedGaps?: readonly string[];
 }
 
 export interface WritingFinding {

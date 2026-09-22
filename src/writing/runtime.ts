@@ -7,7 +7,7 @@ import {
   type WritingSourceEvidence,
 } from './evaluator.js';
 import { resolveWritingRoute } from './routing.js';
-import type { WritingGate, WritingPipelineStage, WritingRoute } from './types.js';
+import type { WritingGate, WritingPipelineStage, WritingRoute, WritingSourcePacket } from './types.js';
 import { runLocalVale, type ValeEvidence } from './vale.js';
 import {
   observeDetectors,
@@ -199,6 +199,62 @@ export function parseWritingGateEvidence(value: unknown): WritingGateEvidence | 
   return output;
 }
 
+export function parseWritingSourcePacket(value: unknown): WritingSourcePacket | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  try {
+    if (Buffer.byteLength(JSON.stringify(value), 'utf8') > 64_000) return undefined;
+  } catch {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  const allowed = new Set([
+    'centralClaim',
+    'support',
+    'pointOfViewStatus',
+    'evidenceBoundary',
+    'approvedLanguage',
+    'unresolvedGaps',
+  ]);
+  if (Object.keys(record).some((key) => !allowed.has(key))) return undefined;
+  const boundedText = (candidate: unknown, maximum: number): candidate is string =>
+    typeof candidate === 'string' &&
+    Boolean(candidate.trim()) &&
+    Buffer.byteLength(candidate, 'utf8') <= maximum;
+  const boundedList = (candidate: unknown, maximumItems: number, maximumBytes: number) => {
+    if (!Array.isArray(candidate) || candidate.length > maximumItems) return undefined;
+    const items = candidate.filter(
+      (item): item is string => boundedText(item, maximumBytes),
+    );
+    return items.length === candidate.length ? items.map((item) => item.trim()) : undefined;
+  };
+  if (
+    !boundedText(record.centralClaim, 4_000) ||
+    !boundedText(record.evidenceBoundary, 4_000) ||
+    !['explicit', 'inferred', 'neutral'].includes(String(record.pointOfViewStatus))
+  )
+    return undefined;
+  const support = boundedList(record.support, 32, 4_000);
+  if (!support?.length) return undefined;
+  const approvedLanguage =
+    record.approvedLanguage === undefined
+      ? undefined
+      : boundedList(record.approvedLanguage, 32, 2_000);
+  if (record.approvedLanguage !== undefined && !approvedLanguage) return undefined;
+  const unresolvedGaps =
+    record.unresolvedGaps === undefined
+      ? undefined
+      : boundedList(record.unresolvedGaps, 32, 2_000);
+  if (record.unresolvedGaps !== undefined && !unresolvedGaps) return undefined;
+  return {
+    centralClaim: record.centralClaim.trim(),
+    support,
+    pointOfViewStatus: record.pointOfViewStatus as WritingSourcePacket['pointOfViewStatus'],
+    evidenceBoundary: record.evidenceBoundary.trim(),
+    ...(approvedLanguage ? { approvedLanguage } : {}),
+    ...(unresolvedGaps ? { unresolvedGaps } : {}),
+  };
+}
+
 const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
 export const writingDraftDigest = digest;
 export const writingSourcesDigest = (sources: readonly string[]): string =>
@@ -212,6 +268,7 @@ function gateDigest(gates: readonly WritingGateResult[]): string {
 export function inspectWritingDraft(input: {
   task: string;
   draft: string;
+  sourcePacket?: WritingSourcePacket;
   sources?: readonly WritingSourceEvidence[];
   claimTrace?: readonly ClaimTraceEvidence[];
   protectedStatements?: readonly string[];
@@ -245,7 +302,16 @@ export function inspectWritingDraft(input: {
     let result: WritingGateResult;
     if (gate === 'route')
       result = { gate, state: 'passed', detail: `resolved ${route.genre} route` };
-    else if (gate === 'draft')
+    else if (gate === 'source-grounding') {
+      const packet = parseWritingSourcePacket(input.sourcePacket);
+      result = {
+        gate,
+        state: packet ? 'passed' : 'failed',
+        detail: packet
+          ? `grounded source packet supplied; point of view ${packet.pointOfViewStatus}`
+          : 'substantive writing requires a bounded central claim, support, point-of-view status, and evidence boundary before drafting',
+      };
+    } else if (gate === 'draft')
       result = {
         gate,
         state: input.draft.trim() ? 'passed' : 'failed',
@@ -374,6 +440,7 @@ export function inspectWritingDraft(input: {
       stage,
       state:
         stage === 'brief' ||
+        (stage === 'source-grounding' && input.sourcePacket) ||
         stage === 'deterministic-prose-lint' ||
         stage === 'natural-writing-qa' ||
         stage === 'substantive-writing-evaluator'

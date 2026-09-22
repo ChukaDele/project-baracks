@@ -100,15 +100,31 @@ function lastLog(logs: string[]): unknown {
   return JSON.parse(logs.at(-1)!);
 }
 
-function resultEnvelope(status: 'done' | 'active', summary: string, writingDraft?: string): string {
+function resultEnvelope(
+  status: 'done' | 'active',
+  summary: string,
+  writingDraft?: string,
+  writingSourcePacket?: {
+    centralClaim: string;
+    support: string[];
+    pointOfViewStatus: 'explicit' | 'inferred' | 'neutral';
+    evidenceBoundary: string;
+    approvedLanguage?: string[];
+    unresolvedGaps?: string[];
+  },
+): string {
   const promotionEvidence =
     status === 'done'
       ? ',"promotionEvidence":{"focusedTests":"focused tests passed","cheapestCompileTypeOrBuild":"typecheck passed","criticalPathBehavior":"critical path passed","materialRiskChecks":[],"broaderValidation":{"triggers":[],"repositoryPolicyRequires":false,"performed":false},"review":{"level":"focused","passed":true},"blockerFindings":0}'
       : '';
   const draft = writingDraft === undefined ? '' : `,"writingDraft":${JSON.stringify(writingDraft)}`;
+  const sourcePacket =
+    writingSourcePacket === undefined
+      ? ''
+      : `,"writingSourcePacket":${JSON.stringify(writingSourcePacket)}`;
   return JSON.stringify({
     type: 'result',
-    result: `MAJOR_RESULT: {"status":"${status}","summary":"${summary}"${draft}${promotionEvidence}}`,
+    result: `MAJOR_RESULT: {"status":"${status}","summary":"${summary}"${draft}${sourcePacket}${promotionEvidence}}`,
   });
 }
 
@@ -288,7 +304,15 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
       stdout: resultEnvelope(
         'done',
         'public release drafted',
-        'Atlas API launches today. It helps operations teams coordinate verified updates.',
+        'The API launch gives operations teams a way to coordinate verified updates.',
+        {
+          centralClaim: 'The API launch helps operations teams coordinate verified updates.',
+          support: ['The admitted goal states that this is an API launch.'],
+          pointOfViewStatus: 'neutral',
+          evidenceBoundary:
+            'Do not invent a product name, launch date, customer claim, metric, or capability beyond the admitted goal.',
+          unresolvedGaps: ['Product name', 'launch date', 'specific verified capabilities'],
+        },
       ),
       stderr: '',
       durationMs: 5,
@@ -366,6 +390,13 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
       status: 'done',
       summary: 'proposal drafted',
       writingDraft: draft,
+      writingSourcePacket: {
+        centralClaim: 'The supplied study reports a measured improvement.',
+        support: [draft],
+        pointOfViewStatus: 'neutral',
+        evidenceBoundary: 'Do not claim causation or effects beyond the supplied study statement.',
+        approvedLanguage: ['measured improvement'],
+      },
       writingEvidence: {
         sourcePreservation: {
           draftSha256,
@@ -502,6 +533,10 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
       writing: {
         draft,
         draftSha256,
+        sourcePacket: {
+          centralClaim: 'The supplied study reports a measured improvement.',
+          pointOfViewStatus: 'neutral',
+        },
         sourceCoverageRequired: true,
         evidence: { sourcePreservation: { sources, sourcesSha256 } },
       },
