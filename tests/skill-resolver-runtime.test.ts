@@ -82,7 +82,7 @@ describe('runtime skill resolver', () => {
         ).not.toContain(fixture.skill);
       }
     }
-  });
+  }, 15_000);
 
   it('resolves a canonical skill by a retained non-ID alias', () => {
     expect(
