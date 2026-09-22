@@ -72,7 +72,8 @@ for (const entry of registry.entries) {
         contract.mode === 'bundle'
           ? contract.skillPathPattern?.replace('{id}', id)
           : contract.skillPath;
-      if (skillPath !== `skills/${id}`) throw new Error(`invalid project install path for ${id}`);
+      if (![`skills/${id}`, `skills/.curated/${id}`, id].includes(skillPath))
+        throw new Error(`invalid project install path for ${id}`);
     }
     for (const feature of contract.features ?? [])
       assertSlug(feature, `skill registry ${entry.id} project feature`);

@@ -471,14 +471,14 @@
       "source": "github:openai/skills",
       "availability": "web-projects",
       "load": "real-browser-automation-debugging-qa",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"], "skillPath": "skills/playwright" }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["web-ui", "exploratory", "full"], "skillPath": "skills/.curated/playwright" }
     },
     {
       "id": "vercel-deploy",
       "source": "github:openai/skills",
       "availability": "vercel-projects",
       "load": "preview-or-production-vercel-deployment",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["vercel"], "skillPath": "skills/vercel-deploy" }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["vercel"], "skillPath": "skills/.curated/vercel-deploy" }
     },
     {
       "id": "vercel-optimize",
@@ -575,42 +575,42 @@
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
       "load": "programmatic-figma-read-write",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-use" }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/.curated/figma-use" }
     },
     {
       "id": "figma-implement-design",
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
       "load": "implement-code-from-figma",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-implement-design" }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/.curated/figma-implement-design" }
     },
     {
       "id": "figma-generate-design",
       "source": "github:openai/skills",
       "availability": "figma-enabled-projects",
       "load": "create-or-update-figma-screen",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/figma-generate-design" }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["figma"], "skillPath": "skills/.curated/figma-generate-design" }
     },
     {
       "id": "security-threat-model",
       "source": "github:openai/skills",
       "availability": "all-projects",
       "load": "material-security-risk",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["security"], "skillPath": "skills/security-threat-model" }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["security"], "skillPath": "skills/.curated/security-threat-model" }
     },
     {
       "id": "pdf",
       "source": "github:openai/skills",
       "availability": "all-projects",
       "load": "pdf-task",
-      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["pdf"], "skillPath": "skills/pdf" }
+      "projectInstall": { "sourceKey": "openai", "repository": "https://github.com/openai/skills.git", "mode": "selected", "profiles": ["full"], "features": ["pdf"], "skillPath": "skills/.curated/pdf" }
     },
     {
       "id": "graph-engineering",
       "source": "github:codejunkie99/graph-engineering",
       "availability": "all-projects",
       "load": "deep-graph-orchestration",
-      "projectInstall": { "sourceKey": "graph", "repository": "https://github.com/codejunkie99/graph-engineering.git", "mode": "selected", "profiles": ["full"], "features": ["deep-graph"], "skillPath": "skills/graph-engineering" }
+      "projectInstall": { "sourceKey": "graph", "repository": "https://github.com/codejunkie99/graph-engineering.git", "mode": "selected", "profiles": ["full"], "features": ["deep-graph"], "skillPath": "graph-engineering" }
     },
     {
       "id": "software-engineering",

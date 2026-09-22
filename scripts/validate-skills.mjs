@@ -145,7 +145,7 @@ for (const entry of registryEntries) {
         contract.mode === 'bundle'
           ? contract.skillPathPattern?.replace('{id}', id)
           : contract.skillPath;
-      if (skillPath !== `skills/${id}`)
+      if (![`skills/${id}`, `skills/.curated/${id}`, id].includes(skillPath))
         fail(`skill registry entry ${entry.id} has an invalid project skill path`);
     }
   }

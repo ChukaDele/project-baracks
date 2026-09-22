@@ -59,7 +59,7 @@ if (command === 'plan') {
         contract.mode === 'bundle'
           ? contract.skillPathPattern.replace('{id}', id)
           : contract.skillPath;
-      if (!slug.test(id) || skillPath !== `skills/${id}`)
+      if (!slug.test(id) || ![`skills/${id}`, `skills/.curated/${id}`, id].includes(skillPath))
         throw new Error(`invalid project install member/path: ${id}`);
       process.stdout.write(
         [contract.sourceKey, contract.repository, id, skillPath].join('\t') + '\n',
