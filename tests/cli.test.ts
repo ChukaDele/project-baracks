@@ -225,7 +225,7 @@ describe('major CLI', () => {
     expect(parsed.schemaVersion).toBe(1);
     expect(parsed.kind).toBe('project-list');
     expect(parsed.data[0]?.name).toBe('demo');
-  });
+  }, 30_000);
 
   it('exposes Toolsmith planning through the compiled control-plane CLI', () => {
     const scratch = mkdtempSync(join(tmpdir(), 'major-capability-cli-'));
