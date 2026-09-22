@@ -9,6 +9,7 @@ import { resolveWritingRoute } from '../src/writing/routing.js';
 import {
   inspectWritingDraft,
   parseWritingGateEvidence,
+  parseWritingSourcePacket,
   writingDraftDigest,
   writingSourcesDigest,
 } from '../src/writing/runtime.js';
@@ -26,6 +27,14 @@ const routeFixtures = JSON.parse(
   fixtures: Array<{ prompt: string; genre: string; required: string[]; forbidden: string[] }>;
   negativeFixtures: Array<{ id: string; prompt: string }>;
 };
+const groundedSourcePacket = {
+  centralClaim: 'The proposal should make one careful claim.',
+  support: ['The supplied brief supports that claim.'],
+  pointOfViewStatus: 'neutral' as const,
+  evidenceBoundary: 'Do not introduce facts beyond the supplied brief.',
+  approvedLanguage: ['one careful claim'],
+};
+
 const priorMajorHome = process.env.MAJOR_HOME;
 const testMajorHome = mkdtempSync(join(tmpdir(), 'major-writing-system-'));
 beforeAll(() => {
@@ -117,7 +126,7 @@ describe('canonical writing system', () => {
     const bodies = disclosure.bodies.map((body) => body.id);
     expect(bodies).toEqual(expect.arrayContaining(['writing-os', 'brand-strategy', 'prose-craft']));
     expect(disclosure.bodies.find((body) => body.id === 'writing-os')?.content).toContain(
-      'For every substantive writing request',
+      'Build the source packet before drafting',
     );
   });
 
@@ -148,6 +157,46 @@ describe('canonical writing system', () => {
     expect(resolveSkills({ task, limit: 2 }).skills.map((skill) => skill.id)).toEqual(route.skills);
   });
 
+  it('keeps the Writing OS authorities separated by decision type and carries concrete simplicity tests', () => {
+    const authorityMap = readFileSync(
+      join(process.cwd(), 'skills/internal/writing-os/references/authority-map.md'),
+      'utf8',
+    );
+    const proseCraft = readFileSync(
+      join(process.cwd(), 'skills/internal/prose-craft/SKILL.md'),
+      'utf8',
+    );
+    const writingOs = readFileSync(
+      join(process.cwd(), 'skills/internal/writing-os/SKILL.md'),
+      'utf8',
+    );
+    const examplesCorpus = readFileSync(
+      join(process.cwd(), 'skills/internal/writing-os/references/writing-examples-corpus.md'),
+      'utf8',
+    );
+
+    expect(authorityMap).toContain(
+      'Robert Greene: investigation, contradiction, and layered case construction',
+    );
+    expect(authorityMap).toContain('Use his thinking process more often than his language.');
+    expect(authorityMap).toContain('Paul Graham: simplicity as a thinking instrument');
+    expect(authorityMap).toContain('David Perell: write from abundance, test ideas, then compress');
+    expect(authorityMap).toContain('Scott Adams: business-writing mechanics');
+    expect(authorityMap).toContain(
+      'Alex Hormozi: utility, narrow scope, and business-writing simplification',
+    );
+    expect(examplesCorpus).toContain('form should match meaning, reader, and purpose');
+    expect(examplesCorpus).toContain('Always use short sentences');
+    expect(examplesCorpus).toContain('Cross-genre QA');
+    expect(proseCraft).toContain('Friction:');
+    expect(proseCraft).toContain('Business-writing pass');
+    expect(proseCraft).toContain('Commodity insight');
+    expect(proseCraft).toContain(
+      'awkward rhythm can be evidence that the thinking is still unresolved',
+    );
+    expect(writingOs).toContain('Do not blend famous writers into a synthetic house voice.');
+  });
+
   it('keeps contextual natural-writing diagnostics out of code and quotes', () => {
     const report = diagnoseProse(
       "```ts\nconst tapestry = 'delve';\n```\n> Studies show this.\nRun the command once.",
@@ -163,6 +212,56 @@ describe('canonical writing system', () => {
     expect(report.critic).toMatchObject({ id: 'natural-writing-qa', mode: 'detect-only' });
     expect(report.critic.upstream).toContain('conorbronsdon/avoid-ai-writing');
     expect(report.fleschKincaidGrade).toBeTypeOf('number');
+  });
+
+  it('flags vague polished business language and overloaded sentences', () => {
+    const vague = diagnoseProse(
+      'This strategic framework will unlock value through a robust approach.',
+      'report',
+    );
+    expect(vague.findings).toContainEqual(
+      expect.objectContaining({ ruleId: 'major.clarity.empty-business-language' }),
+    );
+
+    const overloaded = diagnoseProse(
+      'The team changed the process because customers were confused, and sales used a different definition, while product tracked another metric, and nobody owned the final decision.',
+      'report',
+    );
+    expect(overloaded.findings).toContainEqual(
+      expect.objectContaining({ ruleId: 'major.clarity.multiple-thought-sentence' }),
+    );
+  });
+
+  it('parses only bounded source packets with explicit evidence limits', () => {
+    expect(
+      parseWritingSourcePacket({
+        centralClaim: 'The launch changes how the team coordinates updates.',
+        support: ['The admitted brief says the API is launching.'],
+        pointOfViewStatus: 'neutral',
+        evidenceBoundary: 'Do not invent product claims or dates.',
+        approvedLanguage: ['coordinate updates'],
+        unresolvedGaps: ['Launch date'],
+      }),
+    ).toMatchObject({
+      centralClaim: 'The launch changes how the team coordinates updates.',
+      pointOfViewStatus: 'neutral',
+    });
+    expect(
+      parseWritingSourcePacket({
+        centralClaim: 'A claim',
+        support: [],
+        pointOfViewStatus: 'neutral',
+        evidenceBoundary: 'A boundary',
+      }),
+    ).toBeUndefined();
+    expect(
+      parseWritingSourcePacket({
+        centralClaim: 'A claim',
+        support: ['support'],
+        pointOfViewStatus: 'invented',
+        evidenceBoundary: 'A boundary',
+      }),
+    ).toBeUndefined();
   });
 
   it('attaches profile, severity, rule, and suppression metadata to contextual findings', () => {
@@ -208,6 +307,10 @@ describe('canonical writing system', () => {
     ]);
     expect(profile).toMatchObject({ schemaVersion: 2, profileId: 'personal-v1', sampleCount: 3 });
     expect(profile.featureEvidence.sentenceLengthMean).toMatchObject({ unit: 'words' });
+    expect(profile.approvedSnippets.length).toBeGreaterThan(0);
+    expect(profile.approvedSnippets[0]).toEqual(
+      expect.objectContaining({ text: expect.any(String), sampleIndex: expect.any(Number) }),
+    );
     expect(profile.features).toEqual(
       expect.objectContaining({
         sentenceLengthVariance: expect.any(Number),
@@ -398,6 +501,25 @@ describe('canonical writing system', () => {
         sources: [{ id: 'manual-1', content: protectedStatement }],
       }).claimTrace.state,
     ).toBe('missing');
+  });
+
+  it('fails substantive writing when the source packet is missing and passes grounding when supplied', () => {
+    const missing = inspectWritingDraft({
+      task: 'prepare an important client-facing proposal',
+      draft: 'The proposal makes one careful claim.',
+    });
+    expect(missing.gates).toContainEqual(
+      expect.objectContaining({ gate: 'source-grounding', state: 'failed' }),
+    );
+
+    const grounded = inspectWritingDraft({
+      task: 'prepare an important client-facing proposal',
+      draft: 'The proposal makes one careful claim.',
+      sourcePacket: groundedSourcePacket,
+    });
+    expect(grounded.gates).toContainEqual(
+      expect.objectContaining({ gate: 'source-grounding', state: 'passed' }),
+    );
   });
 
   it('surfaces high-stakes red-team and unavailable lint as explicit lifecycle states', () => {

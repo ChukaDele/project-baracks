@@ -1,6 +1,11 @@
 import { redactText } from '../security/redact.js';
 import { decideSdlc, type SdlcRisk } from '../domain/sdlc.js';
-import { parseWritingGateEvidence, type WritingGateEvidence } from '../writing/runtime.js';
+import {
+  parseWritingGateEvidence,
+  parseWritingSourcePacket,
+  type WritingGateEvidence,
+} from '../writing/runtime.js';
+import type { WritingSourcePacket } from '../writing/types.js';
 
 const WORKER_REPORT_PREFIX = 'MAJOR_RESULT: ';
 const FINAL_REPORT_TYPE = 'major.result.final';
@@ -195,6 +200,7 @@ export interface WorkerReport {
   capabilityUse?: { key: string; evidence: string }[];
   /** Sole production draft input for canonical writing completion. */
   writingDraft?: string;
+  writingSourcePacket?: WritingSourcePacket;
   writingEvidence?: WritingGateEvidence;
 }
 
@@ -285,6 +291,11 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
       return undefined;
     const taskId = typeof value.taskId === 'string' ? value.taskId.trim() : '';
     if (value.taskId !== undefined && !/^[a-z][a-z0-9_-]{2,127}$/.test(taskId)) return undefined;
+    const writingSourcePacket =
+      value.writingSourcePacket === undefined
+        ? undefined
+        : parseWritingSourcePacket(value.writingSourcePacket);
+    if (value.writingSourcePacket !== undefined && !writingSourcePacket) return undefined;
     const writingEvidence =
       value.writingEvidence === undefined
         ? undefined
@@ -552,6 +563,7 @@ export function parseWorkerReport(output: string): WorkerReport | undefined {
       ...(assetCandidate ? { assetCandidate } : {}),
       ...(capabilityUse ? { capabilityUse } : {}),
       ...(writingDraft ? { writingDraft } : {}),
+      ...(writingSourcePacket ? { writingSourcePacket } : {}),
       ...(writingEvidence ? { writingEvidence } : {}),
     };
   } catch {

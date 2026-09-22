@@ -107,6 +107,13 @@ export function diagnoseProse(text: string, genre: WritingGenre = 'general'): Pr
       genre === 'academic' || genre === 'technical' ? 'info' : 'warning',
     ],
     [
+      'major.clarity.empty-business-language',
+      /\b(?:(?:robust|seamless|holistic|transformative|innovative|strategic)\s+(?:approach|framework|solution|model|capabilit(?:y|ies)|experience|ecosystem|journey)|(?:drive|unlock|deliver|create)\s+(?:meaningful\s+)?value|facilitat(?:e|es|ing)\s+(?:better\s+)?alignment)\b/iu,
+      'empty-business-language',
+      'Abstract business language praises the idea without naming a concrete actor, action, mechanism, or result.',
+      genre === 'academic' || genre === 'technical' ? 'info' : 'warning',
+    ],
+    [
       'major.aiisms.chatbot-artifact',
       /\b(?:certainly|absolutely|great question)[,!]/iu,
       'chatbot-artifact',
@@ -131,6 +138,27 @@ export function diagnoseProse(text: string, genre: WritingGenre = 'general'): Pr
         },
       });
   }
+  const overloadedSentence = sentenceTexts.find((sentence) => {
+    const wordCount = sentence.match(/[A-Za-z]+/g)?.length ?? 0;
+    const joins =
+      sentence.match(/[,;]|\b(?:and|but|which|while|because|although|whereas)\b/giu)?.length ?? 0;
+    return wordCount >= 26 && joins >= 3;
+  });
+  if (overloadedSentence)
+    findings.push({
+      ruleId: 'major.clarity.multiple-thought-sentence',
+      dimension: 'sentence-load',
+      severity: genre === 'academic' || genre === 'technical' ? 'info' : 'warning',
+      message:
+        'Long sentence carries several joins; check whether it contains multiple independent thoughts that should be separated.',
+      evidence: overloadedSentence.slice(0, 240),
+      profile: genre,
+      suppression: {
+        eligible: true,
+        reason: 'Keep when the relationship between clauses requires one sentence.',
+      },
+    });
+
   if ((withoutCode.match(/^#{1,6}\s/gmu) ?? []).length > 3 && tokens.length < 300)
     findings.push({
       dimension: 'structure',

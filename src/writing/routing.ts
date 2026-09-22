@@ -124,6 +124,7 @@ export function resolveWritingRoute(task: string): WritingRoute | undefined {
       ? ['route', 'draft', 'natural-writing-qa', 'final-verification']
       : [
           'route',
+          'source-grounding',
           'draft',
           'prose-lint',
           'natural-writing-qa',

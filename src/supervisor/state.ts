@@ -169,6 +169,7 @@ export interface SupervisorGoal {
         writing?: {
           draft: string;
           draftSha256: string;
+          sourcePacket?: import('../writing/types.js').WritingSourcePacket;
           evidence?: import('../writing/runtime.js').WritingGateEvidence;
           redTeamRequired: boolean;
           sourceCoverageRequired: boolean;
