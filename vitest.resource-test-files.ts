@@ -1,9 +1,11 @@
 /**
- * These tests exercise shared host resources such as macOS Seatbelt,
- * subprocess timing, and the active Lima worker. Run them after the parallel
- * suite so they cannot delay each other past their safety deadlines.
+ * Tests that must not run in the ordinary parallel pool.
+ *
+ * sharedResourceTestFiles may run together in one serialized Vitest process.
+ * isolatedResourceTestFiles each run in their own Vitest process because they
+ * mutate process-level host state that must not leak into another suite.
  */
-export const resourceTestFiles = [
+export const sharedResourceTestFiles = [
   'tests/execution-containment.test.ts',
   'tests/lima-provisioner.test.ts',
   'tests/real-worker-containment.test.ts',
@@ -12,3 +14,7 @@ export const resourceTestFiles = [
   'tests/skill-resolver-evals.test.ts',
   'tests/skill-resolver-runtime.test.ts',
 ];
+
+export const isolatedResourceTestFiles = ['tests/cli.test.ts', 'tests/skill-host-commands.test.ts'];
+
+export const resourceTestFiles = [...sharedResourceTestFiles, ...isolatedResourceTestFiles];

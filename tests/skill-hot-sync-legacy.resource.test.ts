@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -18,6 +19,7 @@ import { resolveSkills } from '../src/skills/resolver.js';
 import { rollbackMajorSkills, syncMajorSkills } from '../src/skills/sync.js';
 
 const roots: string[] = [];
+const canonicalTmp = realpathSync(tmpdir());
 const priorMajorHome = process.env.MAJOR_HOME;
 const priorSkillsRegistry = process.env.MAJOR_SKILLS_REGISTRY;
 const priorSkillEvals = process.env.MAJOR_SKILLS_EVALS;
@@ -38,7 +40,7 @@ afterEach(() => {
 });
 
 function sourceCopy(): string {
-  const source = mkdtempSync(join(tmpdir(), 'major-skill-rollback-source-'));
+  const source = mkdtempSync(join(canonicalTmp, 'major-skill-rollback-source-'));
   roots.push(source);
   for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates', 'adapters']) {
     cpSync(join(process.cwd(), directory), join(source, directory), { recursive: true });
@@ -126,7 +128,7 @@ function installLegacyBundle(home: string, source: string): string {
 
 describe('legacy Skills Library rollback', () => {
   it('rejects and quarantines an incomplete legacy rollback bundle', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-rollback-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-rollback-home-'));
     const source = sourceCopy();
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -144,7 +146,7 @@ describe('legacy Skills Library rollback', () => {
   });
 
   it('rolls back skills and assets to the exact recorded predecessor bundle', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-rollback-paired-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-rollback-paired-home-'));
     const sourceA = sourceCopy();
     const sourceB = sourceCopy();
     roots.push(home);

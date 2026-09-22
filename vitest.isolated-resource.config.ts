@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
-import { sharedResourceTestFiles } from './vitest.resource-test-files.js';
+import { isolatedResourceTestFiles } from './vitest.resource-test-files.js';
 
 export default defineConfig({
   resolve: {
@@ -13,7 +13,7 @@ export default defineConfig({
     ],
   },
   test: {
-    include: sharedResourceTestFiles,
+    include: isolatedResourceTestFiles,
     environment: 'node',
     maxWorkers: 1,
     fileParallelism: false,
