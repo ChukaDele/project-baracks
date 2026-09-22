@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   readdirSync,
   rmSync,
   symlinkSync,
@@ -20,6 +21,7 @@ import { resolveSkills } from '../src/skills/resolver.js';
 import { rollbackMajorSkills, syncMajorSkills } from '../src/skills/sync.js';
 
 const roots: string[] = [];
+const canonicalTmp = realpathSync(tmpdir());
 const priorMajorHome = process.env.MAJOR_HOME;
 const priorGbrainAssetIndex = process.env.MAJOR_GBRAIN_ASSET_INDEX;
 const priorSkillsRegistry = process.env.MAJOR_SKILLS_REGISTRY;
@@ -61,7 +63,7 @@ afterEach(() => {
 });
 
 function sourceCopy(prefix: string): string {
-  const source = mkdtempSync(join(tmpdir(), prefix));
+  const source = mkdtempSync(join(canonicalTmp, prefix));
   roots.push(source);
   for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates', 'adapters']) {
     cpSync(join(process.cwd(), directory), join(source, directory), { recursive: true });
@@ -71,8 +73,8 @@ function sourceCopy(prefix: string): string {
 
 describe('Major hot skill sync', () => {
   it('rejects a symlinked bundles authority without touching its external target', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-symlink-home-'));
-    const external = mkdtempSync(join(tmpdir(), 'major-skill-symlink-external-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-symlink-home-'));
+    const external = mkdtempSync(join(canonicalTmp, 'major-skill-symlink-external-'));
     roots.push(home, external);
     process.env.MAJOR_HOME = home;
     writeFileSync(join(external, 'sentinel'), 'preserve me\n');
@@ -87,7 +89,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('activates all current internal skills without a runtime reinstall', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-sync-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-sync-home-'));
     roots.push(home);
     process.env.MAJOR_HOME = home;
 
@@ -141,7 +143,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('binds resolved reads to the authenticated canonical bundle after current changes', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-binding-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-binding-home-'));
     const sourceA = sourceCopy('major-skill-binding-a-');
     const sourceB = sourceCopy('major-skill-binding-b-');
     roots.push(home);
@@ -161,7 +163,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('uses one authenticated bundle when current switches during resolution', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-resolution-switch-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-resolution-switch-home-'));
     const sourceA = sourceCopy('major-skill-resolution-switch-a-');
     const sourceB = sourceCopy('major-skill-resolution-switch-b-');
     roots.push(home);
@@ -182,7 +184,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('rejects post-rename corruption before activation and preserves prior artifacts', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-post-rename-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-post-rename-home-'));
     const sourceA = sourceCopy('major-skill-post-rename-a-');
     const sourceB = sourceCopy('major-skill-post-rename-b-');
     roots.push(home);
@@ -202,7 +204,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('is idempotent when the content-addressed destination is already active', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-idempotent-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-idempotent-home-'));
     const source = sourceCopy('major-skill-idempotent-source-');
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -217,7 +219,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('quarantines and rebuilds a corrupt retained bundle instead of activating it', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-corrupt-retained-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-corrupt-retained-home-'));
     const sourceA = sourceCopy('major-skill-corrupt-retained-a-');
     const sourceB = sourceCopy('major-skill-corrupt-retained-b-');
     roots.push(home);
@@ -248,7 +250,7 @@ describe('Major hot skill sync', () => {
     ['eval', 'evals/skill-resolver/api.json'],
     ['skill', 'skills/internal/api/SKILL.md'],
   ])('rejects a symlinked %s anywhere in authenticated bundle content', (_kind, relativePath) => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-symlink-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-symlink-home-'));
     const source = sourceCopy('major-skill-symlink-source-');
     const external = join(home, 'external-artifact');
     roots.push(home);
@@ -270,9 +272,9 @@ describe('Major hot skill sync', () => {
     ['package', 'package'],
     ['asset parent', 'templates'],
   ])('rejects a symlinked %s source path component', (_kind, relativePath) => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-parent-symlink-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-parent-symlink-home-'));
     const source = sourceCopy('major-skill-parent-symlink-source-');
-    const external = mkdtempSync(join(tmpdir(), 'major-skill-parent-symlink-external-'));
+    const external = mkdtempSync(join(canonicalTmp, 'major-skill-parent-symlink-external-'));
     roots.push(home, external);
     process.env.MAJOR_HOME = home;
     cpSync(join(source, relativePath), join(external, relativePath), { recursive: true });
@@ -284,7 +286,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('rejects staged copy drift before activation and preserves current host artifacts', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-copy-drift-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-copy-drift-home-'));
     const sourceA = sourceCopy('major-skill-copy-drift-a-');
     const sourceB = sourceCopy('major-skill-copy-drift-b-');
     roots.push(home);
@@ -306,9 +308,9 @@ describe('Major hot skill sync', () => {
   });
 
   it('preflights a symlinked host root before bundle or external mutation', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-host-preflight-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-host-preflight-home-'));
     const source = sourceCopy('major-skill-host-preflight-source-');
-    const external = mkdtempSync(join(tmpdir(), 'major-skill-host-preflight-external-'));
+    const external = mkdtempSync(join(canonicalTmp, 'major-skill-host-preflight-external-'));
     roots.push(home, external);
     process.env.MAJOR_HOME = join(home, '.major');
     writeFileSync(join(external, 'sentinel.txt'), 'external sentinel\n');
@@ -321,7 +323,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('requires an eval fixture for every canonical catalogue entry', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-eval-coverage-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-eval-coverage-home-'));
     const source = sourceCopy('major-skill-eval-coverage-source-');
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -333,9 +335,9 @@ describe('Major hot skill sync', () => {
   });
 
   it('ignores active bundle artifact drift and a current link relocated outside skill-bundles', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-resolver-integrity-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-resolver-integrity-home-'));
     const source = sourceCopy('major-skill-resolver-integrity-source-');
-    const external = mkdtempSync(join(tmpdir(), 'major-skill-relocated-bundle-'));
+    const external = mkdtempSync(join(canonicalTmp, 'major-skill-relocated-bundle-'));
     roots.push(home, external);
     process.env.MAJOR_HOME = home;
     const synced = syncMajorSkills({ sourceRoot: source });
@@ -359,7 +361,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('records the immediately active predecessor when reactivating, then rolls back to it', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-reactivation-rollback-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-reactivation-rollback-home-'));
     const sourceA = sourceCopy('major-skill-reactivation-rollback-a-');
     const sourceB = sourceCopy('major-skill-reactivation-rollback-b-');
     roots.push(home);
@@ -381,7 +383,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('fails closed when the active bundle has no recorded predecessor', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-no-predecessor-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-no-predecessor-home-'));
     const source = sourceCopy('major-skill-no-predecessor-source-');
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -391,7 +393,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('does not substitute another retained bundle for a corrupt recorded predecessor', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-corrupt-predecessor-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-corrupt-predecessor-home-'));
     const sourceA = sourceCopy('major-skill-corrupt-predecessor-a-');
     const sourceB = sourceCopy('major-skill-corrupt-predecessor-b-');
     const sourceC = sourceCopy('major-skill-corrupt-predecessor-c-');
@@ -412,7 +414,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('does not substitute another retained bundle for a missing recorded predecessor', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-missing-predecessor-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-missing-predecessor-home-'));
     const sourceA = sourceCopy('major-skill-missing-predecessor-a-');
     const sourceB = sourceCopy('major-skill-missing-predecessor-b-');
     const sourceC = sourceCopy('major-skill-missing-predecessor-c-');
@@ -433,7 +435,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('rejects a changed referenced skill resource when the catalogue identity is stale', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-resource-identity-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-resource-identity-home-'));
     const source = sourceCopy('major-skill-resource-identity-source-');
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -447,7 +449,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('rejects aliases that collide with another canonical id', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-alias-collision-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-alias-collision-home-'));
     const source = sourceCopy('major-skill-alias-collision-source-');
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -466,7 +468,7 @@ describe('Major hot skill sync', () => {
     ['alias', '../../escape'],
     ['id', 'nested/escape'],
   ])('rejects an unsafe registry %s before host path interpolation', (field, unsafe) => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-slug-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-slug-home-'));
     const source = sourceCopy('major-skill-slug-source-');
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -484,7 +486,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('restores the prior bundle and every host artifact after an injected activation failure', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-atomic-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-atomic-home-'));
     const sourceA = sourceCopy('major-skill-atomic-source-a-');
     const sourceB = sourceCopy('major-skill-atomic-source-b-');
     roots.push(home);
@@ -512,7 +514,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('rebuilds matching host rules, catalogue, and namespaced commands on rollback', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-rollback-artifacts-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-rollback-artifacts-home-'));
     const sourceA = sourceCopy('major-skill-rollback-artifacts-a-');
     const sourceB = sourceCopy('major-skill-rollback-artifacts-b-');
     roots.push(home);
@@ -540,9 +542,9 @@ describe('Major hot skill sync', () => {
   });
 
   it('returns a project-local asset before the metadata index', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-assets-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-assets-home-'));
     const source = sourceCopy('major-skill-assets-source-');
-    const project = mkdtempSync(join(tmpdir(), 'major-skill-assets-project-'));
+    const project = mkdtempSync(join(canonicalTmp, 'major-skill-assets-project-'));
     roots.push(home, project);
     process.env.MAJOR_HOME = home;
     syncMajorSkills({ sourceRoot: source });
@@ -579,7 +581,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('queries a configured metadata-only GBrain index before canonical shared assets', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-gbrain-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-gbrain-home-'));
     const source = sourceCopy('major-skill-gbrain-source-');
     roots.push(home);
     process.env.MAJOR_HOME = home;
@@ -600,7 +602,7 @@ describe('Major hot skill sync', () => {
   });
 
   it('returns a historical candidate for inspection before recommending a new build', () => {
-    const home = mkdtempSync(join(tmpdir(), 'major-skill-candidate-home-'));
+    const home = mkdtempSync(join(canonicalTmp, 'major-skill-candidate-home-'));
     const source = sourceCopy('major-skill-candidate-source-');
     roots.push(home);
     process.env.MAJOR_HOME = home;

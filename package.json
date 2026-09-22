@@ -1,7 +1,7 @@
 {
   "name": "major",
   "version": "0.5.3",
-  "description": "Major — thin cross-project control plane with immutable runtime releases, project-context integrity, closed-loop learning and evidence-driven delivery",
+  "description": "Major \u2014 thin cross-project control plane with immutable runtime releases, project-context integrity, closed-loop learning and evidence-driven delivery",
   "type": "module",
   "private": true,
   "bin": {
@@ -23,7 +23,7 @@
     "lint": "eslint src",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "pnpm test:parallel && pnpm test:resource",
+    "test": "pnpm test:parallel && pnpm test:resource && pnpm test:isolated-resource",
     "test:parallel": "vitest run",
     "test:resource": "vitest run --config vitest.resource.config.ts",
     "test:watch": "vitest",
@@ -37,7 +37,8 @@
     "validate:dsh": "bash scripts/validate-dsh-field.sh",
     "major": "tsx src/entry.ts",
     "install:runtime": "bash scripts/install-major-runtime.sh",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "test:isolated-resource": "vitest run tests/cli.test.ts --config vitest.isolated-resource.config.ts && vitest run tests/skill-host-commands.test.ts --config vitest.isolated-resource.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.3.0",
