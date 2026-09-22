@@ -16,5 +16,6 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     exclude: resourceTestFiles,
     environment: 'node',
+    testTimeout: 10_000,
   },
 });

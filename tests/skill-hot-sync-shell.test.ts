@@ -1,4 +1,5 @@
 import {
+  realpathSync,
   chmodSync,
   cpSync,
   existsSync,
@@ -22,7 +23,7 @@ afterEach(() => {
 });
 
 function cleanSource(prefix: string): string {
-  const source = mkdtempSync(join(tmpdir(), prefix));
+  const source = mkdtempSync(join(realpathSync(tmpdir()), prefix));
   roots.push(source);
   for (const directory of ['guidance', 'package', 'skills', 'evals', 'templates', 'adapters']) {
     cpSync(join(process.cwd(), directory), join(source, directory), { recursive: true });
@@ -51,7 +52,7 @@ function cleanSource(prefix: string): string {
 }
 
 function fixtureRuntime(home: string): string {
-  const runtime = mkdtempSync(join(tmpdir(), 'major-shell-runtime-fixture-'));
+  const runtime = mkdtempSync(join(realpathSync(tmpdir()), 'major-shell-runtime-fixture-'));
   roots.push(runtime);
   cpSync(join(process.cwd(), 'dist'), join(runtime, 'dist'), { recursive: true });
   for (const directory of ['guidance', 'skills', 'evals', 'adapters', 'templates']) {
@@ -85,7 +86,7 @@ export const testFixturePath = (name) => process.env[name];
 
 describe('shipped Major skill sync compatibility path', () => {
   it('delegates an idempotent complete-bundle activation to the canonical transaction', () => {
-    const homeRoot = mkdtempSync(join(tmpdir(), 'major-shell-sync-home-'));
+    const homeRoot = mkdtempSync(join(realpathSync(tmpdir()), 'major-shell-sync-home-'));
     const source = cleanSource('major-shell-sync-source-');
     roots.push(homeRoot);
     const majorHome = join(homeRoot, '.major');
