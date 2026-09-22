@@ -1,6 +1,10 @@
 {
   "skill": "exploratory-creative-dev",
-  "should_trigger": ["Use exploratory-creative-dev for this task."],
+  "should_trigger": [
+    "Use exploratory-creative-dev for this task.",
+    "Build the settled art direction into an immersive Awwwards-style web experience with heavy motion and custom interactions.",
+    "The visual direction is approved. Now execute the experimental scroll-driven site with specialised creative development."
+  ],
   "should_not_trigger": [
     "This unrelated request must not activate exploratory creative dev workflow."
   ]

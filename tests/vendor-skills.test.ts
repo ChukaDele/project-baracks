@@ -129,6 +129,48 @@ describe('live vendor skill sources', () => {
     expect(entry?.contentSha256).toBeUndefined();
   });
 
+  it.each([
+    [
+      'vercel-optimize',
+      'Reduce Vercel latency and function cost using measured performance and caching evidence.',
+    ],
+    [
+      'vercel-react-best-practices',
+      'Review this Next.js React app for rendering, bundle, server, and performance best practices.',
+    ],
+    [
+      'web-design-guidelines',
+      'Audit this Vercel website interface for accessibility, UX, interaction, and web design quality.',
+    ],
+    [
+      'writing-guidelines',
+      'Improve the copy and content structure on this Vercel product page for clarity and voice.',
+    ],
+    [
+      'vercel-react-native-skills',
+      'Improve this Vercel React Native mobile flow, including list performance, navigation, and animation.',
+    ],
+    [
+      'vercel-react-view-transitions',
+      'Add React view transitions to this Vercel app navigation without over-animating the interface.',
+    ],
+    [
+      'vercel-composition-patterns',
+      'Refactor these Vercel React components using better composition, compound components, and state ownership.',
+    ],
+    ['deploy-to-vercel', 'Deploy this app to Vercel and return the working preview deployment.'],
+    [
+      'vercel-cli-with-tokens',
+      'Configure this Vercel project environment and deployment using the CLI and existing token authentication.',
+    ],
+  ] as const)('routes natural live-vendor intent to %s', (skillId, task) => {
+    const resolved = resolveSkills({ task, limit: 12, now: new Date('2026-08-28T12:00:00.000Z') });
+    const selected = resolved.skills.find((skill) => skill.id === skillId);
+    expect(selected, task).toBeDefined();
+    expect(selected?.sourceKind).toBe('VENDOR_LIVE');
+    expect(selected?.vendor?.skillId).toBe(skillId);
+  });
+
   it('resolves a Vercel skill as a live reference without manufacturing a local body', () => {
     const now = new Date('2026-08-28T12:00:00.000Z');
     const resolved = resolveSkills({

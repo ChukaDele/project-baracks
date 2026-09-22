@@ -45,12 +45,35 @@ type CommandAdapter = {
 function fixtureRepository(root: string, name: string, ids: string[], skillRoot = 'skills'): void {
   const repository = join(root, name);
   mkdirSync(repository, { recursive: true });
+  const descriptions: Record<string, string> = {
+    'frontend-design':
+      'Create distinctive production-grade frontend interfaces with strong visual design.',
+    'webapp-testing':
+      'Test web applications in a real browser with automated interaction and debugging.',
+    'algorithmic-art':
+      'Create generative algorithmic art with particles, flow fields, and creative code.',
+    'mcp-builder':
+      'Build and improve MCP servers with reliable tools, resources, and integration behavior.',
+    'skill-creator':
+      'Create, evaluate, and improve persistent agent skills with clear trigger behavior.',
+    playwright:
+      'Automate browser interactions for web testing, debugging, screenshots, and user flows.',
+    'vercel-deploy': 'Deploy web projects to Vercel and verify preview or production deployments.',
+    'figma-use': 'Read and write Figma designs programmatically through editable design data.',
+    'figma-implement-design': 'Implement production code from an existing Figma design.',
+    'figma-generate-design': 'Create or update Figma screens and editable design layouts.',
+    'security-threat-model':
+      'Threat model application security risks, assets, trust boundaries, and attack paths.',
+    pdf: 'Create, read, edit, analyze, and verify PDF documents and rendered pages.',
+    'graph-engineering':
+      'Design graph orchestration, dependencies, parallel execution, and graph workflows.',
+  };
   for (const id of ids) {
     const body = join(repository, skillRoot, id, 'SKILL.md');
     mkdirSync(dirname(body), { recursive: true });
     writeFileSync(
       body,
-      `---\ndescription: Fixture body for ${id}\n---\n\n# Exact ${id} fixture body\n`,
+      `---\ndescription: ${descriptions[id] ?? `Fixture body for ${id}`}\n---\n\n# Exact ${id} fixture body\n`,
     );
   }
   for (const args of [
@@ -851,6 +874,57 @@ describe('installed host skill commands', () => {
       reason: expect.stringContaining('lower precedence than selected candidates'),
     });
     expect(animateMatch!.score).toBeGreaterThan(competingInternal!.score);
+
+    const naturalExternalCases = [
+      [
+        'frontend-design',
+        'Create a distinctive production-grade frontend interface with strong visual design.',
+      ],
+      [
+        'webapp-testing',
+        'Test this web application in a real browser and debug the broken user flow.',
+      ],
+      [
+        'algorithmic-art',
+        'Prototype a creative generative art experience with particles and flow fields for this UI.',
+      ],
+      [
+        'mcp-builder',
+        'Build an MCP server with reliable tools, resources, and integration behavior.',
+      ],
+      [
+        'skill-creator',
+        'Create a persistent agent skill and evaluate whether its trigger behavior is reliable.',
+      ],
+      [
+        'playwright',
+        'Automate this browser user flow for web testing, screenshots, and debugging.',
+      ],
+      ['vercel-deploy', 'Deploy this web project to Vercel and verify the preview deployment.'],
+      [
+        'figma-use',
+        'Read and update this Figma design programmatically while keeping it editable.',
+      ],
+      ['figma-implement-design', 'Implement production code from this existing Figma design.'],
+      ['figma-generate-design', 'Create an editable Figma screen and update the design layout.'],
+      [
+        'security-threat-model',
+        'Threat model this application by mapping assets, trust boundaries, and attack paths.',
+      ],
+      ['pdf', 'Read and analyze this PDF document and verify its rendered pages.'],
+      ['graph-engineering', 'Design a graph workflow with dependencies and parallel execution.'],
+    ] as const;
+    for (const [skillId, task] of naturalExternalCases) {
+      expect(managed, `full profile did not install ${skillId}`).toContain(skillId);
+      const result = cli(['skill', 'resolve', '--task', task, '--json']);
+      expect(result.status, result.stderr).toBe(0);
+      const parsed = JSON.parse(result.stdout) as { skills: Array<{ id: string }> };
+      expect(
+        parsed.skills.map((skill) => skill.id),
+        task,
+      ).toContain(skillId);
+    }
+
     const unknown = cli([
       'skill',
       'resolve',

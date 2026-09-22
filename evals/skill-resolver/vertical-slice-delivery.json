@@ -1,6 +1,10 @@
 {
   "skill": "vertical-slice-delivery",
-  "should_trigger": ["Use vertical-slice-delivery for this task."],
+  "should_trigger": [
+    "Use vertical-slice-delivery for this task.",
+    "Ship the smallest end-to-end user outcome with a visible result and evidence that it works.",
+    "Turn this feature into one thin vertical slice that crosses UI, logic, and persistence without building unused layers."
+  ],
   "should_not_trigger": [
     "This unrelated request must not activate vertical slice delivery workflow."
   ]

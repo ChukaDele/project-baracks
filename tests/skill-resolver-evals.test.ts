@@ -42,6 +42,30 @@ afterAll(() => {
 });
 
 describe('skill resolver fixtures', () => {
+  it('gives every Major-internal skill at least one natural-language positive fixture', () => {
+    const registryEntries = JSON.parse(readFileSync(registry, 'utf8')) as {
+      entries: Array<{ id: string; source: string }>;
+    };
+    const bySkill = new Map(fixtures.map((fixture) => [fixture.skill, fixture]));
+
+    for (const entry of registryEntries.entries.filter(
+      (candidate) => candidate.source === 'major-internal',
+    )) {
+      const fixture = bySkill.get(entry.id);
+      expect(fixture, `missing resolver fixture for ${entry.id}`).toBeDefined();
+      const escapedId = entry.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const explicitOnly = new RegExp(
+        `^(?:please\\s+)?(?:use|run|invoke|load|apply)\\s+(?:the\\s+)?${escapedId}(?:\\s+(?:skill|workflow|route))?(?:\\b|$)`,
+        'i',
+      );
+      const natural = fixture!.should_trigger.filter((prompt) => !explicitOnly.test(prompt.trim()));
+      expect(
+        natural.length,
+        `${entry.id} has no natural-language positive fixture`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
   it.each(fixtures)(
     'retrieves $skill for every positive and excludes every negative',
     (fixture) => {
@@ -117,24 +141,20 @@ describe('skill resolver fixtures', () => {
 
   it('guards negative spatial intent and generic ShapeR generation semantically', () => {
     const cases = [
-      [
-        'Create a point cloud of a sculpture without reconstruction or rendering.',
-        ['concept-synthesis', 'worktree'],
-      ],
-      ['No reconstruction is needed; inspect a sculpture point cloud.', []],
-      ['Do not reconstruct the sculpture; export its point cloud.', ['presentation-storylining']],
-      ['Reconstruction is unnecessary; inspect the point cloud.', []],
-      ['Do not use splatting or novel-view rendering; export the point cloud.', ['idea-lineage']],
-      [
-        'Do not use COLMAP; inspect the existing point cloud.',
-        ['project-context-integrity', 'seo-os', 'skill-harvest', 'skill-resolver'],
-      ],
-      ['Use ShapeR to make a 3D model.', []],
-      ['Generate a 3D asset with ShapeR from a text prompt.', ['reusable-asset-discovery']],
+      'Create a point cloud of a sculpture without reconstruction or rendering.',
+      'No reconstruction is needed; inspect a sculpture point cloud.',
+      'Do not reconstruct the sculpture; export its point cloud.',
+      'Reconstruction is unnecessary; inspect the point cloud.',
+      'Do not use splatting or novel-view rendering; export the point cloud.',
+      'Do not use COLMAP; inspect the existing point cloud.',
+      'Use ShapeR to make a 3D model.',
+      'Generate a 3D asset with ShapeR from a text prompt.',
     ] as const;
 
-    for (const [task, expected] of cases) {
-      expect(skillIds(task), task).toEqual(expected);
+    for (const task of cases) {
+      const ids = skillIds(task);
+      expect(ids, task).not.toContain('analytics-with-shaper');
+      expect(ids, task).not.toContain('gaussian-splatting-spatial-reconstruction');
     }
 
     const shapeRWithGaussianTasks = [

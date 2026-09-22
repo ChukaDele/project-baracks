@@ -1,5 +1,9 @@
 {
   "skill": "cost-control",
-  "should_trigger": ["Use cost-control for this task."],
+  "should_trigger": [
+    "Use cost-control for this task.",
+    "Audit our model, browser, API, and infrastructure usage so we keep throughput high without wasting spend.",
+    "We are burning too much provider quota and GitHub Actions budget. Find the highest-leverage cost controls."
+  ],
   "should_not_trigger": ["This unrelated request must not activate cost control workflow."]
 }

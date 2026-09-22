@@ -1,5 +1,9 @@
 {
   "skill": "rapid-ui-prototype",
-  "should_trigger": ["Use rapid-ui-prototype for this task."],
+  "should_trigger": [
+    "Use rapid-ui-prototype for this task.",
+    "Before we commit to this interaction, prototype three credible UI approaches and compare the tradeoffs.",
+    "Show a small number of realistic interaction variants so we can choose the pattern before full implementation."
+  ],
   "should_not_trigger": ["This unrelated request must not activate rapid ui prototype workflow."]
 }

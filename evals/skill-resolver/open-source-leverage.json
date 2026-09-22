@@ -1,5 +1,9 @@
 {
   "skill": "open-source-leverage",
-  "should_trigger": ["Use open-source-leverage for this task."],
+  "should_trigger": [
+    "Use open-source-leverage for this task.",
+    "Before building this from scratch, find maintained open-source tools we can adopt or wrap safely.",
+    "Search for proven open-source implementations that can save us build time without creating dangerous lock-in."
+  ],
   "should_not_trigger": ["This unrelated request must not activate open source leverage workflow."]
 }

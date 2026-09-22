@@ -1,6 +1,10 @@
 {
   "skill": "source-adapter-engineering",
-  "should_trigger": ["Use source-adapter-engineering for this task."],
+  "should_trigger": [
+    "Use source-adapter-engineering for this task.",
+    "Build a replaceable adapter for this external API with retries, deduplication, health checks, and structured-source preference.",
+    "We need data from multiple external feeds. Design modular source adapters so one provider can be swapped without rewriting the system."
+  ],
   "should_not_trigger": [
     "This unrelated request must not activate source adapter engineering workflow."
   ]

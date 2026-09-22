@@ -1,6 +1,10 @@
 {
   "skill": "mvp-speed-prioritisation",
-  "should_trigger": ["Use mvp-speed-prioritisation for this task."],
+  "should_trigger": [
+    "Use mvp-speed-prioritisation for this task.",
+    "Cut this broad requirement down to the fastest credible MVP that proves the core user outcome.",
+    "We have too much scope. Identify the minimum end-to-end slice that gets us to a working product fastest."
+  ],
   "should_not_trigger": [
     "This unrelated request must not activate mvp speed prioritisation workflow."
   ]

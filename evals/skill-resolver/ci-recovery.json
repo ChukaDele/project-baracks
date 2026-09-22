@@ -1,5 +1,9 @@
 {
   "skill": "ci-recovery",
-  "should_trigger": ["Use ci-recovery for this task."],
+  "should_trigger": [
+    "Use ci-recovery for this task.",
+    "GitHub Actions is red on this pull request. Inspect the exact failing check, fix the root cause, and rerun only what matters.",
+    "The PR check failed in CI after the last change. Recover the pipeline without rerunning unrelated jobs."
+  ],
   "should_not_trigger": ["This unrelated request must not activate ci recovery workflow."]
 }

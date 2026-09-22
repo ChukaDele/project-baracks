@@ -1,6 +1,10 @@
 {
   "skill": "human-blocker-orchestration",
-  "should_trigger": ["Use human-blocker-orchestration for this task."],
+  "should_trigger": [
+    "Use human-blocker-orchestration for this task.",
+    "OAuth consent and 2FA need me. Surface that blocker clearly, let me complete it, and keep progressing on independent work.",
+    "A CAPTCHA is blocking this flow. Hand that step to me visibly without stalling the rest of the task."
+  ],
   "should_not_trigger": [
     "This unrelated request must not activate human blocker orchestration workflow."
   ]

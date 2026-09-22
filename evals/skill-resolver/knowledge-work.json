@@ -1,5 +1,9 @@
 {
   "skill": "knowledge-work",
-  "should_trigger": ["Use knowledge-work for this task."],
+  "should_trigger": [
+    "Use knowledge-work for this task.",
+    "Research this market deeply, compare the evidence, and produce a decision memo with the strongest conclusion we can support.",
+    "Synthesize primary sources and competitor evidence into a recommendation for the next product decision."
+  ],
   "should_not_trigger": ["This unrelated request must not activate knowledge work workflow."]
 }
