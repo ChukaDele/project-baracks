@@ -48,7 +48,7 @@ import {
   recordModelOutcome,
 } from '../providers/discovery-store.js';
 import type { ProviderInfo } from '../providers/types.js';
-import { route } from '../routing/router.js';
+import { route, type RoutingRequest } from '../routing/router.js';
 import {
   compareSubscriptionAccounts,
   contextContinuity,
@@ -56,6 +56,21 @@ import {
   subscriptionAccountPool,
 } from '../routing/subscription-accounts.js';
 import { discloseSkills, resolveSkills } from '../skills/resolver.js';
+import {
+  decisionKernelEnabled,
+  semanticEgressAllowed,
+  type DecisionAdapter,
+} from '../intelligence/decision-kernel.js';
+import { filterOptionalContext, type ContextItem } from '../intelligence/context-filter.js';
+import { smartSkillRoute } from '../intelligence/skill-router.js';
+import { classifyRoutingRequest } from '../intelligence/semantic-routing.js';
+import { suggestAllowedFunction, type AllowedFunction } from '../intelligence/tool-dispatcher.js';
+import {
+  composeRepairPolicy,
+  judgeRepairAction,
+  materiallySameFailure,
+} from '../intelligence/repair-gate.js';
+import { browserWorkImplicated } from '../web/semantic-decisions.js';
 import { observeSuccessfulWorkflow, recordSkillOutcome } from '../skills/lifecycle.js';
 import { formatReusableAssetDiscovery, observeReusableAssetCandidate } from '../skills/assets.js';
 import {
@@ -335,9 +350,10 @@ export function modelOutcomeForWorker(
   return undefined;
 }
 
-export function selectCoordinator(
+function selectCoordinatorForRequest(
   goal: SupervisorGoal,
   providers: ProviderInfo[],
+  request: RoutingRequest,
 ): CoordinatorSelection {
   const preferred = HOST_PROVIDERS[goal.preferredCoordinator];
   const stickyKey = lastCapacityKey({
@@ -354,7 +370,7 @@ export function selectCoordinator(
   const ordered = [...pooled.providers].sort((left, right) =>
     compareSubscriptionAccounts(left, right, preferred),
   );
-  let decision = route({ purpose: 'analysis', complexity: 'architectural' }, ordered);
+  let decision = route(request, ordered);
   // Work-failure rotation may exclude the last key while another provider
   // remains. Quota rotation must not fall back to the full list: that is the
   // Codex failover bug (hopping to Claude and dropping vendor session/history).
@@ -363,7 +379,7 @@ export function selectCoordinator(
     pooled.reason?.startsWith('work-failure rotation') &&
     pooled.providers.length !== providers.length
   ) {
-    decision = route({ purpose: 'analysis', complexity: 'architectural' }, providers);
+    decision = route(request, providers);
   }
   if (decision.kind === 'checkpoint') return decision;
   const parsed = parseCapacityKey(decision.provider);
@@ -377,6 +393,50 @@ export function selectCoordinator(
     modelRef: decision.modelRef,
     reason: pooled.reason ? `${pooled.reason}; ${decision.reason}` : decision.reason,
   };
+}
+
+export function selectCoordinator(
+  goal: SupervisorGoal,
+  providers: ProviderInfo[],
+): CoordinatorSelection {
+  return selectCoordinatorForRequest(goal, providers, {
+    purpose: 'analysis',
+    complexity: 'architectural',
+  });
+}
+
+function implementedByProvider(goal: SupervisorGoal): string | undefined {
+  const reviewedHost = goal.pendingCompletion?.reviewedRun?.provider;
+  const capacityKey = reviewedHost
+    ? HOST_PROVIDERS[reviewedHost]
+    : (goal.lastRoutingDecision?.provider ??
+      (goal.lastCoordinator ? HOST_PROVIDERS[goal.lastCoordinator] : undefined));
+  return capacityKey ? parseCapacityKey(capacityKey).providerName : undefined;
+}
+
+export async function selectCoordinatorSmart(
+  goal: SupervisorGoal,
+  providers: ProviderInfo[],
+  adapter?: DecisionAdapter,
+): Promise<CoordinatorSelection> {
+  const policy = getProjectPolicy(goal.project, goal.repoPath);
+  if (!decisionKernelEnabled(adapter) || !semanticEgressAllowed(policy)) {
+    return selectCoordinator(goal, providers);
+  }
+  const classification = await classifyRoutingRequest(goal.goal, {
+    ...(adapter ? { adapter } : {}),
+  });
+  const request: RoutingRequest = {
+    purpose: classification.purpose,
+    complexity: classification.complexity,
+    riskLevel: classification.riskLevel,
+    ...(goal.consecutiveFailures > 0 ? { repairAttempts: goal.consecutiveFailures } : {}),
+  };
+  if (request.purpose === 'review') {
+    const provider = implementedByProvider(goal);
+    if (provider) request.implementedByProvider = provider;
+  }
+  return selectCoordinatorForRequest(goal, providers, request);
 }
 
 /** Resolve and persist the one provider/model/account decision used by every
@@ -405,6 +465,60 @@ export function routeGoalExecution(
       return true;
     });
     selection = selectCoordinator(goal, eligibleProviderInfos);
+    if (selection.kind === 'route') {
+      const routedSelection = selection;
+      const selectedModel = providerInfos
+        .find((provider) => provider.name === routedSelection.provider)
+        ?.models.find((model) => model.modelRef === routedSelection.modelRef);
+      if (
+        selectedModel?.retryEligible &&
+        !consumeModelRetry(providerState.db, {
+          providerName: routedSelection.provider,
+          modelRef: routedSelection.modelRef,
+        })
+      ) {
+        selection = {
+          kind: 'checkpoint',
+          reason: `retry for ${routedSelection.provider}/${routedSelection.modelRef} was already consumed`,
+        };
+      }
+    }
+  } finally {
+    providerState.sqlite.close();
+  }
+  if (selection.kind === 'route') {
+    updateGoal(goal.id, routingDecisionGoalPatch(selection));
+  }
+  return selection;
+}
+
+/** Smart execution routing mirrors the persisted deterministic authority but
+ * may supply a bounded semantic request classification. Independent-review
+ * dispatch intentionally continues to call routeGoalExecution above. */
+export async function routeGoalExecutionSmart(
+  goal: SupervisorGoal,
+  options: {
+    eligibleHosts?: readonly WorkerHost[];
+    excludedCapacityKeys?: readonly string[];
+    adapter?: DecisionAdapter;
+  } = {},
+): Promise<CoordinatorSelection> {
+  assertExecutionAllowed(getProjectPolicy(goal.project, goal.repoPath));
+  const providerState = openDb();
+  let selection: CoordinatorSelection;
+  try {
+    const providerInfos = loadPersistedProviderInfos(providerState.db);
+    const eligibleHosts = options.eligibleHosts ? new Set(options.eligibleHosts) : undefined;
+    const excludedCapacityKeys = new Set(options.excludedCapacityKeys ?? []);
+    const eligibleProviderInfos = providerInfos.filter((provider) => {
+      if (excludedCapacityKeys.has(provider.name)) return false;
+      if (eligibleHosts) {
+        const host = PROVIDER_HOSTS[parseCapacityKey(provider.name).providerName];
+        return host !== undefined && eligibleHosts.has(host);
+      }
+      return true;
+    });
+    selection = await selectCoordinatorSmart(goal, eligibleProviderInfos, options.adapter);
     if (selection.kind === 'route') {
       const routedSelection = selection;
       const selectedModel = providerInfos
@@ -623,9 +737,14 @@ export function coordinatorPrompt(
     continuityBlock: string;
     canonicalTask?: CanonicalTaskBinding;
   },
+  semanticOverride?: {
+    filteredLearningContext?: string;
+    semanticGuidance?: string;
+  },
 ): string {
   const context = readProjectContext(goal.repoPath);
-  const learningContext = readLearningContext(goal.project, goal.repoPath);
+  const learningContext =
+    semanticOverride?.filteredLearningContext ?? readLearningContext(goal.project, goal.repoPath);
   let skillDisclosure: ReturnType<typeof discloseSkills> | undefined;
   let skillResolutionFailed = false;
   try {
@@ -782,12 +901,119 @@ ${learningContext}
 RESOLVED MAJOR SKILLS:
 ${skillContext}
 
+${semanticOverride?.semanticGuidance ? `SEMANTIC SKILL ROUTING GUIDANCE (advisory only):\n${semanticOverride.semanticGuidance}\n` : ''}
+
 ${assetContext}
 
 CURRENT PROJECT CONTEXT:
 ${context || '(No canonical project context files found. Inspect the repository directly.)'}
 ${hop ? `\n${hop.continuityBlock}\nActive subscription account: ${hop.accountLabel}\n` : ''}
 `;
+}
+
+function capabilityIsValidated(capability: CapabilityRecord): boolean {
+  return (
+    ['validated', 'preferred'].includes(capability.status) &&
+    ['independently_validated', 'capability_verified'].includes(capability.validationState)
+  );
+}
+
+function deterministicSkillIds(goal: SupervisorGoal): string[] {
+  try {
+    return resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills.map((skill) => skill.id);
+  } catch {
+    return [];
+  }
+}
+
+export async function prepareCoordinatorPromptSmart(
+  goal: SupervisorGoal,
+  capabilities: readonly CapabilityRecord[],
+  hop: {
+    accountLabel: string;
+    continuityBlock: string;
+    canonicalTask?: CanonicalTaskBinding;
+  },
+  adapter?: DecisionAdapter,
+): Promise<{ prompt: string; routedSkillIds: string[] }> {
+  const policy = getProjectPolicy(goal.project, goal.repoPath);
+  const fallbackIds = deterministicSkillIds(goal);
+  if (!decisionKernelEnabled(adapter) || !semanticEgressAllowed(policy)) {
+    return {
+      prompt: coordinatorPrompt(goal, capabilities, hop),
+      routedSkillIds: fallbackIds,
+    };
+  }
+
+  try {
+    const learningContext = readLearningContext(goal.project, goal.repoPath);
+    const learningItems: ContextItem[] = learningContext
+      .split('\n')
+      .map((text, index) => ({
+        id: `learning-${index}`,
+        text,
+        authority: 'optional' as const,
+        source: 'learning' as const,
+      }))
+      .filter((item) => item.text.trim().length > 0);
+    const validatedCapabilities = capabilities.filter(capabilityIsValidated);
+    const allowedFunctions: AllowedFunction<string>[] = validatedCapabilities.map((capability) => ({
+      name: capability.key,
+      description: `${capability.description} Operations: ${capability.operations.join(', ')}.`,
+      validated: true,
+      risk: capability.riskLevel,
+    }));
+    const [skillRoute, filteredContext, toolSuggestion] = await Promise.all([
+      smartSkillRoute(
+        { task: goal.goal, cwd: goal.repoPath },
+        { ...(adapter ? { adapter } : {}), telemetry: false },
+      ),
+      filterOptionalContext(
+        { query: goal.goal, items: learningItems },
+        { ...(adapter ? { adapter } : {}), telemetry: false },
+      ),
+      suggestAllowedFunction(
+        { task: goal.goal, functions: allowedFunctions },
+        { ...(adapter ? { adapter } : {}), telemetry: false },
+      ),
+    ]);
+    const filteredLearningContext = filteredContext.items
+      .filter((item) => item.source === 'learning')
+      .map((item) => item.text)
+      .join('\n');
+    const guidance: string[] = [];
+    guidance.push(
+      `Selected semantic skill IDs: ${skillRoute.ids.length > 0 ? skillRoute.ids.join(', ') : '(none)'}. Deterministic explicit, canonical, and writing routes remain authoritative.`,
+    );
+    if (skillRoute.guidance) guidance.push(skillRoute.guidance);
+    if (toolSuggestion) {
+      guidance.push(
+        `Validated capability suggestion: ${toolSuggestion.functionName} ${JSON.stringify(toolSuggestion.arguments)}. This is advisory and non-executing; actionable=${toolSuggestion.actionable}, requiresConfirmation=${toolSuggestion.requiresConfirmation}.`,
+      );
+    }
+    if (
+      browserWorkImplicated(goal.goal) &&
+      validatedCapabilities.some((capability) => capability.key === 'jev-browser-use')
+    ) {
+      guidance.push(
+        'Browser work is implicated and the validated jev-browser-use capability is available. Use only bounded allowlisted browser suggestions; existing preview, write-policy, and confirmation gates remain authoritative.',
+      );
+    }
+    const semanticGuidance = guidance.join('\n\n').slice(0, 24_000);
+    return {
+      prompt: coordinatorPrompt(goal, capabilities, hop, {
+        filteredLearningContext:
+          filteredLearningContext || '(No optional Major learning context survived filtering.)',
+        semanticGuidance,
+      }),
+      routedSkillIds: skillRoute.ids,
+    };
+  } catch {
+    return {
+      prompt: coordinatorPrompt(goal, capabilities, hop),
+      routedSkillIds: fallbackIds,
+    };
+  }
 }
 
 /** Acquire the single integration-owner slot for a repository. This prevents
@@ -1479,7 +1705,7 @@ async function runLockedGoalCycle(
 ): Promise<void> {
   const cycleStartedAtMs = Date.now();
   const policy = getProjectPolicy(goal.project, goal.repoPath);
-  const selection = routeGoalExecution(goal);
+  const selection = await routeGoalExecutionSmart(goal);
   if (selection.kind === 'checkpoint') {
     // No eligible capacity remains anywhere in the pool: a genuine stop, not
     // a hop the foreground continuation loop should chase further.
@@ -1542,14 +1768,6 @@ async function runLockedGoalCycle(
     return;
   }
   let routedSkillIds: string[] = [];
-  try {
-    routedSkillIds = resolveSkills({ task: goal.goal, cwd: goal.repoPath }).skills.map(
-      (skill) => skill.id,
-    );
-  } catch {
-    // The prompt already reports a degraded resolver. Outcome recording must
-    // not turn resolver unavailability into a second execution failure.
-  }
   const continuity = contextContinuity({
     nextHost: host,
     nextAccountLabel: routedSelection.accountLabel,
@@ -1712,15 +1930,21 @@ async function runLockedGoalCycle(
     });
     return;
   }
+  const promptPreparation = await prepareCoordinatorPromptSmart(
+    goal,
+    capabilityResolution.capabilities,
+    {
+      accountLabel: routedSelection.accountLabel,
+      continuityBlock: continuity.promptBlock,
+      ...(canonicalTask ? { canonicalTask } : {}),
+    },
+  );
+  routedSkillIds = promptPreparation.routedSkillIds;
   const outcome = await runWorker({
     host,
     taskId: goal.id,
     resourceId: `worker:${goal.project}`,
-    prompt: coordinatorPrompt(goal, capabilityResolution.capabilities, {
-      accountLabel: routedSelection.accountLabel,
-      continuityBlock: continuity.promptBlock,
-      ...(canonicalTask ? { canonicalTask } : {}),
-    }),
+    prompt: promptPreparation.prompt,
     cwd: goal.repoPath,
     // Clamped to whatever foreground continuation budget remains, so a
     // rotation across several exhausted providers cannot stack multiple
@@ -2096,7 +2320,7 @@ async function runLockedGoalCycle(
     });
     recordTerminalObservation();
   } else {
-    const patch = nonSuccessCyclePatch({
+    const patch = await smartNonSuccessCyclePatch({
       modelOutcome,
       stderr: outcome.stderr,
       stdout: outcome.stdout,
@@ -2104,6 +2328,9 @@ async function runLockedGoalCycle(
       modelRef: routedSelection.modelRef,
       host,
       consecutiveFailures: after.consecutiveFailures,
+      task: goal.goal,
+      ...(after.lastSummary ? { previousSummary: after.lastSummary } : {}),
+      semanticAllowed: semanticEgressAllowed(policy),
     });
     updateGoal(goal.id, {
       status: patch.status,
@@ -2220,6 +2447,67 @@ export function nonSuccessCyclePatch(input: {
     nextRunDelayMs: Math.min(60_000, failures * 10_000),
     retryImmediately: false,
   };
+}
+
+export async function smartNonSuccessCyclePatch(
+  input: Parameters<typeof nonSuccessCyclePatch>[0] & {
+    task: string;
+    previousSummary?: string;
+    semanticAllowed: boolean;
+    adapter?: DecisionAdapter;
+  },
+): Promise<ReturnType<typeof nonSuccessCyclePatch>> {
+  const deterministic = nonSuccessCyclePatch(input);
+  if (input.modelOutcome !== undefined && input.modelOutcome !== 'available') {
+    return deterministic;
+  }
+  const failureSummary = trim(input.stderr || input.stdout || `Coordinator ${input.host} failed.`);
+  const failureCount = input.consecutiveFailures + 1;
+  const materiallyUnchangedFailures = materiallySameFailure(failureSummary, input.previousSummary)
+    ? Math.max(2, failureCount)
+    : 0;
+  const judged =
+    input.semanticAllowed && decisionKernelEnabled(input.adapter)
+      ? await judgeRepairAction(
+          {
+            task: input.task,
+            failureSummary,
+            failureCount,
+            materiallyUnchangedFailures,
+          },
+          { ...(input.adapter ? { adapter: input.adapter } : {}), telemetry: false },
+        )
+      : {
+          decision: composeRepairPolicy({
+            failureCount,
+            materiallyUnchangedFailures,
+            workerSucceeded: false,
+            independentReviewSatisfied: false,
+          }),
+          usedSemanticJudgment: false,
+        };
+  if (judged.decision.action === 'change_strategy') {
+    return {
+      status: 'active',
+      consecutiveFailures: Math.max(2, deterministic.consecutiveFailures),
+      lastSummary: trim(
+        `${failureSummary}\nRepair posture: change strategy. ${judged.decision.reason}`,
+      ),
+      nextRunDelayMs: 0,
+      retryImmediately: true,
+    };
+  }
+  if (judged.decision.action === 'stop' || judged.decision.action === 'escalate') {
+    return {
+      ...deterministic,
+      status: 'failed',
+      lastSummary: trim(
+        `${failureSummary}\nRepair posture: ${judged.decision.action}. ${judged.decision.reason}`,
+      ),
+      retryImmediately: false,
+    };
+  }
+  return deterministic;
 }
 
 function pidAlive(pid: number): boolean {

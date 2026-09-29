@@ -1,4 +1,5 @@
 import type { BillingMode, RoutingClass, RunPurpose, TaskComplexity } from '../db/schema.js';
+import { parseCapacityKey } from '../providers/account.js';
 import type { ModelState, ProviderInfo } from '../providers/types.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
 
@@ -133,7 +134,10 @@ export function route(
 
   let pool = candidates;
   if (isReview && request.implementedByProvider) {
-    const independent = candidates.filter((c) => c.provider !== request.implementedByProvider);
+    const implementedByProvider = parseCapacityKey(request.implementedByProvider).providerName;
+    const independent = candidates.filter(
+      (candidate) => parseCapacityKey(candidate.provider).providerName !== implementedByProvider,
+    );
     const { free } = pickFromLadder(ladder, independent, request, options);
     if (free) {
       pool = independent;
