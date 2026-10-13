@@ -30,8 +30,8 @@
       ]
     },
     {
-      "id": "lenis-scroll-orchestration-reference",
-      "kind": "reference",
+      "id": "lenis-scroll-orchestration",
+      "kind": "lenis-pattern",
       "title": "Lenis scroll orchestration",
       "summary": "Lenis/GSAP/ScrollTrigger wheel synchronisation, interpolation, ticker ownership.",
       "locator": "skills/internal/responsive-motion-systems/SKILL.md",
