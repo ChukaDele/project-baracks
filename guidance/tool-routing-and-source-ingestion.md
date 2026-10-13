@@ -110,9 +110,9 @@ Use native vision for understanding. Use image-generation/editing tools for actu
 
 The maintained knowledge hierarchy is:
 
-1. **Project truth and GBrain:** Inspect relevant project files and \`LEARNINGS.md\`; use scoped GBrain decisions, patterns and outcomes when a real GBrain read capability is available. A current project decision outranks an older global note. Never import confidential data from another client.
+1. **Project truth and GBrain:** Inspect relevant project files and `LEARNINGS.md`; use scoped GBrain decisions, patterns and outcomes when a real GBrain read capability is available. A current project decision outranks an older global note. Never import confidential data from another client.
 2. **Maintained Notion synthesis:** Search the connected **Chuka Knowledge Library**, navigate the relevant Knowledge Bank and fetch 1–3 maintained Knowledge Pieces. Check the source trail, last review date, thesis, exceptions and contradictions. This synthesis outranks an unreviewed saved post.
-3. **ContextBolt original saves:** When examples, source links or conflicting evidence matter, use the installed \`search_bookmarks\` connector, optionally expanding a relevant topic cluster. Do not bulk-export thousands of saves. A bookmark is a lead, not automatically a true fact.
+3. **ContextBolt original saves:** When examples, source links or conflicting evidence matter, use the installed `search_bookmarks` connector, optionally expanding a relevant topic cluster. Do not bulk-export thousands of saves. A bookmark is a lead, not automatically a true fact.
 4. **Eagle visual references:** For visual tasks, use the corresponding Design Knowledge Piece and Eagle reference set when authorized and available. Do not assume inspiration assets are licensed for reuse.
 5. **Raw local corpus:** Only if maintained pieces and source connectors are insufficient, inspect bounded, relevant portions of the user-owned local archive with appropriate permissions. Never ingest the entire corpus into a prompt, check it into Git, or send unrelated project/PII information to another client or provider.
 
