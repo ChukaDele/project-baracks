@@ -11,29 +11,29 @@ afterEach(() => {
 });
 
 describe('reusable asset lifecycle', () => {
-  it('retrieves Lenis metadata only when scroll orchestration is relevant', () => {
+  it('retrieves Lenis only for relevant scroll orchestration', () => {
     const previous = process.env.MAJOR_GBRAIN_ASSET_INDEX;
-    process.env.MAJOR_GBRAIN_ASSET_INDEX = join(process.cwd(), 'guidance', 'gbrain-reusable-assets.index.json');
+    const indexPath = join(process.cwd(), 'guidance', 'gbrain-reusable-assets.index.json');
+    process.env.MAJOR_GBRAIN_ASSET_INDEX = indexPath;
     try {
       const relevant = retrieveReusableAssets({
-        task: 'Integrate Lenis with GSAP ScrollTrigger for an animated site',
+        task: 'Integrate Lenis with GSAP ScrollTrigger',
         cwd: process.cwd(),
       });
-      expect(relevant.assets).toContainEqual(expect.objectContaining({
-        id: 'lenis-scroll-orchestration',
-        source: 'gbrain-org-index',
-      }));
+      const match = relevant.assets.find((asset) => asset.id === 'lenis-scroll-orchestration');
+      expect(match?.source).toBe('gbrain-org-index');
 
       const unrelated = retrieveReusableAssets({
-        task: 'Audit website accessibility and SEO for a static business homepage',
+        task: 'Audit static business homepage SEO',
         cwd: process.cwd(),
       });
-      const unrelatedWriting = retrieveReusableAssets({
+      expect(unrelated.assets.map((asset) => asset.id)).not.toContain('lenis-scroll-orchestration');
+
+      const writing = retrieveReusableAssets({
         task: 'Make this reference letter sound smooth and polished',
         cwd: process.cwd(),
       });
-      expect(unrelated.assets.some((asset) => asset.id === 'lenis-scroll-orchestration')).toBe(false);
-      expect(unrelatedWriting.assets.some((asset) => asset.id === 'lenis-scroll-orchestration')).toBe(false);
+      expect(writing.assets.map((asset) => asset.id)).not.toContain('lenis-scroll-orchestration');
     } finally {
       if (previous === undefined) delete process.env.MAJOR_GBRAIN_ASSET_INDEX;
       else process.env.MAJOR_GBRAIN_ASSET_INDEX = previous;
