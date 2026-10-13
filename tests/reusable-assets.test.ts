@@ -11,6 +11,30 @@ afterEach(() => {
 });
 
 describe('reusable asset lifecycle', () => {
+  it('retrieves Lenis metadata only when scroll orchestration is relevant', () => {
+    const previous = process.env.MAJOR_GBRAIN_ASSET_INDEX;
+    process.env.MAJOR_GBRAIN_ASSET_INDEX = join(process.cwd(), 'guidance', 'gbrain-reusable-assets.index.json');
+    try {
+      const relevant = retrieveReusableAssets({
+        task: 'Integrate Lenis with GSAP ScrollTrigger for an animated site',
+        cwd: process.cwd(),
+      });
+      expect(relevant.assets).toContainEqual(expect.objectContaining({
+        id: 'lenis-scroll-orchestration-reference',
+        source: 'gbrain-org-index',
+      }));
+
+      const unrelated = retrieveReusableAssets({
+        task: 'Audit website accessibility and SEO without scroll animations',
+        cwd: process.cwd(),
+      });
+      expect(unrelated.assets.some((asset) => asset.id === 'lenis-scroll-orchestration-reference')).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.MAJOR_GBRAIN_ASSET_INDEX;
+      else process.env.MAJOR_GBRAIN_ASSET_INDEX = previous;
+    }
+  });
+
   it('records a successful implementation only as a project-local reuse candidate', () => {
     const project = mkdtempSync(join(tmpdir(), 'major-asset-candidate-'));
     roots.push(project);
