@@ -23,7 +23,7 @@ These are canonical Major-owned skills.
 | `design-direction-and-taste` | Canonical art-direction layer: design read, surface mode, preserve-vs-redesign, variance/motion/density, anti-default discipline and bounded critique. |
 | `remote-first-web-development` | Require GitHub plus a Cloudflare preview for browser work and block local browser targets. |
 | `website-design-qa` | Canonical website/landing-page visual, responsive, browser, launch, SEO, accessibility and production QA doctrine. |
-| `responsive-motion-systems` | Responsive GSAP/ScrollTrigger/sticky/pinned/Three.js geometry, lifecycle, handoff and zoom-robustness doctrine. |
+| `responsive-motion-systems` | Responsive GSAP/ScrollTrigger/sticky/pinned/Three.js geometry, optional Lenis scroll orchestration, lifecycle, handoff and zoom-robustness doctrine. |
 | `human-blocker-orchestration` | Surface auth/OAuth/2FA/CAPTCHA/payment/irreversible human-only actions and keep independent work moving. |
 | `dev-server-management` | Coordinate an explicitly approved local exception only. |
 | `mcp-integration-ops` | Diagnose and prove MCP/connector/plugin integrations across installed→configured→exposed→authenticated→permissioned→operational→integrated states. |
@@ -193,7 +193,7 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 - Explicit correction / repeated mistake / "we fixed this before" → `learning-capture` after the real task is fixed.
 - Substantial UI/website creation, redesign, new visual identity, "generic AI", "too safe", "too loud" → `design-direction-and-taste`.
 - Web UI implementation/browser/launch QA → `remote-first-web-development` + `website-design-qa`.
-- GSAP/ScrollTrigger/sticky/pinned/Three.js/viewport motion → add `responsive-motion-systems`.
+- GSAP/ScrollTrigger/sticky/pinned/Three.js/Lenis/scroll orchestration → add `responsive-motion-systems`; Lenis remains conditional, never an automatic global runtime install.
 - Explicit owner-approved local exception → `dev-server-management`.
 - MCP/connector/plugin setup/reconnect/tool exposure/auth/permission failure → `mcp-integration-ops`.
 - Taleshape Shaper dashboards or privacy-safe SQL analytics over Major telemetry → `analytics-with-shaper`.
