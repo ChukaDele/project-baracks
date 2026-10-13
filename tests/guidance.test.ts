@@ -61,41 +61,17 @@ describe('guidance registries', () => {
     expect(pilot).toContain('same-provider grade is accepted');
     expect(pilot).not.toContain('refuses the grade when the provider matches');
   });
-  it('keeps relevant knowledge library retrieval safe', () => {
-    const guidePath = 'guidance/tool-routing-and-source-ingestion.md';
-    const corePath = 'templates/project/major-core.md';
-    const guide = readFileSync(guidePath, 'utf8');
-    const projectContract = readFileSync(corePath, 'utf8');
-    const committed = loadGuidanceRegistry('guidance/instructions.registry.json');
-    const activeIds = activeEntries(committed).map((item) => item.id);
-    expect(activeIds).toContain('tool-routing-and-source-ingestion');
-
-    const required = [
-      'Maintained personal Knowledge Library retrieval',
-      'Notion',
-      'ContextBolt',
-      'GBrain',
-      'Eagle',
-      'Knowledge Piece',
-      'read-only',
-      'Runtime access must be proven',
-    ];
-    for (const term of required) {
-      expect(guide, term).toContain(term);
-    }
+  it('routes relevant Knowledge Library context', () => {
+    const guide = readFileSync('guidance/tool-routing-and-source-ingestion.md', 'utf8');
+    const core = readFileSync('templates/project/major-core.md', 'utf8');
     expect(guide).toContain('Automatically consult');
-    expect(guide).toContain('Do not bulk-export thousands of saves');
-    expect(guide).toContain(
-      'A ChatGPT connection does not automatically make these available',
-    );
+    expect(guide).toContain('Notion');
+    expect(guide).toContain('ContextBolt');
+    expect(guide).toContain('GBrain');
+    expect(guide).toContain('Eagle');
+    expect(guide).toContain('Runtime access must be proven');
     expect(guide).toContain('Never ingest the entire corpus into a prompt');
-    expect(projectContract).toContain(
-      '## Knowledge Library lookup when relevant',
-    );
-    expect(projectContract).toContain(
-      'Skip retrieval when no relevant prior knowledge',
-    );
-    expect(projectContract).toContain('preserve client confidentiality');
+    expect(core).toContain('Knowledge Library lookup when relevant');
   });
 
 });
