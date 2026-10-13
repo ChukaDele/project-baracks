@@ -25,7 +25,7 @@ describe('reusable asset lifecycle', () => {
       }));
 
       const unrelated = retrieveReusableAssets({
-        task: 'Audit website accessibility and SEO without scroll animations',
+        task: 'Audit website accessibility and SEO for a static business homepage',
         cwd: process.cwd(),
       });
       expect(unrelated.assets.some((asset) => asset.id === 'lenis-scroll-orchestration-reference')).toBe(false);
