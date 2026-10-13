@@ -103,3 +103,11 @@ This is a metadata validator. Independently inspect the actual browser traces, v
 - `project.target_revision`: must match current Git HEAD when run in a Git checkout. Target evidence and passing tests must carry the same revision; out-of-repo target revisions need independent verification.
 
 The gate also checks global record IDs for collisions, unique target artifact URIs, per-screen visual checks, and evidence freshness. These deterministic rules prevent common bookkeeping mistakes. They cannot verify that the evidence files or permission statements are truthful.
+
+## External evidence origin boundaries
+
+A release manifest declares a canonical `source_origin`. Every externally hosted source artifact must belong to that origin or appear under an explicitly recorded `approved_source_origins` value. Relative local evidence records remain supported for authorized repositories and exports.
+
+A public `remote_preview_url` identifies the rebuilt application. Externally hosted *target evidence* must originate there or from an expressly listed `approved_artifact_origins` location (for example, the team's evidence-storage hostname). The metadata gate normalizes percent-encoded paths, default HTTPS ports, Unicode hostnames, URI fragments and archive buckets before comparing references. Private, local and scheme-less network endpoints require an approved isolated local-testing exception.
+
+These controls help reject internally inconsistent evidence references. They cannot establish actual DNS resolution, human authorization, content integrity or browser functionality; those require separate verification.

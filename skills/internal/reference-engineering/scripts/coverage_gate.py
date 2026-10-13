@@ -14,8 +14,10 @@ import json
 import ipaddress
 import posixpath
 import re
+import socket
 import subprocess
-from urllib.parse import urlsplit
+import unicodedata
+from urllib.parse import unquote, urlsplit
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -86,20 +88,36 @@ def normalized_date(s: str):
         return None
 
 
+def _canonical_hostname(raw: str) -> str:
+    """Normalize Unicode dot variants and IDN hostnames without doing DNS."""
+    host = unicodedata.normalize("NFKC", unquote(raw)).translate(
+        str.maketrans({"。": ".", "．": ".", "｡": "."})
+    ).lower().rstrip(".")
+    try:
+        return host.encode("idna").decode("ascii")
+    except UnicodeError:
+        return host
+
+
 def normalized_artifact_uri(raw: str) -> str:
-    """Canonicalize an artifact locator for conservative reuse comparison."""
-    raw = (raw or "").strip()
+    """Conservatively collapse equivalent artifact locators and URI fragments."""
+    raw = (raw or "").strip().replace("\\", "/")
     try:
         parsed = urlsplit(raw)
-        if parsed.scheme and parsed.scheme not in {"http", "https"}:
-            return parsed.scheme.lower() + "://" + posixpath.normpath(parsed.path)
-        if parsed.scheme:
-            host = (parsed.hostname or "").lower().rstrip(".")
-            port = ":" + str(parsed.port) if parsed.port else ""
-            return parsed.scheme.lower() + "://" + host + port + posixpath.normpath(parsed.path or "/")
-        return posixpath.normpath(parsed.path)
+        path = posixpath.normpath(unquote(parsed.path).replace("\\", "/")).casefold()
+        if not parsed.scheme:
+            return posixpath.normpath(unquote(raw.split("#", 1)[0].split("?", 1)[0])).casefold()
+        scheme = parsed.scheme.lower()
+        if not parsed.netloc:
+            return scheme + ":" + path
+        host = _canonical_hostname(parsed.hostname or "")
+        port = parsed.port
+        if (scheme, port) in {("https", 443), ("http", 80)}:
+            port = None
+        authority = host + (":" + str(port) if port else "")
+        return scheme + "://" + authority + path
     except ValueError:
-        return raw.lower()
+        return raw.casefold()
 
 
 def source_matches_origin(source_uri: str, origin: str) -> bool:
@@ -109,40 +127,60 @@ def source_matches_origin(source_uri: str, origin: str) -> bool:
     return candidate == expected or candidate.startswith(expected.rstrip("/") + "/")
 
 
+_NUMERIC_HOST = re.compile(r"(?:0x[0-9a-f]+|[0-9]+)(?:\.(?:0x[0-9a-f]+|[0-9]+)){0,3}", re.I)
+_INTERNAL_SUFFIXES = (".local", ".localhost", ".internal", ".corp", ".lan", ".home")
+_URL_PATTERN = re.compile(r"[a-z][a-z0-9+.-]*://[^\s\"'<>()]+", re.I)
+
+
+def _is_public_hostname(hostname: str) -> bool:
+    host = _canonical_hostname(hostname)
+    if not host or host in {"localhost", "host.docker.internal"} or host.endswith(_INTERNAL_SUFFIXES):
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        if _NUMERIC_HOST.fullmatch(host):
+            try:
+                address = ipaddress.IPv4Address(socket.inet_aton(host))
+            except (OSError, ValueError):
+                return False
+        else:
+            # A public hostname must be qualified. DNS itself is not queried here.
+            return "." in host and not host.startswith(".") and ".." not in host
+    return address.is_global
+
+
 def is_private_or_insecure_url(raw: str, require_https: bool = False) -> bool:
-    """Offline URL check; DNS resolution and authorization remain separate gates."""
-    raw = raw or ""
-    if "file://" in raw.lower() or "ftp://" in raw.lower():
+    """Screen for unsafe network endpoints without performing DNS or network I/O."""
+    if not isinstance(raw, str):
         return True
-    urls = re.findall(r"https?://[^\s\"']+", raw, flags=re.IGNORECASE)
-    if require_https and not urls:
+    urls = _URL_PATTERN.findall(raw)
+    if require_https and (not raw.strip().lower().startswith("https://") or len(urls) != 1):
         return True
-    if re.search(r"(?:^|[\s/])(?:localhost|host\.docker\.internal|127(?:\.[0-9]+){0,3}|10(?:\.[0-9]+){0,3}|192\.168(?:\.[0-9]+){0,2}|0x7f[0-9a-f]+):\d+", raw, re.I):
-        return True
-    for value in urls:
+    for candidate in urls:
         try:
-            url = urlsplit(value)
-            host = (url.hostname or "").rstrip(".").lower()
-            if not host or (require_https and url.scheme.lower() != "https") or url.scheme.lower() == "http":
+            url = urlsplit(candidate)
+            if url.scheme.lower() != "https" or not _is_public_hostname(url.hostname or ""):
                 return True
-            if host in {"localhost", "host.docker.internal"} or host.endswith((".local", ".localhost")):
-                return True
-            if re.match(r"^(?:127|10|0)\.", host):
-                return True
-            if host.startswith("0x"):
-                address = ipaddress.IPv4Address(int(host, 16))
-            elif host.isdecimal():
-                address = ipaddress.IPv4Address(int(host))
-            else:
-                try:
-                    address = ipaddress.ip_address(host)
-                except ValueError:
-                    continue  # public DNS name; no network/DNS resolution in metadata gate
-            if (address.is_private or address.is_loopback or address.is_link_local
-                or address.is_reserved or address.is_unspecified
-                or (address.version == 4 and address in ipaddress.ip_network("100.64.0.0/10"))):
-                return True
+            _ = url.port  # invalid ports must fail closed
         except (ValueError, OverflowError):
+            return True
+    # Catch scheme-less endpoints in source_uri and shell commands such as
+    # BASE_URL=localhost:3000, --base-url=127.1 and 127.0.0.1/snapshot.png.
+    normalized = unicodedata.normalize("NFKC", unquote(raw)).translate(
+        str.maketrans({"。": ".", "．": ".", "｡": "."})
+    )
+    for match in re.finditer(r"(?:^|[\s=])([^\s\"'<>;]+)", normalized):
+        token = match.group(1).strip("()[];,")
+        if "://" in token:
+            continue
+        host = token.split("/", 1)[0].split(":", 1)[0].lower()
+        host_like = (
+            host in {"localhost", "host.docker.internal"}
+            or host.endswith(_INTERNAL_SUFFIXES)
+            or bool(_NUMERIC_HOST.fullmatch(host))
+        )
+        if host_like and not _is_public_hostname(host):
             return True
     return False
 
@@ -176,7 +214,7 @@ def audit(root: Path, stage: str) -> dict:
     elif project.get("interactive") is False and any(v in {"website", "app"} for v in project["source_types"]):
         if not str(project.get("noninteractive_rationale", "")).strip():
             errors.append("Website/app declared noninteractive requires noninteractive_rationale")
-    web_types = {"website", "web", "web-app"}
+    web_types = {"website", "web", "web-app", "app"}
     if stage == "release" and any(x in web_types for x in (project.get("source_types") if isinstance(project.get("source_types"), list) else [])):
         preview = str(project.get("remote_preview_url") or "")
         if (not preview.startswith("https://") or is_private_or_insecure_url(preview, require_https=True)) and not str(project.get("local_testing_exception", "")).strip():
@@ -214,6 +252,9 @@ def audit(root: Path, stage: str) -> dict:
 
     if stage == "release" and freshness_days is not None and freshness_days > 30 and not project.get("scope_approval_evidence_id"):
         errors.append("Freshness policy longer than 30 days requires SCOPE approval")
+    for key in ("approved_source_origins", "approved_artifact_origins"):
+        if not isinstance(project.get(key, []), list) or any(not isinstance(x, str) or not x.strip() for x in project.get(key, [])):
+            errors.append(f"project.json {key} must be a list of nonempty origins")
     tables = {name: read_csv(root, name, errors) for name in COLUMNS}
     all_ids = {}
     reserved = {"OWN", "AUTH", "SCOPE", "RIGHTS", "MVP", "DATA", "LOCAL", "LONG_FRESHNESS", "LOW_VISUAL", "NO_INTERACTIONS", "NO_VISUAL", "NO_DATA"}
@@ -675,16 +716,33 @@ def audit(root: Path, stage: str) -> dict:
             for row in tables[name] if row["source_evidence_id"]
         }
         source_uris = {evidence[ref]["source_uri"] for ref in source_refs if ref in evidence}
+        normalized_source_uris = {normalized_artifact_uri(uri) for uri in source_uris}
+        source_roots = [origin] + project.get("approved_source_origins", [])
         if isinstance(origin, str) and origin and not any(source_matches_origin(uri, origin) for uri in source_uris):
             errors.append("No in-scope source evidence binds to source_origin")
+        for source_uri in source_uris:
+            parsed = urlsplit(source_uri)
+            if parsed.scheme and parsed.netloc and not any(
+                source_matches_origin(source_uri, allowed)
+                for allowed in source_roots if isinstance(allowed, str) and allowed
+            ):
+                errors.append(f"Source evidence outside declared source origins: {source_uri}")
+        artifact_roots = [project.get("remote_preview_url")] + project.get("approved_artifact_origins", [])
         for ref in referenced_target_evidence:
             ev = evidence.get(ref)
             if not ev:
                 continue
-            if normalized_artifact_uri(ev["source_uri"]) in {normalized_artifact_uri(uri) for uri in source_uris}:
+            uri = ev["source_uri"]
+            if normalized_artifact_uri(uri) in normalized_source_uris:
                 errors.append(f"Target evidence {ref}: artifact URI also used as source evidence")
-            if is_private_or_insecure_url(ev["source_uri"]) and not local_exception:
+            if is_private_or_insecure_url(uri) and not local_exception:
                 errors.append(f"Target evidence {ref}: insecure/local URI needs approved local_testing_exception")
+            parsed = urlsplit(uri)
+            if parsed.scheme in {"http", "https"} and not any(
+                source_matches_origin(uri, allowed)
+                for allowed in artifact_roots if isinstance(allowed, str) and allowed
+            ):
+                errors.append(f"Target evidence {ref}: external artifact outside approved target/artifact origins")
         for test in tables["tests"]:
             if test["result"] == "pass" and is_private_or_insecure_url(test["command"]) and not local_exception:
                 errors.append(f"Test {test['test_id']}: local/insecure browser address needs approved local_testing_exception")

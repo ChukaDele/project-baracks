@@ -27,5 +27,7 @@
   "noninteractive_rationale": "",
   "remote_preview_url": "",
   "local_testing_exception": "",
-  "source_origin": ""
+  "source_origin": "",
+  "approved_source_origins": [],
+  "approved_artifact_origins": []
 }

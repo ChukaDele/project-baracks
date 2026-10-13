@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from coverage_gate import audit, COLUMNS
+from coverage_gate import audit, COLUMNS, is_private_or_insecure_url, normalized_artifact_uri, source_matches_origin
 
 NOW = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -593,6 +593,90 @@ class GateTests(unittest.TestCase):
         self.tables['features'][0]['feature_id'] = 'SCOPE'
         self.persist()
         self.assertIn('Reserved scope tag', ' '.join(audit(self.root, 'release')['errors']))
+
+
+
+    def test_private_address_alternate_ipv4_and_unicode_spelling(self):
+        for url in (
+            "https://0177.0.0.1/",
+            "https://192.168.1/",
+            "https://169.254.43518/",
+            "https://172.16.1/",
+            "https://127。0。0。1/",
+            "https://127．0．0．1/",
+            "https://2130706433/",
+            "https://0x7f000001/",
+            "https://intranet/",
+            "https://printer.corp/",
+        ):
+            with self.subTest(url=url):
+                self.assertTrue(is_private_or_insecure_url(url, require_https=True), url)
+
+    def test_private_addresses_without_scheme_in_test_commands(self):
+        for command in (
+            "BASE_URL=localhost:3000 npx playwright test",
+            "npx playwright test --base-url=127.1:3000",
+            "127.0.0.1/app",
+            "localhost/snapshot.png",
+            "file:///tmp/screenshot.png",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(is_private_or_insecure_url(command), command)
+        self.assertFalse(is_private_or_insecure_url("npx playwright test booking"))
+        self.assertFalse(is_private_or_insecure_url("https://preview.example.com/app", require_https=True))
+
+    def test_artifact_url_canonicalization_with_default_port_and_encoding(self):
+        self.assertEqual(
+            normalized_artifact_uri("https://ARTIFACT.example.com:443/%66ile.PNG#F01"),
+            normalized_artifact_uri("https://artifact.example.com/file.png"),
+        )
+        self.assertNotEqual(
+            normalized_artifact_uri("s3://bucket-a/evidence/file.png"),
+            normalized_artifact_uri("s3://bucket-b/evidence/file.png"),
+        )
+
+    def test_source_origin_does_not_accept_encoded_path_escape(self):
+        self.assertFalse(source_matches_origin(
+            "https://reference.example.com/app/%2e%2e/admin",
+            "https://reference.example.com/app",
+        ))
+        self.assertFalse(source_matches_origin(
+            "https://reference.example.com.evil.net/app",
+            "https://reference.example.com",
+        ))
+        self.assertFalse(source_matches_origin(
+            "s3://other-bucket/app/data",
+            "s3://our-bucket/app",
+        ))
+
+    def test_external_source_must_be_from_allowlisted_origin(self):
+        self.tables["evidence"][1]["source_uri"] = "https://docs.outside.example.test/help"
+        self.persist()
+        errors = audit(self.root, "release")["errors"]
+        self.assertIn("Source evidence outside declared source origins", " ".join(errors))
+        self.project["approved_source_origins"] = ["https://docs.outside.example.test"]
+        self.persist()
+        self.assertNotIn("Source evidence outside declared source origins", " ".join(audit(self.root, "release")["errors"]))
+
+    def test_external_target_evidence_requires_target_or_artifact_origin(self):
+        self.tables["evidence"][4]["source_uri"] = "https://artifacts.example.test/F01.png"
+        self.persist()
+        self.assertIn("external artifact outside approved", " ".join(audit(self.root, "release")["errors"]))
+        self.project["approved_artifact_origins"] = ["https://artifacts.example.test"]
+        self.persist()
+        self.assertNotIn("external artifact outside approved", " ".join(audit(self.root, "release")["errors"]))
+
+    def test_app_source_type_requires_remote_preview(self):
+        self.project["source_types"] = ["app"]
+        self.project["remote_preview_url"] = ""
+        self.persist()
+        self.assertIn("public HTTPS remote_preview_url", " ".join(audit(self.root, "release")["errors"]))
+
+    def test_same_artifact_encoded_uri_with_distinct_evidence_ids_rejected(self):
+        self.tables["evidence"][4]["source_uri"] = "https://artifacts.example.test/%66ile.png#one"
+        self.tables["evidence"][5]["source_uri"] = "https://ARTIFACTS.example.test:443/file.PNG#two"
+        self.persist()
+        self.assertIn("target artifact URI reused", " ".join(audit(self.root, "release")["errors"]))
 
 
 
