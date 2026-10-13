@@ -13,23 +13,42 @@
       "title": "Project goal-state template",
       "summary": "A project-independent current-goal record with outcome, evidence, owners, decisions, risks, and next actions.",
       "locator": "templates/project/GOAL_STATE.md",
-      "tags": ["template", "goal", "project", "state", "planning"],
-      "aliases": ["goal-state", "project-goal-record"],
+      "tags": [
+        "template",
+        "goal",
+        "project",
+        "state",
+        "planning"
+      ],
+      "aliases": [
+        "goal-state",
+        "project-goal-record"
+      ],
       "lifecycle": "PROMOTED",
       "provenance": {
         "sourceProject": "Major",
         "sourceVersion": "6b1235d19ecd0c6a5ea59b4d3af4346159ec5e55",
         "owner": "Major",
         "license": "internal",
-        "lineage": ["templates/project/GOAL_STATE.md"]
+        "lineage": [
+          "templates/project/GOAL_STATE.md"
+        ]
       },
-      "compatibility": ["markdown", "all-projects"],
+      "compatibility": [
+        "markdown",
+        "all-projects"
+      ],
       "dependencies": [],
       "evidence": {
-        "tests": ["tests/skill-hot-sync.test.ts"],
+        "tests": [
+          "tests/skill-hot-sync.test.ts"
+        ],
         "latestVerifiedVersion": "1.0.0"
       },
-      "limitations": ["The consumer supplies project-specific facts.", "Do not place client-private information in the shared template."],
+      "limitations": [
+        "The consumer supplies project-specific facts.",
+        "Do not place client-private information in the shared template."
+      ],
       "scope": "shared",
       "usage": {
         "successfulProjects": 1,
@@ -37,6 +56,62 @@
         "incidents": 0
       },
       "wrapperPolicy": "Use a project wrapper or composition file for business-specific fields. Do not edit the shared template for one project."
+    },
+    {
+      "id": "lenis-scroll-orchestration-reference",
+      "kind": "reference",
+      "title": "Lenis scroll orchestration decision",
+      "summary": "Conditional Lenis runtime adoption policy for GSAP/ScrollTrigger/WebGL scroll synchronization with native input, accessibility, rollback and browser verification gates.",
+      "locator": "docs/gbrain/lenis-scroll-orchestration.md",
+      "tags": [
+        "lenis",
+        "gsap",
+        "scrolltrigger",
+        "motion",
+        "website",
+        "accessibility"
+      ],
+      "aliases": [
+        "smooth-scroll-orchestration",
+        "lenis-optional-runtime"
+      ],
+      "lifecycle": "REUSE_CANDIDATE",
+      "provenance": {
+        "sourceProject": "chuka-personal-site",
+        "sourceVersion": "pilot-pr-12",
+        "owner": "Major",
+        "license": "internal",
+        "lineage": [
+          "skills/internal/responsive-motion-systems/SKILL.md",
+          "docs/gbrain/lenis-scroll-orchestration.md"
+        ]
+      },
+      "compatibility": [
+        "web-projects",
+        "Astro",
+        "GSAP",
+        "ScrollTrigger"
+      ],
+      "dependencies": [],
+      "evidence": {
+        "tests": [
+          "evals/skill-resolver/responsive-motion-systems.json",
+          "https://github.com/ChukaDele/chuka-personal-site/pull/12"
+        ],
+        "latestVerifiedVersion": "routing-only"
+      },
+      "limitations": [
+        "Browser/device acceptance and production value have not been independently established.",
+        "No automatic installation into apps; keep native scrolling as default.",
+        "Local GBrain database indexing is pending authorised online access."
+      ],
+      "scope": "shared",
+      "usage": {
+        "successfulProjects": 0,
+        "latestVerifiedVersion": "routing-only",
+        "incidents": 0
+      },
+      "wrapperPolicy": "Select via responsive-motion-systems only for explicit Lenis/scroll orchestration needs; require project-local opt-in, native baseline and QA."
     }
   ]
 }
