@@ -4,14 +4,21 @@
     "The GSAP ScrollTrigger section overlaps the next section at certain zoom levels.",
     "Fix the sticky card-stack and hero scroll interaction without deleting the motion.",
     "This Three.js/GSAP experience breaks on mobile and short laptops; recompose it responsively.",
-    "Two pinned sections are fighting for the viewport and the page gets stuck after resize."
+    "Two pinned sections are fighting for the viewport and the page gets stuck after resize.",
+    "Assess whether Lenis smooth scroll makes sense for an Astro site that already has GSAP ScrollTrigger and WebGL.",
+    "Lenis scroll events are out of sync with GSAP ticker; keep keyboard and mobile native scrolling intact.",
+    "Review the existing Lenis desktop scrolling preview, nested modals, anchors and reduced-motion fallback."
   ],
   "should_not_trigger": [
     "Animate a simple button hover.",
     "Fix a database migration.",
-    "Review static copy for grammar."
+    "Review static copy for grammar.",
+    "Make this paragraph sound smoother and less wordy.",
+    "Create a static business landing page without any scrolling animation.",
+    "Fix a React admin table with keyboard navigation and no scroll-driven effects."
   ],
   "conflicts": [
-    "Pair with website-design-qa for the broader site pass. Responsive-motion-systems owns geometry, sticky/pinned ownership, motion lifecycle and responsive motion fallbacks."
+    "Pair with website-design-qa for the broader site pass. Responsive-motion-systems owns geometry, sticky/pinned ownership, motion lifecycle and responsive motion fallbacks.",
+    "Lenis is a conditional runtime dependency, not a mandatory design style or universal coding skill. The responsive-motion-systems skill owns scroll orchestration; Figma fidelity, reference-replica, Emil QA and website-design-qa keep their existing authority."
   ]
 }

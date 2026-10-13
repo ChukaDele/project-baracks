@@ -1,6 +1,6 @@
 ---
 name: responsive-motion-systems
-description: Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.
+description: Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, Lenis or other smooth-scroll controllers, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.
 ---
 
 # Responsive Motion Systems
@@ -188,3 +188,17 @@ The system is broken if any of these occur:
 - a user-provided screenshot shows a defect that automated QA declares impossible.
 
 When this skill triggers, pair it with `website-design-qa` for the broader site-quality pass.
+
+## 14. Conditional scroll orchestration (Lenis)
+
+Use this section when a frontend task explicitly involves **Lenis**, smooth-scroll orchestration, or synchronising GSAP/ScrollTrigger/WebGL to scroll input. Lenis is a **runtime library**, not a generic AI skill, not a replacement for the approved Figma implementation flow, and never a mandatory global dependency. A request for a normal landing page, admin UI, accessibility review or merely "make writing smoother" does **not** justify injecting Lenis.
+
+Decision contract:
+1. **ADOPT only for a measured need.** Inspect current project motion, its scroll owner, pinned scenes, CSS scroll-behavior, and native inputs. Establish a native-scroll baseline. Default to no Lenis for forms, admin dashboards, data tables, touch and reduced-motion surfaces.
+2. **Review upstream before install.** Source: https://github.com/darkroomengineering/lenis, documentation and exact pinned npm version. Scope the dependency to the project and avoid duplicated smooth-scroll controllers.
+3. **Use one animation clock.** With GSAP, set `autoRaf: false`; wire `lenis.on('scroll', ScrollTrigger.update)` and `gsap.ticker.add((seconds) => lenis.raf(seconds * 1000))`. Never also run an independent Lenis RAF loop or accidentally reset existing global GSAP ticker preferences.
+4. **Preserve native behavior.** Respect `prefers-reduced-motion`, touch physics, keyboard Home/End/PageDown, in-page hashes, history restoration, modals, drawers and nested scrolling. Explicitly stop or exclude overlays from smoothing; destroy the Lenis instance and detach listeners on unmount/pagehide/changed capability. Leave a native fallback if the module fails.
+5. **Preview and validate.** Make adoption opt-in or reversible until QA is complete. Compare the same build SHA in browser tests and a deployed HTTPS preview at 100% zoom, plus breakpoint, real touch, Safari/WebKit and reduced-motion checks. Judge benefit against input delay, scroll lag, jank, INP and bundle overhead. Merge/enable by default only after a documented positive comparison.
+6. **Do not create competing design owners.** Figma-to-code owns Figma parity. Reference-replica owns screenshot recreations. This skill owns scroll architecture. `website-design-qa` and `break-ui` own broader/browser edge-case verification.
+
+A proven reference is the isolated personal-site Lenis pilot: https://github.com/ChukaDele/chuka-personal-site/pull/12. It is a trial, **not a globally validated template**. Do not copy it into projects without inspecting their own motion systems. Local capture for eventual GBrain indexing: `docs/gbrain/lenis-scroll-orchestration.md`.
