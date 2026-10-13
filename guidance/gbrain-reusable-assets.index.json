@@ -34,7 +34,7 @@
       "kind": "reference",
       "title": "Lenis scroll orchestration decision",
       "summary": "Conditional Lenis runtime adoption policy for GSAP/ScrollTrigger/WebGL scroll synchronization with native input, accessibility, rollback and browser verification gates.",
-      "locator": "docs/gbrain/lenis-scroll-orchestration.md",
+      "locator": "skills/internal/responsive-motion-systems/SKILL.md",
       "tags": [
         "lenis",
         "gsap",
