@@ -36,7 +36,8 @@ Selection examples:
 - Baseline: no URL flag. Desktop experimental path: `?lenis-preview=1` on a reviewed preview build only.
 
 ## Proof and caveats
-- Initial personal-site source checks and CI passed in October 2026. A cross-browser pilot QA workflow was added on 13 October; its result must be checked before claiming browser readiness.
+- Personal-site CI passed at the 13 October 2026 pilot head, and the automated Playwright QA suite passed **10/10** on Chromium and WebKit: https://github.com/ChukaDele/chuka-personal-site/actions/runs/38382381672. Tests covered native baseline, explicit opt-in, anchor navigation, contact dialog, reduced motion and responsive teardown.
+- Live Cloudflare HTTPS preview A/B, physical mobile devices, Safari hardware, and measured performance comparison are still release gates; automated engine checks do not establish these outcomes.
 - No blanket approval to enable Lenis in production or other projects.
 - This version-controlled page is the **GBrain-ready source record and metadata projection**, not confirmation that the local GBrain PGLite index has ingested it.
 - GBrain runtime ingestion requires access to the user's Mac/MCP connection or an authorised remote GBrain write tool. Do not steal or break the live PGLite lock.
@@ -45,3 +46,14 @@ Selection examples:
 - Source project: user-owned personal site and Major engineering skillpack.
 - Library: https://github.com/darkroomengineering/lenis (MIT); https://www.npmjs.com/package/lenis
 - Canonical skill owner: responsive-motion-systems. Browser review: website-design-qa. Figma parity: official Figma workflow; reference replication: reference-replica; mobile/edge QA: Emil mobile-native and break-ui.
+
+## Local GBrain ingestion after machine reconnection
+This Git-owned source and the metadata-only index preserve the capability meanwhile. When the local GBrain service is available, use its existing MCP write tool if the PGLite server owns the database. Do not start a second DB process against the live lock. With the service stopped and the CLI owning the store, the documented import path is:
+
+```sh
+gbrain put major/capabilities/lenis-scroll-orchestration < docs/gbrain/lenis-scroll-orchestration.md
+gbrain get major/capabilities/lenis-scroll-orchestration
+gbrain search "Lenis scroll orchestration"
+```
+
+Verify that the page content is searchable before describing it as GBrain-indexed. After a reviewed Major release/installation, verify the existing motion skill automatically resolves an explicit Lenis/GSAP prompt and rejects unrelated admin UI/writing requests. Never override another agent's active lock or replace a working global skills installation blindly.
