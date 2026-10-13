@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { retrieveReusableAssets } from '../src/skills/assets.js';
 import { runSkillCli } from '../src/skills/cli.js';
-import { resolveSkills } from '../src/skills/resolver.js';
+import { auditSkillReachability, resolveSkills } from '../src/skills/resolver.js';
 import { rollbackMajorSkills, syncMajorSkills } from '../src/skills/sync.js';
 
 const roots: string[] = [];
@@ -131,6 +131,15 @@ describe('Major hot skill sync', () => {
       readFileSync(join(current, 'guidance', 'skills.catalog.json'), 'utf8'),
     );
 
+    const activeAudit = auditSkillReachability(process.cwd());
+    expect(activeAudit.orphanInternalSkills).toEqual([]);
+    expect(activeAudit.duplicateIds).toEqual([]);
+    expect(activeAudit.internal.filter((entry) => entry.reachable).length).toBe(
+      syncedRegistry.entries.filter(
+        (entry) => (entry as { source?: string }).source === 'major-internal',
+      ).length,
+    );
+
     const resolved = resolveSkills({
       task: 'Prepare an approved customer invoice, review receivables and payables, and draft a controlled follow-up.',
       limit: 6,
@@ -140,7 +149,7 @@ describe('Major hot skill sync', () => {
     expect(accounting?.path).toContain(
       `/skill-bundles/${marker.sha}/skills/internal/ar-ap-invoice/SKILL.md`,
     );
-  });
+  }, 30_000);
 
   it('binds resolved reads to the authenticated canonical bundle after current changes', () => {
     const home = mkdtempSync(join(canonicalTmp, 'major-skill-binding-home-'));
