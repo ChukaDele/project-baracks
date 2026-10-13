@@ -20,7 +20,7 @@ describe('reusable asset lifecycle', () => {
         cwd: process.cwd(),
       });
       expect(relevant.assets).toContainEqual(expect.objectContaining({
-        id: 'lenis-scroll-orchestration-reference',
+        id: 'lenis-scroll-orchestration',
         source: 'gbrain-org-index',
       }));
 
@@ -28,7 +28,12 @@ describe('reusable asset lifecycle', () => {
         task: 'Audit website accessibility and SEO for a static business homepage',
         cwd: process.cwd(),
       });
-      expect(unrelated.assets.some((asset) => asset.id === 'lenis-scroll-orchestration-reference')).toBe(false);
+      const unrelatedWriting = retrieveReusableAssets({
+        task: 'Make this reference letter sound smooth and polished',
+        cwd: process.cwd(),
+      });
+      expect(unrelated.assets.some((asset) => asset.id === 'lenis-scroll-orchestration')).toBe(false);
+      expect(unrelatedWriting.assets.some((asset) => asset.id === 'lenis-scroll-orchestration')).toBe(false);
     } finally {
       if (previous === undefined) delete process.env.MAJOR_GBRAIN_ASSET_INDEX;
       else process.env.MAJOR_GBRAIN_ASSET_INDEX = previous;
