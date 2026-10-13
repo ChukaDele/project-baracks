@@ -58,8 +58,8 @@
       "wrapperPolicy": "Use a project wrapper or composition file for business-specific fields. Do not edit the shared template for one project."
     },
     {
-      "id": "lenis-scroll-orchestration-reference",
-      "kind": "reference",
+      "id": "lenis-scroll-orchestration",
+      "kind": "lenis-pattern",
       "title": "Lenis scroll orchestration",
       "summary": "Lenis/GSAP/ScrollTrigger wheel synchronisation, interpolation, ticker ownership.",
       "locator": "skills/internal/responsive-motion-systems/SKILL.md",
@@ -70,8 +70,8 @@
         "smoothscroll"
       ],
       "aliases": [
-        "smooth-scroll-orchestration",
-        "lenis-optional-runtime"
+        "lenis-scroll-sync",
+        "lenis-runtime-adoption"
       ],
       "lifecycle": "REUSE_CANDIDATE",
       "provenance": {
