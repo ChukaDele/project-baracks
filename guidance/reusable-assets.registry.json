@@ -61,7 +61,7 @@
       "id": "lenis-scroll-orchestration-reference",
       "kind": "reference",
       "title": "Lenis scroll orchestration",
-      "summary": "Lenis and GSAP ScrollTrigger synchronization for controlled smooth-scroll integration.",
+      "summary": "Lenis/GSAP/ScrollTrigger wheel synchronisation, interpolation, ticker ownership.",
       "locator": "skills/internal/responsive-motion-systems/SKILL.md",
       "tags": [
         "lenis",
