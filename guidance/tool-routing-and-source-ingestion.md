@@ -104,6 +104,26 @@ Use the appropriate native parser/skill before OCR or screenshots. Use rendered 
 
 Use native vision for understanding. Use image-generation/editing tools for actual image transformation rather than describing edits that were not performed.
 
+## Maintained personal Knowledge Library retrieval
+
+**Automatically consult the owner's prior knowledge when it can materially improve a substantive task.** Good triggers include research/strategy, product decisions, prior-art discovery, brand/design references, career systems, reusable agent workflows, or explicit references to saved material and earlier decisions. Decide relevance quickly. Avoid library retrieval for unrelated narrow code edits, arithmetic, trivial answers or current system-status checks.
+
+The maintained knowledge hierarchy is:
+
+1. **Project truth and GBrain:** Inspect relevant project files and `LEARNINGS.md`; use scoped GBrain decisions, patterns and outcomes when a real GBrain read capability is available. A current project decision outranks an older global note. Never import confidential data from another client.
+2. **Maintained Notion synthesis:** Search the connected **Chuka Knowledge Library**, navigate the relevant Knowledge Bank and fetch 1–3 maintained Knowledge Pieces. Check the source trail, last review date, thesis, exceptions and contradictions. This synthesis outranks an unreviewed saved post.
+3. **ContextBolt original saves:** When examples, source links or conflicting evidence matter, use the installed `search_bookmarks` connector, optionally expanding a relevant topic cluster. Do not bulk-export thousands of saves. A bookmark is a lead, not automatically a true fact.
+4. **Eagle visual references:** For visual tasks, use the corresponding Design Knowledge Piece and Eagle reference set when authorized and available. Do not assume inspiration assets are licensed for reuse.
+5. **Raw local corpus:** Only if maintained pieces and source connectors are insufficient, inspect bounded, relevant portions of the user-owned local archive with appropriate permissions. Never ingest the entire corpus into a prompt, check it into Git, or send unrelated project/PII information to another client or provider.
+
+**Runtime access must be proven.** Prefer native Notion search/fetch, ContextBolt MCP bookmark search and the authorized local GBrain CLI. A ChatGPT connection does not automatically make these available in Claude, Codex or Major. Run a real read in the current host before reporting a source as accessible. If a connector is unavailable, use the remaining permitted sources, report the limitation, and do not fabricate library findings or extract credentials.
+
+**Freshness:** Reverify time-sensitive claims (laws, tools, vendor behaviour, prices, finance, immigration, regulations) from current primary sources. Preserve disagreements with the maintained piece rather than silently overwriting it. Attribute decisions and claims to the actual source.
+
+**Bounded receipt and privacy:** Record which relevant Knowledge Piece or GBrain note was read, which supporting bookmarks were used, and meaningful gaps. Do not put full private content in logs, public repositories or broad shared memory. Retrieval is read-only by default. Updating the maintained synthesis, bookmarks or GBrain requires a user-authorized write and review.
+
+This is triggered source retrieval, not an always-on context dump, background sync, competing skill registry, or permission to cross project boundaries.
+
 ## Provenance
 
 For material knowledge work, preserve:

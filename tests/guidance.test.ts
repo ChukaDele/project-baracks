@@ -61,4 +61,16 @@ describe('guidance registries', () => {
     expect(pilot).toContain('same-provider grade is accepted');
     expect(pilot).not.toContain('refuses the grade when the provider matches');
   });
+  it('routes relevant Knowledge Library context', () => {
+    const guide = readFileSync('guidance/tool-routing-and-source-ingestion.md', 'utf8');
+    const core = readFileSync('templates/project/major-core.md', 'utf8');
+    expect(guide).toContain('Automatically consult');
+    expect(guide).toContain('Notion');
+    expect(guide).toContain('ContextBolt');
+    expect(guide).toContain('GBrain');
+    expect(guide).toContain('Eagle');
+    expect(guide).toContain('Runtime access must be proven');
+    expect(guide).toContain('Never ingest the entire corpus into a prompt');
+    expect(core).toContain('Knowledge Library lookup when relevant');
+  });
 });
