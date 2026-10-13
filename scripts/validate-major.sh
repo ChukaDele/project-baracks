@@ -20,6 +20,7 @@ for p in Path('.').rglob('*.json'):
 PY
 
 node scripts/validate-skills.mjs || fail "skills, YAML frontmatter, resolver fixtures, or reusable asset metadata"
+PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/major-validation-pycache" python3 -m unittest discover -s skills/internal/reference-engineering/tests -q || fail "reference-engineering coverage-gate tests"
 node scripts/generate-skill-catalog.mjs
 git diff --exit-code -- guidance/skills.catalog.json adapters/skills || fail "generated skill catalogue or host adapters are stale"
 

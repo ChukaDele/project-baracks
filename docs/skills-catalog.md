@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 40
+## Major internal skills — 103
 
 These are canonical Major-owned skills.
 
@@ -22,6 +22,7 @@ These are canonical Major-owned skills.
 | `tools-as-code` | Compose repeated deterministic retrieval/filter/dedupe/rank/transform mechanics with short temporary code. |
 | `design-direction-and-taste` | Canonical art-direction layer: design read, surface mode, preserve-vs-redesign, variance/motion/density, anti-default discipline and bounded critique. |
 | `remote-first-web-development` | Require GitHub plus a Cloudflare preview for browser work and block local browser targets. |
+| `reference-engineering` | Coordinate complete authorized reference reconstruction: inventory screens, controls, roles, workflows and datasets, then prove full feature and evidence coverage. |
 | `website-design-qa` | Canonical website/landing-page visual, responsive, browser, launch, SEO, accessibility and production QA doctrine. |
 | `responsive-motion-systems` | Responsive GSAP/ScrollTrigger/sticky/pinned/Three.js geometry, lifecycle, handoff and zoom-robustness doctrine. |
 | `human-blocker-orchestration` | Surface auth/OAuth/2FA/CAPTCHA/payment/irreversible human-only actions and keep independent work moving. |
