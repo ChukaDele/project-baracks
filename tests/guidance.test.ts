@@ -61,4 +61,22 @@ describe('guidance registries', () => {
     expect(pilot).toContain('same-provider grade is accepted');
     expect(pilot).not.toContain('refuses the grade when the provider matches');
   });
+  it('preserves automatic, bounded knowledge retrieval in binding source guidance', () => {
+    const guide = readFileSync('guidance/tool-routing-and-source-ingestion.md', 'utf8');
+    const projectContract = readFileSync('templates/project/major-core.md', 'utf8');
+    const committed = loadGuidanceRegistry('guidance/instructions.registry.json');
+    expect(activeEntries(committed).some((item) => item.id === 'tool-routing-and-source-ingestion')).toBe(true);
+    for (const term of ['Maintained personal Knowledge Library retrieval', 'Notion', 'ContextBolt', 'GBrain', 'Eagle', 'Knowledge Piece', 'read-only', 'Runtime access must be proven']) {
+      expect(guide, term).toContain(term);
+    }
+    expect(guide).toContain('Automatically consult');
+    expect(guide).toContain('Do not bulk-export thousands of saves');
+    expect(guide).toContain('A ChatGPT connection does not automatically make these available');
+    expect(guide).toContain('Never ingest the entire corpus into a prompt');
+    expect(projectContract).toContain('## Knowledge Library lookup when relevant');
+    expect(projectContract).toContain('Skip retrieval when no relevant prior knowledge');
+    expect(projectContract).toContain('preserve client confidentiality');
+  });
+
+
 });

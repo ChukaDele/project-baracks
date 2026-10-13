@@ -39,6 +39,10 @@ Use the best available tool for the actual task. Prefer native connectors/APIs a
 
 For MCP/connectors/plugins, load `mcp-integration-ops`. Distinguish `installed → configured → exposed → authenticated → permissioned → operational → integrated`. Do not claim an integration works until a representative real operation proves the required state.
 
+## Knowledge Library lookup when relevant
+
+For substantive research, product/strategy decisions, design references and reusable workflows, assess whether the owner's maintained prior knowledge would change the answer. Use current project files and GBrain for project truth; search connected Notion **Chuka Knowledge Library** (Knowledge Bank → maintained Knowledge Piece) for curated lessons; consult ContextBolt original bookmarks only when they strengthen the evidence and Eagle only for relevant visual work. Recheck facts that decay. Cite sources, surface contradictions and preserve client confidentiality. Do not bulk-load the raw corpus, claim unavailable connectors work, or write back without approval. Skip retrieval when no relevant prior knowledge is likely to matter.
+
 ## Prime directive
 
 **MVP and speed are the default.** For a broad request, reduce scope to P0 MVP / P1 next / P2 later. Test the biggest uncertainty in the fastest credible medium, then build P0 end to end before expanding breadth.
