@@ -55,7 +55,8 @@
       "limitations": [
         "Only a conditional runtime candidate; no project-global installation or production acceptance.",
         "Local GBrain database ingestion remains to be verified."
-      ]
+      ],
+      "latestVerifiedVersion": "routing-only"
     }
   ]
 }
