@@ -1,0 +1,33 @@
+{
+  "title": "Replace with project name",
+  "mode": "owned",
+  "phase": "recon",
+  "parity_goal": "full",
+  "source_types": [
+    "repository",
+    "website"
+  ],
+  "platforms": [
+    "desktop-web"
+  ],
+  "scope": "Explicitly describe routes, roles, jobs, and data in scope",
+  "interactive": true,
+  "visual_in_scope": true,
+  "data_in_scope": true,
+  "source_last_checked_at": null,
+  "freshness_policy_days": 7,
+  "deployment_approved": false,
+  "target_revision": "",
+  "authorization_evidence_id": "",
+  "differentiation_scope": "",
+  "data_waiver": "",
+  "min_visual_score": 85,
+  "ownership_evidence_id": "",
+  "scope_approval_evidence_id": "",
+  "noninteractive_rationale": "",
+  "remote_preview_url": "",
+  "local_testing_exception": "",
+  "source_origin": "",
+  "approved_source_origins": [],
+  "approved_artifact_origins": []
+}

@@ -1,0 +1,23 @@
+{
+  "skill": "reference-engineering",
+  "should_trigger": [
+    "Reconstruct this complete application from its public site and my authorized account, including every user journey, dataset, permissions and tested feature parity.",
+    "Make a full functional clone of this web app with all hidden controls and data, not just the screenshot.",
+    "Map the reference site screens, data and workflows, rebuild it end to end, then check missing functionality before release.",
+    "Use reference-engineering to inventory source evidence and validate reconstructed product completeness."
+  ],
+  "should_not_trigger": [
+    "Recreate the appearance of this single screenshot without additional functionality.",
+    "Implement this selected Figma frame pixel-perfect using the official Figma design-to-code pipeline.",
+    "Audit the existing marketing site for mobile spacing and accessibility without copying another product.",
+    "Fix the SQL query inside our current owned application.",
+    "Reverse engineer a binary protocol only to understand how it encodes packets without rebuilding any product.",
+    "Clone this landing page UI from a URL, only the layout and text placement.",
+    "Port our existing owned app to another framework without referencing or matching another product.",
+    "Replicate this one search input interaction in our existing app.",
+    "Build something like this example dashboard, using it as inspiration rather than a full clone."
+  ],
+  "conflicts": [
+    "For an entire product reconstruction, this coordinator owns scope, evidence, inventory and parity. Delegate visual-only to reference-replica/Figma-native workflows, behavior-only to engineering-by-reference/REA, and ordinary live-site QA to website-design-qa. Keep source-ingestion for fetching primary evidence."
+  ]
+}
