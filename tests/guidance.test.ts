@@ -73,5 +73,4 @@ describe('guidance registries', () => {
     expect(guide).toContain('Never ingest the entire corpus into a prompt');
     expect(core).toContain('Knowledge Library lookup when relevant');
   });
-
 });
