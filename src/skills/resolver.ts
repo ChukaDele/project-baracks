@@ -1417,7 +1417,10 @@ export interface SkillAudit {
 }
 
 export function auditSkillReachability(cwd = process.cwd()): SkillAudit {
-  const entries = loadSkillRegistry();
+  // Audit the same validated active bundle the resolver uses. Using the
+  // immutable runtime registry with a newer hot bundle yields false orphans.
+  const hot = hotSkillBundleRoot();
+  const entries = readRegistry(registryPath(undefined, hot)).entries;
   const counts = new Map<string, number>();
   for (const entry of entries) counts.set(entry.id, (counts.get(entry.id) ?? 0) + 1);
   const internal = entries
@@ -1427,7 +1430,6 @@ export function auditSkillReachability(cwd = process.cwd()): SkillAudit {
       return { id: entry.id, reachable: Boolean(path), ...(path ? { path } : {}) };
     });
   const registered = new Set(internal.map((entry) => entry.id));
-  const hot = hotSkillBundleRoot();
   const internalRoot = hot
     ? join(hot, 'skills', 'internal')
     : join(runtimeRoot(), 'skills', 'internal');
