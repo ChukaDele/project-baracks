@@ -51,9 +51,12 @@ Selection examples:
 This Git-owned source and the metadata-only index preserve the capability meanwhile. When the local GBrain service is available, use its existing MCP write tool if the PGLite server owns the database. Do not start a second DB process against the live lock. With the service stopped and the CLI owning the store, the documented import path is:
 
 ```sh
-# Preserve the earlier UI Skills note too, if it is still staged on this Mac.
-test -s "$HOME/.gbrain/pending-import/ui-engineering-skills.md" && \
+# Ingest the earlier UI Skills note from its local staging file or Git-backed copy.
+if [ -s "$HOME/.gbrain/pending-import/ui-engineering-skills.md" ]; then
   gbrain put concepts/ui-engineering-skills < "$HOME/.gbrain/pending-import/ui-engineering-skills.md"
+else
+  gbrain put concepts/ui-engineering-skills < docs/gbrain/ui-engineering-skills.md
+fi
 # Then ingest this separate Lenis decision record from the reviewed Major checkout.
 gbrain put major/capabilities/lenis-scroll-orchestration < docs/gbrain/lenis-scroll-orchestration.md
 gbrain get major/capabilities/lenis-scroll-orchestration
