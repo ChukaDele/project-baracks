@@ -104,7 +104,7 @@ def normalized_artifact_uri(raw: str) -> str:
     raw = (raw or "").strip().replace("\\", "/")
     try:
         parsed = urlsplit(raw)
-        path = posixpath.normpath(unquote(parsed.path).replace("\\", "/")).casefold()
+        path = posixpath.normpath(unquote(parsed.path or "/").replace("\\", "/")).casefold()
         if not parsed.scheme:
             return posixpath.normpath(unquote(raw.split("#", 1)[0].split("?", 1)[0])).casefold()
         scheme = parsed.scheme.lower()
@@ -171,7 +171,7 @@ def is_private_or_insecure_url(raw: str, require_https: bool = False) -> bool:
         str.maketrans({"。": ".", "．": ".", "｡": "."})
     )
     for match in re.finditer(r"(?:^|[\s=])([^\s\"'<>;]+)", normalized):
-        token = match.group(1).strip("()[];,")
+        token = match.group(1).strip("()[];,").rsplit("=", 1)[-1]
         if "://" in token:
             continue
         host = token.split("/", 1)[0].split(":", 1)[0].lower()
