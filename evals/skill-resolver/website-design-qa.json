@@ -4,12 +4,22 @@
     "Do a full responsive and visual QA of this marketing website before launch.",
     "Review the live site against the intended design across desktop, tablet and mobile.",
     "The page looks wrong at 100% zoom and on a short laptop; diagnose and fix the real layout cause.",
-    "Check production parity, SEO, accessibility, performance and critical journeys before we call the site ready."
+    "Check production parity, SEO, accessibility, performance and critical journeys before we call the site ready.",
+    "The website is ready. Do the final release checks, verify live URL and get owner signoff before closeout.",
+    "Add a website SOP so no project can be closed until missing SEO, privacy and QA items are flagged.",
+    "Hand over this finished customer-facing website and confirm GitHub and production deployment approval gates."
   ],
   "should_not_trigger": [
     "Fix this backend SQL query.",
     "Explain what this API endpoint does.",
-    "Generate a PDF report from these numbers."
+    "Generate a PDF report from these numbers.",
+    "Draft a client invoice after an already-closed engagement.",
+    "Explain DNS TTL behavior without auditing a website.",
+    "Release the next version of the Go CLI service.",
+    "Write acceptance tests for the payment API.",
+    "Go live with the database migration.",
+    "Close the completed Jira ticket.",
+    "Deploy a backend worker with no website UI."
   ],
   "conflicts": [
     "Pair with responsive-motion-systems for GSAP, ScrollTrigger, sticky/pinned or Three.js work. Root-cause-qa handles generic bugs but website-design-qa owns the complete customer-facing site quality pass."

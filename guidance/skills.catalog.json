@@ -4458,14 +4458,14 @@
       "id": "website-design-qa",
       "name": "website-design-qa",
       "title": "Website Design Qa",
-      "description": "Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.",
-      "shortDescription": "Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.",
+      "description": "Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, website release acceptance/closeout and handover, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.",
+      "shortDescription": "Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, website release acceptance/closeout and handover, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.",
       "aliases": [],
       "triggerConditions": [
         "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"
       ],
       "category": "uncategorized",
-      "version": "23",
+      "version": "24",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -4479,7 +4479,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 23,
-      "contentSha256": "08457f8b070e37ee8c47a8c625e43ff0c25920eecf4b664fe06ae77208f3cb45",
+      "contentSha256": "21172b2d21bb6e34625f60bb22dff4e66411e1925f19bc8af2a79f85df7581bf",
       "triggers": [
         "website",
         "landing",

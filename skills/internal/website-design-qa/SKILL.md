@@ -1,6 +1,6 @@
 ---
 name: website-design-qa
-description: Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.
+description: Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, website release acceptance/closeout and handover, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.
 ---
 
 # Website Design & QA
@@ -223,3 +223,24 @@ Do not call a website ready because `build` passed. Require evidence appropriate
 - analytics/consent verified when configured
 
 When motion-heavy design exists, `responsive-motion-systems` is mandatory alongside this skill.
+
+
+## 17. Mandatory website delivery and closeout evidence gate (2026-10-14)
+
+**Routing scope:** When the work concerns a customer-facing website, landing page, web application, redesign or site migration, load this skill at project setup and again when that **site** is described as finished, ready to go live, for release, for handover or for closeout. Generic software deployments, Go services, release notes, Jira tickets and API acceptance tests are not website closeouts. Selection is a **required operating instruction**. Verify that the host actually resolved and loaded the skill; an installed file alone is not a firing test.
+
+Authoritative policy: [Website Launch QA v2.0 in Notion](https://app.notion.com/p/3c5ab0bfbea581de9b47c90d59774099). Machine-readable policy: [website release evidence contract](https://github.com/ChukaDele/websites/tree/main/tooling/website-release-gate). The published 47-control catalog may evolve; use the current pinned and reviewed standard. Compose only the relevant `web-quality-audit`, `seo-os`, `browser-release-qa`, `mobile-native`, `break-ui` and `responsive-motion-systems` specialists.
+
+**Stages and decision criteria:** `DRAFT` -> `BUILD_GREEN` (source/static, vulnerability and unit checks passed) -> `PRELAUNCH_VERIFIED` (staging/browser, critical user journeys and independent review passed) -> `APPROVED_FOR_DEPLOY` (accountable project owner explicitly approved this source SHA in the protected GitHub environment or an authenticated client approval record) -> `LIVE_VERIFIED` (production URL, exact SHA, functional flows and monitoring confirmed) -> `CLOSED` (handover, support/rollback and final owner acceptance recorded). Use `BLOCKED` at any stage for P0/P1 gaps, failed checks or missing approval. Report the separate enforcement attribute as `ENFORCED` or `ENFORCEMENT_PARTIAL`. A green JSON manifest is only evidence-contract lint, never a lifecycle transition.
+
+**Execution contract:**
+1. Confirm the project repository, current source and deployed SHA, production/preview URL, jurisdiction, critical journeys, website capabilities and applicable contractual scope. At kickoff name the implementer, an independent tester/reviewer and the accountable client/project approver, recording their authenticated identities and approval authority in the project's protected workflow context.
+2. Select relevant controls and the check tier proportionate to page risk. An `NOT_APPLICABLE` control is valid only when the site feature is genuinely absent, the rationale has evidence, and an independent reviewer accepts it. Do not mark mandatory P0 security/privacy controls inapplicable merely to pass. `NOT_TESTED` never means pass.
+3. Run actual executable build, dependency/secret checks, browser/device/keyboard/critical flow tests, links/assets, SEO/indexability, privacy/consent and performance checks as applicable. Respect the existing remote-first Cloudflare preview/host policy; local Worker-aware preview is an initial check, not proof of production. Record test URLs, SHA, timestamp, results and blockers. Do not fabricate evidence.
+4. Require independent adversarial review and verify GitHub check origins, branch rulesets, required code-owner approvals, protected deployment environment and actual hosting permission boundaries. Neither a pass in a self-authored workflow nor textual reviewer names prove authorization.
+5. After deployment, recheck actual production response SHA, TLS, paths/404, critical CTA or form/CRM delivery, robots/sitemap/metadata, errors, uptime/alerts, and preview versus production parity. If browsers or hosting are inaccessible, fail closed and identify the blocked test.
+6. Require a documented handover: source/assets and licence ownership, hosting/domain/admin access transferred through an approved secure channel, analytics/processor inventory, backups/rollback, support and maintenance ownership. **Never place secrets or customer PII in QA evidence artifacts.**
+7. P0 security/data exposure and critical journeys cannot be waived. P1 exceptions require a concrete mitigation, authenticated project-owner approval, named owner, issue ID and short expiry; P2 deferrals require an owned due date. Record all remaining issues in the project tracker. Client or site owner must sign off final acceptance; an implementing agent cannot mark its own work CLOSED.
+8. Check the site against the actual supported GitHub plan and Cloudflare/Vercel deployment path. If authenticated approval, required checks, code-owner review or host protection is unavailable, mark enforcement `ENFORCEMENT_PARTIAL` and do not assert automatic enforcement or completion.
+
+Keep the 100% zoom, responsive-geometry, accessibility, reduced-motion and interaction-preservation doctrine above. Use risk-scaled tests for simple static sites and deeper security/data checks for authenticated apps. Record observations in the scoped project, not as generic claims about all websites.
