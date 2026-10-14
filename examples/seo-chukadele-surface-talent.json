@@ -1,0 +1,48 @@
+{
+  "id": "chukadele-evidence-before-ranking-20261014",
+  "siteUrl": "https://chukadele.com/",
+  "targetUrl": "https://chukadele.com/work-surface-talent.html",
+  "targetQuery": "CV parsing mistakes before candidate scoring",
+  "audience": "Specialist recruitment agencies and hiring managers evaluating candidate-assessment workflows",
+  "businessOutcome": "Relevant conversations about evidence-based operations and recruiting-product development",
+  "market": "United Kingdom, English",
+  "intentHypothesis": "Readers want concrete failure modes and a practical verification step before trusting candidate scores. Query demand and ranking difficulty remain unverified.",
+  "observedSources": [
+    {
+      "url": "https://recruiterflow.com/blog/resume-parsing/",
+      "role": "relevant vendor article, not verified Google rank",
+      "observation": "Documents plausible-looking parsed records that can misplace dates or miss work history; distinguishes extraction from screening.",
+      "checkedAt": "2026-10-14"
+    },
+    {
+      "url": "https://sprad.io/blog/ai-resume-screening-what-it-can-and-cannot-do",
+      "role": "relevant vendor article, not verified Google rank",
+      "observation": "Explains that consistent extraction and ranking support do not replace judgement about fit; uses a human-review boundary.",
+      "checkedAt": "2026-10-14"
+    }
+  ],
+  "firsthandEvidence": [
+    {
+      "claim": "The Surface Talent working note describes checking parsed candidate profiles against source CVs and finding responsibilities and achievements had not carried across.",
+      "sourceUrl": "https://chukadele.com/notes.html",
+      "visibility": "public",
+      "verified": true,
+      "sourceExcerpt": "responsibilities and achievements"
+    },
+    {
+      "claim": "The public project page describes work on role/candidate evidence, assessment, intake and handover during the MBA internship.",
+      "sourceUrl": "https://chukadele.com/work-surface-talent.html",
+      "visibility": "public",
+      "verified": true,
+      "sourceExcerpt": "role and candidate evidence"
+    }
+  ],
+  "approval": {
+    "editorial": false,
+    "clientClearance": false
+  },
+  "publication": {
+    "websiteUrl": null,
+    "linkedinUrl": null
+  }
+}
