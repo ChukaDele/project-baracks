@@ -6,13 +6,17 @@
     "Improve internal linking and site architecture so our money pages rank better.",
     "Build an SEO content plan based on what we already rank for and what competitors own.",
     "Check our visibility in AI answers and improve GEO/AEO as part of SEO.",
-    "Use OpenSEO with our existing Major skills rather than rebuilding SEO tooling."
+    "Use OpenSEO with our existing Major skills rather than rebuilding SEO tooling.",
+    "Take these learnings about founder-led SEO and LinkedIn articles, build a sourced content experiment, and verify our site.",
+    "Use the Instagram SEO ranking Reel idea to incorporate original experience-led content with a LinkedIn distribution test."
   ],
   "should_not_trigger": [
     "Fix the spacing on this dashboard card.",
     "Why is this SQL query slow?",
     "Draft a cold email to this prospect.",
-    "Make this animation smoother."
+    "Make this animation smoother.",
+    "Write a LinkedIn direct message asking for a coffee chat.",
+    "Edit the opening paragraph of my autobiographical story without changing any SEO."
   ],
   "conflicts": [
     "website-design-qa owns broad visual/responsive/launch quality; compose it when SEO work touches production-site QA. knowledge-work provides general research rigor; seo-os owns the SEO-specific decision model. open-source-leverage and prior-art-discovery own the general reuse gate; seo-os applies it specifically to SEO providers such as OpenSEO."

@@ -18,7 +18,10 @@ describe('release test scheduling', () => {
     const resourceConfig = readFileSync(join(root, 'vitest.resource.config.ts'), 'utf8');
 
     expect(packageJson.scripts.test).toBe(
-      'pnpm test:parallel && pnpm test:resource && pnpm test:isolated-resource',
+      'pnpm test:seo && pnpm test:parallel && pnpm test:resource && pnpm test:isolated-resource',
+    );
+    expect(packageJson.scripts['test:seo']).toBe(
+      'node --test scripts/seo-content-experiment.test.mjs',
     );
     expect(packageJson.scripts['test:parallel']).toBe('vitest run');
     expect(packageJson.scripts['test:resource']).toBe(

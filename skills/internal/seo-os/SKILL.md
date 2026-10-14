@@ -136,6 +136,18 @@ Treat architecture as a search system, not just navigation polish. Evaluate:
 
 Prefer systematic internal-link improvements tied to page roles and opportunity value over arbitrary link counts.
 
+## Founder-led search capture and distribution
+
+When the request involves an SEO-content experiment, publishing from firsthand experience, LinkedIn articles, "rank fast" tactics, or a video promising rapid Google rankings, load `references/founder-led-search-experiment.md` and use its research → verified experience → editorial → owned-site → distribution → measurement gates.
+
+- A high-authority LinkedIn article ranking for one narrow query is **not** proof the owner's website will rank, or that it drove leads. Treat it as a testable distribution hypothesis.
+- Search demand, live SERP competitors, indexing and ranking are separate observations. Never fabricate or conflate them.
+- Primary editorial value belongs on an owned, indexable website page when commercially and strategically appropriate. Adapt a **distinct** LinkedIn article with context and a relevant reference link, rather than duplicating text at scale.
+- Require at least one independently traceable firsthand source; do not invent operator experiences, metrics, quotes, clients, or unpublished details. Hold for owner/client approval when necessary.
+- Use Google Search Console and sitemaps for ordinary content discovery. Google's Indexing API is only for eligible job-posting or broadcast-event pages. Avoid third-party forced-indexing services, PBNs, paid links, and manipulative parasite/site-reputation schemes.
+- Prepare, audit and measure automatically where safe; do **not** publish on behalf of the owner, impersonate them on LinkedIn, or incur spend without approval.
+- Use `node scripts/seo-content-experiment.mjs <experiment.json> [--live] [--out <directory>]` from the Major repository for the reproducible brief and live technical preflight. Record unconnected GSC/analytics as "unknown", never zero.
+
 ## Content
 
 Content work must match search intent **and** create business value. Assess:

@@ -3315,7 +3315,7 @@
       "shortDescription": "Use for substantive SEO, search growth, technical SEO, keyword/content opportunity research, site architecture, authority/link work, local SEO, AI-search visibility/GEO/AEO, SEO measurement, or autonomous SEO improvement. Orchestrates evidence, prioritisation, safe execution, verification and learning while reusing OpenSEO and other mature providers instead of rebuilding commodity tooling.",
       "aliases": [],
       "triggerConditions": [
-        "seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking"
+        "seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking-founder-led-content-linkedin-article-distribution-firsthand-evidence-search-experiment-publishing-serp-test"
       ],
       "category": "uncategorized",
       "version": "23",
@@ -3332,7 +3332,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 23,
-      "contentSha256": "b20e0b0355bd512440f116611e8c7bf06ac6409035a967569a526d8b16def230",
+      "contentSha256": "f6ab74623a31007252d0c8dd814810a2d553f6b4c1a094f2a0f434448e41ab09",
       "triggers": [
         "seo",
         "search",
@@ -3368,7 +3368,20 @@
         "seo",
         "openseo",
         "rank",
-        "tracking"
+        "tracking",
+        "founder",
+        "led",
+        "content",
+        "linkedin",
+        "article",
+        "distribution",
+        "firsthand",
+        "evidence",
+        "search",
+        "experiment",
+        "publishing",
+        "serp",
+        "test"
       ]
     },
     {

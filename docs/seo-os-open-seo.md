@@ -1,6 +1,6 @@
 # SEO OS — OpenSEO integration memory
 
-Status: **standing reusable architecture decision; not yet a validated/published skill pack**
+Status: **standing reusable architecture decision. Founder-led distribution pilot added and dry-run tested 2026-10-14; the entire OpenSEO provider/skill bundle is not yet fully validated or published.**
 
 Date: 2026-08-20
 
