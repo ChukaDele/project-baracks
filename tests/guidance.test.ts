@@ -61,16 +61,40 @@ describe('guidance registries', () => {
     expect(pilot).toContain('same-provider grade is accepted');
     expect(pilot).not.toContain('refuses the grade when the provider matches');
   });
-  it('routes relevant Knowledge Library context', () => {
+  it('routes curated Knowledge Library context without raw ContextBolt fallback', () => {
     const guide = readFileSync('guidance/tool-routing-and-source-ingestion.md', 'utf8');
     const core = readFileSync('templates/project/major-core.md', 'utf8');
-    expect(guide).toContain('Automatically consult');
+    expect(guide).toContain('authoritative source for distilled cross-topic knowledge');
     expect(guide).toContain('Notion');
     expect(guide).toContain('ContextBolt');
     expect(guide).toContain('GBrain');
     expect(guide).toContain('Eagle');
-    expect(guide).toContain('Runtime access must be proven');
-    expect(guide).toContain('Never ingest the entire corpus into a prompt');
+    expect(guide).toContain('Runtime access check');
+    expect(guide).toContain('ContextBolt is excluded from automatic retrieval');
+    expect(guide).toContain('explicit ingestion and triage tool only');
+    expect(guide).toContain('never silent ContextBolt substitution');
+    expect(guide).toContain('the Notion Knowledge Bank');
+    expect(guide).toContain('current project decision outranks an older global Notion note');
+    expect(guide).toContain(
+      'updating Notion, GBrain or any maintained knowledge record requires explicit owner authorization',
+    );
+    expect(guide).toContain('Do not put full private library content into logs');
+    expect(guide).not.toContain('ContextBolt original saves');
+    expect(guide).not.toContain('search_bookmarks');
+    expect(guide).not.toContain(
+      'When examples, source links or conflicting evidence matter, use the installed',
+    );
+    expect(core).toContain('Do not automatically retrieve ContextBolt');
+    expect(core).toContain('If Notion is unavailable or no maintained Knowledge Piece');
+    expect(core).toContain('Never substitute untriaged saves');
     expect(core).toContain('Knowledge Library lookup when relevant');
+
+    const audit = readFileSync('docs/skill-activation-knowledge-library-audit.md', 'utf8');
+    expect(audit).toContain('not fully triaged');
+    expect(audit).toContain(
+      'Only **Notion** is required for automatic curated-knowledge retrieval',
+    );
+    expect(audit).toContain('ContextBolt: optional for explicit triage only');
+    expect(audit).not.toContain('codex mcp login contextbolt-bookmarks');
   });
 });
