@@ -104,25 +104,22 @@ Use the appropriate native parser/skill before OCR or screenshots. Use rendered 
 
 Use native vision for understanding. Use image-generation/editing tools for actual image transformation rather than describing edits that were not performed.
 
-## Maintained personal Knowledge Library retrieval
+## Curated Knowledge Library retrieval — Notion is the cross-topic authority
 
-**Automatically consult the owner's prior knowledge when it can materially improve a substantive task.** Good triggers include research/strategy, product decisions, prior-art discovery, brand/design references, career systems, reusable agent workflows, or explicit references to saved material and earlier decisions. Decide relevance quickly. Avoid library retrieval for unrelated narrow code edits, arithmetic, trivial answers or current system-status checks.
+**The maintained Notion Knowledge Library is the authoritative source for distilled cross-topic knowledge.** For substantive research, strategy, product decisions, writing, career systems, design references, prior-art discovery or reusable agent workflows, assess whether a Knowledge Piece could materially improve the task. If yes, search the relevant Knowledge Bank and fetch the best 1–3 maintained Notion Knowledge Pieces before relying on prior lessons. Inspect review date, thesis, supporting primary evidence, caveats and contradictions. Skip retrieval for unrelated narrow code edits, arithmetic and trivial lookups.
 
-The maintained knowledge hierarchy is:
+**Source precedence**
 
-1. **Project truth and GBrain:** Inspect relevant project files and `LEARNINGS.md`; use scoped GBrain decisions, patterns and outcomes when a real GBrain read capability is available. A current project decision outranks an older global note. Never import confidential data from another client.
-2. **Maintained Notion synthesis:** Search the connected **Chuka Knowledge Library**, navigate the relevant Knowledge Bank and fetch 1–3 maintained Knowledge Pieces. Check the source trail, last review date, thesis, exceptions and contradictions. This synthesis outranks an unreviewed saved post.
-3. **ContextBolt original saves:** When examples, source links or conflicting evidence matter, use the installed `search_bookmarks` connector, optionally expanding a relevant topic cluster. Do not bulk-export thousands of saves. A bookmark is a lead, not automatically a true fact.
-4. **Eagle visual references:** For visual tasks, use the corresponding Design Knowledge Piece and Eagle reference set when authorized and available. Do not assume inspiration assets are licensed for reuse.
-5. **Raw local corpus:** Only if maintained pieces and source connectors are insufficient, inspect bounded, relevant portions of the user-owned local archive with appropriate permissions. Never ingest the entire corpus into a prompt, check it into Git, or send unrelated project/PII information to another client or provider.
+1. For the *current project's operational state*, use authorized project files and project-scoped GBrain records. A current project decision outranks an older global Notion note. Do not mix data from unrelated clients or projects.
+2. For *maintained conceptual knowledge*, use the Notion Knowledge Bank → comprehensive Knowledge Piece. GBrain notes or saved social posts are not substitutes for a maintained Notion synthesis.
+3. For facts that decay (regulations, finance, vendor behavior, prices, external tools), verify against the latest primary/official evidence. If Notion and current evidence disagree, keep the distinction visible.
+4. For design tasks, inspect the appropriate maintained Notion Design Knowledge Piece and optionally Eagle for visual references when authorized. Do not assume inspiration media or assets are licensed for copying.
 
-**Runtime access must be proven.** Prefer native Notion search/fetch, ContextBolt MCP bookmark search and the authorized local GBrain CLI. A ChatGPT connection does not automatically make these available in Claude, Codex or Major. Run a real read in the current host before reporting a source as accessible. If a connector is unavailable, use the remaining permitted sources, report the limitation, and do not fabricate library findings or extract credentials.
+**ContextBolt is excluded from automatic retrieval.** Its saved bookmarks, social posts and raw X/Instagram corpus are not completely reviewed, distilled or triaged. Do not call ContextBolt, inject its unreviewed content, or use it as a fallback if a Notion query returns no result. It is an **explicit ingestion and triage tool only**: use it when the owner directly requests review, mining, source-level comparison or backfill; label its contents unverified and reconcile them into a maintained Notion Knowledge Piece before treating them as operational knowledge. Do not bulk export, paste raw corpora into prompts, send unrelated client/PII material to another project or provider, or bypass client-data boundaries.
 
-**Freshness:** Reverify time-sensitive claims (laws, tools, vendor behaviour, prices, finance, immigration, regulations) from current primary sources. Preserve disagreements with the maintained piece rather than silently overwriting it. Attribute decisions and claims to the actual source.
+**Runtime access check:** Prefer the native connected Notion search-and-fetch API. Installed or ChatGPT-connected does not mean Claude, Codex or Major is authenticated; verify an actual Knowledge Piece fetch in the current host before reporting it as operational. When Notion is unavailable or no piece covers the question, say so and proceed with current project state and verified primary research, never silent ContextBolt substitution. Do not fabricate a Knowledge Piece, claim a page was read when access failed, or attempt to extract private connector credentials.
 
-**Bounded receipt and privacy:** Record which relevant Knowledge Piece or GBrain note was read, which supporting bookmarks were used, and meaningful gaps. Do not put full private content in logs, public repositories or broad shared memory. Retrieval is read-only by default. Updating the maintained synthesis, bookmarks or GBrain requires a user-authorized write and review.
-
-This is triggered source retrieval, not an always-on context dump, background sync, competing skill registry, or permission to cross project boundaries.
+Record which Notion piece was consulted, its date and material gaps. Retrieve in proportion to the task, preserve disagreements and attribute critical factual claims to the primary evidence or relevant Notion piece. Do not put full private library content into logs, public repositories, broad shared memory or unrelated project contexts. Retrieval is read-only by default; updating Notion, GBrain or any maintained knowledge record requires explicit owner authorization. This is not an always-on context dump or a separate skill router.
 
 ## Provenance
 
