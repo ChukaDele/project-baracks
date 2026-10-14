@@ -104,7 +104,8 @@
       "id": "website-design-qa",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa"
+      "load": "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa",
+      "version": 24
     },
     {
       "id": "seo-os",
