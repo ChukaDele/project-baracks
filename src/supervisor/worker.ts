@@ -30,6 +30,7 @@ import {
   extractProviderUsage,
   parseProviderEventLine,
 } from '../providers/evidence.js';
+import type { Effort } from '../routing/router.js';
 import type { ProviderApprovalAuthority } from '../security/provider-approval-policy.js';
 import type { ApprovalCategory } from '../security/provider-approval-policy.js';
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
@@ -147,12 +148,14 @@ export function workerCommand(
   prompt: string,
   modelRef?: string,
   resumeSessionRef?: string,
+  effort?: Effort,
 ): { command: string; args: string[] } {
   return {
     command: providerExecutable(host),
     args: providerArgs(host, {
       prompt,
       modelRef,
+      effort,
       outputMode: 'batch',
       ...(resumeSessionRef ? { resumeSessionRef } : {}),
     }),
@@ -357,6 +360,7 @@ export async function runWorker(input: {
   resourceId?: string;
   timeoutMs?: number;
   modelRef?: string;
+  effort?: Effort;
   accountLabel?: string;
   resumeSessionRef?: string;
   approvalAuthority?: ProviderApprovalAuthority;
@@ -434,7 +438,13 @@ export async function runWorker(input: {
       ...(input.accountLabel ? { accountLabel: input.accountLabel } : {}),
     };
     const runProvider = (resumeSessionRef?: string) => {
-      const spec = workerCommand(input.host, input.prompt, input.modelRef, resumeSessionRef);
+      const spec = workerCommand(
+        input.host,
+        input.prompt,
+        input.modelRef,
+        resumeSessionRef,
+        input.effort,
+      );
       return runGatewayCommand({
         executable: spec.command,
         args: spec.args,

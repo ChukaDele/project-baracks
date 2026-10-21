@@ -244,6 +244,7 @@ describe('Major coordinator contract', () => {
         provider: 'codex#default',
         accountLabel: 'default',
         modelRef: 'gpt-5-codex',
+        effort: 'high',
         reason: 'subscription route',
       },
       skills: ['tdd'],
@@ -330,6 +331,7 @@ describe('Major coordinator contract', () => {
           provider: 'codex#default',
           accountLabel: 'default',
           modelRef: 'gpt-5-codex',
+          effort: 'high',
           reason: 'subscription route',
         },
         skills: [],
@@ -363,6 +365,7 @@ describe('Major coordinator contract', () => {
           provider: 'claude-code#review',
           accountLabel: 'review',
           modelRef: 'claude-opus-4-1',
+          effort: 'high',
           reason: 'subscription route',
         },
         () => new Date('2026-08-20T12:00:00.000Z'),
@@ -749,6 +752,7 @@ describe('Major coordinator contract', () => {
     expect(prompt).toContain('A completed goal alone is not proof that a capability was used');
     expect(prompt).toContain('Speed and MVP are the default');
     expect(prompt).toContain('Make it work, make it useful, then improve it');
+    expect(prompt).toContain('LEAN CODING (ponytail, full)');
     expect(prompt).toContain(
       'Reuse the existing project, validated capability, maintained library or skill before building a new subsystem',
     );

@@ -1,4 +1,5 @@
 import type { ExecuteRequest } from './types.js';
+import type { Effort } from '../routing/router.js';
 import { configuredExecutionPath } from '../execution/path.js';
 
 export type ProviderCommandHost = 'claude' | 'codex' | 'cursor' | 'antigravity';
@@ -7,6 +8,8 @@ export type ProviderOutputMode = 'batch' | 'stream';
 export interface ProviderCommandRequest {
   prompt: string;
   modelRef?: string | undefined;
+  /** Omitted keeps the provider default. Cursor ACP and Antigravity take none. */
+  effort?: Effort | undefined;
   resumeSessionRef?: string | undefined;
   outputMode: ProviderOutputMode;
 }
@@ -62,6 +65,7 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
       if (request.resumeSessionRef) args.push('--resume', request.resumeSessionRef);
       else args.push('--no-session-persistence');
       if (request.modelRef && request.modelRef !== 'auto') args.push('--model', request.modelRef);
+      if (request.effort) args.push('--effort', request.effort);
       return args;
     }
     case 'codex': {
@@ -89,6 +93,7 @@ export function providerArgs(host: ProviderCommandHost, request: ProviderCommand
       if (request.modelRef && request.modelRef !== 'auto') {
         args.splice(1, 0, '--model', request.modelRef);
       }
+      if (request.effort) args.splice(1, 0, '-c', `model_reasoning_effort="${request.effort}"`);
       return args;
     }
     case 'cursor': {

@@ -48,7 +48,7 @@ import {
   recordModelOutcome,
 } from '../providers/discovery-store.js';
 import type { ProviderInfo } from '../providers/types.js';
-import { route, type RoutingRequest } from '../routing/router.js';
+import { route, type Effort, type RoutingRequest, type TargetClass } from '../routing/router.js';
 import {
   compareSubscriptionAccounts,
   contextContinuity,
@@ -327,6 +327,7 @@ export type CoordinatorSelection =
        * named Codex account uses its own isolated auth slot. */
       accountLabel: string;
       modelRef: string;
+      effort: Effort;
       reason: string;
     }
   | { kind: 'checkpoint'; reason: string };
@@ -391,18 +392,52 @@ function selectCoordinatorForRequest(
     provider: decision.provider,
     accountLabel: parsed.accountLabel,
     modelRef: decision.modelRef,
+    effort: decision.effort,
     reason: pooled.reason ? `${pooled.reason}; ${decision.reason}` : decision.reason,
   };
+}
+
+/** Strongest class, high effort. Used when Major has no task facts and for
+ * the independent completion review, which is adversarial by design. */
+export const STRONGEST_ROUTING_REQUEST: RoutingRequest = {
+  purpose: 'analysis',
+  complexity: 'architectural',
+};
+
+/** Deterministic task class -> routing request, from Major's own admission
+ * risk assessment (outcome text, required operations, project policy):
+ *   high_consequence (authority/security/persistence/external/...) -> fable, high
+ *   substantive implementation                                    -> opus, medium
+ *   bounded (small, mechanical, no risk signal)                    -> sonnet, low
+ *   unassessed                                                     -> fable, high
+ * Repeated failures still escalate the class through the router. */
+export function taskRoutingRequest(goal: SupervisorGoal): RoutingRequest {
+  const assessment = goal.admissionRiskAssessment;
+  const repair = goal.consecutiveFailures > 0 ? { repairAttempts: goal.consecutiveFailures } : {};
+  switch (assessment?.classification) {
+    case 'high_consequence':
+      return {
+        purpose: 'implementation',
+        complexity: 'architectural',
+        riskLevel: assessment.risk.touchesSecurity ? 'security_sensitive' : 'high',
+        targetClass: 'fable',
+        ...repair,
+      };
+    case 'substantive':
+      return { purpose: 'implementation', complexity: 'complex', targetClass: 'opus', ...repair };
+    case 'bounded':
+      return { purpose: 'implementation', complexity: 'routine', targetClass: 'sonnet', ...repair };
+    default:
+      return { ...STRONGEST_ROUTING_REQUEST, ...repair };
+  }
 }
 
 export function selectCoordinator(
   goal: SupervisorGoal,
   providers: ProviderInfo[],
+  request: RoutingRequest = taskRoutingRequest(goal),
 ): CoordinatorSelection {
-  return selectCoordinatorForRequest(goal, providers, {
-    purpose: 'analysis',
-    complexity: 'architectural',
-  });
+  return selectCoordinatorForRequest(goal, providers, request);
 }
 
 function implementedByProvider(goal: SupervisorGoal): string | undefined {
@@ -418,10 +453,12 @@ export async function selectCoordinatorSmart(
   goal: SupervisorGoal,
   providers: ProviderInfo[],
   adapter?: DecisionAdapter,
+  ownerTargetClass?: TargetClass,
 ): Promise<CoordinatorSelection> {
   const policy = getProjectPolicy(goal.project, goal.repoPath);
+  const owner = ownerTargetClass ? { targetClass: ownerTargetClass } : {};
   if (!decisionKernelEnabled(adapter) || !semanticEgressAllowed(policy)) {
-    return selectCoordinator(goal, providers);
+    return selectCoordinator(goal, providers, { ...taskRoutingRequest(goal), ...owner });
   }
   const classification = await classifyRoutingRequest(goal.goal, {
     ...(adapter ? { adapter } : {}),
@@ -431,6 +468,7 @@ export async function selectCoordinatorSmart(
     complexity: classification.complexity,
     riskLevel: classification.riskLevel,
     ...(goal.consecutiveFailures > 0 ? { repairAttempts: goal.consecutiveFailures } : {}),
+    ...owner,
   };
   if (request.purpose === 'review') {
     const provider = implementedByProvider(goal);
@@ -447,6 +485,7 @@ export function routeGoalExecution(
   options: {
     eligibleHosts?: readonly WorkerHost[];
     excludedCapacityKeys?: readonly string[];
+    request?: RoutingRequest;
   } = {},
 ): CoordinatorSelection {
   assertExecutionAllowed(getProjectPolicy(goal.project, goal.repoPath));
@@ -464,7 +503,7 @@ export function routeGoalExecution(
       }
       return true;
     });
-    selection = selectCoordinator(goal, eligibleProviderInfos);
+    selection = selectCoordinator(goal, eligibleProviderInfos, options.request);
     if (selection.kind === 'route') {
       const routedSelection = selection;
       const selectedModel = providerInfos
@@ -501,6 +540,8 @@ export async function routeGoalExecutionSmart(
     eligibleHosts?: readonly WorkerHost[];
     excludedCapacityKeys?: readonly string[];
     adapter?: DecisionAdapter;
+    /** Owner `--model <class>` override for this dispatch. */
+    targetClass?: TargetClass;
   } = {},
 ): Promise<CoordinatorSelection> {
   assertExecutionAllowed(getProjectPolicy(goal.project, goal.repoPath));
@@ -518,7 +559,12 @@ export async function routeGoalExecutionSmart(
       }
       return true;
     });
-    selection = await selectCoordinatorSmart(goal, eligibleProviderInfos, options.adapter);
+    selection = await selectCoordinatorSmart(
+      goal,
+      eligibleProviderInfos,
+      options.adapter,
+      options.targetClass,
+    );
     if (selection.kind === 'route') {
       const routedSelection = selection;
       const selectedModel = providerInfos
@@ -729,6 +775,22 @@ function trustContract(policy: ProjectPolicy): string {
 - Client data and PII stay inside the project boundary. Never use client/candidate data as global training/memory material.`;
 }
 
+/** Ponytail (full) for code-changing workers. Interactive Claude/Codex sessions
+ * get ponytail from a plugin hook, but Major workers run with --safe-mode
+ * (Claude) and --ignore-user-config (Codex), so the prompt must carry it. */
+export const LEAN_CODING_CONTRACT = `LEAN CODING (ponytail, full):
+- Understand the task and trace the code it touches first. Then stop at the first rung that holds: not needed at all (say so) -> already in this codebase -> standard library -> native platform feature -> installed dependency -> one line -> the minimum code that works.
+- No unrequested abstraction, interface with one implementation, config for a fixed value, or scaffolding for later. Prefer deletion. Fewest files, shortest correct diff.
+- Fix the root cause once where all callers route through, not one guard per caller.
+- Never simplify away validation at trust boundaries, data-loss handling, security controls, accessibility basics, or anything explicitly requested.
+- Mark a deliberate shortcut with a known ceiling with a \`ponytail:\` comment naming the ceiling and the upgrade path.
+- Non-trivial logic leaves one small runnable check that fails if the logic breaks.`;
+
+/** Ponytail-review lens for the independent review gate. Advisory only: it
+ * informs the evidence but never decides the verdict by itself. */
+export const LEAN_REVIEW_LENS =
+  'Also apply the ponytail-review lens: list over-engineering in the evidence (unrequested abstraction, re-implemented existing helpers, dead scaffolding, a longer diff than needed). These findings are advisory and do not fail the review unless they cause a correctness, security, or contract defect.';
+
 export function coordinatorPrompt(
   goal: SupervisorGoal,
   capabilities: readonly CapabilityRecord[] = [],
@@ -842,6 +904,7 @@ Use this exact optional field for that evidence:
 
 ${formatCodexCapacityOverview(readCodexUsageReport())}
 ${writingOutputContract}
+${resolvedWritingRoute ? '' : LEAN_CODING_CONTRACT}
 
 Before any substantive mutation, confirm the embedded CANONICAL TARGET and the source tree in your current cwd describe the same project. Do not treat a provider-boundary restriction as identity failure. If the task clearly belongs to another known project, do not patch the current worktree. Use project-context-integrity and reroute when unambiguous; ask only if the target is genuinely ambiguous. A correct fix in the wrong project is a failed task.
 
@@ -1153,7 +1216,7 @@ export function supervisorRunInsight(input: {
 
 export async function runGoalCycle(
   goalId: string,
-  options: { maxTimeoutMs?: number } = {},
+  options: { maxTimeoutMs?: number; targetClass?: TargetClass } = {},
 ): Promise<GoalCycleOutcome> {
   recoverSupervisorCompletion(goalId);
   const goal = getGoal(goalId);
@@ -1168,7 +1231,7 @@ export async function runGoalCycle(
     if (goal.pendingCompletion) {
       await runPendingCompletionReview(goal, options.maxTimeoutMs, writerFence);
     } else {
-      await runLockedGoalCycle(goal, options.maxTimeoutMs, writerFence);
+      await runLockedGoalCycle(goal, options.maxTimeoutMs, writerFence, options.targetClass);
     }
     return { ranCycle: true };
   } finally {
@@ -1243,6 +1306,7 @@ async function runPendingCompletionReview(
   }
   const selection = routeGoalExecution(goal, {
     excludedCapacityKeys: priorAttempts.map((attempt) => attempt.capacityKey),
+    request: STRONGEST_ROUTING_REQUEST,
   });
   if (selection.kind === 'checkpoint') {
     updateGoal(goal.id, {
@@ -1336,6 +1400,7 @@ async function runPendingCompletionReview(
     cwd: goal.repoPath,
     timeoutMs: maxTimeoutMs ?? 15 * 60 * 1000,
     modelRef: selection.modelRef,
+    effort: selection.effort,
     accountLabel: selection.accountLabel,
     readOnly: true,
     prompt:
@@ -1349,6 +1414,7 @@ async function runPendingCompletionReview(
         : '') +
       `Canonical task ID: ${pending.taskId ?? 'none'}\nClaim: ${pending.summary}\n` +
       `Use read-only exact-head checks. Do not implement, merge, install, or trust the completing worker's conclusion.\n` +
+      `${LEAN_REVIEW_LENS}\n` +
       `End with exactly one provider-owned line: MAJOR_RESULT: {"status":"active","summary":"review summary","independentReview":{"purpose":"independent_completion_review","goalId":"${goal.id}","sourceHead":"${pending.sourceHead}","verdict":"pass|fail","evidence":"specific evidence"}}`,
   });
   const runStatusState = openDb();
@@ -1660,10 +1726,12 @@ export async function runForegroundGoal(
   goalId: string,
   options: {
     maxRunMinutes?: number;
+    /** Owner `--model <class>` override, applied to every hop of this dispatch. */
+    targetClass?: TargetClass;
     /** Injectable for tests; defaults to the real single-cycle dispatch. */
     runCycle?: (
       goalId: string,
-      cycleOptions?: { maxTimeoutMs?: number },
+      cycleOptions?: { maxTimeoutMs?: number; targetClass?: TargetClass },
     ) => Promise<GoalCycleOutcome>;
   } = {},
 ): Promise<ForegroundGoalOutcome> {
@@ -1674,7 +1742,10 @@ export async function runForegroundGoal(
   for (let hop = 0; hop < FOREGROUND_CONTINUATION_HOP_LIMIT; hop++) {
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) break;
-    const { ranCycle } = await runCycle(goalId, { maxTimeoutMs: remainingMs });
+    const { ranCycle } = await runCycle(goalId, {
+      maxTimeoutMs: remainingMs,
+      ...(options.targetClass ? { targetClass: options.targetClass } : {}),
+    });
     // The repo lock was held by another integration owner, or the goal hit
     // an early-return path (already done/paused/awaiting completion): this
     // call contributed nothing. Stop rather than hot-loop or fabricate a
@@ -1702,10 +1773,11 @@ async function runLockedGoalCycle(
   goal: SupervisorGoal,
   maxTimeoutMs?: number,
   writerFence?: RepositoryWriterFence,
+  targetClass?: TargetClass,
 ): Promise<void> {
   const cycleStartedAtMs = Date.now();
   const policy = getProjectPolicy(goal.project, goal.repoPath);
-  const selection = await routeGoalExecutionSmart(goal);
+  const selection = await routeGoalExecutionSmart(goal, targetClass ? { targetClass } : {});
   if (selection.kind === 'checkpoint') {
     // No eligible capacity remains anywhere in the pool: a genuine stop, not
     // a hop the foreground continuation loop should chase further.
@@ -1951,6 +2023,7 @@ async function runLockedGoalCycle(
     // full maxRunMinutes allowances into a much longer total wall-clock.
     timeoutMs: Math.min(Math.max(1, policy.maxRunMinutes) * 60 * 1000, maxTimeoutMs ?? Infinity),
     modelRef: routedSelection.modelRef,
+    effort: routedSelection.effort,
     accountLabel: routedSelection.accountLabel,
     ...(writerFence ? { writerFence } : {}),
     ...(continuity.resumeSessionRef ? { resumeSessionRef: continuity.resumeSessionRef } : {}),
