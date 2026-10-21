@@ -113,9 +113,9 @@ function normalizePolicy(policy: ProjectPolicy): ProjectPolicy {
   const trustLimits = limitsFor(policy.trust);
   const normalized = {
     ...policy,
-    // Persisted policies from earlier releases cannot exceed the active
-    // runtime's truthful concurrency ceiling.
-    maxWorkers: Math.min(policy.maxWorkers ?? trustLimits.maxWorkers, trustLimits.maxWorkers),
+    // maxWorkers is always derived from trust, never owner-set, so a value
+    // persisted by an earlier release is replaced by the current ceiling.
+    maxWorkers: trustLimits.maxWorkers,
     maxRunMinutes: policy.maxRunMinutes ?? limitsFor(policy.trust).maxRunMinutes,
     allowPaidSpend: policy.allowPaidSpend ?? false,
     ownerApprovedBuild: policy.ownerApprovedBuild ?? false,

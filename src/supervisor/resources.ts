@@ -29,9 +29,10 @@ export interface ResourceLimits {
 
 export const GLOBAL_RESOURCE_LIMITS: ResourceLimits = {
   total: 6,
-  // Hard ceiling only. The active worker limit is derived from live host
-  // capacity by currentResourceLimits(); it is not a fixed governance count.
-  workers: 4,
+  // Workers have no ceiling of their own below the shared total: they may use
+  // any slot browsers and builds are not using. The active worker limit is
+  // derived from live host capacity by currentResourceLimits().
+  workers: 6,
   browsers: 2,
   builds: 1,
   maxSubagentDepth: 1,
@@ -251,21 +252,39 @@ export function availableMemoryPercent(): number {
   return Math.round((freemem() / totalmem()) * 100);
 }
 
+/** Planning estimate of one leased worker's resident memory. Leased workers
+ * are mostly API clients waiting on remote models, so this is deliberately a
+ * modest per-process figure rather than a model-runtime footprint. */
+export const WORKER_MEMORY_ESTIMATE_BYTES = 256 * 1024 * 1024;
+
+function workerMemoryEstimateBytes(): number {
+  const override = Number.parseInt(process.env.MAJOR_WORKER_MEMORY_MB ?? '', 10);
+  return Number.isInteger(override) && override > 0
+    ? override * 1024 * 1024
+    : WORKER_MEMORY_ESTIMATE_BYTES;
+}
+
 /**
- * Derive the active resource ceiling from the current host instead of the
- * retired DSH one-worker limit. The optional override is deliberately narrow:
- * it is useful for deterministic validation and an owner-controlled
- * workstation cap, but it can never exceed Major's hard ceiling.
+ * Derive the active worker limit from live host capacity: memory headroom
+ * above the soft floor, in bytes, divided by the per-worker estimate, bounded
+ * by CPU parallelism and the shared hard ceiling. It never drops below 1;
+ * below the soft floor capacityReason() queues all new work instead. The
+ * optional MAJOR_WORKER_LIMIT override is for deterministic validation and an
+ * owner-controlled workstation cap, and can never exceed the hard ceiling.
  */
 export function currentResourceLimits(): ResourceLimits {
+  const ceiling = GLOBAL_RESOURCE_LIMITS.workers;
   const override = Number.parseInt(process.env.MAJOR_WORKER_LIMIT ?? '', 10);
-  const cpuLimit = Math.max(1, Math.min(GLOBAL_RESOURCE_LIMITS.workers, availableParallelism()));
-  const memory = availableMemoryPercent();
-  const memoryLimit = memory < 40 ? 1 : memory < 60 ? 2 : GLOBAL_RESOURCE_LIMITS.workers;
-  const workers =
-    Number.isInteger(override) && override > 0
-      ? Math.min(GLOBAL_RESOURCE_LIMITS.workers, override)
-      : Math.min(cpuLimit, memoryLimit);
+  if (Number.isInteger(override) && override > 0) {
+    return { ...GLOBAL_RESOURCE_LIMITS, workers: Math.min(ceiling, override) };
+  }
+  // Headroom already reflects running workers' memory, so this counts them
+  // twice. That is conservative: queued work drains as memory frees.
+  const headroomPercent =
+    availableMemoryPercent() - GLOBAL_RESOURCE_LIMITS.softMemoryAvailablePercent;
+  const headroomBytes = (Math.max(0, headroomPercent) / 100) * totalmem();
+  const memoryLimit = Math.floor(headroomBytes / workerMemoryEstimateBytes());
+  const workers = Math.max(1, Math.min(ceiling, availableParallelism(), memoryLimit));
   return { ...GLOBAL_RESOURCE_LIMITS, workers };
 }
 

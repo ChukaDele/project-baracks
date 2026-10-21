@@ -16,7 +16,7 @@ Major is the standalone cross-project engineering harness for Bredge, client, pe
 - **MVP/speed is the default.** Large briefs become P0 MVP / P1 next / P2 later; P0 is built end to end before broad expansion.
 - **Proof-first, not Figma-first.** Use the fastest credible medium for the biggest uncertainty.
 - **Visible progress matters.** UI/interaction proof may lead backend via explicit replaceable mocks/contracts.
-- **Normal substantive concurrency:** Major derives worker, browser and build ceilings from live resource availability and task economics. The current guard permits up to four workers and six total active resources, but it does not promise that capacity or fill it automatically.
+- **Normal substantive concurrency:** Major derives worker, browser and build ceilings from live resource availability and task economics. The guard caps six total active resources; workers may use any slot browsers (2) and builds (1) leave free. The live worker limit is memory headroom above the soft floor divided by a per-worker estimate, bounded by CPU parallelism. It does not promise that capacity or fill it automatically.
 - **Worker pools:** Claude, Codex, Antigravity and Cursor when installed, authenticated and operational. Major routes by task fit, subscription capacity and observed outcomes. Codex is the currently proven host lane in this migration.
 - **Skills:** Major internal catalog + complete current Emil bundle for UI + selected Anthropic/OpenAI/graph skills by profile/trigger.
 - **Communication:** BLUF + ASD-STE100-inspired simplified technical English across supported worker global/project instructions.
