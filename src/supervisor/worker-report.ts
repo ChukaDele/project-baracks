@@ -67,17 +67,84 @@ export const DEFAULT_SUPERVISOR_PROMOTION_CONTRACT: SupervisorPromotionContract 
   repositoryPolicyRequiresBroadValidation: false,
 };
 
+/** Split camelCase and treat `_`/`-` as spaces, so operation ids
+ * (`completion_policy`, `deleteUser`, `git-push`) match like prose. */
+const riskText = (fact: string): string =>
+  fact
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    // `CSRFToken` -> `CSRF Token`, but `OAuth2`/`PRs`/`IDs`/`JWTs` stay whole.
+    .replace(/([A-Z]{2,})([A-Z][a-z]{2})/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+
+/** Whole-word match on riskText, so incidental substrings (`preview`,
+ * `dropdown`, `tokenizer`) do not fire. */
+const words = (alternatives: string): RegExp => new RegExp(`\\b(?:${alternatives})\\b`, 'i');
+
+/** Up to two filler words between a verb and its object ("drop the users table"). */
+const GAP = '(?:\\w+ ){0,2}';
+
+// Generic words (session, role, push, shared, drop, review) are only risky in
+// a qualified form; alone they fire on ordinary UI and tooling goals. When in
+// doubt, match: under-classifying security or authority weakens review depth.
 const RISK_CRITERIA: readonly [keyof SdlcRisk, RegExp, string][] = [
-  ['touchesAuthority', /authority|permission|policy|promotion|completion|review/i, 'authority'],
-  ['touchesPersistence', /database|sqlite|schema|migration|persist|storage/i, 'persistence'],
+  [
+    'touchesAuthority',
+    words(
+      'authorit(?:y|ies)|permissions?|polic(?:y|ies)|promot(?:e|es|ed|ing|ion|ions)|completion|' +
+        'reviewers?|(?:independent|required|mandatory|code|pr|adversarial) reviews?|' +
+        'reviews? (?:gate|policy|depth|requirements?|approvals?)|' +
+        `(?:bypass|skip|require|request|need)\\w* ${GAP}reviews?|review ${GAP}(?:pr|pull request|diff)s?`,
+    ),
+    'authority',
+  ],
+  [
+    'touchesPersistence',
+    words('databases?|db|sqlite|postgres\\w*|schemas?|migrat\\w*|persist\\w*|storage'),
+    'persistence',
+  ],
   [
     'touchesSecurity',
-    /security|secret|credential|\bauth\b|authentication|authorization|login|sign[- ]?in|session|access[- ]?control|identity|token|oauth|mfa|2fa|role|privilege|encryption|privacy|pii/i,
+    words(
+      'security|secrets?|credentials?|passwords?|auth|authn|authz|(?:un)?authenticat\\w*|(?:un)?authori[sz]\\w*|' +
+        'log ?(?:in|ins|ged in)|sign(?:s|ed|ing)? ?(?:in|on)|sso|access ?controls?|rls|' +
+        'identit(?:y|ies)|oauth\\w*|mfa|2fa|rbac|privileges?|(?:en|de)crypt\\w*|privacy|pii|jwts?|csrf|api ?keys?|signatures?|sign(?:ing|ed)? (?:urls?|requests?|keys?)|(?:urls?|requests?) sign(?:ing|ed|atures?)?|' +
+        // ponytail: design tokens and token budget/usage are UI or LLM cost, not security; extend the exclusion list if more cost terms appear.
+        '(?<!design )tokens?(?! (?:budgets?|usage|counts?|limits?|diet|costs?|spend))|' +
+        'sessions? (?:tokens?|cookies?|fixation|hijack\\w*|expir\\w*|revo[ck]\\w*|timeouts?|security|management|ids?|keys?|secrets?)|' +
+        `(?:invalidat|expir|revok|terminat|hijack|rotat)\\w* ${GAP}sessions?|` +
+        'roles? (?:based|assignments?|permissions?|checks?|guards?|hierarch\\w*|escalation)|' +
+        `(?:assign|grant|revok|check|elevat|chang|remov)\\w* ${GAP}roles?|(?:user|admin|member|owner) roles?`,
+    ),
     'security',
   ],
-  ['externalEffect', /deploy|publish|push|merge|external[_ -]?write/i, 'external effect'],
-  ['irreversible', /irreversible|destructive|delete|drop/i, 'irreversibility'],
-  ['broadBlastRadius', /shared|global|runtime|installer|broad/i, 'blast radius'],
+  [
+    'externalEffect',
+    words(
+      'deploy\\w*|publish\\w*|(?:auto ?)?merg(?:e|es|ed|ing)|external ?writes?|' +
+        '(?:git|force) push\\w*|push\\w* (?:\\w+ )?(?:force|f)|' +
+        `push\\w* ${GAP}to (?:main|master|prod\\w*|origin|remote|github|upstream)`,
+    ),
+    'external effect',
+  ],
+  [
+    'irreversible',
+    words(
+      'irreversibl\\w*|destructive|delet(?:e|es|ed|ing|ion|ions)|truncat\\w*|wip(?:e|es|ed|ing)|purg(?:e|es|ed|ing)|' +
+        'rm rf|reset hard|' +
+        `drop\\w* ${GAP}(?:tables?|columns?|databases?|index(?:es)?|schemas?|data|users?|records?|rows?)`,
+    ),
+    'irreversibility',
+  ],
+  [
+    'broadBlastRadius',
+    words(
+      'global(?:ly)?|installers?|broad|' +
+        'shared (?:\\w+ )?(?:state|memory|dependency|dependencies|librar(?:y|ies)|config\\w*|database|infra\\w*|runtime)|' +
+        '(?:supervisor|major|production) runtime',
+    ),
+    'blast radius',
+  ],
 ];
 
 const SUBSTANTIVE_OUTCOME =
@@ -102,7 +169,7 @@ export function assessSupervisorAdmissionRisk(input: {
       materialRiskCriteria: ['authority', 'blast radius'],
     };
   }
-  const facts = [outcome, ...operations];
+  const facts = [outcome, ...operations].map(riskText);
   const risk: SdlcRisk = {};
   const materialRiskCriteria: string[] = [];
   for (const [field, pattern, criterion] of RISK_CRITERIA) {
