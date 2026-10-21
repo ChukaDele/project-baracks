@@ -4,6 +4,10 @@ import type { ModelState, ProviderInfo } from '../providers/types.js';
 import { isCapabilityAvailable } from '../security/capabilities.js';
 
 export type RiskLevel = 'normal' | 'high' | 'security_sensitive';
+/** Reasoning effort passed to providers that accept one (Claude, Codex). */
+export type Effort = 'low' | 'medium' | 'high';
+export type TargetClass = Exclude<RoutingClass, 'unknown' | 'codex'>;
+export const TARGET_CLASSES: readonly TargetClass[] = ['fable', 'opus', 'sonnet'];
 
 export interface RoutingRequest {
   purpose: RunPurpose;
@@ -15,6 +19,8 @@ export interface RoutingRequest {
   repairAttempts?: number;
   /** Explicit approval for paid capacity. Subscription-included capacity needs none. */
   approvedPaidUsage?: { decisionId: string };
+  /** Task-class or owner choice. Replaces the purpose/complexity default; repair escalation still applies. */
+  targetClass?: TargetClass;
 }
 
 export interface RoutingOptions {
@@ -34,6 +40,7 @@ export type RoutingDecision =
       modelRef: string;
       routingClass: RoutingClass;
       billingMode: BillingMode;
+      effort: Effort;
       reason: string;
       paidUsageDecisionId?: string;
       independenceLoss?: string;
@@ -54,19 +61,21 @@ const FREE_BILLING: BillingMode = 'subscription_included';
 const LADDERS: Record<Exclude<RoutingClass, 'unknown'>, RoutingClass[]> = {
   fable: ['fable', 'opus', 'codex', 'sonnet'],
   opus: ['opus', 'fable', 'codex', 'sonnet'],
-  sonnet: ['sonnet', 'codex', 'opus'],
+  sonnet: ['sonnet', 'codex', 'opus', 'fable'],
   codex: ['codex', 'opus', 'sonnet', 'fable'],
 };
 
-function escalate(target: Exclude<RoutingClass, 'unknown' | 'codex'>): typeof target {
+function escalate(target: TargetClass): TargetClass {
   if (target === 'sonnet') return 'opus';
   if (target === 'opus') return 'fable';
   return 'fable';
 }
 
-export function targetClass(request: RoutingRequest): Exclude<RoutingClass, 'unknown' | 'codex'> {
-  let target: Exclude<RoutingClass, 'unknown' | 'codex'>;
-  if (request.riskLevel === 'security_sensitive' || request.riskLevel === 'high') {
+export function targetClass(request: RoutingRequest): TargetClass {
+  let target: TargetClass;
+  if (request.targetClass) {
+    target = request.targetClass;
+  } else if (request.riskLevel === 'security_sensitive' || request.riskLevel === 'high') {
     target = 'opus';
   } else if (request.complexity === 'architectural') {
     target = 'fable';
@@ -79,6 +88,15 @@ export function targetClass(request: RoutingRequest): Exclude<RoutingClass, 'unk
   const escalations = Math.min(2, Math.floor((request.repairAttempts ?? 0) / 2));
   for (let i = 0; i < escalations; i++) target = escalate(target);
   return target;
+}
+
+/** Effort follows the intended class: strongest or risky work thinks hardest,
+ * the cheapest class runs fast. Review is adversarial, so it is always high. */
+export function effortFor(request: RoutingRequest): Effort {
+  if (request.purpose === 'review' || (request.riskLevel ?? 'normal') !== 'normal') return 'high';
+  const target = targetClass(request);
+  if (target === 'fable') return 'high';
+  return target === 'sonnet' ? 'low' : 'medium';
 }
 
 function usable(candidate: Candidate): boolean {
@@ -146,6 +164,7 @@ export function route(
 
   const { free, paid } = pickFromLadder(ladder, pool, request, options);
 
+  const effort = effortFor(request);
   if (free) {
     const decision: RoutingDecision = {
       kind: 'route',
@@ -153,9 +172,10 @@ export function route(
       modelRef: free.model.modelRef,
       routingClass: free.model.routingClass,
       billingMode: free.model.billingMode,
+      effort,
       reason:
         `purpose=${request.purpose} complexity=${request.complexity} ` +
-        `risk=${request.riskLevel ?? 'normal'} target=${target} -> ` +
+        `risk=${request.riskLevel ?? 'normal'} target=${target} effort=${effort} -> ` +
         `${free.provider}/${free.model.modelRef} (${free.model.routingClass}, ` +
         `${free.model.billingMode})`,
     };
@@ -174,6 +194,7 @@ export function route(
       modelRef: chosen.model.modelRef,
       routingClass: chosen.model.routingClass,
       billingMode: chosen.model.billingMode,
+      effort,
       paidUsageDecisionId: request.approvedPaidUsage.decisionId,
       reason:
         `no subscription-included model usable for target=${target}; ` +

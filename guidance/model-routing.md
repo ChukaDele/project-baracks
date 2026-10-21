@@ -36,6 +36,23 @@ Prefer **subscription-included** capacity. Never silently switch onto credits or
 - Preserve cross-provider review for high-consequence decisions where useful.
 - After two materially unchanged failed approaches, change strategy or escalate.
 
+## Automatic task-class defaults
+
+Goal dispatch picks the routing class and reasoning effort from Major's own admission risk assessment (`taskRoutingRequest` in `src/supervisor/runtime.ts`). No owner input is needed.
+
+| Task class | Signal | Class | Effort |
+| --- | --- | --- | --- |
+| Bounded, mechanical | short outcome, no risk keyword | sonnet | low |
+| Substantive implementation | build/repair/integrate or a longer outcome | opus | medium |
+| High consequence | authority, security, persistence, external effect, blast radius | fable | high |
+| Unassessed, independent review | no assessment, or completion review | fable | high |
+
+- Two consecutive failures escalate the class one step (sonnet → opus → fable).
+- The class is a target, not a lock. The existing ladder, subscription-only billing and account reroute still choose the actual provider.
+- Effort goes to Claude (`--effort`) and Codex (`model_reasoning_effort`). Cursor ACP and Antigravity keep their defaults.
+- Owner override for one dispatch: `major run <project> --goal-id <id> --foreground --model <fable|opus|sonnet|auto>`.
+- Code-changing workers receive the ponytail (full) lean-coding contract in the prompt, because workers run without user plugins and hooks. The independent review applies the ponytail-review lens as advisory evidence only.
+
 ## Cost/rate-limit objective
 
 Optimise for **time-to-verified-outcome and subscription headroom**, not minimum token count. Track duplicate work, context size, iteration count, latency, rate limits and any real paid spend.

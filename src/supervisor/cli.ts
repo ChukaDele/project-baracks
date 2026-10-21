@@ -35,6 +35,7 @@ import {
   type WorkerHost,
 } from './state.js';
 import { assessSupervisorAdmissionRisk } from './worker-report.js';
+import { TARGET_CLASSES, type TargetClass } from '../routing/router.js';
 import { resolveSupervisedWorkshopAuthority } from '../security/supervised-workshop.js';
 import { autonomyMetrics } from './autonomy.js';
 import { applyIndependentSkillValidation } from '../skills/lifecycle.js';
@@ -428,6 +429,20 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const preferredRaw = flag(args, '--coordinator');
     const requestedAutonomy = hasFlag(args, '--autonomous');
     const requiredOperations = [...new Set(flags(args, '--capability'))];
+    // Owner override of the task-class default for this dispatch only. A class,
+    // not a model name: billing, availability and reroute stay with the router.
+    const modelArg = flag(args, '--model');
+    if (modelArg === undefined && args.includes('--model')) {
+      throw new Error('--model needs a value: auto, fable, opus or sonnet');
+    }
+    const targetClass =
+      modelArg === undefined || modelArg === 'auto' ? undefined : (modelArg as TargetClass);
+    if (targetClass && !TARGET_CLASSES.includes(targetClass)) {
+      throw new Error(`--model must be auto or one of: ${TARGET_CLASSES.join(', ')}`);
+    }
+    if (modelArg !== undefined && !hasFlag(args, '--foreground')) {
+      throw new Error('--model applies to a dispatch; combine it with --foreground');
+    }
     if (requestedAutonomy && !policy.allowBackground) {
       throw new Error(
         `project ${project.project} is ${policy.projectClass}/${policy.trust}; unattended execution is not allowed`,
@@ -500,7 +515,10 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         'supervisor: running this goal in the foreground until it is done, blocked, or ' +
           `out of eligible capacity (up to ${policy.maxRunMinutes} minutes)`,
       );
-      const outcome = await runForegroundGoal(goal.id, { maxRunMinutes: policy.maxRunMinutes });
+      const outcome = await runForegroundGoal(goal.id, {
+        maxRunMinutes: policy.maxRunMinutes,
+        ...(targetClass ? { targetClass } : {}),
+      });
       console.log(`MAJOR_FOREGROUND_DISPATCH: ${JSON.stringify(outcome)}`);
       if (outcome.hops === 0) {
         console.log(

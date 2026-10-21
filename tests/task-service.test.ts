@@ -179,6 +179,107 @@ describe('dependency blocking', () => {
 });
 
 describe('completion proof and guarded completion transition', () => {
+  const riskPolicy = {
+    projectClass: 'workshop' as const,
+    trust: 'build' as const,
+    allowExternalWrites: false,
+    allowPaidSpend: false,
+  };
+
+  it.each([
+    ['Add OAuth login to the admin console', [], 'security', 'independent'],
+    ['Repair authentication for API clients', [], 'security', 'independent'],
+    ['Rotate the refresh token secret', [], 'security', 'independent'],
+    ['Expire session cookies after logout', [], 'security', 'independent'],
+    ['Add role-based access for editors', [], 'security', 'independent'],
+    ['Patch the security headers', [], 'security', 'independent'],
+    ['Write the migration for invoices', [], 'persistence', 'focused'],
+    ['Deploy the worker to production', [], 'external effect', 'focused'],
+    ['git push the release branch', [], 'external effect', 'focused'],
+    ['Delete stale user records', [], 'irreversibility', 'independent'],
+    ['Drop the table of legacy events', [], 'irreversibility', 'independent'],
+    ['Change the independent review gate', [], 'authority', 'independent'],
+    ['Tidy the handler', ['completion_policy'], 'authority', 'independent'],
+    ['Tidy the handler', ['external-write'], 'external effect', 'focused'],
+    ['Upgrade the shared runtime', [], 'blast radius', 'independent'],
+    // Adversarial-review regressions: camelCase/snake ids, plurals, verb-object gaps.
+    ['Tidy the handler', ['deleteUser'], 'irreversibility', 'independent'],
+    ['Tidy the handler', ['checkPermission'], 'authority', 'independent'],
+    ['Tidy the handler', ['revokeSession'], 'security', 'independent'],
+    ['Tidy the handler', ['signInWithGoogle'], 'security', 'independent'],
+    ['Tidy the handler', ['drop_table'], 'irreversibility', 'independent'],
+    ['Tidy the handler', ['push_to_main'], 'external effect', 'focused'],
+    ['Tidy the handler', ['sharedState'], 'blast radius', 'independent'],
+    ['Invalidate sessions on password change', [], 'security', 'independent'],
+    ['Session timeout for idle users', [], 'security', 'independent'],
+    ['Rotate tokens nightly', [], 'security', 'independent'],
+    ['Assign roles to members', [], 'security', 'independent'],
+    ['Drop the users table', [], 'irreversibility', 'independent'],
+    ['Pushed changes to prod', [], 'external effect', 'focused'],
+    ['Allow push --force on release', [], 'external effect', 'focused'],
+    ['Bypass review for bot PRs', [], 'authority', 'independent'],
+    ['Store tokens in localStorage', [], 'security', 'independent'],
+    ['Rotate the API key', [], 'security', 'independent'],
+    ['Require 2FA for admins', [], 'security', 'independent'],
+    ['Tidy the handler', ['CSRFToken'], 'security', 'independent'],
+    ['Tidy the handler', ['isPIIField'], 'security', 'independent'],
+    ['Tidy the handler', ['session_revoke'], 'security', 'independent'],
+    ['Block unauthorized access', [], 'security', 'independent'],
+    ['Require review of PRs touching billing', [], 'authority', 'independent'],
+    ['Validate JWTs on every request', [], 'security', 'independent'],
+    ['Fix the OAuth2 callback', [], 'security', 'independent'],
+    // Gaps the original substring regexes also missed.
+    ['Fix the IDOR on invoice downloads', [], 'security', 'independent'],
+    ['Escape output to stop XSS', [], 'security', 'independent'],
+    ['Patch the SQL injection in search', [], 'security', 'independent'],
+    ['Allow CORS from the docs site', [], 'security', 'independent'],
+    ['Tighten the CSP header', [], 'security', 'independent'],
+    ['Relax branch protection on main', [], 'security', 'independent'],
+    ['Make the repo public', [], 'security', 'independent'],
+    ['Point DNS at the new host', [], 'irreversibility', 'independent'],
+    ['Add Stripe payments to checkout', [], 'irreversibility', 'independent'],
+    ['Tidy the handler', ['URLSigning'], 'security', 'independent'],
+    ['Tidy the handler', ['enable_2FA'], 'security', 'independent'],
+  ] as const)(
+    'classifies real risk words as high consequence: %s %j',
+    (outcome, operations, criterion, review) => {
+      const assessment = assessSupervisorAdmissionRisk({
+        outcome,
+        requiredOperations: [...operations],
+        policy: riskPolicy,
+      });
+      expect(assessment.classification).toBe('high_consequence');
+      expect(assessment.materialRiskCriteria).toContain(criterion);
+      expect(
+        deriveSupervisorPromotionContract({
+          admissionRiskAssessment: assessment,
+          autonomous: false,
+        }).review,
+      ).toBe(review);
+    },
+  );
+
+  it.each([
+    'Fix the preview card spacing',
+    'Style the dropdown menu',
+    'Support drag and drop reordering',
+    'Show a tokenizer-free word count',
+    'Rename the session list header',
+    'Push the footer links left',
+    'Use the shared button component',
+    'Show runtime duration in the table',
+    'Fix the role picker label',
+    'Polish the author byline',
+    'Update the design tokens for dark mode',
+    'Make the helper method public',
+    'Use dependency injection for the logger',
+    'Cut the token budget for summaries',
+  ])('does not treat incidental substrings as risk: %s', (outcome) => {
+    const assessment = assessSupervisorAdmissionRisk({ outcome, policy: riskPolicy });
+    expect(assessment.materialRiskCriteria).toEqual([]);
+    expect(assessment.classification).not.toBe('high_consequence');
+  });
+
   it('classifies no-task admission from typed outcome and policy facts and fails closed', () => {
     const workshopPolicy = {
       projectClass: 'workshop' as const,
@@ -233,6 +334,12 @@ describe('completion proof and guarded completion transition', () => {
       classification: 'high_consequence',
       materialRiskCriteria: ['security'],
     });
+
+    const signedIn = assessSupervisorAdmissionRisk({
+      outcome: 'Hide the banner for signed-in users',
+      policy: workshopPolicy,
+    });
+    expect(signedIn.materialRiskCriteria).toEqual(['security']);
 
     const unavailable = assessSupervisorAdmissionRisk({ outcome: 'Ship it' });
     expect(unavailable.classification).toBe('unavailable');
