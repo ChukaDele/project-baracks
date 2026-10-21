@@ -12,6 +12,7 @@ import { resolveSkills } from '../skills/resolver.js';
 import {
   activeGoals,
   attachSession,
+  readSupervisorState,
   authorizeSessionWorkshop,
   revokeSessionWorkshop,
   resolveProjectForCwd,
@@ -34,12 +35,32 @@ async function readStdin(): Promise<string> {
   return text;
 }
 
+const LEARNING_LIMIT = 10;
+const SKILL_LIMIT = 8;
+
 function projectLearningFile(repoPath: string): string {
   const path = join(repoPath, 'LEARNINGS.md');
   if (!existsSync(path)) return '(No project LEARNINGS.md found.)';
   const text = readFileSync(path, 'utf8').trim();
   if (!text) return '(Project LEARNINGS.md is empty.)';
-  return text.slice(0, 8_000);
+  if (text.length <= 3_000) return text;
+  return `${text.slice(0, 3_000)}\n(Truncated: read ${path} for the rest.)`;
+}
+
+/** Banner budget: the active goal in full, every other goal as one count line. */
+function goalStateSection(project: string, repoPath: string): string {
+  const activeIds = new Set(activeGoals(project, repoPath).map((goal) => goal.id));
+  const active = activeIds.size
+    ? supervisorSnapshot(undefined, (goal) => activeIds.has(goal.id))
+    : 'No active Major goal.';
+  const counts = new Map<string, number>();
+  for (const goal of readSupervisorState().goals) {
+    if (goal.project !== project || activeIds.has(goal.id)) continue;
+    counts.set(goal.status, (counts.get(goal.status) ?? 0) + 1);
+  }
+  if (counts.size === 0) return active;
+  const byStatus = [...counts].map(([status, n]) => `${n} ${status}`).join(', ');
+  return `${active}\n\nhidden inactive goals: ${byStatus}; list: major status ${project}`;
 }
 
 function durableCandidates(project: string, repoPath: string): string {
@@ -55,17 +76,24 @@ function durableCandidates(project: string, repoPath: string): string {
       if (left.status !== right.status) return left.status === 'promoted' ? -1 : 1;
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
       return right.updatedAt.localeCompare(left.updatedAt);
-    })
-    .slice(0, 20);
+    });
   if (learnings.length === 0) return '(No active Major learnings.)';
-  return learnings
+  const shown = learnings.slice(0, LEARNING_LIMIT);
+  const more =
+    learnings.length > shown.length
+      ? `\n(${learnings.length - shown.length} more: major learn list --project current)`
+      : '';
+  return shown
     .map((candidate) => {
       const review =
         candidate.status === 'candidate' && candidate.occurrences >= 2 ? ' REVIEW-DUE' : '';
       const key = candidate.key ? ` key=${candidate.key}` : '';
-      return `- ${candidate.status.toUpperCase()} ${candidate.occurrences}x${review} [${candidate.scope}/${candidate.source}]${key} ${candidate.summary}`;
+      const summary =
+        candidate.summary.length > 240 ? `${candidate.summary.slice(0, 239)}…` : candidate.summary;
+      return `- ${candidate.status.toUpperCase()} ${candidate.occurrences}x${review} [${candidate.scope}/${candidate.source}]${key} ${summary}`;
     })
-    .join('\n');
+    .join('\n')
+    .concat(more);
 }
 
 function resolvedGoalSkills(project: string, repoPath: string): string {
@@ -83,7 +111,11 @@ function resolvedGoalSkills(project: string, repoPath: string): string {
     return '(Major skill registry unavailable: skill context withheld without blocking session attach.)';
   }
   if (unique.size === 0) return '(No installed skill matched the active goal.)';
-  return [...unique].map(([id, path]) => `- ${id}: ${path}`).join('\n');
+  const shown = [...unique].slice(0, SKILL_LIMIT).map(([id, path]) => `- ${id}: ${path}`);
+  if (unique.size > SKILL_LIMIT) {
+    shown.push(`(${unique.size - SKILL_LIMIT} more: major skill resolve --task "<task>")`);
+  }
+  return shown.join('\n');
 }
 
 /** One-line, discovery-store-backed capacity read for the banner — not a
@@ -310,7 +342,7 @@ current worker capacity: ${currentWorkerCapacity()}
 ${formatCodexCapacityOverview(readCodexUsageReport())}
 
 ACTIVE GOAL STATE
-${supervisorSnapshot(project.project)}
+${goalStateSection(project.project, project.repoPath)}
 
 DURABLE PROJECT LEARNINGS
 ${projectLearningFile(project.repoPath)}
@@ -331,7 +363,7 @@ SESSION CONTRACT
 - Major is already active; do not ask the user to start it again.
 ${
   workshopEligible
-    ? `- This is an owner-approved build project: for SUBSTANTIVE project work (build/fix/redesign/implement/deploy/debug/investigate/modify the repo/multi-step build-or-research tasks), call \`major goal admit --host ${host} --outcome "<the durable outcome, not the latest implementation step>"\` before starting. It creates or resumes the one durable goal for this project, auto-grants foreground authority, and tells you if another session already owns live work here. Skip it for lightweight interaction (explaining code, answering questions, opinions, summaries, read-only inspection) unless a goal is already active. Call it once per new increment of substantive work, not on every message inside the same increment while a dispatch is already in flight or its result is still being reported. The response echoes the goal's current \`outcome\` even when resuming — read it: if it plainly does not match what the user is actually asking for right now, pass \`--refine\` to redefine it; the mechanism preserves outcome text by default and cannot tell staleness from a refinement on its own.\n- After admitting, DISPATCH the work through Major rather than implementing it directly yourself: run \`major run <project> --goal-id <the admitted goal id> --foreground\` (use a long-running/background command mechanism — it can take up to this project's maxRunMinutes). If the selected provider hits an authoritative rate limit, exhaustion, or auth failure mid-run, Major reroutes to the next eligible provider/account and continues the SAME goal automatically within that dispatch; you never need to notice the failure or name a different provider. Read the result and report it to the user — you are the interface/controller, not a second parallel implementer: do not also make the same edits yourself while a dispatch is in flight or after it completes. A dispatch that reports 0 hops did nothing (another Major process already held the repo lock) -- do not start one while a prior dispatch for the same goal is still running. One dispatch finishes one increment of work: for the next increment, admit/resume the same goal and dispatch again.\n`
+    ? `- Owner-approved build project. Before SUBSTANTIVE work (build/fix/redesign/implement/deploy/debug/investigate/modify the repo/multi-step build-or-research), run \`major goal admit --host ${host} --outcome "<durable outcome, not the latest step>"\`: it creates or resumes the one project goal, auto-grants foreground authority and reports another session's live work. Skip it for lightweight interaction (explain, answer, opine, summarize, read-only inspection) unless a goal is already active. Admit once per new increment, not per message while a dispatch is in flight or being reported. Read the echoed \`outcome\`; if it plainly does not match the current request, pass \`--refine\` (outcome text is preserved by default).\n- Then DISPATCH, do not implement yourself: \`major run <project> --goal-id <id> --foreground\` via a long-running/background command (up to maxRunMinutes). Major reroutes on provider rate-limit, exhaustion or auth failure and continues the SAME goal; you never pick a provider. You are the controller: report the result; never make the same edits in parallel or afterwards. 0 hops = another process held the repo lock and nothing ran; never start a second dispatch for a goal that is still running. One dispatch = one increment; for the next, admit/resume and dispatch again.\n`
     : ''
 }- Before substantive edits, confirm any named/implied project matches this repo. If not, load project-context-integrity and reroute before mutation.
 - Run Major's skill resolver and load the exact project or immutable-runtime skill paths it returns before inventing a workflow.

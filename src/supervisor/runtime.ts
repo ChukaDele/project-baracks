@@ -2584,9 +2584,14 @@ export async function runDaemon(): Promise<void> {
   }
 }
 
-export function supervisorSnapshot(project?: string): string {
+export function supervisorSnapshot(
+  project?: string,
+  include: (goal: SupervisorGoal) => boolean = () => true,
+): string {
   const state = readSupervisorState();
-  const goals = state.goals.filter((goal) => project === undefined || goal.project === project);
+  const goals = state.goals.filter(
+    (goal) => (project === undefined || goal.project === project) && include(goal),
+  );
   if (goals.length === 0) return 'No Major goals found.';
   return goals
     .map((goal) => {

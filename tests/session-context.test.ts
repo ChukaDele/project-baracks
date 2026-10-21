@@ -11,7 +11,7 @@ import {
 } from '../src/providers/discovery-store.js';
 import { writeCodexUsageReport } from '../src/providers/codex-usage.js';
 import { configureProjectPolicy } from '../src/supervisor/policy.js';
-import { readSupervisorState, startGoal } from '../src/supervisor/state.js';
+import { readSupervisorState, startGoal, updateGoal } from '../src/supervisor/state.js';
 import {
   assertSupervisedWorkshopAuthority,
   resolveSupervisedWorkshopAuthority,
@@ -355,6 +355,39 @@ describe('fresh session context', () => {
     expect(output).toMatch(/current worker capacity:.*\bcodex\b/);
     expect(output).toMatch(/current worker capacity:.*claude \(not yet discovered\)/);
     expect(output).toContain('no refreshed snapshot — run `major provider usage`');
+  });
+
+  it('keeps the banner small: active goal in full, inactive goals and extra learnings collapsed', async () => {
+    const current = repo('budget-project');
+    const project = 'github.com/example/budget-project';
+    const old = startGoal({
+      project,
+      repoPath: current,
+      goal: 'Old abandoned goal',
+      autonomous: false,
+    });
+    updateGoal(old.id, { status: 'failed', lastSummary: 'OLD FAILURE DETAIL' });
+    startGoal({ project, repoPath: current, goal: 'Current live goal', autonomous: false });
+    for (let index = 0; index < 12; index += 1) {
+      captureLearning({
+        project: 'budget-project',
+        repoPath: current,
+        source: 'manual',
+        scope: 'project',
+        key: `budget-${index}`,
+        summary: `Learning ${index} ${'x'.repeat(400)}`,
+      });
+    }
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    await runSessionContextCli(['session', 'attach', '--host', 'claude', '--cwd', current]);
+    const output = lines.join('\n');
+    expect(output).toContain('ACTIVE — Current live goal');
+    expect(output).not.toContain('Old abandoned goal');
+    expect(output).not.toContain('OLD FAILURE DETAIL');
+    expect(output).toContain(`hidden inactive goals: 1 failed; list: major status ${project}`);
+    expect(output).toContain('(2 more: major learn list --project current)');
+    expect(output).not.toContain('x'.repeat(300));
   });
 
   it('surfaces persisted Codex capacity for both authenticated accounts in the banner', async () => {
