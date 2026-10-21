@@ -14,7 +14,7 @@ Always-on core. Apply these defaults across projects unless a project/user instr
 
 ## Trust levels
 
-`observe` (no worker execution; write a **MAJOR SHADOW PLAN** for a human/gstack driver; **Three consecutive passing shadow grades** may earn `assist`) → `assist` (foreground pilot, 30-minute limit) → `build` (normal foreground, 120-minute limit; reached by evidence or explicit `--owner-approved`) → `unattended` (background; needs a representative build result plus a fresh independent grade; owner-approved build never grants it silently). A `SUPERVISED_WORKSHOP` session is foreground, expiring and project-bound and does not replace the exact-SHA Secure Enclave gate for a frozen release. In owner-approved build, continue ordinary reversible engineering (inspect, edit, branch, worktree, test, browser QA, fix CI, push feature branches, open/update PRs, previews) without shadow runs, repeated permission prompts or ceremonial review loops.
+`observe` (no worker execution; write a **MAJOR SHADOW PLAN** for a human/gstack driver; **Three consecutive passing shadow grades** may earn `assist`) → `assist` (foreground pilot, 30-minute coordinator limit) → `build` (normal foreground, 120-minute coordinator limit; reached by evidence or explicit `--owner-approved`) → `unattended` (background; needs a representative build result plus a fresh independent grade; owner-approved build never grants it silently). An explicitly authorized `SUPERVISED_WORKSHOP` session is foreground, expiring and project-bound and does not replace the exact-SHA Secure Enclave gate for a frozen release. In owner-approved build, continue ordinary reversible engineering (inspect, edit, branch, worktree, test, browser QA, fix CI, push feature branches, open/update PRs, previews) without shadow runs, repeated permission prompts or ceremonial review loops.
 
 ## Working method
 
@@ -22,31 +22,31 @@ Always-on core. Apply these defaults across projects unless a project/user instr
 - Maximise useful concurrency within capacity, trust policy and write ownership. Serialize only actual conflicts. Treat worker/browser caps as current physical/runtime capacity; never bypass them. Concurrent writers need isolated worktrees and explicit ownership; keep one integration owner.
 - Match validation and independent review to risk. By default require focused changed-behavior tests, the cheapest relevant compile/type/build check, critical-path behavior, and checks for each material risk. Do not run broad suites unless explicit blast-radius, shared-dependency, insufficient-evidence, historical-regression, or promotion-policy triggers apply, or repository policy requires them. Record broad validation's cost versus expected information gain and run it only when that tradeoff supports the promotion decision. Do not add review loops that do not change the decision.
 - After two materially unchanged failed approaches, change strategy, tool or provider.
-- Communication: BLUF, short active sentences, simple technical English; separate fact, assumption, risk, recommendation and next action when mixing them could mislead.
+- Communication: BLUF, short active sentences, simple technical English; consistent terms; explain unavoidable jargon once; never bury the recommendation; separate fact, assumption, risk, recommendation and next action when mixing them could mislead.
 
 ## On-demand rules (trigger → where the full rule lives)
 
 Each line is binding. Load the named skill or detail-file section before acting on its trigger.
 
 - Prior art before new infrastructure: before a new subsystem, provider integration, runtime, sandbox, router, memory, auth, scraper, workflow engine, browser system, MCP integration, installer, deployment mechanism or major dependency, check prior art and record ADOPT/WRAP/BORROW/BUILD in `docs/prior-art-decisions.md` first; BUILD is last. Skill: `prior-art-discovery`.
-- Remote-first web: for web projects never open localhost/127.0.0.1/[::1]/0.0.0.0/.local or a local port for preview, QA or user links (a CLI's loopback OAuth callback is the only exception); run `major web preflight --preview-url <Cloudflare URL> --github-url <GitHub URL> --production-branch main` before any browser action. Skill: `remote-first-web-development`.
+- Remote-first web: for web projects, persistent local servers and local browser navigation are denied unless the owner explicitly opts in for that specific project; never open localhost/127.0.0.1/[::1]/0.0.0.0/.local or a local port for preview, QA, E2E or user links (a trusted CLI's loopback OAuth callback is the only exception); replace a generic skill's `npm run dev`/local-URL preview step with a Cloudflare preview; run `major web preflight --preview-url <Cloudflare URL> --github-url <GitHub URL> --production-branch main` before any browser action. Skill: `remote-first-web-development`.
 - Auth, OAuth, consent, 2FA, CAPTCHA, payment or an irreversible account/domain decision blocks work: skill `human-blocker-orchestration`; block only the dependent branch and continue independent work.
 - Use the right tool: prefer native connectors/APIs/deterministic CLIs; a failed first tool is not a failed task. Tools as Code: use short temporary code for repeated deterministic tool calls, never to bypass filesystem, credential, client-data, paid-spend or owner-gate boundaries (skill `tools-as-code`).
 - Primary-source integrity: analyze the source the user gave; exhaust its fallback chain and say exactly what failed before using labelled secondary sources (skill `source-ingestion`).
 - Skill-first: resolve the smallest relevant installed skill set before inventing a workflow; skillify a successful novel recurring procedure after the real task succeeds.
-- Corrections: an explicit user correction or "we already fixed this" is a learning event. Fix and verify the task, then run `major learn capture` without being asked; promote recurring candidates (detail: "Self-learning loop").
-- New project shape: `project-start`. Legacy replacement verified: remove obsolete code/config/docs/names (`legacy-cleanup`). Speed/MVP, code simplicity, autonomy and Foundry detail: detail file.
+- Learning: an explicit user correction, "this happened before"/"we already fixed this", evidence contradicting you, a repeated mistake or a recurring failure is a learning event. Fix and verify the task, then run `major learn capture` project-locally without being asked. Global promotion is a separate reviewed action that needs sanitized content and evidence (detail: "Self-learning loop").
+- Before planning or implementing substantive work, read detail sections "Operating principle", "Speed / MVP", "Code simplicity" and "Skill-first execution". New project or project shape: `project-start` and detail "Foundry project intake". YouTube/media sources: detail "Use the right tool". Verified replacement: remove obsolete code/config/docs/names and scan for stale references (`legacy-cleanup`).
 
 ## Stability invariants (full text: `~/.major/stability-invariants.md`)
 
-1. Confirm the Git root/remote matches the task's project before substantive edits; reroute with `project-context-integrity`; a correct fix in the wrong repo is a failed task.
+1. Confirm the Git root/remote matches the task's project before substantive edits; reroute with `project-context-integrity`; if two targets are genuinely plausible, ask one concise question before mutation; reading a reference project never authorizes writing to it; a correct fix in the wrong repo is a failed task.
 2. At substantive start, read project `LEARNINGS.md`, check `major learn list --project current`, load the smallest relevant skill set; a learning that recurs twice must be promoted or explained.
 3. Integration states are distinct (`installed → configured → exposed → authenticated → permissioned → operational → integrated`); prove the state with a real operation (`mcp-integration-ops`).
-4. Creating, moving, parking, deleting or archiving projects, or storage pressure: `workspace-lifecycle-management`; never delete a clone without checking local-only state.
-5. Customer-facing websites: `website-design-qa` (+ `responsive-motion-systems` for GSAP/ScrollTrigger/sticky/pinned/Three.js); browser evidence for visual claims; 100% zoom is the baseline.
-6. In Major/project-baracks: `major-self-maintenance`; no material direct change to `main`; full gate before merge; never start a self-change while `main` is red.
+4. Creating, cloning, locating, moving, parking, deleting or archiving projects, or storage pressure: `workspace-lifecycle-management`; never create a duplicate clone because the expected path is missing; never delete or park a clone without checking local-only commits, untracked/ignored files and non-Git state.
+5. Customer-facing websites: `website-design-qa` (+ `responsive-motion-systems` for GSAP, ScrollTrigger, sticky/pinned storytelling, hero video, card stacking, parallax or Three.js); browser evidence for visual claims; 100% zoom is the baseline; preserve approved interactions and repair architecture rather than deleting motion to make tests pass.
+6. In Major/project-baracks: `major-self-maintenance`; no material direct change to `main`; skill promotion is atomic (skill + registry + resolver eval + catalog/validator); full gate before merge; independent review for consequential routing/learning/authority changes; never start a self-change while `main` is red.
 7. Push back when an instruction conflicts with stronger project truth; take the safer reversible route; ask only on real ambiguity or owner-only decisions.
-8. Prior art before new infrastructure (above).
+8. Prior art before new infrastructure (above); a BUILD without a recorded prior-art check is a process failure even if the code works.
 
 ## Global resource guard
 

@@ -369,13 +369,29 @@ describe('fresh session context', () => {
     updateGoal(old.id, { status: 'failed', lastSummary: 'OLD FAILURE DETAIL' });
     startGoal({ project, repoPath: current, goal: 'Current live goal', autonomous: false });
     for (let index = 0; index < 12; index += 1) {
-      captureLearning({
+      const learning = captureLearning({
         project: 'budget-project',
         repoPath: current,
         source: 'manual',
         scope: 'project',
         key: `budget-${index}`,
         summary: `Learning ${index} ${'x'.repeat(400)}`,
+      });
+      promoteLearning({
+        id: learning.id,
+        project: 'budget-project',
+        scope: 'project',
+        evidence: 'Fixture.',
+      });
+    }
+    for (let repeat = 0; repeat < 2; repeat += 1) {
+      captureLearning({
+        project: 'budget-project',
+        repoPath: current,
+        source: 'recurring-failure',
+        scope: 'project',
+        key: 'budget-review-due',
+        summary: 'Recurring failure that is due for review.',
       });
     }
     const lines: string[] = [];
@@ -386,7 +402,8 @@ describe('fresh session context', () => {
     expect(output).not.toContain('Old abandoned goal');
     expect(output).not.toContain('OLD FAILURE DETAIL');
     expect(output).toContain(`hidden inactive goals: 1 failed; list: major status ${project}`);
-    expect(output).toContain('(2 more: major learn list --project current)');
+    expect(output).toMatch(/REVIEW-DUE .*Recurring failure that is due for review\./);
+    expect(output).toContain('more: major learn list --project current)');
     expect(output).not.toContain('x'.repeat(300));
   });
 

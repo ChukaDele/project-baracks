@@ -172,7 +172,7 @@ for section in "Major is the default control plane" "Trust levels" "Foundry proj
   "Self-learning loop" "Legacy cleanup"; do
   grep -Fq "## $section" guidance/global-worker-detail.md || fail "global worker detail section missing: $section"
 done
-[ "$(wc -c < guidance/global-worker-rules.md)" -le 12000 ] || fail "always-on global worker rules exceed the 12000-byte budget"
+[ "$(wc -c < guidance/global-worker-rules.md)" -le 13000 ] || fail "always-on global worker rules exceed the 13000-byte budget"
 grep -Fq 'global-worker-detail.md' scripts/stage-major-user-state.py || fail "global worker detail is not installed"
 grep -Fq "Use the right tool" guidance/global-worker-rules.md || fail "global tool-routing rule missing"
 grep -Fq "Primary-source integrity" guidance/global-worker-rules.md || fail "global primary-source rule missing"

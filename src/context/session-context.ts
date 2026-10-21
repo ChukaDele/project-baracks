@@ -36,6 +36,10 @@ async function readStdin(): Promise<string> {
 }
 
 const LEARNING_LIMIT = 10;
+
+function isReviewDue(candidate: { status: string; occurrences: number }): boolean {
+  return candidate.status === 'candidate' && candidate.occurrences >= 2;
+}
 const SKILL_LIMIT = 8;
 
 function projectLearningFile(repoPath: string): string {
@@ -78,15 +82,17 @@ function durableCandidates(project: string, repoPath: string): string {
       return right.updatedAt.localeCompare(left.updatedAt);
     });
   if (learnings.length === 0) return '(No active Major learnings.)';
-  const shown = learnings.slice(0, LEARNING_LIMIT);
+  // REVIEW-DUE learnings are always shown: they must not become ignored notes.
+  const shown = learnings.filter(
+    (candidate, index) => index < LEARNING_LIMIT || isReviewDue(candidate),
+  );
   const more =
     learnings.length > shown.length
       ? `\n(${learnings.length - shown.length} more: major learn list --project current)`
       : '';
   return shown
     .map((candidate) => {
-      const review =
-        candidate.status === 'candidate' && candidate.occurrences >= 2 ? ' REVIEW-DUE' : '';
+      const review = isReviewDue(candidate) ? ' REVIEW-DUE' : '';
       const key = candidate.key ? ` key=${candidate.key}` : '';
       const summary =
         candidate.summary.length > 240 ? `${candidate.summary.slice(0, 239)}…` : candidate.summary;
@@ -113,7 +119,9 @@ function resolvedGoalSkills(project: string, repoPath: string): string {
   if (unique.size === 0) return '(No installed skill matched the active goal.)';
   const shown = [...unique].slice(0, SKILL_LIMIT).map(([id, path]) => `- ${id}: ${path}`);
   if (unique.size > SKILL_LIMIT) {
-    shown.push(`(${unique.size - SKILL_LIMIT} more: major skill resolve --task "<task>")`);
+    shown.push(
+      `(${unique.size - SKILL_LIMIT} more: major skill resolve --task "<active goal outcome>")`,
+    );
   }
   return shown.join('\n');
 }
