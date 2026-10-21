@@ -355,10 +355,16 @@ function capacityReason(
   }
   if (store.leases.length >= limits.total)
     return `global active resource cap ${limits.total} reached`;
-  const kindLimit =
-    kind === 'worker' ? limits.workers : kind === 'browser' ? limits.browsers : limits.builds;
-  if (countKind(store, kind) >= kindLimit) return `${kind} cap ${kindLimit} reached`;
+  if (kindCapReached(store, kind, limits)) return `${kind} cap ${kindLimit(kind, limits)} reached`;
   return undefined;
+}
+
+function kindLimit(kind: ResourceKind, limits: ResourceLimits): number {
+  return kind === 'worker' ? limits.workers : kind === 'browser' ? limits.browsers : limits.builds;
+}
+
+function kindCapReached(store: ResourceStore, kind: ResourceKind, limits: ResourceLimits): boolean {
+  return countKind(store, kind) >= kindLimit(kind, limits);
 }
 
 function leaseFrom(request: QueuedResourceRequest, now = Date.now()): ResourceLease {
@@ -396,7 +402,15 @@ function promoteQueued(
       store.queue.splice(index, 1);
       continue;
     }
-    if (capacityReason(store, request.kind, memoryAvailable, limits)) break;
+    if (capacityReason(store, request.kind, memoryAvailable, limits)) {
+      // A kind-capped request must not block other kinds queued behind it.
+      // Order within a kind is unchanged: later requests of it are capped too.
+      if (kindCapReached(store, request.kind, limits)) {
+        index += 1;
+        continue;
+      }
+      break;
+    }
     store.queue.splice(index, 1);
     store.leases.push(leaseFrom(request));
   }

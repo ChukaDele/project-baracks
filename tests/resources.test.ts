@@ -241,8 +241,10 @@ describe('Major global resource guard', () => {
     it('never drops below one worker at or near the soft floor', () => {
       process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '25';
       expect(currentResourceLimits().workers).toBe(1);
-      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '10';
+      expect(requestResource({ kind: 'worker', owner: 'at-floor' }).status).toBe('active');
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '24';
       expect(currentResourceLimits().workers).toBe(1);
+      expect(requestResource({ kind: 'worker', owner: 'below-floor' }).status).toBe('queued');
     });
 
     it('honours MAJOR_WORKER_LIMIT only up to the hard ceiling', () => {
@@ -262,6 +264,22 @@ describe('Major global resource guard', () => {
       const overflow = requestResource({ kind: 'worker', owner: 'worker-overflow' });
       expect(overflow.status).toBe('queued');
       if (overflow.status === 'queued') expect(overflow.request.reason).toMatch(/global/);
+    });
+
+    it('does not let a capped worker block a browser queued behind it', () => {
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
+      process.env.MAJOR_WORKER_LIMIT = '1';
+      const first = requestResource({ kind: 'worker', owner: 'worker-a' });
+      requestResource({ kind: 'browser', owner: 'browser-a' });
+      requestResource({ kind: 'browser', owner: 'browser-b' });
+      expect(requestResource({ kind: 'worker', owner: 'worker-b' }).status).toBe('queued');
+      expect(requestResource({ kind: 'browser', owner: 'browser-c' }).status).toBe('queued');
+      const browserA = resourceSnapshot().leases.find((lease) => lease.owner === 'browser-a')!;
+      releaseResource(browserA.id, browserA.fencingToken);
+      const owners = resourceSnapshot().leases.map((lease) => lease.owner);
+      expect(owners).toContain('browser-c');
+      expect(owners).not.toContain('worker-b');
+      expect(first.status).toBe('active');
     });
   });
 

@@ -76,8 +76,9 @@ major run jss-tool \
   --foreground
 ```
 
-The live resource guard has a hard worker ceiling of four and derives the
-usable count from current CPU and memory. It may queue work under pressure. This
+The live resource guard lets workers use any of the six shared slots that
+browsers and builds leave free, and derives the usable count from memory
+headroom above the soft floor and CPU parallelism. It may queue work under pressure. This
 is a safety limit, not a permanent one-worker architecture. Orca worktrees
 provide isolation when independent work can safely run in parallel.
 
