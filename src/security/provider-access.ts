@@ -2,6 +2,10 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+// On-demand global rule files that the installed core rules point to. Exact
+// files only: the rest of ~/.major (learning, DB, credentials) stays outside.
+const ON_DEMAND_RULES = ['.major/global-worker-detail.md', '.major/stability-invariants.md'];
+
 const PROVIDER_CONFIG_PATHS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   claude: [
     '.claude.json',
@@ -16,6 +20,7 @@ const PROVIDER_CONFIG_PATHS: Readonly<Record<string, readonly string[]>> = Objec
     '.claude/remote-settings.json',
     '.claude/settings.json',
     '.claude/settings.local.json',
+    ...ON_DEMAND_RULES,
   ],
   codex: [
     '.codex/auth.json',
@@ -26,8 +31,14 @@ const PROVIDER_CONFIG_PATHS: Readonly<Record<string, readonly string[]>> = Objec
     '.codex/plugins/.plugin-appserver',
     '.codex/rules',
     '.codex/sessions',
+    ...ON_DEMAND_RULES,
   ],
-  'cursor-agent': ['.cursor/agent-cli-state.json', '.cursor/cli-config.json', '.cursor/rules'],
+  'cursor-agent': [
+    '.cursor/agent-cli-state.json',
+    '.cursor/cli-config.json',
+    '.cursor/rules',
+    ...ON_DEMAND_RULES,
+  ],
   agy: [
     '.gemini/GEMINI.md',
     '.gemini/config',
@@ -35,6 +46,7 @@ const PROVIDER_CONFIG_PATHS: Readonly<Record<string, readonly string[]>> = Objec
     '.gemini/antigravity-cli/installation_id',
     '.gemini/antigravity-cli/jetski_state.pbtxt',
     '.gemini/antigravity-cli/builtin',
+    ...ON_DEMAND_RULES,
   ],
 });
 

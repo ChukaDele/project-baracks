@@ -527,15 +527,17 @@ def main() -> None:
     stage.mkdir(parents=True)
 
     global_base = root / "guidance" / "global-worker-rules.md"
+    detail = root / "guidance" / "global-worker-detail.md"
     stability = root / "guidance" / "stability-invariants.md"
     skills_src = root / "skills" / "internal"
     catalog_src = root / "guidance" / "skills.catalog.json"
     adapters_src = root / "adapters" / "skills"
-    for required in (global_base, stability, skills_src, catalog_src, adapters_src):
+    for required in (global_base, detail, stability, skills_src, catalog_src, adapters_src):
         if not required.exists():
             raise SystemExit(f"required Major source missing: {required}")
 
-    rules = global_base.read_text().rstrip() + "\n\n" + stability.read_text().strip() + "\n"
+    # Always-on core only; detail and stability invariants are read on demand.
+    rules = global_base.read_text().rstrip() + "\n"
     entries: list[dict[str, str]] = []
 
     if args.execution_path == "lima" and not args.execution_config:
@@ -547,6 +549,9 @@ def main() -> None:
 
     global_rules = write_stage_file(stage, "global-worker-rules.md", rules)
     add_file(entries, global_rules, home / ".major" / "global-worker-rules.md")
+    for on_demand in (detail, stability):
+        staged = write_stage_file(stage, on_demand.name, on_demand.read_text())
+        add_file(entries, staged, home / ".major" / on_demand.name)
     catalog_stage = write_stage_file(stage, "skills.catalog.json", catalog_src.read_text())
     add_file(entries, catalog_stage, home / ".major" / "skills.catalog.json")
     catalog = json.loads(catalog_src.read_text())

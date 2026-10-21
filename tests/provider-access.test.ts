@@ -37,6 +37,25 @@ describe('provider authentication read roots', () => {
     expect(roots.join('\n')).not.toMatch(/projects|attachments|\.codex|\.gemini/);
   });
 
+  it('exposes the on-demand global rule files to every provider, but nothing else in ~/.major', () => {
+    const home = fixtureHome();
+    for (const relative of [
+      '.major/global-worker-detail.md',
+      '.major/stability-invariants.md',
+      '.major/major.db',
+      '.major/learning-candidates.json',
+    ]) {
+      mkdirSync(join(home, '.major'), { recursive: true });
+      writeFileSync(join(home, relative), 'fixture');
+    }
+    for (const provider of ['claude', 'codex', 'cursor-agent', 'agy']) {
+      const roots = providerReadOnlyRoots(`/trusted/bin/${provider}`, home);
+      expect(roots).toContain(join(home, '.major/global-worker-detail.md'));
+      expect(roots).toContain(join(home, '.major/stability-invariants.md'));
+      expect(roots.filter((root) => root.includes('/.major'))).toHaveLength(2);
+    }
+  });
+
   it('returns no config roots for an unknown executable', () => {
     expect(providerReadOnlyRoots('/trusted/bin/not-a-provider', fixtureHome())).toEqual([]);
   });
