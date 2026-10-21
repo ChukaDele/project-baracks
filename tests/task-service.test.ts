@@ -228,6 +228,16 @@ describe('completion proof and guarded completion transition', () => {
     ['Require review of PRs touching billing', [], 'authority', 'independent'],
     ['Validate JWTs on every request', [], 'security', 'independent'],
     ['Fix the OAuth2 callback', [], 'security', 'independent'],
+    // Gaps the original substring regexes also missed.
+    ['Fix the IDOR on invoice downloads', [], 'security', 'independent'],
+    ['Escape output to stop XSS', [], 'security', 'independent'],
+    ['Patch the SQL injection in search', [], 'security', 'independent'],
+    ['Allow CORS from the docs site', [], 'security', 'independent'],
+    ['Tighten the CSP header', [], 'security', 'independent'],
+    ['Relax branch protection on main', [], 'security', 'independent'],
+    ['Make the repo public', [], 'security', 'independent'],
+    ['Point DNS at the new host', [], 'irreversibility', 'independent'],
+    ['Add Stripe payments to checkout', [], 'irreversibility', 'independent'],
     ['Tidy the handler', ['URLSigning'], 'security', 'independent'],
     ['Tidy the handler', ['enable_2FA'], 'security', 'independent'],
   ] as const)(
@@ -261,6 +271,8 @@ describe('completion proof and guarded completion transition', () => {
     'Fix the role picker label',
     'Polish the author byline',
     'Update the design tokens for dark mode',
+    'Make the helper method public',
+    'Use dependency injection for the logger',
     'Cut the token budget for summaries',
   ])('does not treat incidental substrings as risk: %s', (outcome) => {
     const assessment = assessSupervisorAdmissionRisk({ outcome, policy: riskPolicy });

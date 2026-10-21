@@ -106,7 +106,10 @@ const RISK_CRITERIA: readonly [keyof SdlcRisk, RegExp, string][] = [
   [
     'touchesSecurity',
     words(
-      'security|secrets?|credentials?|passwords?|auth|authn|authz|(?:un)?authenticat\\w*|(?:un)?authori[sz]\\w*|' +
+      'idor|xss|sqli|cors|csp|cross site (?:scripting|request forgery)|(?:sql|command|code|prompt|html|script) injection|' +
+        'branch protection|protected branch\\w*|rulesets?|(?:repo|repository) visibility|public (?:repos?|repositor(?:y|ies)|buckets?)|' +
+        `mak\\w* ${GAP}(?:repos?|repositor(?:y|ies)|buckets?|projects?) public|` +
+        'security|secrets?|credentials?|passwords?|auth|authn|authz|(?:un)?authenticat\\w*|(?:un)?authori[sz]\\w*|' +
         'log ?(?:in|ins|ged in)|sign(?:s|ed|ing)? ?(?:in|on)|sso|access ?controls?|rls|' +
         'identit(?:y|ies)|oauth\\w*|mfa|2fa|rbac|privileges?|(?:en|de)crypt\\w*|privacy|pii|jwts?|csrf|api ?keys?|signatures?|sign(?:ing|ed)? (?:urls?|requests?|keys?)|(?:urls?|requests?) sign(?:ing|ed|atures?)?|' +
         // ponytail: design tokens and token budget/usage are UI or LLM cost, not security; extend the exclusion list if more cost terms appear.
@@ -130,7 +133,9 @@ const RISK_CRITERIA: readonly [keyof SdlcRisk, RegExp, string][] = [
   [
     'irreversible',
     words(
-      'irreversibl\\w*|destructive|delet(?:e|es|ed|ing|ion|ions)|truncat\\w*|wip(?:e|es|ed|ing)|purg(?:e|es|ed|ing)|' +
+      // Money movement and DNS are hard to undo once they reach the provider.
+      'payments?|billing|stripe|refunds?|dns|nameservers?|domain (?:records?|transfers?)|' +
+        'irreversibl\\w*|destructive|delet(?:e|es|ed|ing|ion|ions)|truncat\\w*|wip(?:e|es|ed|ing)|purg(?:e|es|ed|ing)|' +
         'rm rf|reset hard|' +
         `drop\\w* ${GAP}(?:tables?|columns?|databases?|index(?:es)?|schemas?|data|users?|records?|rows?)`,
     ),
