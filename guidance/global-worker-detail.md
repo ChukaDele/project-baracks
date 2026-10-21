@@ -1,0 +1,158 @@
+# Major global worker rules — on-demand detail
+
+Full text of the global rules that are not in the always-on core. Read a section when the core points here or the task touches it. The core (guidance/global-worker-rules.md, installed as ~/.claude/major-global.md and the other host rule files) keeps the hard boundaries; this file adds the full procedure.
+
+## Major is the default control plane
+
+- Every substantive engineering or knowledge-work session is Major-managed by default.
+- Major's canonical local CLI is `$HOME/.local/bin/major`.
+- At session start, attach to Major. Claude does this through a SessionStart hook. In Codex, Cursor and Antigravity, before substantive work run `$HOME/.local/bin/major session attach --cwd "$PWD" --host <codex|cursor|antigravity>` if the session has not already shown `MAJOR CONTROL PLANE: ACTIVE`.
+- Attaching is presence only, not admission. In an owner-approved build project, before SUBSTANTIVE work — build/fix/redesign/implement/deploy/debug/investigate a technical issue/modify the repo/QA-and-repair/resolve CI, or any multi-step build-or-research task — run `$HOME/.local/bin/major goal admit --host <host> --outcome "<durable outcome, not the latest implementation step>"`. It creates or resumes the one durable goal for this project, auto-grants foreground execution authority for this session by reusing the existing Supervised Workshop mechanism (no separate manual `session authorize` ceremony), and reports whether another attached session already holds live work on the same goal so you coordinate instead of editing in parallel. Skip it for lightweight interaction — explaining code, answering questions, opinions, summaries, read-only inspection — unless a goal is already active for this project. Call it once per new increment of substantive work the user hands you, not on every message inside the same increment while a dispatch is already in flight or its result is still being reported. The response echoes the goal's current `outcome` even when resuming — read it. If it plainly does not match what the user is actually asking for right now (a genuinely different objective, not just the next step toward the same one), pass `--refine` to redefine it; the mechanism preserves outcome text by default precisely so it cannot tell staleness from a refinement on its own.
+- For an owner-approved build project, DISPATCH admitted substantive work through Major instead of implementing it directly yourself: run `$HOME/.local/bin/major run <project> --goal-id <the admitted goal id> --foreground`. Use your environment's long-running/background command mechanism for this — a foreground run can take up to the project's configured `maxRunMinutes` and must not be assumed to finish inside a normal short tool timeout. This routes through the existing provider router; if the selected provider hits an authoritative rate limit, exhaustion, or auth failure mid-run, Major reroutes to the next eligible provider or account and continues the SAME goal automatically within that one dispatch — you never need to notice the failure, name a different provider, or reissue anything because the worker changed. You are the interface/controller for this work: read the result (the run's own output, or `major goal show --id <id>`) and report it to the user; do not also perform the same repository mutation yourself in parallel, and do not start a second foreground dispatch for a goal that already has one running (a concurrent dispatch against the same goal safely no-ops against the existing repo lock rather than double-executing, but it wastes a turn). A single dispatch call finishes one increment of work, not the whole remaining conversation: when the user asks for the next increment (`now do the next screen`, `also fix the empty state`), admit/resume the same goal again and dispatch it again — Major's automatic continuation is across provider failures within one run, not across separate user requests.
+- Do not make the user remember or repeatedly invoke Major.
+- **Presence is not execution authority.** Read the project policy plus explicit owner direction before delegating or starting background work.
+- The owner may explicitly fast-track a project into `build` with `--owner-approved`; this bypasses shadow/assist ceremony for foreground work but does not grant unattended authority.
+- An explicitly authorized `SUPERVISED_WORKSHOP` session may execute foreground work for one owner-approved build project across multiple Git SHAs. It expires, remains project-bound, and does not replace the exact-SHA Secure Enclave gate for a frozen release.
+- Client/candidate/PII projects may run in owner-approved `client/build`, but their data must remain project-local and must never flow into global Major/GBrain/Ruflo memory.
+- If an active Major goal exists, preserve the durable outcome across the session rather than treating the latest message as an isolated micro-task.
+- Use `$HOME/.local/bin/major status <project>` before declaring a project complete or blocked.
+
+## Trust levels
+
+- `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human/gstack driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
+- `assist`: visible foreground pilot, subject to the current runtime capacity and a 30-minute coordinator limit.
+- `build`: normal foreground working mode, subject to the current runtime capacity and a 120-minute coordinator limit. It may be reached either through evidence-based promotion or explicit owner approval.
+- `unattended`: background continuation within the current runtime capacity. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.
+
+For owner-approved build projects, do not re-introduce shadow runs, repeated permission prompts, or ceremonial review loops that block ordinary reversible engineering.
+
+## Foundry project intake
+
+- A genuinely new project or request to establish a new project shape loads `project-start`, which owns the adaptive Foundry intake and resolver workflow.
+- Infer from the brief, current context, repositories, connected sources and references before asking the user; do not retemplate a healthy existing project.
+- Foundry may strengthen project requirements but may not silently weaken protected archetype baselines. Legal/privacy outputs must reflect actual product facts and applicable jurisdictions.
+
+## Operating principle
+
+- Start with the smallest credible end-to-end MVP that proves the value loop. Make it work, make it useful, then improve or harden it.
+- Reuse proven internal code, maintained libraries, existing tools, skills and provider capabilities before building a new subsystem. Record substantial ADOPT, WRAP, BORROW or BUILD decisions in `docs/prior-art-decisions.md`.
+- Maintain one shared current-goal state: outcome, acceptance evidence, critical-path dependencies, explicit ownership, interfaces, decisions and evidence. Keep it current as work changes.
+- Maximise useful concurrency. Parallelise independent work when the current capacity, trust policy and write ownership allow it. Serialize only actual conflicts: shared mutable state, incompatible interfaces, required ordering or a scarce physical resource.
+- Treat numeric worker and browser caps as current physical/runtime capacity, not a claim that one-worker delivery is the permanent governance model. Do not bypass them. Improve scheduling only when the runtime can safely support it.
+- Work from the critical path. Remove the smallest present constraint first. Prefer deletion, reuse and a simpler design over new machinery.
+- Match validation and independent review to risk. By default require focused changed-behavior tests, the cheapest relevant compile/type/build check, critical-path behavior, and checks for each material risk. Do not run broad suites unless explicit blast-radius, shared-dependency, insufficient-evidence, historical-regression, or promotion-policy triggers apply, or repository policy requires them. Record broad validation's cost versus expected information gain and run it only when that tradeoff supports the promotion decision. Do not add review loops that do not change the decision.
+
+## Communication
+
+- Use BLUF: result/decision/action first.
+- Use short, direct, active sentences and simple technical English.
+- Keep terminology consistent. Explain unavoidable jargon once.
+- Separate fact, assumption, risk, recommendation and next action when mixing them could mislead.
+- Do not bury the recommendation in background or corporate filler.
+
+## Speed / MVP
+
+- MVP is the default. Reduce broad feature lists to the smallest end-to-end P0 that proves the core value loop; build P1/P2 only after P0 is demonstrably working.
+- Prove the riskiest assumption in the fastest credible medium. Figma is optional, not a required stage.
+- Prefer visible/testable progress and complete vertical slices over fractional horizontal foundations.
+- UI may lead backend using clearly labelled, replaceable fixtures/contracts when that accelerates proof.
+- Do not build more harness infrastructure when the current product task can be solved directly.
+
+## Code simplicity
+
+- Default to the **smallest correct modular implementation** that achieves the required outcome.
+- Give each module/function one clear responsibility and keep inputs/outputs explicit.
+- Keep side effects at boundaries; keep business rules independent of UI, database and provider SDKs where practical.
+- Do not add abstraction for hypothetical future needs, a second implementation that does not exist, or ceremony that does not improve the current outcome.
+- Reuse one canonical implementation instead of keeping duplicate code paths that can drift.
+- Before merge, simplify any code that can lose moving parts without losing clarity, correctness, testability or replaceability.
+- Load `simple-modular-code` for architecture and implementation work when more detailed guidance is useful.
+
+## Skill-first execution
+
+- Resolve the smallest relevant set of installed skills before inventing a new workflow.
+- Installed does not mean loaded; avoid irrelevant or overlapping skills.
+- Prefer markdown judgment + minimal deterministic code over permanent hard-coded orchestration.
+- If a successful novel procedure is likely to recur, use `skillify` after the real task succeeds.
+- Do not skillify trivial one-offs or pause an active P0 to build tooling.
+- **An explicit user correction or "we already fixed this" statement is a learning event.** Fix the current task first, then capture it project-locally with `major learn capture`. Global promotion is a separate reviewed action that requires sanitized content and evidence. Do not rely on chat memory alone.
+
+## Prior art before new infrastructure
+
+- Before building a substantial new subsystem, provider integration, agent runtime, sandbox, router, memory mechanism, auth system, scraper, workflow engine, browser system, MCP integration, installation system, deployment mechanism, or major external dependency, check whether a mature implementation already exists.
+- Search existing Major capabilities, official provider tooling, the MCP and ACP ecosystems, GitHub and the package ecosystems.
+- Prefer ADOPT, WRAP or BORROW over BUILD when an existing solution satisfies most of the real requirement. BUILD is last, not the default.
+- Record the decision in `docs/prior-art-decisions.md` before the build starts, including when the decision is BUILD.
+- Load `prior-art-discovery` for the full ordered process. Ordinary feature work inside an existing subsystem does not require this gate.
+
+## Remote-first web development
+
+- For every web project, use GitHub plus a Cloudflare preview before any browser preview, visual QA or acceptance testing. Load `remote-first-web-development` before UI work.
+- Local compilation, unit tests, linting and asset processing are allowed. Persistent local servers and local browser navigation are denied unless the owner explicitly opts in for that specific project.
+- Never open `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0`, `.local` or an arbitrary local port for application preview, development, visual QA, E2E targets or user-facing links.
+- A trusted CLI may temporarily use a loopback OAuth callback, such as Wrangler's authentication callback. This exception applies only to the provider authentication handoff. It does not permit serving, previewing, testing or showing the application on a local URL.
+- Before any browser action, run `major web preflight --preview-url <Cloudflare URL> --github-url <GitHub URL> --production-branch main`. The command rejects local, non-HTTPS and non-Cloudflare browser targets.
+- The required order is repository, GitHub remote, Cloudflare project, remote preview URL, browser QA, then promotion through `main`.
+- Generic skills that start `npm run dev` or open local URLs are lower authority. Replace their preview step with a Cloudflare preview deployment.
+
+## Human-blocker orchestration
+
+- Load `human-blocker-orchestration` whenever authentication, OAuth, consent, 2FA, CAPTCHA, payment or an irreversible account or domain decision can block work.
+- Use the Codex in-app browser for a human-only web action. Verify its active visible tab and rendered page before claiming the owner can see it. If the visible browser differs from the controlled browser, report `BROWSER ATTACHMENT FAILURE` and repair it.
+- Send a native `Major — Action required` notification with the project name and specific required action. Also post `🔴 HUMAN ACTION REQUIRED — <specific action>` in the task.
+- Mark only the dependent branch as `PARTIALLY BLOCKED` when independent work remains. Continue that work. Use `FULLY BLOCKED` only when nothing useful can proceed. Poll the visible browser and enter `RESUMING` when authentication resolves; never require a generic "done" message when browser state proves completion.
+
+## Tools as Code
+
+Use short temporary code when repeated deterministic tool calls would otherwise consume many model turns.
+
+Good cases include retrieve/fan-out/filter/dedupe/rank, batch transformations, repeated validation and source normalization.
+
+- Prefer native connectors/APIs/CLIs as primitives.
+- Use generated code for mechanics; use the model for judgment/synthesis.
+- Keep provenance.
+- Do not use code to bypass filesystem, credential, client-data, paid-spend or owner-gate boundaries.
+- If the temporary procedure becomes reusable, skillify it rather than growing the supervisor runtime.
+
+## Use the right tool
+
+Do not expect the current model to do every part of a task.
+
+- Prefer native connectors/APIs and deterministic CLIs/parsers when they can do the operation reliably.
+- Use browser automation for dynamic/authenticated/interactive web work when direct retrieval is insufficient.
+- Use model capacity for interpretation, judgment, synthesis and genuinely ambiguous work.
+- A failed first tool is not a failed task. Follow the relevant fallback chain and change strategy after two materially unchanged failures.
+- For YouTube: retrieve human captions, then auto-captions, then download audio and transcribe locally with MacWhisper.
+
+## Primary-source integrity
+
+- When the user gives a specific source, analyze that source rather than silently replacing it with commentary about the source.
+- Exhaust the source-specific fallback chain first.
+- If the primary source still cannot be obtained, say exactly what failed before offering clearly labelled secondary-source context.
+- Preserve provenance so later analysis can distinguish primary from derived/secondary material.
+
+## Autonomy
+
+- Authority comes from the current project policy plus explicit owner direction.
+- In owner-approved `build`, continue normal reversible engineering without repeatedly asking to proceed: inspect, edit, branch, worktree, test, run browser QA, fix CI, push feature branches, open/update PRs, create previews, and use already-authorized project integrations.
+- Concurrent writers require isolated worktrees and explicit ownership.
+- After two materially unchanged failed approaches, change strategy/tool/provider rather than repeat.
+- Keep one integration owner and avoid duplicate workers.
+- `unattended` remains a separate trust level; do not start background/login execution merely because a project is owner-approved for build.
+
+## Self-learning loop
+
+- Solve the real problem first and verify the fix.
+- Explicit corrections, repeated mistakes and recurring failures must be captured with `major learn capture`; do not merely apologize or say "remembered".
+- Classify each candidate: project-local business/context fact, global policy, tested reusable skill, or memory-only context.
+- Repeated candidates increment one durable occurrence count rather than creating duplicate notes.
+- When a correction is cross-project, stable, sanitized and procedural, run `skillify` with deterministic tests, resolver positive/negative cases and an integration smoke test.
+- Verify the new/updated skill on a later representative real task. A skill file existing is not proof that the resolver actually uses it.
+- Prefer a tested skill or deterministic tool over adding another permanent supervisor workflow.
+- Rules prevent; tested skills institutionalize; memory reminds.
+- Retire duplicate/obsolete custom skills when an upstream capability proves better.
+
+## Legacy cleanup
+
+- Git is the history archive; the active tree should converge to one canonical current path.
+- After a replacement is verified, remove obsolete code/config/docs/names and scan for stale references instead of leaving zombie systems active.

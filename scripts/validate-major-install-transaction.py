@@ -368,6 +368,9 @@ def main() -> None:
         assert not (home / "Library" / "LaunchAgents" / "com.chuka.major-supervisor.plist").exists()
         assert 'export PATH="$HOME/.local/bin:$PATH"' in (home / ".zshrc").read_text()
         assert (home / ".major" / "skills" / "internal" / "skill-resolver" / "SKILL.md").is_file()
+        for on_demand in ("global-worker-detail.md", "stability-invariants.md"):
+            assert (home / ".major" / on_demand).is_file(), f"on-demand {on_demand} not installed"
+        assert "# Major stability invariants" not in (home / ".claude" / "major-global.md").read_text()
         learning_root = home / ".major" / "learning"
         assert not (learning_root / "global.json").exists()
         project_files = list((learning_root / "projects").glob("*.json"))

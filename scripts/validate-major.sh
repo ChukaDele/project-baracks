@@ -162,6 +162,18 @@ grep -Fq "BUILT" templates/project/major-core.md || fail "project readiness lang
 
 [ -f guidance/global-worker-rules.md ] || fail "compact global worker rules missing"
 [ -f scripts/install-major-global-rules.sh ] || fail "global worker rules installer missing"
+# Always-on core stays small; full procedures load on demand from the detail file.
+[ -f guidance/global-worker-detail.md ] || fail "on-demand global worker detail missing"
+grep -Fq '~/.major/global-worker-detail.md' guidance/global-worker-rules.md || fail "core rules do not point to the on-demand detail"
+grep -Fq '~/.major/stability-invariants.md' guidance/global-worker-rules.md || fail "core rules do not point to the on-demand stability invariants"
+for section in "Major is the default control plane" "Trust levels" "Foundry project intake" "Operating principle" \
+  "Code simplicity" "Skill-first execution" "Prior art before new infrastructure" "Remote-first web development" \
+  "Human-blocker orchestration" "Tools as Code" "Use the right tool" "Primary-source integrity" "Autonomy" \
+  "Self-learning loop" "Legacy cleanup"; do
+  grep -Fq "## $section" guidance/global-worker-detail.md || fail "global worker detail section missing: $section"
+done
+[ "$(wc -c < guidance/global-worker-rules.md)" -le 12000 ] || fail "always-on global worker rules exceed the 12000-byte budget"
+grep -Fq 'global-worker-detail.md' scripts/stage-major-user-state.py || fail "global worker detail is not installed"
 grep -Fq "Use the right tool" guidance/global-worker-rules.md || fail "global tool-routing rule missing"
 grep -Fq "Primary-source integrity" guidance/global-worker-rules.md || fail "global primary-source rule missing"
 grep -Fq "Major is the default control plane" guidance/global-worker-rules.md || fail "Major default control-plane rule missing"
