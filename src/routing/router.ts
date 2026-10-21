@@ -61,7 +61,7 @@ const FREE_BILLING: BillingMode = 'subscription_included';
 const LADDERS: Record<Exclude<RoutingClass, 'unknown'>, RoutingClass[]> = {
   fable: ['fable', 'opus', 'codex', 'sonnet'],
   opus: ['opus', 'fable', 'codex', 'sonnet'],
-  sonnet: ['sonnet', 'codex', 'opus'],
+  sonnet: ['sonnet', 'codex', 'opus', 'fable'],
   codex: ['codex', 'opus', 'sonnet', 'fable'],
 };
 
@@ -164,6 +164,7 @@ export function route(
 
   const { free, paid } = pickFromLadder(ladder, pool, request, options);
 
+  const effort = effortFor(request);
   if (free) {
     const decision: RoutingDecision = {
       kind: 'route',
@@ -171,10 +172,10 @@ export function route(
       modelRef: free.model.modelRef,
       routingClass: free.model.routingClass,
       billingMode: free.model.billingMode,
-      effort: effortFor(request),
+      effort,
       reason:
         `purpose=${request.purpose} complexity=${request.complexity} ` +
-        `risk=${request.riskLevel ?? 'normal'} target=${target} effort=${effortFor(request)} -> ` +
+        `risk=${request.riskLevel ?? 'normal'} target=${target} effort=${effort} -> ` +
         `${free.provider}/${free.model.modelRef} (${free.model.routingClass}, ` +
         `${free.model.billingMode})`,
     };
@@ -193,7 +194,7 @@ export function route(
       modelRef: chosen.model.modelRef,
       routingClass: chosen.model.routingClass,
       billingMode: chosen.model.billingMode,
-      effort: effortFor(request),
+      effort,
       paidUsageDecisionId: request.approvedPaidUsage.decisionId,
       reason:
         `no subscription-included model usable for target=${target}; ` +

@@ -432,6 +432,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     // Owner override of the task-class default for this dispatch only. A class,
     // not a model name: billing, availability and reroute stay with the router.
     const modelArg = flag(args, '--model');
+    if (modelArg === undefined && args.includes('--model')) {
+      throw new Error('--model needs a value: auto, fable, opus or sonnet');
+    }
     const targetClass =
       modelArg === undefined || modelArg === 'auto' ? undefined : (modelArg as TargetClass);
     if (targetClass && !TARGET_CLASSES.includes(targetClass)) {

@@ -97,6 +97,16 @@ describe('task class -> routing class and effort', () => {
     });
   });
 
+  it('lets a cheap task use fable when it is the only capacity left', () => {
+    const fableOnly: ProviderInfo[] = [
+      { ...FLEET[0]!, models: FLEET[0]!.models.filter((m) => m.routingClass === 'fable') },
+    ];
+    expect(selectCoordinator(goal('bounded'), fableOnly)).toMatchObject({
+      modelRef: 'fable',
+      effort: 'low',
+    });
+  });
+
   it('lets the owner override the class without bypassing billing', () => {
     const request = { ...taskRoutingRequest(goal('bounded')), targetClass: 'fable' as const };
     expect(selectCoordinator(goal('bounded'), FLEET, request)).toMatchObject({
@@ -127,9 +137,9 @@ describe('provider effort flags', () => {
       '-c',
       'model_reasoning_effort="low"',
     ]);
-    expect(providerArgs('codex', { ...base, resumeSessionRef: 's1' })).toContain(
-      'model_reasoning_effort="low"',
-    );
+    const resume = providerArgs('codex', { ...base, resumeSessionRef: 's1' });
+    expect(resume.slice(0, 3)).toEqual(['exec', '-c', 'model_reasoning_effort="low"']);
+    expect(resume.indexOf('resume')).toBeGreaterThan(2);
     expect(providerArgs('antigravity', base).join(' ')).not.toContain('effort');
     expect(providerArgs('claude', { prompt: 'p', outputMode: 'batch' })).not.toContain('--effort');
   });
