@@ -226,7 +226,11 @@ grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts |
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
 grep -Fq "maxWorkers: 1" src/supervisor/policy.ts || fail "truthful project worker ceiling missing"
 grep -Fq "maxRunMinutes: 30" src/supervisor/policy.ts || fail "assist wall-clock ceiling missing"
-grep -Fq "workers: 4" src/supervisor/resources.ts || fail "durable worker hard ceiling missing"
+grep -Fq "workers: 6" src/supervisor/resources.ts || fail "durable worker hard ceiling missing"
+for cap in "total: 6," "browsers: 2," "builds: 1," "softMemoryAvailablePercent: 25,"; do
+  grep -Fq "$cap" src/supervisor/resources.ts || fail "global resource cap missing: $cap"
+done
+grep -Fq "WORKER_MEMORY_ESTIMATE_BYTES" src/supervisor/resources.ts || fail "headroom-based worker limit missing"
 grep -Fq "currentResourceLimits" src/supervisor/resources.ts || fail "live worker capacity calculation missing"
 grep -Fq "GLOBAL_RESOURCE_LIMITS" src/supervisor/resources.ts || fail "global resource guard missing"
 grep -Fq "maxSubagentDepth: 1" src/supervisor/resources.ts || fail "subagent depth cap missing"

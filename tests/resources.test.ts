@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertActiveResourceLease,
+  currentResourceLimits,
   formatResourceTelemetry,
   heartbeatResource,
   reclaimStaleResources,
@@ -13,6 +14,19 @@ import {
   requestResource,
   resourceSnapshot,
 } from '../src/supervisor/resources.js';
+
+const host = vi.hoisted(() => ({
+  totalmem: undefined as number | undefined,
+  cpus: undefined as number | undefined,
+}));
+vi.mock('node:os', async (importOriginal) => {
+  const os = await importOriginal<typeof import('node:os')>();
+  return {
+    ...os,
+    totalmem: () => host.totalmem ?? os.totalmem(),
+    availableParallelism: () => host.cpus ?? os.availableParallelism(),
+  };
+});
 
 const roots: string[] = [];
 const source = pathToFileURL(
@@ -47,6 +61,9 @@ afterEach(() => {
   else process.env.MAJOR_WORKER_LIMIT = priorWorkerLimit;
   if (priorParentLeaseId === undefined) delete process.env.MAJOR_RESOURCE_LEASE_ID;
   else process.env.MAJOR_RESOURCE_LEASE_ID = priorParentLeaseId;
+  delete process.env.MAJOR_WORKER_MEMORY_MB;
+  host.totalmem = undefined;
+  host.cpus = undefined;
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
@@ -190,6 +207,80 @@ describe('Major global resource guard', () => {
     expect(requestResource({ kind: 'browser', owner: 'third-browser' }).status).toBe('queued');
     expect(requestResource({ kind: 'build', owner: 'build-one' }).status).toBe('active');
     expect(requestResource({ kind: 'build', owner: 'build-two' }).status).toBe('queued');
+  });
+
+  describe('live worker limit', () => {
+    const GiB = 1024 ** 3;
+    beforeEach(() => {
+      delete process.env.MAJOR_WORKER_LIMIT;
+      host.totalmem = 18 * GiB;
+      host.cpus = 12;
+    });
+
+    it('divides memory headroom above the soft floor by the per-worker estimate', () => {
+      // 30% of 18 GiB minus the 25% floor leaves ~0.9 GiB: three 256 MiB workers.
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '30';
+      expect(currentResourceLimits().workers).toBe(3);
+      process.env.MAJOR_WORKER_MEMORY_MB = '128';
+      expect(currentResourceLimits().workers).toBe(6);
+    });
+
+    it('caps workers at the shared total, not a separate lower ceiling', () => {
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
+      const limits = currentResourceLimits();
+      expect(limits.workers).toBe(limits.total);
+      expect(limits).toMatchObject({ total: 6, browsers: 2, builds: 1, maxSubagentDepth: 1 });
+    });
+
+    it('bounds workers by CPU parallelism', () => {
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
+      host.cpus = 2;
+      expect(currentResourceLimits().workers).toBe(2);
+    });
+
+    it('never drops below one worker at or near the soft floor', () => {
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '25';
+      expect(currentResourceLimits().workers).toBe(1);
+      expect(requestResource({ kind: 'worker', owner: 'at-floor' }).status).toBe('active');
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '24';
+      expect(currentResourceLimits().workers).toBe(1);
+      expect(requestResource({ kind: 'worker', owner: 'below-floor' }).status).toBe('queued');
+    });
+
+    it('honours MAJOR_WORKER_LIMIT only up to the hard ceiling', () => {
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '30';
+      process.env.MAJOR_WORKER_LIMIT = '5';
+      expect(currentResourceLimits().workers).toBe(5);
+      process.env.MAJOR_WORKER_LIMIT = '50';
+      expect(currentResourceLimits().workers).toBe(6);
+    });
+
+    it('lets workers fill slots browsers and builds leave free', () => {
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
+      expect(requestResource({ kind: 'browser', owner: 'browser' }).status).toBe('active');
+      for (let i = 0; i < 5; i += 1) {
+        expect(requestResource({ kind: 'worker', owner: `worker-${i}` }).status).toBe('active');
+      }
+      const overflow = requestResource({ kind: 'worker', owner: 'worker-overflow' });
+      expect(overflow.status).toBe('queued');
+      if (overflow.status === 'queued') expect(overflow.request.reason).toMatch(/global/);
+    });
+
+    it('does not let a capped worker block a browser queued behind it', () => {
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
+      process.env.MAJOR_WORKER_LIMIT = '1';
+      const first = requestResource({ kind: 'worker', owner: 'worker-a' });
+      requestResource({ kind: 'browser', owner: 'browser-a' });
+      requestResource({ kind: 'browser', owner: 'browser-b' });
+      expect(requestResource({ kind: 'worker', owner: 'worker-b' }).status).toBe('queued');
+      expect(requestResource({ kind: 'browser', owner: 'browser-c' }).status).toBe('queued');
+      const browserA = resourceSnapshot().leases.find((lease) => lease.owner === 'browser-a')!;
+      releaseResource(browserA.id, browserA.fencingToken);
+      const owners = resourceSnapshot().leases.map((lease) => lease.owner);
+      expect(owners).toContain('browser-c');
+      expect(owners).not.toContain('worker-b');
+      expect(first.status).toBe('active');
+    });
   });
 
   it('queues new work when memory falls below the soft floor', () => {
