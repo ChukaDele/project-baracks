@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { basename, isAbsolute, join, matchesGlob } from 'node:path';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { tasks, worktrees } from '../db/schema.js';
+import { tasks, worktrees, type BillingMode } from '../db/schema.js';
 import {
   claimNextTask,
   completeClaim,
@@ -12,7 +12,13 @@ import {
   releaseClaim,
 } from '../domain/claim-service.js';
 import { newId } from '../domain/ids.js';
-import { transitionTask, type ClaimFence } from '../domain/task-service.js';
+import { createRun, recordVerificationRun, setRunStatus } from '../domain/run-service.js';
+import {
+  addEvidence,
+  applyTransition,
+  transitionTask,
+  type ClaimFence,
+} from '../domain/task-service.js';
 import { runGatewayCommand, type WorkerOutcome } from './worker.js';
 import { parseWorkerReport } from './worker-report.js';
 import {
@@ -183,12 +189,23 @@ export interface ParallelTaskResult {
   integratorRuns: number;
 }
 
+/** The routed worker's persisted provider/model, recorded on each landed
+ * task's canonical implementation run. */
+export interface ParallelRunProvenance {
+  providerId: string;
+  modelId: string;
+  modelRef: string;
+  billingMode: BillingMode;
+  routingReason: string;
+}
+
 export interface ParallelBatchInput {
   db: Db;
   repoPath: string;
   projectId: string;
   tasks: readonly ParallelTask[];
   verificationCommands: readonly string[];
+  runProvenance: ParallelRunProvenance;
   /** Claim lease length; a heartbeat renews it while the task is in flight. */
   leaseMs: number;
   heartbeatMs?: number;
@@ -242,7 +259,8 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
     heartbeatClaim(input.db, fence.claimId, fence.workerId, input.leaseMs);
 
   type Failure = { ok: false; reason: string; output: string; head: string };
-  type Landing = { ok: true } | Failure;
+  type Check = { command: string; output: string };
+  type Landing = { ok: true; checks: Check[] } | Failure;
   const fail = (reason: string, output = '', target = ''): Failure => ({
     ok: false,
     reason,
@@ -303,16 +321,18 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
         target,
       );
     }
+    const checks: Check[] = [];
     for (const command of input.verificationCommands) {
       // ponytail: whitespace split, no shell quoting; configure commands without quoted args.
       const [executable, ...args] = command.trim().split(/\s+/);
       const check = await run(executable!, args, tree.path, [root]);
       if (!check.ok) return fail(`verification failed: ${command}`, check.output, target);
+      checks.push({ command, output: check.output });
     }
     renew(fence); // a lost claim must not land
     const ff = await git(input.repoPath, 'merge', '--ff-only', tree.branch);
     if (!ff.ok) return fail('fast-forward refused', ff.output, target);
-    return { ok: true };
+    return { ok: true, checks };
   };
 
   const integratorPrompt = async (
@@ -358,8 +378,17 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
     fence: ClaimFence,
   ): Promise<ParallelTaskResult> => {
     renew(fence);
-    if (outcome.status !== 'succeeded') {
-      releaseClaim(input.db, { ...fence, requeue: true, reason: `worker ${outcome.status}` });
+    const sessionRef = outcome.sessionRef?.trim();
+    // Like the single-worker cycle, a result without a durable session identity
+    // is refused: the landed task's canonical run must carry one.
+    const refused =
+      outcome.status !== 'succeeded'
+        ? `worker ${outcome.status}`
+        : sessionRef
+          ? undefined
+          : 'worker returned no durable session identity';
+    if (refused) {
+      releaseClaim(input.db, { ...fence, requeue: true, reason: refused });
       // Discard only this failed attempt's own scratch tree and branch; the
       // task is retried from the integration head. Never touches the goal checkout.
       const removed = await git(input.repoPath, 'worktree', 'remove', '--force', tree.path);
@@ -367,12 +396,7 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
         await git(input.repoPath, 'branch', '-D', tree.branch);
         setWorktreeStatus(tree.id, 'removed');
       }
-      return {
-        taskId: task.id,
-        outcome: 'requeued',
-        detail: `worker ${outcome.status}`,
-        integratorRuns: 0,
-      };
+      return { taskId: task.id, outcome: 'requeued', detail: refused, integratorRuns: 0 };
     }
     const report = parseWorkerReport(outcome.stdout);
     if (report?.status === 'blocked') {
@@ -405,8 +429,42 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
         integratorRuns,
       };
     }
-    // Landed and verified on the goal checkout. Task-level review is not wired
-    // yet: the goal's own independent review still gates goal completion.
+    // Landed and verified on the goal checkout. Record the canonical
+    // implementation run at the landed head with the merge queue's passed
+    // checks as its verification evidence; promoteNextLandedTask later routes
+    // the task into the independent completion review.
+    const landedHead = await head();
+    const agentRun = createRun(input.db, {
+      taskId: task.id,
+      ...input.runProvenance,
+      claimId: fence.claimId,
+      claimWorkerId: fence.workerId,
+      worktreeId: tree.id,
+      purpose: 'implementation',
+      sourceHead: landedHead,
+    });
+    setRunStatus(input.db, agentRun.id, 'running');
+    setRunStatus(input.db, agentRun.id, 'succeeded', {
+      sessionRef: sessionRef!,
+      usage: outcome.usage,
+    });
+    for (const check of landing.checks) {
+      const verification = recordVerificationRun(input.db, {
+        taskId: task.id,
+        command: check.command,
+        status: 'passed',
+        exitCode: 0,
+        outputSummary: clip(check.output),
+        agentRunId: agentRun.id,
+      });
+      addEvidence(input.db, {
+        taskId: task.id,
+        agentRunId: agentRun.id,
+        kind: 'verification_run',
+        ref: verification.id,
+        summary: `merge queue verification passed at ${landedHead}: ${check.command}`,
+      });
+    }
     transitionTask(input.db, task.id, 'verifying', { fence });
     completeClaim(input.db, fence.claimId, fence.workerId, 'merged');
     setWorktreeStatus(tree.id, 'merged');
@@ -494,5 +552,39 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
         clearInterval(heartbeat);
       }
     }),
+  );
+}
+
+/** Move the oldest merge-queue-landed (verifying) task into the existing
+ * completion gate: verifying -> reviewing -> ready_to_merge. Only one task is
+ * in the gate at a time, because resolveCanonicalTaskBinding accepts exactly
+ * one ready_to_merge task. The goal's independent completion review is the
+ * review this gate waits on; its pass grade is what completes the task. */
+export function promoteNextLandedTask(db: Db, projectId: string): string | undefined {
+  return db.transaction(
+    (tx) => {
+      const inGate = tx
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.projectId, projectId),
+            inArray(tasks.status, ['reviewing', 'ready_to_merge']),
+          ),
+        )
+        .get();
+      if (inGate) return undefined;
+      const next = tx
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(and(eq(tasks.projectId, projectId), eq(tasks.status, 'verifying')))
+        .orderBy(asc(tasks.createdAt))
+        .get();
+      if (!next) return undefined;
+      applyTransition(tx, next.id, 'reviewing');
+      applyTransition(tx, next.id, 'ready_to_merge');
+      return next.id;
+    },
+    { behavior: 'immediate' },
   );
 }

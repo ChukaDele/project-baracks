@@ -38,7 +38,9 @@ vi.mock('../src/supervisor/resources.js', async (importOriginal) => {
 
 import { projectConfigSchema } from '../src/config/project-config.js';
 import { getOrAddProject } from '../src/config/project-service.js';
+import { eq } from 'drizzle-orm';
 import { openDb } from '../src/db/client.js';
+import { agentRuns } from '../src/db/schema.js';
 import { addTask, getTask, transitionTask } from '../src/domain/task-service.js';
 import {
   persistProviderDiscovery,
@@ -74,7 +76,7 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-async function admittedGoal(parallelWorkers: boolean) {
+async function admittedGoal(parallelWorkers: boolean, names = ['alpha', 'beta']) {
   const repoPath = join(root, 'app');
   mkdirSync(repoPath);
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repoPath });
@@ -114,7 +116,7 @@ async function admittedGoal(parallelWorkers: boolean) {
     db,
     projectConfigSchema.parse({ name: 'app', repoPath, verificationCommands: ['git status'] }),
   );
-  const taskIds = ['alpha', 'beta'].map((name) => {
+  const taskIds = names.map((name) => {
     const task = addTask(db, { projectId: project.id, title: name, paths: [`${name}/**`] });
     transitionTask(db, task.id, 'ready');
     transitionTask(db, task.id, 'queued');
@@ -195,5 +197,74 @@ describe('parallel workers through the real supervisor cycle', { timeout: 30_000
     expect(existsSync(join(repoPath, 'alpha', 'done.txt'))).toBe(true);
     expect(existsSync(join(repoPath, 'beta', 'done.txt'))).toBe(true);
     expect(getGoal(goalId)?.lastSummary).toContain('Parallel cycle');
+  });
+
+  it('a landed task reaches completed through the independent completion review', async () => {
+    const { repoPath, goalId, taskIds } = await admittedGoal(true, ['alpha']);
+    const [alpha] = taskIds as [string];
+    const head = () =>
+      execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoPath }).toString().trim();
+    const result = (report: object, sessionRef: string) => ({
+      ...succeeded,
+      stdout: JSON.stringify({ type: 'result', result: `MAJOR_RESULT: ${JSON.stringify(report)}` }),
+      sessionRef,
+    });
+    runWorkerMock.mockImplementation(
+      async (input: { cwd: string; prompt: string; readOnly?: boolean }) => {
+        if (input.prompt.includes('Work only on task')) {
+          mkdirSync(join(input.cwd, 'alpha'));
+          writeFileSync(join(input.cwd, 'alpha', 'done.txt'), 'alpha\n');
+          return succeeded;
+        }
+        if (input.readOnly) {
+          return result(
+            {
+              status: 'active',
+              summary: 'landed alpha reviewed',
+              independentReview: {
+                purpose: 'independent_completion_review',
+                goalId,
+                sourceHead: head(),
+                verdict: 'pass',
+                evidence: 'alpha/done.txt exists at the exact head',
+              },
+            },
+            'review-session',
+          );
+        }
+        return result(
+          { status: 'done', summary: 'alpha shipped', taskId: alpha },
+          'coordinator-session',
+        );
+      },
+    );
+
+    // Cycle 1: the merge queue lands alpha with a canonical implementation run.
+    await runSupervisorCli(['run', 'app', '--goal-id', goalId, '--foreground']);
+    expect(taskStatuses(taskIds)).toEqual(['verifying']);
+    const { db, sqlite } = openDb(process.env.MAJOR_DB_PATH);
+    try {
+      expect(db.select().from(agentRuns).where(eq(agentRuns.taskId, alpha)).all()).toEqual([
+        expect.objectContaining({
+          purpose: 'implementation',
+          status: 'succeeded',
+          sourceHead: head(),
+          sessionRef: 'codex-session',
+        }),
+      ]);
+    } finally {
+      sqlite.close();
+    }
+
+    // Cycle 2: alpha enters the gate; the coordinator claims done for it.
+    await runSupervisorCli(['run', 'app', '--goal-id', goalId, '--foreground']);
+    expect(taskStatuses(taskIds)).toEqual(['ready_to_merge']);
+    expect(getGoal(goalId)?.pendingCompletion?.taskId).toBe(alpha);
+
+    // Cycle 3: the independent review passes and its grade completes alpha.
+    await runSupervisorCli(['run', 'app', '--goal-id', goalId, '--foreground']);
+    expect(runWorkerMock.mock.calls.at(-1)?.[0]).toMatchObject({ readOnly: true });
+    expect(taskStatuses(taskIds)).toEqual(['completed']);
+    expect(getGoal(goalId)?.status).toBe('done');
   });
 });

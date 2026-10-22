@@ -100,6 +100,7 @@ import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './w
 import { currentResourceLimits } from './resources.js';
 import {
   parallelRefusal,
+  promoteNextLandedTask,
   runParallelBatch,
   selectParallelBatch,
   type ParallelTask,
@@ -1789,6 +1790,36 @@ Major commits, rebases, verifies and merges this worktree after you finish. Do n
 Report status "done" when this task is done; it does not mean the whole goal is done.`;
 }
 
+/** The persisted provider account and billed model behind a routed worker. */
+function routedWorkerModel(
+  db: DbConn,
+  selection: Extract<CoordinatorSelection, { kind: 'route' }>,
+) {
+  const routed = parseCapacityKey(selection.provider);
+  const provider = db
+    .select()
+    .from(agentProviders)
+    .where(
+      and(
+        eq(agentProviders.name, routed.providerName),
+        eq(agentProviders.accountLabel, routed.accountLabel),
+      ),
+    )
+    .get();
+  if (!provider) throw new Error('routed worker provider account is not persisted');
+  const model = db
+    .select()
+    .from(agentModels)
+    .where(
+      and(eq(agentModels.providerId, provider.id), eq(agentModels.modelRef, selection.modelRef)),
+    )
+    .get();
+  if (!model || model.billingMode === 'unknown') {
+    throw new Error('routed worker model has no authoritative billing state');
+  }
+  return { provider, model: { ...model, billingMode: model.billingMode } };
+}
+
 /** Opt-in parallel path (policy.parallelWorkers). Returns false when no
  * queued task declares paths, so the ordinary single-worker cycle runs. */
 async function runParallelGoalCycle(
@@ -1806,6 +1837,9 @@ async function runParallelGoalCycle(
     } catch {
       return false;
     }
+    // A landed task enters the completion gate before the batch check, so the
+    // single-worker cycle can bind it once no queued work is left.
+    promoteNextLandedTask(state.db, project.id);
     const limit = Math.max(1, Math.min(policy.maxWorkers, currentResourceLimits().workers));
     const batch = selectParallelBatch(state.db, project.id, limit);
     if (batch.length === 0) return false;
@@ -1815,6 +1849,7 @@ async function runParallelGoalCycle(
       console.error(`Parallel workers skipped: ${refusal}`);
       return false;
     }
+    const { provider, model } = routedWorkerModel(state.db, selection);
     const timeoutMs = Math.min(
       Math.max(1, policy.maxRunMinutes) * 60 * 1000,
       maxTimeoutMs ?? Infinity,
@@ -1857,6 +1892,13 @@ async function runParallelGoalCycle(
         projectId: project.id,
         tasks: batch,
         verificationCommands,
+        runProvenance: {
+          providerId: provider.id,
+          modelId: model.id,
+          modelRef: model.modelRef,
+          billingMode: model.billingMode,
+          routingReason: selection.reason,
+        },
         leaseMs: 10 * 60 * 1000,
         runTaskWorker: (task, cwd) => dispatch(selection, parallelTaskPrompt(prompt, task), cwd),
         runIntegrator: async (integratorPrompt, cwd) => {
@@ -2052,31 +2094,7 @@ async function runLockedGoalCycle(
           title: `Supervisor worker execution for goal ${goal.id}`,
           description: 'Major-owned canonical execution provenance; not a promotable task.',
         }).id;
-    const routed = parseCapacityKey(routedSelection.provider);
-    const provider = taskState.db
-      .select()
-      .from(agentProviders)
-      .where(
-        and(
-          eq(agentProviders.name, routed.providerName),
-          eq(agentProviders.accountLabel, routed.accountLabel),
-        ),
-      )
-      .get();
-    if (!provider) throw new Error('routed worker provider account is not persisted');
-    const model = taskState.db
-      .select()
-      .from(agentModels)
-      .where(
-        and(
-          eq(agentModels.providerId, provider.id),
-          eq(agentModels.modelRef, routedSelection.modelRef),
-        ),
-      )
-      .get();
-    if (!model || model.billingMode === 'unknown') {
-      throw new Error('routed worker model has no authoritative billing state');
-    }
+    const { provider, model } = routedWorkerModel(taskState.db, routedSelection);
     const run = createRun(taskState.db, {
       taskId,
       providerId: provider.id,

@@ -4,11 +4,13 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { worktrees } from '../src/db/schema.js';
+import { agentModels, agentRuns, evidence, verificationRuns, worktrees } from '../src/db/schema.js';
+import { evaluateCompletionProof } from '../src/domain/completion.js';
 import { addTask, getTask, transitionTask } from '../src/domain/task-service.js';
 import {
   parallelRefusal,
   pathsOverlap,
+  promoteNextLandedTask,
   runParallelBatch,
   selectParallelBatch,
   type ParallelTask,
@@ -20,7 +22,7 @@ import {
   getProjectPolicy,
 } from '../src/supervisor/policy.js';
 import type { WorkerOutcome } from '../src/supervisor/worker.js';
-import { seedProject, testDb } from './helpers.js';
+import { ensureProvider, seedProject, testDb } from './helpers.js';
 
 let root = '';
 let repo = '';
@@ -49,6 +51,7 @@ function outcome(status: WorkerOutcome['status'] = 'succeeded'): WorkerOutcome {
     durationMs: 1,
     rateLimited: false,
     exhausted: false,
+    sessionRef: 'worker-session',
   };
 }
 
@@ -85,6 +88,21 @@ function batchInput(overrides: Partial<Parameters<typeof runParallelBatch>[0]> =
     projectId,
     tasks: selectParallelBatch(db, projectId, 4),
     verificationCommands: ['git status'],
+    runProvenance: (() => {
+      const providerId = ensureProvider(db);
+      const model = db
+        .select()
+        .from(agentModels)
+        .where(eq(agentModels.providerId, providerId))
+        .get()!;
+      return {
+        providerId,
+        modelId: model.id,
+        modelRef: model.modelRef,
+        billingMode: 'subscription_included' as const,
+        routingReason: 'test route',
+      };
+    })(),
     leaseMs: 60_000,
     run,
     worktreeRoot: join(root, 'worktrees'),
@@ -324,6 +342,65 @@ describe('parallel dispatch', { timeout: 30_000 }, () => {
     expect(results[0]?.outcome).toBe('requeued');
     expect(getTask(db, a.id).status).toBe('queued');
     expect(db.select().from(worktrees).get()?.status).toBe('removed');
+  });
+
+  it('refuses a succeeded result without a durable session identity', async () => {
+    const a = queuedTask('A', ['a/**']);
+    const results = await runParallelBatch(
+      batchInput({
+        runTaskWorker: async () => {
+          const { sessionRef: _, ...unidentified } = outcome();
+          return unidentified;
+        },
+      }),
+    );
+    expect(results[0]).toMatchObject({ outcome: 'requeued', detail: /session identity/ });
+    expect(getTask(db, a.id).status).toBe('queued');
+    expect(db.select().from(agentRuns).all()).toEqual([]);
+  });
+
+  it('records a canonical implementation run at the landed head with its checks as proof', async () => {
+    const a = queuedTask('A', ['a/**']);
+    const { worker } = writingWorker({ A: ['a/a.txt', 'a\n'] });
+    await runParallelBatch(batchInput({ runTaskWorker: worker }));
+    const landedHead = git(repo, 'rev-parse', 'HEAD');
+    expect(db.select().from(agentRuns).where(eq(agentRuns.taskId, a.id)).all()).toEqual([
+      expect.objectContaining({
+        purpose: 'implementation',
+        status: 'succeeded',
+        sourceHead: landedHead,
+        sessionRef: 'worker-session',
+      }),
+    ]);
+    const run = db.select().from(agentRuns).where(eq(agentRuns.taskId, a.id)).get()!;
+    expect(db.select().from(verificationRuns).all()).toEqual([
+      expect.objectContaining({ command: 'git status', status: 'passed', agentRunId: run.id }),
+    ]);
+    expect(db.select().from(evidence).all()).toEqual([
+      expect.objectContaining({ kind: 'verification_run', agentRunId: run.id }),
+    ]);
+    expect(evaluateCompletionProof(db, a.id)).toMatchObject({ ok: true });
+  });
+});
+
+describe('promoteNextLandedTask', { timeout: 30_000 }, () => {
+  it('moves one landed task at a time into the ready_to_merge gate, oldest first', async () => {
+    const a = queuedTask('A', ['a/**']);
+    const b = queuedTask('B', ['b/**']);
+    const { worker } = writingWorker({ A: ['a/a.txt', 'a\n'], B: ['b/b.txt', 'b\n'] });
+    await runParallelBatch(batchInput({ runTaskWorker: worker }));
+
+    expect(promoteNextLandedTask(db, projectId)).toBe(a.id);
+    expect(getTask(db, a.id).status).toBe('ready_to_merge');
+    expect(getTask(db, b.id).status).toBe('verifying');
+    // Exactly one ready_to_merge task: B waits until A leaves the gate.
+    expect(promoteNextLandedTask(db, projectId)).toBeUndefined();
+    expect(getTask(db, b.id).status).toBe('verifying');
+
+    transitionTask(db, a.id, 'completed');
+    expect(promoteNextLandedTask(db, projectId)).toBe(b.id);
+    expect(getTask(db, b.id).status).toBe('ready_to_merge');
+    expect(promoteNextLandedTask(db, projectId)).toBeUndefined();
   });
 });
 

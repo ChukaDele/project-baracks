@@ -34,7 +34,7 @@ export function tempDbPath(): string {
   return join(mkdtempSync(join(tmpdir(), 'major-db-')), 'major.db');
 }
 
-function ensureProvider(db: Db, name = 'test-provider'): string {
+export function ensureProvider(db: Db, name = 'test-provider'): string {
   const existing = db.select().from(agentProviders).where(eq(agentProviders.name, name)).get();
   const id = existing?.id ?? newId('aprov');
   if (!existing) db.insert(agentProviders).values({ id, name }).run();
