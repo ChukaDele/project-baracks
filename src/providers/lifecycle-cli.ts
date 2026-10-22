@@ -29,6 +29,7 @@ import { readApprovedCodexProfileUsage } from './codex-profile-reader.js';
 import { syncApprovedCodexProfiles } from './codex-profile-sync.js';
 import { classifyModel, loadModelRegistry } from './registry.js';
 import { probeHostProvider } from './host-probe.js';
+import { importProviderToken, providerTokenEnvName } from './provider-token.js';
 
 const ATTESTABLE_PROVIDERS = Object.freeze({
   'claude-code': 'claude',
@@ -243,6 +244,9 @@ Commands:
                                                       version-compatible, else fall back to native sign-in
                                                       (--provider <name> also accepted; --relogin re-authenticates
                                                       even when already READY)
+  import-token <name>                                store a headless token read from stdin (claude-code:
+                                                      \`claude setup-token\` output; cursor: a User API Key),
+                                                      then re-probe. Never pass the token as an argument.
   probe --provider <name>                            re-check a provider through the selected Major boundary (e.g. after an account swap)
   attest-billing --provider <p> --model <m> --billing <mode> --evidence <text>
                                                       record the owner-confirmed billing mode for a model
@@ -390,6 +394,7 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
           {
             provider: providerName,
             status: 'login-required',
+            probe: result.detail,
             detail:
               `Major could not confirm the host CLI login. Complete the provider's supported native login (` +
               `${executableName} auth login, or the provider's documented equivalent), then run ` +
@@ -552,6 +557,26 @@ export async function runProviderLifecycleCli(args: string[]): Promise<boolean> 
     const result = await probeAndPersist(providerName, 'connect: provider-native login');
     console.log(JSON.stringify(result, null, 2));
     await promptBillingIfNeeded(providerName);
+    return true;
+  }
+  if (args[1] === 'import-token') {
+    // stdin only: argv is visible in `ps` and shell history. The token is
+    // never echoed; the probe result below reports names and state only.
+    const providerName = attestableProvider(args[2] ?? '');
+    const host = PROVIDER_TO_HOST[providerName];
+    if (!providerTokenEnvName(host)) {
+      throw new Error(`${providerName} has no supported headless token`);
+    }
+    if (process.stdin.isTTY) {
+      throw new Error(
+        `pipe the token on stdin, e.g. pbpaste | major provider import-token ${providerName}`,
+      );
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+    const path = importProviderToken(host, Buffer.concat(chunks).toString('utf8'));
+    const result = await probeAndPersist(providerName);
+    console.log(JSON.stringify({ stored: path, ...result }, null, 2));
     return true;
   }
   if (args[1] === 'probe') {
