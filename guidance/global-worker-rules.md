@@ -50,12 +50,12 @@ Each line is binding. Load the named skill or detail-file section before acting 
 
 ## Global resource guard
 
-- The hard ceiling is 6 active resources across the full task tree. Parent agents, child agents, nested subagents, QA workers, browser workers and build workers share this one budget. The preferred operating range is 3–4 active resources.
-- Subagent depth is 1 by default. Review and QA workers are leaves. They do not delegate unless Major has granted a parent-linked worker lease and the request remains within depth 1.
+- There is no fixed resource ceiling. Major derives worker, browser and build limits from live memory headroom (and CPU for builds); parent agents, child agents, nested subagents, QA workers, browser workers and build workers all draw on that one host budget.
+- Subagent depth has no default cap. Child workers take a parent-linked worker lease; the owner may set `MAJOR_MAX_SUBAGENT_DEPTH`.
 - Before starting a worker, browser or build, acquire a Major lease with `major resource acquire --kind <worker|browser|build> --owner <stable-owner> --project <project>`. Pass `--parent <lease-id>` for child workers. Release it immediately after the work with `major resource release --lease <lease-id>`.
-- A queued result is not permission to start. Wait until Major promotes the request. Six occupied slots means further work queues.
-- Browser budget: at most one shared visible browser plus one headless browser context. Reuse contexts and close each viewport/page set promptly.
-- Build budget: one production build at a time. Build once per relevant commit. Reviewers inspect the same immutable remote preview.
+- A queued result is not permission to start. Wait until Major promotes the request.
+- Browsers: limited by memory headroom. Reuse contexts and close each viewport/page set promptly.
+- Builds: limited by memory and CPU. Build once per relevant commit. Reviewers inspect the same immutable remote preview.
 - Major admission checks the shared resource ledger and memory availability. Below the memory soft floor, new work queues instead of increasing pressure.
 - Use `major resource status` for lightweight telemetry: workers, browsers, builds, total active, queued and memory availability.
 - QA uses the shared live resource ledger: review, consolidate and repair, then run the next reviewer and final verifier when capacity and token economics justify it. This is a current scheduling rule, not a fixed one-worker limit.

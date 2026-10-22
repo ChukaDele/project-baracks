@@ -11,7 +11,7 @@ import { eq } from 'drizzle-orm';
 import type { DbConn } from '../db/client.js';
 import { agentProviders, agentRuns, independentReviewReceipts } from '../db/schema.js';
 import { redactText } from '../security/redact.js';
-import { GLOBAL_RESOURCE_LIMITS } from './resources.js';
+import { currentResourceLimits } from './resources.js';
 import { gitCommonDir, majorHome } from './state.js';
 import type { WorkerHost } from './state.js';
 
@@ -89,16 +89,15 @@ function limitsFor(
       return { maxWorkers: 1, maxRunMinutes: 30, allowBackground: false };
     case 'build':
       return {
-        // Policy stores the hard project ceiling. The resource ledger applies
-        // the current CPU/memory limit at admission, so transient pressure
-        // cannot permanently rewrite a build policy to one worker.
-        maxWorkers: GLOBAL_RESOURCE_LIMITS.workers,
+        // No policy ceiling: the worker count is live host capacity,
+        // re-derived on every read by normalizePolicy().
+        maxWorkers: currentResourceLimits().workers,
         maxRunMinutes: 120,
         allowBackground: false,
       };
     case 'unattended':
       return {
-        maxWorkers: GLOBAL_RESOURCE_LIMITS.workers,
+        maxWorkers: currentResourceLimits().workers,
         maxRunMinutes: 480,
         allowBackground: true,
       };

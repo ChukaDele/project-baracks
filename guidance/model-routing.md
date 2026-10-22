@@ -30,7 +30,7 @@ Prefer **subscription-included** capacity. Never silently switch onto credits or
 - Use strong reasoning for architecture, difficult root cause, consequential security and adjudication.
 - Use cheaper/abundant workers for bounded execution once the contract is clear.
 - Use deterministic scripts/codemods/tests instead of a model where sufficient.
-- Keep normal substantive builds at 3–4 active resources. Never exceed the hard global ceiling of 6 across workers, browsers and builds.
+- Run as many independent workers as live host capacity allows; Major derives the limit from memory headroom.
 - Contract to 1–2 workers for small/local work.
 - Do not duplicate identical work across providers unless independent verification or exploration has clear value.
 - Preserve cross-provider review for high-consequence decisions where useful.

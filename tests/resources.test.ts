@@ -201,10 +201,12 @@ describe('Major global resource guard', () => {
     if (child.status === 'queued') expect(child.request.reason).toMatch(/worker cap 1/);
   });
 
-  it('applies browser and build caps inside the shared total budget', () => {
+  it('derives browser and build caps from memory headroom', () => {
+    // 30% of 18 GiB minus the 25% floor leaves ~0.9 GiB: one browser, one build.
+    host.totalmem = 18 * 1024 ** 3;
+    process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '30';
     expect(requestResource({ kind: 'browser', owner: 'visible' }).status).toBe('active');
-    expect(requestResource({ kind: 'browser', owner: 'headless' }).status).toBe('active');
-    expect(requestResource({ kind: 'browser', owner: 'third-browser' }).status).toBe('queued');
+    expect(requestResource({ kind: 'browser', owner: 'second-browser' }).status).toBe('queued');
     expect(requestResource({ kind: 'build', owner: 'build-one' }).status).toBe('active');
     expect(requestResource({ kind: 'build', owner: 'build-two' }).status).toBe('queued');
   });
@@ -222,20 +224,46 @@ describe('Major global resource guard', () => {
       process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '30';
       expect(currentResourceLimits().workers).toBe(3);
       process.env.MAJOR_WORKER_MEMORY_MB = '128';
-      expect(currentResourceLimits().workers).toBe(6);
+      expect(currentResourceLimits().workers).toBe(7);
     });
 
-    it('caps workers at the shared total, not a separate lower ceiling', () => {
+    it('has no fixed ceiling: every limit comes from host capacity', () => {
+      // 75% headroom of 18 GiB = 13.5 GiB: 54 workers, 18 browsers, 6 builds.
       process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
       const limits = currentResourceLimits();
-      expect(limits.workers).toBe(limits.total);
-      expect(limits).toMatchObject({ total: 6, browsers: 2, builds: 1, maxSubagentDepth: 1 });
+      expect(limits).toMatchObject({ workers: 54, browsers: 18, builds: 6, total: 78 });
+      expect(limits.maxSubagentDepth).toBe(Number.POSITIVE_INFINITY);
     });
 
-    it('bounds workers by CPU parallelism', () => {
+    it('bounds builds, not workers, by CPU parallelism', () => {
       process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
       host.cpus = 2;
-      expect(currentResourceLimits().workers).toBe(2);
+      expect(currentResourceLimits()).toMatchObject({ workers: 54, builds: 1 });
+    });
+
+    it('honours an owner subagent depth cap', () => {
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
+      process.env.MAJOR_MAX_SUBAGENT_DEPTH = '1';
+      try {
+        const root = requestResource({ kind: 'worker', owner: 'root' });
+        if (root.status !== 'active') throw new Error('root not active');
+        const child = requestResource({
+          kind: 'worker',
+          owner: 'child',
+          parentLeaseId: root.lease.id,
+        });
+        if (child.status !== 'active') throw new Error('child not active');
+        const grandchild = requestResource({
+          kind: 'worker',
+          owner: 'grandchild',
+          parentLeaseId: child.lease.id,
+        });
+        expect(grandchild.status).toBe('rejected');
+        if (grandchild.status === 'rejected')
+          expect(grandchild.reason).toMatch(/MAJOR_MAX_SUBAGENT_DEPTH=1/);
+      } finally {
+        delete process.env.MAJOR_MAX_SUBAGENT_DEPTH;
+      }
     });
 
     it('never drops below one worker at or near the soft floor', () => {
@@ -247,27 +275,25 @@ describe('Major global resource guard', () => {
       expect(requestResource({ kind: 'worker', owner: 'below-floor' }).status).toBe('queued');
     });
 
-    it('honours MAJOR_WORKER_LIMIT only up to the hard ceiling', () => {
+    it('honours MAJOR_WORKER_LIMIT as an owner cap with no built-in maximum', () => {
       process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '30';
       process.env.MAJOR_WORKER_LIMIT = '5';
       expect(currentResourceLimits().workers).toBe(5);
       process.env.MAJOR_WORKER_LIMIT = '50';
-      expect(currentResourceLimits().workers).toBe(6);
+      expect(currentResourceLimits().workers).toBe(50);
     });
 
-    it('lets workers fill slots browsers and builds leave free', () => {
+    it('runs more than six workers at once when memory allows', () => {
       process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
       expect(requestResource({ kind: 'browser', owner: 'browser' }).status).toBe('active');
-      for (let i = 0; i < 5; i += 1) {
+      for (let i = 0; i < 12; i += 1) {
         expect(requestResource({ kind: 'worker', owner: `worker-${i}` }).status).toBe('active');
       }
-      const overflow = requestResource({ kind: 'worker', owner: 'worker-overflow' });
-      expect(overflow.status).toBe('queued');
-      if (overflow.status === 'queued') expect(overflow.request.reason).toMatch(/global/);
     });
 
     it('does not let a capped worker block a browser queued behind it', () => {
-      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '100';
+      // 10% headroom of 18 GiB = 1.8 GiB: room for two browsers.
+      process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '35';
       process.env.MAJOR_WORKER_LIMIT = '1';
       const first = requestResource({ kind: 'worker', owner: 'worker-a' });
       requestResource({ kind: 'browser', owner: 'browser-a' });
@@ -291,13 +317,16 @@ describe('Major global resource guard', () => {
   });
 
   it('reports lightweight runtime telemetry', () => {
+    host.totalmem = 18 * 1024 ** 3;
+    host.cpus = 12;
+    process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '35';
     requestResource({ kind: 'worker', owner: 'worker' });
     requestResource({ kind: 'browser', owner: 'browser' });
     const formatted = formatResourceTelemetry(resourceSnapshot().telemetry);
     expect(formatted).toContain('workers: 1/1');
     expect(formatted).toContain('browsers: 1/2');
     expect(formatted).toContain('builds: 0/1');
-    expect(formatted).toContain('total: 2/6');
+    expect(formatted).toContain('total: 2/4');
     expect(formatted).toContain('queued: 0');
     expect(formatted).toContain('reclaimed: 0');
   });
