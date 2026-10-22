@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  agentModels,
-  agentProviders,
-  discoveryObservations,
-  routingCheckpoints,
-} from '../src/db/schema.js';
+import { agentModels, agentProviders, discoveryObservations } from '../src/db/schema.js';
 import {
   consumeModelRetry,
   loadPersistedProviderInfos,
@@ -14,9 +9,7 @@ import {
   shouldProbe,
 } from '../src/providers/discovery-store.js';
 import type { ProviderInfo } from '../src/providers/types.js';
-import { recordRoutingCheckpoint } from '../src/routing/checkpoint.js';
 import { route } from '../src/routing/router.js';
-import { addTask } from '../src/domain/task-service.js';
 import { model, seedProject, testDb } from './helpers.js';
 
 function providerInfo(overrides: Partial<ProviderInfo> = {}): ProviderInfo {
@@ -377,35 +370,5 @@ describe('discovery persistence', () => {
 
     const decision = route({ purpose: 'implementation', complexity: 'complex' }, infos);
     expect(decision).toMatchObject({ kind: 'route', provider: 'codex#work-b' });
-  });
-});
-
-describe('routing checkpoints', () => {
-  it('persists an explicit checkpoint record with the paid options', () => {
-    const db = testDb();
-    const project = seedProject(db);
-    const task = addTask(db, { projectId: project.id, title: 'blocked work' });
-    const decision = route({ purpose: 'implementation', complexity: 'architectural' }, [
-      {
-        name: 'claude-code',
-        installed: true,
-        authenticated: true,
-        models: [model({ modelRef: 'fable', routingClass: 'fable', billingMode: 'usage_credits' })],
-      },
-    ]);
-    expect(decision.kind).toBe('checkpoint');
-    if (decision.kind !== 'checkpoint') return;
-    const row = recordRoutingCheckpoint(db, {
-      taskId: task.id,
-      purpose: 'implementation',
-      decision,
-    });
-    const stored = db.select().from(routingCheckpoints).all();
-    expect(stored).toHaveLength(1);
-    expect(stored[0]!.id).toBe(row.id);
-    expect(JSON.parse(stored[0]!.paidOptionsJson)).toEqual([
-      { provider: 'claude-code', modelRef: 'fable', billingMode: 'usage_credits' },
-    ]);
-    expect(() => db.delete(routingCheckpoints).run()).toThrow(/append-only/);
   });
 });

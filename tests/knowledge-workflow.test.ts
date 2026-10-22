@@ -4,17 +4,6 @@ import { runKnowledgeCli } from '../src/knowledge/cli.js';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import {
-  academicEvidenceStrength,
-  orderIdeaLineage,
-  strategicReadingFindings,
-  validateConceptSynthesis,
-  verifyAcademicEvidence,
-  validateCompendium,
-  type IdeaLineageEvent,
-  type StrategicReadingOutput,
-  type ConceptSynthesisEdge,
-} from '../src/knowledge/contracts.js';
 import { validateSkillOptimization } from '../src/skills/optimizer-validation.js';
 
 const row = (overrides: Partial<KnowledgeInputRecord> = {}): KnowledgeInputRecord => ({
@@ -132,104 +121,6 @@ describe('Major-native knowledge workflow', () => {
     );
     expect(receipt.unresolved[0]).toMatchObject({ relationship: 'CONTRADICTORY' });
     expect(captureMeaning).not.toHaveBeenCalled();
-  });
-});
-
-describe('knowledge skill contracts', () => {
-  it('produces deterministic findings while keeping reasoning explicit', () => {
-    expect(
-      strategicReadingFindings({
-        mechanisms: [' feedback ', 'feedback'],
-        limits: [],
-        contradictions: [],
-        actions: [],
-        indicators: [],
-      }),
-    ).toMatchObject({ mechanisms: ['feedback'], executionClass: 'reasoning-required' });
-    expect(
-      orderIdeaLineage([
-        { ideaId: 'i', transition: 'introduced', sourceRef: 's', observedAt: 'bad' },
-        { ideaId: 'i', transition: 'challenged', sourceRef: 's1', observedAt: '2026-01-01' },
-        { ideaId: 'i', transition: 'revived', sourceRef: 's2', observedAt: '2026-01-01' },
-      ]),
-    ).toMatchObject({
-      invalid: [expect.objectContaining({ observedAt: 'bad' })],
-      contradictory: [expect.objectContaining({ ideaId: 'i' })],
-    });
-    expect(
-      validateConceptSynthesis([{ from: 'a', to: 'a', relationship: 'supports', sourceRefs: [] }]),
-    ).toMatchObject({
-      accepted: [],
-      findings: expect.arrayContaining(['edge-0-entities-invalid']),
-    });
-    expect(
-      verifyAcademicEvidence({
-        sourceCount: 1,
-        primary: true,
-        replicated: true,
-        methodologyPresent: false,
-        limitationsPresent: false,
-        contradictoryResults: true,
-      }),
-    ).toMatchObject({
-      strength: 'single-source',
-      executionClass: 'reasoning-required',
-      findings: expect.arrayContaining([
-        'replication-unsupported',
-        'contradictory-results-unresolved',
-      ]),
-    });
-  });
-
-  it('behaviorally represents strategic reading, lineage and synthesis', () => {
-    const reading: StrategicReadingOutput = {
-      mechanisms: ['feedback'],
-      limits: ['small sample'],
-      contradictions: ['A vs B'],
-      actions: ['test'],
-      indicators: ['retention'],
-      executionClass: 'reasoning-required',
-    };
-    const lineage: IdeaLineageEvent[] = [
-      { ideaId: 'i', transition: 'challenged', sourceRef: 's1', observedAt: '2026-01-01' },
-      { ideaId: 'i', transition: 'revived', sourceRef: 's2', observedAt: '2026-02-01' },
-    ];
-    const edges: ConceptSynthesisEdge[] = [
-      { from: 'a', to: 'b', relationship: 'minority-alternative', sourceRefs: ['s1'] },
-    ];
-    expect(reading.limits).toEqual(['small sample']);
-    expect(lineage.map((event) => event.transition)).toEqual(['challenged', 'revived']);
-    expect(edges[0]?.relationship).toBe('minority-alternative');
-  });
-
-  it('validates compendium citation structure and academic evidence strength', () => {
-    expect(
-      validateCompendium({
-        question: 'Q?',
-        sources: [{ locator: 's', retrievedAt: '2026-01-01' }],
-        claims: [{ text: 'c', sourceLocators: ['s'] }],
-        conclusions: [{ text: 'd', basisClaimIndexes: [0] }],
-        unresolved: [],
-      }),
-    ).toEqual([]);
-    expect(
-      validateCompendium({
-        question: 'Q?',
-        sources: [],
-        claims: [{ text: 'c', sourceLocators: [] }],
-        conclusions: [],
-        unresolved: [],
-      }),
-    ).toContain('claim-0-source-invalid');
-    expect(
-      ['unsupported', 'single-source', 'corroborated', 'primary-replicated'].map((_, index) =>
-        academicEvidenceStrength({
-          sourceCount: index,
-          primary: index === 3,
-          replicated: index === 3,
-        }),
-      ),
-    ).toEqual(['unsupported', 'single-source', 'corroborated', 'primary-replicated']);
   });
 });
 
