@@ -27,6 +27,8 @@ export interface ClaimOptions {
   workerId: string;
   leaseMs?: number;
   projectId?: string;
+  /** Claim this exact task (if still queued) instead of the oldest one. */
+  taskId?: string;
   now?: () => Date;
 }
 
@@ -51,9 +53,11 @@ export function claimNextTask(db: Db, options: ClaimOptions) {
   return db.transaction(
     (tx) => {
       const nowMs = (options.now?.() ?? new Date()).getTime();
-      const conditions = options.projectId
-        ? and(eq(tasks.status, 'queued'), eq(tasks.projectId, options.projectId))
-        : eq(tasks.status, 'queued');
+      const conditions = and(
+        eq(tasks.status, 'queued'),
+        options.projectId ? eq(tasks.projectId, options.projectId) : undefined,
+        options.taskId ? eq(tasks.id, options.taskId) : undefined,
+      );
       const candidates = tx
         .select()
         .from(tasks)

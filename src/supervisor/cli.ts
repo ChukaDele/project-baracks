@@ -1,6 +1,4 @@
-import { mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { allocateDevPort, listDevPorts } from '../dev/ports.js';
 import {
   PROJECT_CLASSES,
@@ -49,7 +47,8 @@ import {
   supervisorSnapshot,
 } from './runtime.js';
 import { tryAcquireRepositoryWriterFence } from './repository-writer-fence.js';
-import { runGatewayCommand, runWorker } from './worker.js';
+import { runWorker } from './worker.js';
+import { createTaskWorktree, gatewayCommand } from './parallel-dispatch.js';
 import {
   RESOURCE_KINDS,
   cancelResourceRequest,
@@ -325,6 +324,8 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       ...(hasFlag(args, '--allow-external-writes') ? { allowExternalWrites: true } : {}),
       ...(hasFlag(args, '--allow-paid-spend') ? { allowPaidSpend: true } : {}),
       ...(hasFlag(args, '--owner-approved') ? { ownerApprovedBuild: true } : {}),
+      ...(hasFlag(args, '--parallel-workers') ? { parallelWorkers: true } : {}),
+      ...(hasFlag(args, '--no-parallel-workers') ? { parallelWorkers: false } : {}),
     });
     console.log(JSON.stringify(policy, null, 2));
     return true;
@@ -802,26 +803,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     const worktree = flag(args, '--worktree');
     let runCwd = cwd;
     if (worktree) {
-      const safe = worktree.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'task';
-      const projectName = basename(cwd);
-      const root = join(homedir(), '.major', 'worktrees', projectName);
-      mkdirSync(root, { recursive: true });
-      const stamp = Date.now();
-      runCwd = join(root, `${stamp}-${safe}`);
-      const branch = `major/${stamp}-${safe}`;
-      const git = await runGatewayCommand({
-        executable: 'git',
-        args: ['worktree', 'add', '-b', branch, runCwd],
-        cwd,
-        timeoutMs: 5 * 60 * 1000,
-        extraAllowedRoots: [root],
-      });
-      if (git.status !== 'succeeded') {
-        throw new Error(
-          `worktree setup failed: ${git.stderr || git.stdout || 'unknown git error'}`,
-        );
-      }
-      console.error(`Major worktree: ${runCwd} (${branch})`);
+      const created = await createTaskWorktree(gatewayCommand, cwd, worktree);
+      runCwd = created.path;
+      console.error(`Major worktree: ${runCwd} (${created.branch})`);
     }
     const writerFence = worktree ? undefined : tryAcquireRepositoryWriterFence(project.repoPath);
     if (!worktree && !writerFence) {
