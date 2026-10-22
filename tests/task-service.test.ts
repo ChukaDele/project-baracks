@@ -7,6 +7,7 @@ import {
   reviewFindings,
   roadmapItems,
   tasks,
+  usageObservations,
 } from '../src/db/schema.js';
 import {
   evaluateCompletionProof,
@@ -1186,5 +1187,39 @@ describe('agent runs', () => {
       data: { input: 100, output: 20 },
     });
     expect(JSON.parse(usage.dataJson)).toEqual({ input: 100, output: 20 });
+  });
+
+  it('records unredacted token counts and cost when a run settles with provider usage', () => {
+    const { db, providerId, run } = seedRun(testDb());
+    setRunStatus(db, run.id, 'succeeded', {
+      usage: {
+        input_tokens: 12,
+        cache_read_input_tokens: 20480,
+        output_tokens: 789,
+        total_cost_usd: 0.0421,
+      },
+    });
+    const rows = db
+      .select()
+      .from(usageObservations)
+      .where(eq(usageObservations.agentRunId, run.id))
+      .all();
+    expect(rows.map((row) => [row.kind, row.providerId, JSON.parse(row.dataJson)])).toEqual([
+      [
+        'tokens',
+        providerId,
+        {
+          input: 12,
+          output: 789,
+          cacheRead: 20480,
+          cacheCreation: null,
+          reasoning: null,
+          total: 801,
+        },
+      ],
+      ['cost', providerId, { cost: 0.0421, currency: 'USD' }],
+    ]);
+    setRunStatus(db, run.id, 'failed', { usage: { service_tier: 'standard' } });
+    expect(db.select().from(usageObservations).all()).toHaveLength(2);
   });
 });
