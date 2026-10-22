@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { testDb, canonicalGradeProvenance } from './helpers.js';
+import { currentResourceLimits } from '../src/supervisor/resources.js';
 import {
   clearGlobalStop,
   configureProjectPolicy,
@@ -81,7 +82,9 @@ describe('Major project trust policy', () => {
         projects: [{ ...legacy, trust: 'build', maxWorkers: 4, ownerApprovedBuild: true }],
       }),
     );
-    expect(getProjectPolicy('legacy', '/tmp/legacy').maxWorkers).toBe(6);
+    expect(getProjectPolicy('legacy', '/tmp/legacy').maxWorkers).toBe(
+      currentResourceLimits().workers,
+    );
   });
 
   it('defaults unknown projects to observe-only with zero delegated workers', () => {
@@ -116,7 +119,7 @@ describe('Major project trust policy', () => {
     });
     expect(policy.trust).toBe('build');
     expect(policy.ownerApprovedBuild).toBe(true);
-    expect(policy.maxWorkers).toBe(6);
+    expect(policy.maxWorkers).toBe(currentResourceLimits().workers);
     expect(policy.maxRunMinutes).toBe(120);
     expect(policy.allowBackground).toBe(false);
     expect(policy.allowExternalWrites).toBe(true);
@@ -153,7 +156,7 @@ describe('Major project trust policy', () => {
       allowExternalWrites: true,
     });
     expect(policy.trust).toBe('build');
-    expect(policy.maxWorkers).toBe(6);
+    expect(policy.maxWorkers).toBe(currentResourceLimits().workers);
     expect(policy.allowExternalWrites).toBe(true);
     expect(policy.allowCrossProjectMemory).toBe(false);
     expect(policy.allowPaidSpend).toBe(false);
@@ -193,7 +196,7 @@ describe('Major project trust policy', () => {
       projectClass: 'workshop',
       trust: 'unattended',
     });
-    expect(unattended.maxWorkers).toBe(6);
+    expect(unattended.maxWorkers).toBe(currentResourceLimits().workers);
     expect(unattended.allowBackground).toBe(true);
   });
 
@@ -225,7 +228,7 @@ describe('Major project trust policy', () => {
       projectClass: 'workshop',
       trust: 'build',
     });
-    expect(built.maxWorkers).toBe(6);
+    expect(built.maxWorkers).toBe(currentResourceLimits().workers);
     expect(built.allowBackground).toBe(false);
   });
 

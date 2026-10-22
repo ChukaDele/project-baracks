@@ -238,14 +238,14 @@ grep -Fq "unknown', 'workshop', 'client', 'knowledge" src/supervisor/policy.ts |
 grep -Fq "observe', 'assist', 'build', 'unattended" src/supervisor/policy.ts || fail "trust levels missing"
 grep -Fq "maxWorkers: 1" src/supervisor/policy.ts || fail "truthful project worker ceiling missing"
 grep -Fq "maxRunMinutes: 30" src/supervisor/policy.ts || fail "assist wall-clock ceiling missing"
-grep -Fq "workers: 6" src/supervisor/resources.ts || fail "durable worker hard ceiling missing"
-for cap in "total: 6," "browsers: 2," "builds: 1," "softMemoryAvailablePercent: 25,"; do
-  grep -Fq "$cap" src/supervisor/resources.ts || fail "global resource cap missing: $cap"
+grep -Fq "softMemoryAvailablePercent: 25," src/supervisor/resources.ts || fail "memory soft floor missing"
+for estimate in "BROWSER_MEMORY_ESTIMATE_BYTES" "BUILD_MEMORY_ESTIMATE_BYTES"; do
+  grep -Fq "$estimate" src/supervisor/resources.ts || fail "host-derived resource limit missing: $estimate"
 done
 grep -Fq "WORKER_MEMORY_ESTIMATE_BYTES" src/supervisor/resources.ts || fail "headroom-based worker limit missing"
 grep -Fq "currentResourceLimits" src/supervisor/resources.ts || fail "live worker capacity calculation missing"
 grep -Fq "GLOBAL_RESOURCE_LIMITS" src/supervisor/resources.ts || fail "global resource guard missing"
-grep -Fq "maxSubagentDepth: 1" src/supervisor/resources.ts || fail "subagent depth cap missing"
+grep -Fq "MAJOR_MAX_SUBAGENT_DEPTH" src/supervisor/resources.ts || fail "owner subagent depth cap missing"
 grep -Fq "three consecutive independently graded shadow passes" src/supervisor/policy.ts || fail "observe-to-assist shadow gate missing"
 grep -Fq "recordShadowGrade" src/supervisor/cli.ts || fail "shadow grade CLI path missing"
 grep -Fq 'MAJOR_RESULT:' src/supervisor/runtime.ts || fail "coordinator has no parent-owned result channel"
