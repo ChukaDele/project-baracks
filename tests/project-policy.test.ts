@@ -17,6 +17,7 @@ import {
 
 let root = '';
 let priorPolicyPath: string | undefined;
+let priorMemoryPercent: string | undefined;
 let priorStopPath: string | undefined;
 let db: ReturnType<typeof testDb>;
 
@@ -35,6 +36,10 @@ beforeEach(() => {
   priorStopPath = process.env.MAJOR_STOP_PATH;
   process.env.MAJOR_POLICY_PATH = join(root, 'policies.json');
   process.env.MAJOR_STOP_PATH = join(root, 'STOP');
+  // Live capacity moves with free memory between reads; pin it so a policy
+  // read and the expected value see the same host.
+  priorMemoryPercent = process.env.MAJOR_MEMORY_AVAILABLE_PERCENT;
+  process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = '60';
 });
 
 afterEach(() => {
@@ -42,6 +47,8 @@ afterEach(() => {
   else process.env.MAJOR_POLICY_PATH = priorPolicyPath;
   if (priorStopPath === undefined) delete process.env.MAJOR_STOP_PATH;
   else process.env.MAJOR_STOP_PATH = priorStopPath;
+  if (priorMemoryPercent === undefined) delete process.env.MAJOR_MEMORY_AVAILABLE_PERCENT;
+  else process.env.MAJOR_MEMORY_AVAILABLE_PERCENT = priorMemoryPercent;
   rmSync(root, { recursive: true, force: true });
 });
 
