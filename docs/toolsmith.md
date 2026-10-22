@@ -74,15 +74,6 @@ deprecates poor performers.
 
 ## Artifact-aware validation
 
-`src/validation/artifacts.ts` runs deterministic checks before a required
-independent/model review. It uses different evidence contracts for writing,
-code, analysis, presentations, and web artifacts. It does not use a universal
-judge prompt.
-
-An artifact reports deterministic success only. It never claims independent
-or production validation from caller-supplied evidence. The existing Major
-independent-grade and runtime-evidence paths must make those stronger claims.
-
 For web artifacts, `src/validation/ship-gate.ts` requires evidence for the
 critical journey, error states, data source and states, desktop/mobile visual
 QA, build/console/network health, performance, secret/auth boundaries, and

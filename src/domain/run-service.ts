@@ -19,6 +19,7 @@ import { StaleClaimError } from './claim-service.js';
 import { isApprovedDecision } from './decision-service.js';
 import { parseCompletionCriteria } from './completion.js';
 import { newId, nowIso } from './ids.js';
+import { normalizeProviderUsage } from '../providers/evidence.js';
 
 export class RunAuthorisationError extends Error {
   constructor(message: string) {
@@ -245,9 +246,20 @@ export function setRunStatus(
   db: DbConn,
   runId: string,
   status: (typeof agentRuns.$inferInsert)['status'],
-  options: { sessionRef?: string } = {},
+  options: { sessionRef?: string; usage?: unknown } = {},
 ) {
   const patch: Partial<typeof agentRuns.$inferInsert> = { status };
+  const usage = normalizeProviderUsage(options.usage);
+  if (usage) {
+    const run = getRun(db, runId);
+    const link = {
+      providerId: run.providerId,
+      agentRunId: runId,
+      ...(run.modelId ? { modelId: run.modelId } : {}),
+    };
+    if (usage.tokens) recordUsage(db, { ...link, kind: 'tokens', data: usage.tokens });
+    if (usage.cost) recordUsage(db, { ...link, kind: 'cost', data: usage.cost });
+  }
   if (options.sessionRef) patch.sessionRef = options.sessionRef;
   if (status === 'running') patch.startedAt = nowIso();
   if (status && ['succeeded', 'failed', 'cancelled', 'timed_out', 'checkpointed'].includes(status))

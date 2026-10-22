@@ -506,6 +506,8 @@ describe('major CLI', () => {
     // This is the Commander task-ledger surface. The successor supervisor is
     // routed by src/entry.ts before Commander and has separate contract tests.
     expect(listCommands(help.stdout).sort()).toEqual([
+      // `backup` only snapshots Major's own state into <majorHome>/backups.
+      'backup',
       'capability',
       // `cleanup` reclaims Major-owned resources. It is deliberately part of
       // this pinned surface: it removes only resources Major created, and

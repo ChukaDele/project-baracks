@@ -179,4 +179,30 @@ describe('admitGoal', () => {
     expect(after.retryImmediately).toBe(true);
     expect(after.pendingCompletion).toMatchObject({ summary: 'claimed done' });
   });
+
+  it('drops stale vendor session continuity when --refine changes the outcome', () => {
+    const repoPath = fakeRepo();
+    const { goal } = admitGoal({
+      project: 'jss-tool',
+      repoPath,
+      outcome: 'Old task',
+      refine: false,
+    });
+    updateGoal(goal.id, {
+      lastCoordinator: 'claude',
+      lastAccountLabel: 'default',
+      lastSessionRef: 'sess-old',
+      lastSummary: 'worked on the old task',
+    });
+    // Same text refine keeps continuity; the task did not change.
+    admitGoal({ project: 'jss-tool', repoPath, outcome: 'Old task', refine: true });
+    expect(getGoal(goal.id)!.lastSessionRef).toBe('sess-old');
+
+    admitGoal({ project: 'jss-tool', repoPath, outcome: 'New task', refine: true });
+    const after = getGoal(goal.id)!;
+    expect(after.goal).toBe('New task');
+    expect(after.lastSessionRef).toBeUndefined();
+    expect(after.lastSummary).toBeUndefined();
+    expect(after.lastAccountLabel).toBe('default');
+  });
 });

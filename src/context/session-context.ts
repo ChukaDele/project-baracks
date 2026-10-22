@@ -363,9 +363,6 @@ ${resolvedGoalSkills(project.project, project.repoPath)}
 
 RESOURCE GUARD
 ${resources}
-subagent depth: 1
-browser hard cap: 2
-concurrent build cap: 1
 
 SESSION CONTRACT
 - Major is already active; do not ask the user to start it again.

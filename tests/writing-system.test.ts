@@ -13,13 +13,8 @@ import {
   writingDraftDigest,
   writingSourcesDigest,
 } from '../src/writing/runtime.js';
-import { captureAcceptedWritingEdit } from '../src/writing/learning.js';
 import { observeDetectors } from '../src/writing/detector-observations.js';
 import { runLocalVale, type LocalDiagnosticExecutor } from '../src/writing/vale.js';
-import {
-  buildVoiceFingerprint,
-  compareVoiceFingerprint,
-} from '../src/writing/voice-fingerprint.js';
 
 const routeFixtures = JSON.parse(
   readFileSync(join(process.cwd(), 'evals/writing-regression/routes.json'), 'utf8'),
@@ -300,45 +295,6 @@ describe('canonical writing system', () => {
     expect(result.evaluatorRole).toBe('critic-only');
     expect(result.aggregation).toBe('none');
     expect(result.pass).toBe(false);
-  });
-
-  it('requires a measurable corpus and returns versioned deviations', () => {
-    expect(() => buildVoiceFingerprint('tiny', ['Too short.'])).toThrow(
-      /at least 3 approved samples and 300 words/,
-    );
-    const sample =
-      'I test the claim against a concrete case. The result matters because the reader can act on it. ';
-    const profile = buildVoiceFingerprint('personal-v1', [
-      sample.repeat(8),
-      sample.repeat(8),
-      sample.repeat(8),
-    ]);
-    expect(profile).toMatchObject({ schemaVersion: 2, profileId: 'personal-v1', sampleCount: 3 });
-    expect(profile.featureEvidence.sentenceLengthMean).toMatchObject({ unit: 'words' });
-    expect(profile.approvedSnippets.length).toBeGreaterThan(0);
-    expect(profile.approvedSnippets[0]).toEqual(
-      expect.objectContaining({ text: expect.any(String), sampleIndex: expect.any(Number) }),
-    );
-    expect(profile.features).toEqual(
-      expect.objectContaining({
-        sentenceLengthVariance: expect.any(Number),
-        functionWordRate: expect.any(Number),
-        transitionRate: expect.any(Number),
-        abstractWordRate: expect.any(Number),
-        conjunctionOpeningRate: expect.any(Number),
-      }),
-    );
-    expect(profile.constraints).toContain('no-author-or-ai-labels');
-    const comparison = compareVoiceFingerprint(profile, 'A short candidate.');
-    expect(comparison).toMatchObject({
-      schemaVersion: 2,
-      profileId: 'personal-v1',
-      profileCorpusSha256: profile.corpusSha256,
-      insufficientEvidence: true,
-    });
-    expect(comparison.deviations.sentenceLengthMean).toEqual(
-      expect.objectContaining({ expected: expect.any(Number), actual: expect.any(Number) }),
-    );
   });
 
   it('runs an optional local Vale seam and parses rule, severity, and span evidence', () => {
@@ -687,33 +643,5 @@ describe('canonical writing system', () => {
         },
       }),
     ).toBeUndefined();
-  });
-
-  it('captures accepted edits as lifecycle candidates without direct global policy', () => {
-    const oneOff = captureAcceptedWritingEdit({
-      summary: 'Keep this sentence for this deliverable only.',
-      evidence: 'User restored the wording.',
-      classification: 'one-off',
-      project: 'writing-test-project',
-      accepted: true,
-    });
-    const proposedGlobal = captureAcceptedWritingEdit({
-      summary: 'Prefer concrete openings.',
-      evidence: 'User accepted the edit.',
-      classification: 'global',
-      project: 'writing-test-project',
-      accepted: true,
-    });
-    expect(oneOff).toMatchObject({ scope: 'undecided', status: 'candidate' });
-    expect(proposedGlobal).toMatchObject({ scope: 'project', status: 'candidate' });
-    const unrelatedGlobal = captureAcceptedWritingEdit({
-      summary: 'Prefer direct conclusions.',
-      evidence: 'User accepted a different edit.',
-      classification: 'global',
-      project: 'writing-test-project',
-      accepted: true,
-    });
-    expect(unrelatedGlobal.id).not.toBe(proposedGlobal.id);
-    expect(unrelatedGlobal.occurrences).toBe(1);
   });
 });

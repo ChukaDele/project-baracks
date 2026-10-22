@@ -27,15 +27,17 @@ export interface ResourceLimits {
   softMemoryAvailablePercent: number;
 }
 
+/** Static part of the resource guard. Kind and total caps are not fixed
+ * numbers: currentResourceLimits() derives them from live memory and CPU, so
+ * the host, not a policy constant, decides how much runs at once. */
 export const GLOBAL_RESOURCE_LIMITS: ResourceLimits = {
-  total: 6,
-  // Workers have no ceiling of their own below the shared total: they may use
-  // any slot browsers and builds are not using. The active worker limit is
-  // derived from live host capacity by currentResourceLimits().
-  workers: 6,
-  browsers: 2,
-  builds: 1,
-  maxSubagentDepth: 1,
+  total: Number.POSITIVE_INFINITY,
+  workers: Number.POSITIVE_INFINITY,
+  browsers: Number.POSITIVE_INFINITY,
+  builds: Number.POSITIVE_INFINITY,
+  // Delegation depth is unbounded by default; the memory floor still stops
+  // runaway nesting. MAJOR_MAX_SUBAGENT_DEPTH sets an owner cap.
+  maxSubagentDepth: Number.POSITIVE_INFINITY,
   softMemoryAvailablePercent: 25,
 };
 
@@ -252,40 +254,53 @@ export function availableMemoryPercent(): number {
   return Math.round((freemem() / totalmem()) * 100);
 }
 
-/** Planning estimate of one leased worker's resident memory. Leased workers
- * are mostly API clients waiting on remote models, so this is deliberately a
- * modest per-process figure rather than a model-runtime footprint. */
+/** Planning estimates of each lease kind's resident memory. Workers are
+ * mostly API clients waiting on remote models; browsers and builds are heavier. */
 export const WORKER_MEMORY_ESTIMATE_BYTES = 256 * 1024 * 1024;
+export const BROWSER_MEMORY_ESTIMATE_BYTES = 768 * 1024 * 1024;
+export const BUILD_MEMORY_ESTIMATE_BYTES = 2048 * 1024 * 1024;
+
+function envPositiveInt(name: string): number | undefined {
+  const value = Number.parseInt(process.env[name] ?? '', 10);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
 
 function workerMemoryEstimateBytes(): number {
-  const override = Number.parseInt(process.env.MAJOR_WORKER_MEMORY_MB ?? '', 10);
-  return Number.isInteger(override) && override > 0
-    ? override * 1024 * 1024
-    : WORKER_MEMORY_ESTIMATE_BYTES;
+  const override = envPositiveInt('MAJOR_WORKER_MEMORY_MB');
+  return override ? override * 1024 * 1024 : WORKER_MEMORY_ESTIMATE_BYTES;
 }
 
 /**
- * Derive the active worker limit from live host capacity: memory headroom
- * above the soft floor, in bytes, divided by the per-worker estimate, bounded
- * by CPU parallelism and the shared hard ceiling. It never drops below 1;
- * below the soft floor capacityReason() queues all new work instead. The
- * optional MAJOR_WORKER_LIMIT override is for deterministic validation and an
- * owner-controlled workstation cap, and can never exceed the hard ceiling.
+ * Derive live limits from host capacity only: memory headroom above the soft
+ * floor divided by each kind's estimate. Workers are I/O-bound, so CPU does
+ * not cap them; builds are CPU-bound, so half the cores also bounds them. Each
+ * kind keeps at least one slot; below the soft floor capacityReason() queues
+ * all new work instead. The total is the sum of the kind limits, so it adds no
+ * ceiling of its own. MAJOR_WORKER_LIMIT and MAJOR_MAX_SUBAGENT_DEPTH are
+ * optional owner caps with no built-in maximum.
  */
 export function currentResourceLimits(): ResourceLimits {
-  const ceiling = GLOBAL_RESOURCE_LIMITS.workers;
-  const override = Number.parseInt(process.env.MAJOR_WORKER_LIMIT ?? '', 10);
-  if (Number.isInteger(override) && override > 0) {
-    return { ...GLOBAL_RESOURCE_LIMITS, workers: Math.min(ceiling, override) };
-  }
-  // Headroom already reflects running workers' memory, so this counts them
+  // Headroom already reflects running leases' memory, so this counts them
   // twice. That is conservative: queued work drains as memory frees.
   const headroomPercent =
     availableMemoryPercent() - GLOBAL_RESOURCE_LIMITS.softMemoryAvailablePercent;
   const headroomBytes = (Math.max(0, headroomPercent) / 100) * totalmem();
-  const memoryLimit = Math.floor(headroomBytes / workerMemoryEstimateBytes());
-  const workers = Math.max(1, Math.min(ceiling, availableParallelism(), memoryLimit));
-  return { ...GLOBAL_RESOURCE_LIMITS, workers };
+  const fit = (estimate: number) => Math.max(1, Math.floor(headroomBytes / estimate));
+  const workers = envPositiveInt('MAJOR_WORKER_LIMIT') ?? fit(workerMemoryEstimateBytes());
+  const browsers = fit(BROWSER_MEMORY_ESTIMATE_BYTES);
+  const builds = Math.min(
+    fit(BUILD_MEMORY_ESTIMATE_BYTES),
+    Math.max(1, Math.floor(availableParallelism() / 2)),
+  );
+  return {
+    ...GLOBAL_RESOURCE_LIMITS,
+    workers,
+    browsers,
+    builds,
+    total: workers + browsers + builds,
+    maxSubagentDepth:
+      envPositiveInt('MAJOR_MAX_SUBAGENT_DEPTH') ?? GLOBAL_RESOURCE_LIMITS.maxSubagentDepth,
+  };
 }
 
 function leaseReclaimAfter(lease: ResourceLease): number {
@@ -433,7 +448,7 @@ function requestDepth(
   if (depth > limits.maxSubagentDepth) {
     return {
       depth,
-      rejection: `subagent depth ${depth} exceeds hard cap ${limits.maxSubagentDepth}; leaf workers cannot delegate`,
+      rejection: `subagent depth ${depth} exceeds owner cap MAJOR_MAX_SUBAGENT_DEPTH=${limits.maxSubagentDepth}`,
     };
   }
   return { depth };
