@@ -5,9 +5,15 @@ import {
   mkdirSync,
   readFileSync,
   readlinkSync,
+  readdirSync,
   realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
   symlinkSync,
+  writeFileSync,
 } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
@@ -255,12 +261,41 @@ function prepareHostCodexHome(runtimeData: string): string {
   return codexHome;
 }
 
+/** Rotate a JSONL audit log past `maxBytes` into a gzipped
+ * `<name>.<UTC timestamp>.jsonl.gz`, keeping the newest `keep` rotations. */
+export function rotateJsonlLog(file: string, maxBytes = 10 * 1024 * 1024, keep = 6): void {
+  let size: number;
+  try {
+    size = statSync(file).size;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  if (size <= maxBytes) return;
+  const dir = dirname(file);
+  const stem = basename(file, '.jsonl');
+  const rotated = join(dir, `${stem}.${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`);
+  try {
+    renameSync(file, rotated);
+  } catch (error) {
+    // Another process rotated it first.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  writeFileSync(`${rotated}.gz`, gzipSync(readFileSync(rotated)), { mode: 0o600 });
+  rmSync(rotated);
+  const archives = readdirSync(dir)
+    .filter((name) => name.startsWith(`${stem}.`) && name.endsWith('.jsonl.gz'))
+    .sort();
+  for (const old of archives.slice(0, -keep)) rmSync(join(dir, old), { force: true });
+}
+
 function recordExecution(decision: ExecutionPolicyDecision): void {
   const dir = majorHome();
   mkdirSync(dir, { recursive: true, mode: 0o700 });
-  appendFileSync(join(dir, 'execution-policy.jsonl'), `${JSON.stringify(decision)}\n`, {
-    mode: 0o600,
-  });
+  const log = join(dir, 'execution-policy.jsonl');
+  rotateJsonlLog(log);
+  appendFileSync(log, `${JSON.stringify(decision)}\n`, { mode: 0o600 });
 }
 
 export function trustedExecutableRegistry(executable: string): TrustedExecutableRegistry {

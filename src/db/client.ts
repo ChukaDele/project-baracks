@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,9 +24,40 @@ export function defaultDbPath(): string {
   return join(trustedMajorHome(), 'major.db');
 }
 
+/** Snapshot root written by `major backup` / `major cleanup`. */
+export function stateBackupRoot(home: string = trustedMajorHome()): string {
+  return join(home, 'backups', 'state');
+}
+
+/** Newest snapshot directory (names are sortable UTC timestamps). */
+export function newestStateBackup(root: string = stateBackupRoot()): string | undefined {
+  if (!existsSync(root)) return undefined;
+  const newest = readdirSync(root).sort().at(-1);
+  return newest ? join(root, newest) : undefined;
+}
+
+function assertIntegrity(sqlite: Database.Database, path: string): void {
+  let result: unknown;
+  try {
+    result = sqlite.pragma('quick_check', { simple: true });
+  } catch (error) {
+    result = error instanceof Error ? error.message : String(error);
+  }
+  if (result === 'ok') return;
+  sqlite.close();
+  const snapshot = newestStateBackup();
+  throw new Error(
+    `Major database ${path} failed integrity check (${String(result)}); ` +
+      (snapshot
+        ? `restore major.db from ${join(snapshot, 'major.db')}`
+        : 'no state snapshot exists to restore from'),
+  );
+}
+
 export function openDb(path: string = defaultDbPath()): { db: Db; sqlite: Database.Database } {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const sqlite = new Database(path);
+  if (path !== ':memory:') assertIntegrity(sqlite, path);
   sqlite.function('sha256', { deterministic: true }, (value: string) =>
     createHash('sha256').update(value).digest('hex'),
   );
