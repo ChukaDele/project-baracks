@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, lte } from 'drizzle-orm';
 import type { DbConn } from '../db/client.js';
 import { decisionRequests, providerActionConsumptions } from '../db/schema.js';
 import { newId, nowIso } from './ids.js';
@@ -32,6 +32,33 @@ export function getDecision(db: DbConn, decisionId: string) {
   const row = db.select().from(decisionRequests).where(eq(decisionRequests.id, decisionId)).get();
   if (!row) throw new Error(`decision request not found: ${decisionId}`);
   return row;
+}
+
+/** Mark open decisions past `expires_at` as 'expired' (terminal, immutable).
+ * Applied lazily when listing and by `major cleanup`; resolve is unchanged
+ * because isApprovedDecision already refuses approvals past expiry. Returns the expired count. */
+export function expireStaleDecisions(db: DbConn, now: Date = new Date()) {
+  const nowStamp = now.toISOString();
+  return db
+    .update(decisionRequests)
+    .set({ status: 'expired', resolvedAt: nowStamp })
+    .where(
+      and(
+        eq(decisionRequests.status, 'open'),
+        isNotNull(decisionRequests.expiresAt),
+        lte(decisionRequests.expiresAt, nowStamp),
+      ),
+    )
+    .run().changes;
+}
+
+/** Open decisions (or every decision with `all`), newest first, after lazy expiry. */
+export function listDecisions(db: DbConn, opts: { all?: boolean; now?: Date } = {}) {
+  expireStaleDecisions(db, opts.now);
+  const query = db.select().from(decisionRequests);
+  return (opts.all ? query : query.where(eq(decisionRequests.status, 'open')))
+    .orderBy(desc(decisionRequests.createdAt))
+    .all();
 }
 
 /** Resolve an open decision. Resolved decisions are immutable (DB trigger). */

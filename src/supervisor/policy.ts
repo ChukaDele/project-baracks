@@ -489,3 +489,17 @@ export function assertExecutionAllowed(policy: ProjectPolicy): void {
     );
   }
 }
+
+export function listProjectPolicies(): ProjectPolicy[] {
+  return readStore().projects;
+}
+
+/** Remove matching policy entries; returns the removed entries. */
+export function removeProjectPolicies(remove: (policy: ProjectPolicy) => boolean): ProjectPolicy[] {
+  const store = readStore();
+  const removed = store.projects.filter(remove);
+  if (removed.length === 0) return removed;
+  store.projects = store.projects.filter((policy) => !remove(policy));
+  writeStore(store);
+  return removed;
+}

@@ -65,7 +65,11 @@ import { assertRemotePreviewUrl } from '../web/remote-preview.js';
 import { redactText } from '../security/redact.js';
 import { openDb } from '../db/client.js';
 import { getIndependentReviewReceipt } from '../insights/performance-history.js';
-import { createDecisionRequest, resolveDecision } from '../domain/decision-service.js';
+import {
+  createDecisionRequest,
+  listDecisions,
+  resolveDecision,
+} from '../domain/decision-service.js';
 import {
   decideProviderAction,
   providerActionDigest,
@@ -839,6 +843,27 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
       if (outcome.status !== 'succeeded') process.exitCode = 1;
     } finally {
       writerFence?.release();
+    }
+    return true;
+  }
+
+  if (command === 'decision' && args[1] === 'list') {
+    const opened = openDb();
+    try {
+      const decisions = listDecisions(opened.db, { all: hasFlag(args, '--all') });
+      if (hasFlag(args, '--json')) {
+        console.log(JSON.stringify(decisions, null, 2));
+      } else if (decisions.length === 0) {
+        console.log(hasFlag(args, '--all') ? 'no decisions' : 'no open decisions');
+      } else {
+        for (const d of decisions) {
+          console.log(
+            `${d.id}  ${d.status}  ${d.category}  expires=${d.expiresAt ?? '-'}  ${d.question}`,
+          );
+        }
+      }
+    } finally {
+      opened.sqlite.close();
     }
     return true;
   }

@@ -307,6 +307,14 @@ export function writeSupervisorState(state: SupervisorState): void {
   renameSync(temp, path);
 }
 
+/** A redefined outcome is a different task: never resume the vendor session
+ * or replay the prior cycle summary that belonged to the old outcome text. */
+function clearSessionContinuityOnOutcomeChange(goal: SupervisorGoal, outcome: string): void {
+  if (goal.goal === outcome) return;
+  goal.lastSessionRef = undefined;
+  goal.lastSummary = undefined;
+}
+
 export function startGoal(input: {
   project: string;
   repoPath: string;
@@ -327,6 +335,7 @@ export function startGoal(input: {
         ['active', 'running', 'blocked'].includes(existing.status)
       ) {
         existing.project = input.project;
+        clearSessionContinuityOnOutcomeChange(existing, input.goal);
         existing.goal = input.goal;
         existing.repoPath = resolve(input.repoPath);
         existing.autonomous = input.autonomous;
@@ -423,6 +432,7 @@ export function admitGoal(input: {
         existing.ownerGate = undefined;
         existing.retryImmediately = false;
         existing.nextRunAt = now;
+        clearSessionContinuityOnOutcomeChange(existing, input.outcome);
         existing.goal = input.outcome;
         existing.admissionRiskAssessment = input.admissionRiskAssessment;
         existing.promotionContract = deriveSupervisorPromotionContract({
@@ -466,7 +476,7 @@ export function admitGoal(input: {
   });
 }
 
-function pidAlive(pid: number): boolean {
+export function pidAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
@@ -1282,4 +1292,13 @@ export function resolveProjectForCwd(
   const root = gitRootFrom(cwd);
   if (!root) return undefined;
   return { project: repositoryIdentity(root), repoPath: root };
+}
+
+/** Remove goals by id under the state lock; returns the removed goals. */
+export function removeGoals(ids: ReadonlySet<string>): SupervisorGoal[] {
+  return mutateSupervisorState((state) => {
+    const removed = state.goals.filter((goal) => ids.has(goal.id));
+    state.goals = state.goals.filter((goal) => !ids.has(goal.id));
+    return removed;
+  });
 }
