@@ -97,7 +97,12 @@ import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integrat
 import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
 import { currentResourceLimits } from './resources.js';
-import { runParallelBatch, selectParallelBatch, type ParallelTask } from './parallel-dispatch.js';
+import {
+  parallelRefusal,
+  runParallelBatch,
+  selectParallelBatch,
+  type ParallelTask,
+} from './parallel-dispatch.js';
 import {
   completedWorkflow,
   assessSupervisorAdmissionRisk,
@@ -1803,6 +1808,12 @@ async function runParallelGoalCycle(
     const limit = Math.max(1, Math.min(policy.maxWorkers, currentResourceLimits().workers));
     const batch = selectParallelBatch(state.db, project.id, limit);
     if (batch.length === 0) return false;
+    const { verificationCommands } = projectConfig(project);
+    const refusal = await parallelRefusal(goal.repoPath, verificationCommands);
+    if (refusal) {
+      console.error(`Parallel workers skipped: ${refusal}`);
+      return false;
+    }
     const timeoutMs = Math.min(
       Math.max(1, policy.maxRunMinutes) * 60 * 1000,
       maxTimeoutMs ?? Infinity,
@@ -1837,33 +1848,46 @@ async function runParallelGoalCycle(
         effort: route.effort,
         accountLabel: route.accountLabel,
       });
-    const results = await runParallelBatch({
-      db: state.db,
-      repoPath: goal.repoPath,
-      projectId: project.id,
-      tasks: batch,
-      verificationCommands: projectConfig(project).verificationCommands,
-      // ponytail: one fixed lease for worker + merge + one integrator, no
-      // heartbeat; add claim heartbeats if runs outgrow it.
-      leaseMs: 2 * timeoutMs + 15 * 60 * 1000,
-      runTaskWorker: (task, cwd) => dispatch(selection, parallelTaskPrompt(prompt, task), cwd),
-      runIntegrator: async (integratorPrompt, cwd) => {
-        const integrator = await routeGoalExecutionSmart(goal, { targetClass: 'sonnet' });
-        if (integrator.kind === 'checkpoint') {
-          return {
-            host: selection.host,
-            status: 'failed',
-            exitCode: null,
-            stdout: '',
-            stderr: integrator.reason,
-            durationMs: 0,
-            rateLimited: false,
-            exhausted: false,
-          };
-        }
-        return dispatch(integrator, integratorPrompt, cwd);
-      },
-    });
+    let results;
+    try {
+      results = await runParallelBatch({
+        db: state.db,
+        repoPath: goal.repoPath,
+        projectId: project.id,
+        tasks: batch,
+        verificationCommands,
+        leaseMs: 10 * 60 * 1000,
+        runTaskWorker: (task, cwd) => dispatch(selection, parallelTaskPrompt(prompt, task), cwd),
+        runIntegrator: async (integratorPrompt, cwd) => {
+          const integrator = await routeGoalExecutionSmart(goal, { targetClass: 'sonnet' });
+          if (integrator.kind === 'checkpoint') {
+            return {
+              host: selection.host,
+              status: 'failed',
+              exitCode: null,
+              stdout: '',
+              stderr: integrator.reason,
+              durationMs: 0,
+              rateLimited: false,
+              exhausted: false,
+            };
+          }
+          return dispatch(integrator, integratorPrompt, cwd);
+        },
+      });
+    } catch (error) {
+      updateGoal(goal.id, {
+        status: 'active',
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary: trim(
+          `Parallel cycle failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+        nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+        retryImmediately: false,
+      });
+      throw error;
+    }
     updateGoal(goal.id, {
       status: 'active',
       activePid: undefined,

@@ -1,12 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { worktrees } from '../src/db/schema.js';
 import { addTask, getTask, transitionTask } from '../src/domain/task-service.js';
 import {
+  parallelRefusal,
   pathsOverlap,
   runParallelBatch,
   selectParallelBatch,
@@ -69,6 +70,7 @@ function writingWorker(files: Record<string, [file: string, content: string, del
     stats.peak = Math.max(stats.peak, active);
     const [file, content, delayMs = 50] = files[task.title]!;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
+    mkdirSync(dirname(join(cwd, file)), { recursive: true });
     writeFileSync(join(cwd, file), content);
     active -= 1;
     return outcome();
@@ -92,6 +94,17 @@ function batchInput(overrides: Partial<Parameters<typeof runParallelBatch>[0]> =
   };
 }
 
+/** A and B have disjoint declared paths, but B strays into A's shared.txt. */
+function strayingPair() {
+  queuedTask('A', ['shared.txt']);
+  const b = queuedTask('B', ['b/**']);
+  const { worker } = writingWorker({
+    A: ['shared.txt', 'from A\n'],
+    B: ['shared.txt', 'from B\n', 150],
+  });
+  return { b, worker };
+}
+
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'major-parallel-'));
   repo = join(root, 'repo');
@@ -113,11 +126,11 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-describe('parallel dispatch', () => {
+describe('parallel dispatch', { timeout: 30_000 }, () => {
   it('runs two disjoint tasks at once and merges both', async () => {
     const a = queuedTask('A', ['a/**']);
     const b = queuedTask('B', ['b/**']);
-    const { worker, stats } = writingWorker({ A: ['a.txt', 'a\n'], B: ['b.txt', 'b\n'] });
+    const { worker, stats } = writingWorker({ A: ['a/a.txt', 'a\n'], B: ['b/b.txt', 'b\n'] });
     let integratorCalls = 0;
     const results = await runParallelBatch(
       batchInput({
@@ -131,8 +144,9 @@ describe('parallel dispatch', () => {
     expect(results.map((result) => result.outcome)).toEqual(['merged', 'merged']);
     expect(stats.peak).toBe(2);
     expect(integratorCalls).toBe(0);
-    expect(readFileSync(join(repo, 'a.txt'), 'utf8')).toBe('a\n');
-    expect(readFileSync(join(repo, 'b.txt'), 'utf8')).toBe('b\n');
+    expect(readFileSync(join(repo, 'a/a.txt'), 'utf8')).toBe('a\n');
+    expect(readFileSync(join(repo, 'b/b.txt'), 'utf8')).toBe('b\n');
+    expect(git(repo, 'log', '-1', '--format=%an')).toBe('Major');
     expect(getTask(db, a.id).status).toBe('verifying');
     expect(getTask(db, b.id).status).toBe('verifying');
     const trees = db.select().from(worktrees).all();
@@ -145,20 +159,15 @@ describe('parallel dispatch', () => {
     const second = queuedTask('second', ['src/feature/x.ts']);
     queuedTask('undeclared');
     expect(selectParallelBatch(db, projectId, 4).map((task) => task.id)).toEqual([first.id]);
-    const { worker } = writingWorker({ first: ['one.txt', '1\n'], second: ['two.txt', '2\n'] });
+    const { worker } = writingWorker({ first: ['src/one.txt', '1\n'] });
     await runParallelBatch(batchInput({ runTaskWorker: worker }));
+    expect(getTask(db, first.id).status).toBe('verifying');
     expect(getTask(db, second.id).status).toBe('queued');
     expect(selectParallelBatch(db, projectId, 4).map((task) => task.id)).toEqual([second.id]);
   });
 
   it('invokes the integrator exactly once on a rebase conflict and merges its fix', async () => {
-    queuedTask('A', ['a/**']);
-    const b = queuedTask('B', ['b/**']);
-    // Both workers stray into the same file: B's rebase onto A must conflict.
-    const { worker } = writingWorker({
-      A: ['shared.txt', 'from A\n'],
-      B: ['shared.txt', 'from B\n', 150],
-    });
+    const { b, worker } = strayingPair();
     const prompts: string[] = [];
     const results = await runParallelBatch(
       batchInput({
@@ -166,8 +175,10 @@ describe('parallel dispatch', () => {
         runIntegrator: async (prompt, cwd) => {
           prompts.push(prompt);
           git(cwd, 'reset', '-q', '--hard', git(repo, 'rev-parse', 'HEAD'));
-          writeFileSync(join(cwd, 'shared.txt'), 'from A\nfrom B\n');
-          git(cwd, 'commit', '-qam', 'integrate');
+          mkdirSync(join(cwd, 'b'));
+          writeFileSync(join(cwd, 'b/b.txt'), 'from B\n');
+          git(cwd, 'add', '-A');
+          git(cwd, 'commit', '-qm', 'integrate');
           return outcome();
         },
       }),
@@ -178,16 +189,12 @@ describe('parallel dispatch', () => {
       outcome: 'merged',
       integratorRuns: 1,
     });
-    expect(readFileSync(join(repo, 'shared.txt'), 'utf8')).toBe('from A\nfrom B\n');
+    expect(readFileSync(join(repo, 'shared.txt'), 'utf8')).toBe('from A\n');
+    expect(readFileSync(join(repo, 'b/b.txt'), 'utf8')).toBe('from B\n');
   });
 
   it('blocks the task for the owner when the integrator cannot fix it, without forcing', async () => {
-    queuedTask('A', ['a/**']);
-    const b = queuedTask('B', ['b/**']);
-    const { worker } = writingWorker({
-      A: ['shared.txt', 'from A\n'],
-      B: ['shared.txt', 'from B\n', 150],
-    });
+    const { b, worker } = strayingPair();
     let integratorCalls = 0;
     const results = await runParallelBatch(
       batchInput({
@@ -207,9 +214,21 @@ describe('parallel dispatch', () => {
     expect(existsSync(kept!.path)).toBe(true);
   });
 
+  it('refuses to land changes outside the declared paths', async () => {
+    const a = queuedTask('A', ['a/**']);
+    const { worker } = writingWorker({ A: ['README.md', 'stray\n'] });
+    const results = await runParallelBatch(
+      batchInput({ runTaskWorker: worker, runIntegrator: async () => outcome() }),
+    );
+    expect(results[0]).toMatchObject({ outcome: 'blocked', integratorRuns: 1 });
+    expect(results[0]?.detail).toContain('outside declared paths');
+    expect(getTask(db, a.id).status).toBe('needs_decision');
+    expect(existsSync(join(repo, 'README.md'))).toBe(false);
+  });
+
   it('sends a failing verification to the integrator and blocks if it still fails', async () => {
     const a = queuedTask('A', ['a/**']);
-    const { worker } = writingWorker({ A: ['a.txt', 'a\n'] });
+    const { worker } = writingWorker({ A: ['a/a.txt', 'a\n'] });
     let integratorCalls = 0;
     const results = await runParallelBatch(
       batchInput({
@@ -224,7 +243,75 @@ describe('parallel dispatch', () => {
     expect(integratorCalls).toBe(1);
     expect(results[0]).toMatchObject({ outcome: 'blocked', integratorRuns: 1 });
     expect(getTask(db, a.id).status).toBe('needs_decision');
-    expect(existsSync(join(repo, 'a.txt'))).toBe(false);
+    expect(existsSync(join(repo, 'a/a.txt'))).toBe(false);
+  });
+
+  it('does not land a worktree that left its task branch', async () => {
+    const a = queuedTask('A', ['a/**']);
+    const results = await runParallelBatch(
+      batchInput({
+        runTaskWorker: async (_task, cwd) => {
+          mkdirSync(join(cwd, 'a'));
+          writeFileSync(join(cwd, 'a/a.txt'), 'a\n');
+          git(cwd, 'checkout', '-q', '--detach');
+          git(cwd, 'add', '-A');
+          git(cwd, 'commit', '-qm', 'detached work');
+          return outcome();
+        },
+      }),
+    );
+    expect(results[0]?.outcome).toBe('blocked');
+    expect(results[0]?.detail).toContain('not on its task branch');
+    expect(getTask(db, a.id).status).toBe('needs_decision');
+  });
+
+  it('never aborts a rebase the integrator left in progress', async () => {
+    const { b, worker } = strayingPair();
+    let worktreePath = '';
+    const results = await runParallelBatch(
+      batchInput({
+        runTaskWorker: worker,
+        runIntegrator: async (_prompt, cwd) => {
+          worktreePath = cwd;
+          spawnSync('git', ['rebase', git(repo, 'rev-parse', 'HEAD')], { cwd });
+          return outcome();
+        },
+      }),
+    );
+    expect(results.find((result) => result.taskId === b.id)?.detail).toContain(
+      'rebase is left in progress',
+    );
+    expect(getTask(db, b.id).status).toBe('needs_decision');
+    const gitDir = git(worktreePath, 'rev-parse', '--absolute-git-dir');
+    expect(existsSync(join(gitDir, 'rebase-merge'))).toBe(true);
+  });
+
+  it('keeps a claim alive past its lease while waiting, via heartbeat', async () => {
+    const a = queuedTask('A', ['a/**']);
+    const { worker } = writingWorker({ A: ['a/a.txt', 'a\n', 700] });
+    const results = await runParallelBatch(
+      batchInput({ leaseMs: 300, heartbeatMs: 50, runTaskWorker: worker }),
+    );
+    expect(results[0]?.outcome).toBe('merged');
+    expect(getTask(db, a.id).status).toBe('verifying');
+  });
+
+  it('a throw in one task parks it without abandoning its sibling', async () => {
+    const a = queuedTask('A', ['a/**']);
+    const b = queuedTask('B', ['b/**']);
+    const { worker } = writingWorker({ B: ['b/b.txt', 'b\n', 100] });
+    const results = await runParallelBatch(
+      batchInput({
+        runTaskWorker: async (task, cwd) => {
+          if (task.id === a.id) throw new Error('resource ledger exploded');
+          return worker(task, cwd);
+        },
+      }),
+    );
+    expect(results.find((result) => result.taskId === a.id)?.outcome).toBe('blocked');
+    expect(getTask(db, a.id).status).toBe('needs_decision');
+    expect(results.find((result) => result.taskId === b.id)?.outcome).toBe('merged');
+    expect(existsSync(join(repo, 'b/b.txt'))).toBe(true);
   });
 
   it('requeues a task whose worker failed and discards its scratch worktree', async () => {
@@ -235,6 +322,15 @@ describe('parallel dispatch', () => {
     expect(results[0]?.outcome).toBe('requeued');
     expect(getTask(db, a.id).status).toBe('queued');
     expect(db.select().from(worktrees).get()?.status).toBe('removed');
+  });
+});
+
+describe('parallelRefusal', () => {
+  it('requires verification commands and a branch checkout', async () => {
+    expect(await parallelRefusal(repo, [], run)).toContain('verificationCommands');
+    expect(await parallelRefusal(repo, ['git status'], run)).toBeUndefined();
+    git(repo, 'checkout', '-q', '--detach');
+    expect(await parallelRefusal(repo, ['git status'], run)).toContain('detached');
   });
 });
 

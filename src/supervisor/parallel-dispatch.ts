@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { basename, isAbsolute, join, matchesGlob } from 'node:path';
 import { and, asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { tasks, worktrees } from '../db/schema.js';
 import {
   claimNextTask,
   completeClaim,
+  heartbeatClaim,
   recoverExpiredClaims,
   releaseClaim,
 } from '../domain/claim-service.js';
@@ -14,6 +15,12 @@ import { newId } from '../domain/ids.js';
 import { transitionTask, type ClaimFence } from '../domain/task-service.js';
 import { runGatewayCommand, type WorkerOutcome } from './worker.js';
 import { parseWorkerReport } from './worker-report.js';
+import {
+  releaseResource,
+  requestResource,
+  waitForResource,
+  type ResourceLease,
+} from './resources.js';
 import { majorHome } from './state.js';
 
 /**
@@ -40,16 +47,44 @@ export type RunCommand = (
 ) => Promise<CommandResult>;
 
 /** Production runner: every git and verification command goes through the
- * canonical execution gateway, exactly like `major delegate --worktree`. */
+ * canonical execution gateway, exactly like `major delegate --worktree`.
+ * Non-git commands (project verification) hold a fenced worker lease, as the
+ * contained backend requires for anything that runs project code. */
 export const gatewayCommand: RunCommand = async (executable, args, cwd, extraAllowedRoots = []) => {
-  const result = await runGatewayCommand({
-    executable,
-    args,
-    cwd,
-    timeoutMs: 30 * 60 * 1000,
-    extraAllowedRoots,
-  });
-  return { ok: result.status === 'succeeded', output: `${result.stdout}${result.stderr}`.trim() };
+  const timeoutMs = 30 * 60 * 1000;
+  let lease: ResourceLease | undefined;
+  try {
+    if (executable !== 'git') {
+      const request = requestResource({
+        kind: 'worker',
+        owner: `major:verify:${process.pid}:${randomUUID()}`,
+        project: basename(cwd),
+        pid: process.pid,
+        ttlMs: timeoutMs + 5 * 60 * 1000,
+      });
+      if (request.status === 'rejected') return { ok: false, output: request.reason };
+      lease = request.status === 'active' ? request.lease : await waitForResource(request.request);
+    }
+    const result = await runGatewayCommand({
+      executable,
+      args,
+      cwd,
+      timeoutMs,
+      extraAllowedRoots,
+      ...(lease
+        ? {
+            resourceLeaseId: lease.id,
+            resourceLeaseFencingToken: lease.fencingToken,
+            resourceLeaseTtlMs: lease.ttlMs,
+          }
+        : {}),
+    });
+    return { ok: result.status === 'succeeded', output: `${result.stdout}${result.stderr}`.trim() };
+  } catch (error) {
+    return { ok: false, output: error instanceof Error ? error.message : String(error) };
+  } finally {
+    if (lease) releaseResource(lease.id, lease.fencingToken);
+  }
 };
 
 export function defaultWorktreeRoot(repoPath: string): string {
@@ -154,18 +189,40 @@ export interface ParallelBatchInput {
   projectId: string;
   tasks: readonly ParallelTask[];
   verificationCommands: readonly string[];
-  /** Claim lease; must cover the worker, merge and one integrator run. */
+  /** Claim lease length; a heartbeat renews it while the task is in flight. */
   leaseMs: number;
+  heartbeatMs?: number;
   runTaskWorker: (task: ParallelTask, cwd: string) => Promise<WorkerOutcome>;
   runIntegrator: (prompt: string, cwd: string) => Promise<WorkerOutcome>;
   run?: RunCommand;
   worktreeRoot?: string;
 }
 
+/** Why the parallel path must not run for this checkout, if anything. */
+export async function parallelRefusal(
+  repoPath: string,
+  verificationCommands: readonly string[],
+  run: RunCommand = gatewayCommand,
+): Promise<string | undefined> {
+  if (verificationCommands.length === 0) {
+    return 'parallel workers need project verificationCommands to gate each landing';
+  }
+  const branch = await run('git', ['symbolic-ref', '-q', 'HEAD'], repoPath);
+  if (!branch.ok) return 'parallel workers need the goal checkout on a branch, not a detached HEAD';
+  return undefined;
+}
+
 const DIFF_LIMIT = 20_000;
+// The gateway gives git an isolated HOME, so Major's own merge-queue commits
+// carry an explicit identity instead of whatever git would guess.
+const MAJOR_GIT_IDENTITY = ['-c', 'user.name=Major', '-c', 'user.email=major@localhost'];
 
 function clip(text: string): string {
   return text.length > DIFF_LIMIT ? `${text.slice(0, DIFF_LIMIT)}\n[truncated]` : text;
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export async function runParallelBatch(input: ParallelBatchInput): Promise<ParallelTaskResult[]> {
@@ -180,41 +237,81 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
   };
   const setWorktreeStatus = (id: string, status: 'merged' | 'removed') =>
     input.db.update(worktrees).set({ status }).where(eq(worktrees.id, id)).run();
+  /** Renew the claim; throws StaleClaimError when it was lost. */
+  const renew = (fence: ClaimFence) =>
+    heartbeatClaim(input.db, fence.claimId, fence.workerId, input.leaseMs);
 
-  type Landing = { ok: true } | { ok: false; reason: string; output: string; head: string };
+  type Failure = { ok: false; reason: string; output: string; head: string };
+  type Landing = { ok: true } | Failure;
+  const fail = (reason: string, output = '', target = ''): Failure => ({
+    ok: false,
+    reason,
+    output,
+    head: target,
+  });
+
+  const rebaseInProgress = async (cwd: string) => {
+    for (const name of ['rebase-merge', 'rebase-apply']) {
+      const path = await git(cwd, 'rev-parse', '--git-path', name);
+      if (path.ok && existsSync(isAbsolute(path.output) ? path.output : join(cwd, path.output))) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const tryLand = async (
     task: ParallelTask,
     tree: { path: string; branch: string },
+    fence: ClaimFence,
   ): Promise<Landing> => {
+    // Never abort a rebase Major did not start: it may hold resolved work.
+    if (await rebaseInProgress(tree.path)) return fail('a rebase is left in progress');
+    const current = await git(tree.path, 'symbolic-ref', '--short', '-q', 'HEAD');
+    if (current.output !== tree.branch) {
+      return fail(`worktree is not on its task branch ${tree.branch}`, current.output);
+    }
     const dirty = await git(tree.path, 'status', '--porcelain');
     if (dirty.ok && dirty.output) {
       await git(tree.path, 'add', '-A');
-      const commit = await git(tree.path, 'commit', '-m', `major: ${task.title} (${task.id})`);
-      if (!commit.ok)
-        return { ok: false, reason: 'commit failed', output: commit.output, head: '' };
+      const commit = await git(
+        tree.path,
+        ...MAJOR_GIT_IDENTITY,
+        'commit',
+        '-m',
+        `major: ${task.title} (${task.id})`,
+      );
+      if (!commit.ok) return fail('commit failed', commit.output);
     }
     const target = await head();
-    const rebase = await git(tree.path, 'rebase', target);
+    const rebase = await git(tree.path, ...MAJOR_GIT_IDENTITY, 'rebase', target);
     if (!rebase.ok) {
       await git(tree.path, 'rebase', '--abort');
-      return { ok: false, reason: 'rebase conflict', output: rebase.output, head: target };
+      return fail('rebase conflict', rebase.output, target);
+    }
+    const changed = await git(tree.path, 'diff', '--name-only', `${target}..HEAD`);
+    const undeclared = changed.output
+      .split('\n')
+      .filter(Boolean)
+      .filter(
+        (file) => !task.paths.some((glob) => matchesGlob(file, glob.trim().replace(/^\.\//, ''))),
+      );
+    if (!changed.ok || undeclared.length > 0) {
+      return fail(
+        `changes outside declared paths (${task.paths.join(', ')})`,
+        changed.ok ? undeclared.join('\n') : changed.output,
+        target,
+      );
     }
     for (const command of input.verificationCommands) {
       // ponytail: whitespace split, no shell quoting; configure commands without quoted args.
       const [executable, ...args] = command.trim().split(/\s+/);
       const check = await run(executable!, args, tree.path, [root]);
-      if (!check.ok) {
-        return {
-          ok: false,
-          reason: `verification failed: ${command}`,
-          output: check.output,
-          head: target,
-        };
-      }
+      if (!check.ok) return fail(`verification failed: ${command}`, check.output, target);
     }
+    renew(fence); // a lost claim must not land
     const ff = await git(input.repoPath, 'merge', '--ff-only', tree.branch);
-    if (!ff.ok)
-      return { ok: false, reason: 'fast-forward refused', output: ff.output, head: target };
+    if (!ff.ok) return fail('fast-forward refused', ff.output, target);
     return { ok: true };
   };
 
@@ -222,7 +319,7 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
     task: ParallelTask,
     tree: { path: string; branch: string },
     base: string,
-    failure: Extract<Landing, { ok: false }>,
+    failure: Failure,
   ) => {
     const target = failure.head || (await head());
     const taskDiff = await git(tree.path, 'diff', `${base}..${tree.branch}`);
@@ -235,13 +332,23 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
       `Task diff (${base}..${tree.branch}):\n${clip(taskDiff.output)}`,
       `Integration changes since the task branched (${base}..${target}):\n${clip(headDiff.output)}`,
       `Failing output:\n${clip(failure.output)}`,
-      `Rebase this branch onto ${target}, resolve conflicts keeping the intent of both sides, ` +
-        `make these checks pass: ${input.verificationCommands.join('; ') || '(none configured)'}, ` +
-        'and commit the result. Do not push, do not force anything, and stay inside this worktree.',
+      `Rebase branch ${tree.branch} onto ${target}, resolve conflicts keeping the intent of both sides, ` +
+        `change only files matching ${task.paths.join(', ')}, ` +
+        `make these checks pass: ${input.verificationCommands.join('; ')}, ` +
+        `and commit the result on ${tree.branch} with no rebase left in progress. ` +
+        'Do not push, do not force anything, and stay inside this worktree.',
     ].join('\n\n');
   };
 
-  let mergeQueue: Promise<unknown> = Promise.resolve();
+  /** Park a task for the owner; the worktree stays for inspection. */
+  const park = (task: ParallelTask, fence: ClaimFence, reason: string) => {
+    try {
+      transitionTask(input.db, task.id, 'needs_decision', { fence });
+      completeClaim(input.db, fence.claimId, fence.workerId, reason);
+    } catch {
+      // Claim already lost: expired-claim recovery requeues the task.
+    }
+  };
 
   const land = async (
     task: ParallelTask,
@@ -250,10 +357,11 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
     outcome: WorkerOutcome,
     fence: ClaimFence,
   ): Promise<ParallelTaskResult> => {
+    renew(fence);
     if (outcome.status !== 'succeeded') {
       releaseClaim(input.db, { ...fence, requeue: true, reason: `worker ${outcome.status}` });
-      // Discard only this failed attempt's scratch tree; the task is requeued
-      // and retried from the integration head. Never touches the integration branch.
+      // Discard only this failed attempt's own scratch tree and branch; the
+      // task is retried from the integration head. Never touches the goal checkout.
       const removed = await git(input.repoPath, 'worktree', 'remove', '--force', tree.path);
       if (removed.ok) {
         await git(input.repoPath, 'branch', '-D', tree.branch);
@@ -268,8 +376,7 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
     }
     const report = parseWorkerReport(outcome.stdout);
     if (report?.status === 'blocked') {
-      transitionTask(input.db, task.id, 'needs_decision', { fence });
-      completeClaim(input.db, fence.claimId, fence.workerId, `worker blocked: ${report.summary}`);
+      park(task, fence, `worker blocked: ${report.summary}`);
       return {
         taskId: task.id,
         outcome: 'blocked',
@@ -278,20 +385,19 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
       };
     }
     let integratorRuns = 0;
-    let landing = await tryLand(task, tree);
+    let landing = await tryLand(task, tree, fence);
     if (!landing.ok) {
       integratorRuns = 1;
       const integrator = await input.runIntegrator(
         await integratorPrompt(task, tree, base, landing),
         tree.path,
       );
-      if (integrator.status === 'succeeded') landing = await tryLand(task, tree);
+      renew(fence);
+      if (integrator.status === 'succeeded') landing = await tryLand(task, tree, fence);
       else landing = { ...landing, reason: `${landing.reason}; integrator ${integrator.status}` };
     }
     if (!landing.ok) {
-      transitionTask(input.db, task.id, 'needs_decision', { fence });
-      completeClaim(input.db, fence.claimId, fence.workerId, `merge blocked: ${landing.reason}`);
-      // The worktree stays active so the owner can inspect the branch.
+      park(task, fence, `merge blocked: ${landing.reason}`);
       return {
         taskId: task.id,
         outcome: 'blocked',
@@ -299,8 +405,8 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
         integratorRuns,
       };
     }
-    // Landed and verified on the integration head; the goal's normal
-    // independent review owns completion from here.
+    // Landed and verified on the goal checkout. Task-level review is not wired
+    // yet: the goal's own independent review still gates goal completion.
     transitionTask(input.db, task.id, 'verifying', { fence });
     completeClaim(input.db, fence.claimId, fence.workerId, 'merged');
     setWorktreeStatus(tree.id, 'merged');
@@ -314,59 +420,78 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
     };
   };
 
+  let mergeQueue: Promise<unknown> = Promise.resolve();
+
+  // Each per-task promise always resolves, so the batch never returns while a
+  // sibling worker or landing is still running in the goal checkout.
   return Promise.all(
     input.tasks.map(async (task): Promise<ParallelTaskResult> => {
-      const claimed = claimNextTask(input.db, {
-        workerId,
-        taskId: task.id,
-        projectId: input.projectId,
-        leaseMs: input.leaseMs,
-      });
-      if (!claimed) {
-        return {
-          taskId: task.id,
-          outcome: 'skipped',
-          detail: 'no longer queued',
-          integratorRuns: 0,
-        };
-      }
-      const fence = { claimId: claimed.claim.id, workerId };
-      let tree: { id: string; path: string; branch: string };
-      let base: string;
+      let fence: ClaimFence;
       try {
-        base = await head();
-        tree = {
-          id: newId('wtree'),
-          ...(await createTaskWorktree(run, input.repoPath, task.id, { base, root })),
-        };
+        const claimed = claimNextTask(input.db, {
+          workerId,
+          taskId: task.id,
+          projectId: input.projectId,
+          leaseMs: input.leaseMs,
+        });
+        if (!claimed) {
+          return {
+            taskId: task.id,
+            outcome: 'skipped',
+            detail: 'no longer queued',
+            integratorRuns: 0,
+          };
+        }
+        fence = { claimId: claimed.claim.id, workerId };
       } catch (error) {
-        releaseClaim(input.db, { ...fence, requeue: true, reason: 'worktree setup failed' });
-        return {
-          taskId: task.id,
-          outcome: 'requeued',
-          detail: error instanceof Error ? error.message : String(error),
-          integratorRuns: 0,
-        };
+        return { taskId: task.id, outcome: 'skipped', detail: message(error), integratorRuns: 0 };
       }
-      input.db
-        .insert(worktrees)
-        .values({ ...tree, projectId: input.projectId, taskId: task.id, status: 'active' })
-        .run();
-      const outcome = await input.runTaskWorker(task, tree.path);
-      // One landing at a time: each rebase sees every earlier landing.
-      const landed = mergeQueue.then(() => land(task, tree, base, outcome, fence));
-      mergeQueue = landed.catch(() => undefined);
+      const heartbeat = setInterval(() => {
+        try {
+          renew(fence);
+        } catch {
+          // Lost claims are caught again by renew() before any landing.
+        }
+      }, input.heartbeatMs ?? 60_000);
+      heartbeat.unref();
+      let tree: { id: string; path: string; branch: string } | undefined;
       try {
+        let base: string;
+        try {
+          base = await head();
+          tree = {
+            id: newId('wtree'),
+            ...(await createTaskWorktree(run, input.repoPath, task.id, { base, root })),
+          };
+        } catch (error) {
+          releaseClaim(input.db, { ...fence, requeue: true, reason: 'worktree setup failed' });
+          return {
+            taskId: task.id,
+            outcome: 'requeued',
+            detail: message(error),
+            integratorRuns: 0,
+          };
+        }
+        const created = tree;
+        input.db
+          .insert(worktrees)
+          .values({ ...created, projectId: input.projectId, taskId: task.id, status: 'active' })
+          .run();
+        const outcome = await input.runTaskWorker(task, created.path);
+        // One landing at a time: each rebase sees every earlier landing.
+        const landed = mergeQueue.then(() => land(task, created, base, outcome, fence));
+        mergeQueue = landed.catch(() => undefined);
         return await landed;
       } catch (error) {
-        // Never reject the batch: siblings must finish before the caller
-        // releases the integration checkout's writer fence.
+        park(task, fence, `parallel dispatch error: ${message(error)}`);
         return {
           taskId: task.id,
           outcome: 'blocked',
-          detail: `landing error: ${error instanceof Error ? error.message : String(error)}; branch ${tree.branch} kept`,
+          detail: `error: ${message(error)}${tree ? `; branch ${tree.branch} kept` : ''}`,
           integratorRuns: 0,
         };
+      } finally {
+        clearInterval(heartbeat);
       }
     }),
   );

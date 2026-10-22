@@ -178,7 +178,10 @@ describe('parallel workers through the real supervisor cycle', { timeout: 30_000
     runWorkerMock.mockImplementation(async (input: { cwd: string; prompt: string }) => {
       const name =
         input.prompt.includes('Work only on task') && input.prompt.match(/: (alpha|beta)\n/)?.[1];
-      if (name) writeFileSync(join(input.cwd, `${name}.txt`), `${name}\n`);
+      if (name) {
+        mkdirSync(join(input.cwd, name));
+        writeFileSync(join(input.cwd, name, 'done.txt'), `${name}\n`);
+      }
       return succeeded;
     });
 
@@ -189,8 +192,8 @@ describe('parallel workers through the real supervisor cycle', { timeout: 30_000
     expect(new Set(cwds).size).toBe(2);
     for (const cwd of cwds) expect(cwd.startsWith(join(root, '.major', 'worktrees'))).toBe(true);
     expect(taskStatuses(taskIds)).toEqual(['verifying', 'verifying']);
-    expect(existsSync(join(repoPath, 'alpha.txt'))).toBe(true);
-    expect(existsSync(join(repoPath, 'beta.txt'))).toBe(true);
+    expect(existsSync(join(repoPath, 'alpha', 'done.txt'))).toBe(true);
+    expect(existsSync(join(repoPath, 'beta', 'done.txt'))).toBe(true);
     expect(getGoal(goalId)?.lastSummary).toContain('Parallel cycle');
   });
 });
