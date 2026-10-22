@@ -560,6 +560,8 @@ program
       console.log(formatCleanupHuman(result.plan));
       return;
     }
+    const { backupState } = await import('../db/backup.js');
+    const backupPath = backupState();
     const result = reconcileResources({
       ...deps,
       phase: 'before-create',
@@ -568,6 +570,7 @@ program
     });
     if (opts.json) {
       emitJson('cleanup-result', {
+        backupPath,
         inventory: result.plan.inventory,
         removed: result.applied?.removed.map((item) => item.id) ?? [],
         reclaimedBytes: result.applied?.reclaimedBytes ?? 0,
@@ -575,7 +578,19 @@ program
       });
       return;
     }
+    console.log(`state backup    ${backupPath}`);
     console.log(formatCleanupHuman(result.plan, result.applied));
+  });
+
+program
+  .command('backup')
+  .description('Snapshot major.db, supervisor state and project policies (keeps newest 14)')
+  .option('--json', 'emit versioned JSON')
+  .action(async (opts: { json?: boolean }) => {
+    const { backupState } = await import('../db/backup.js');
+    const backupPath = backupState();
+    if (opts.json) return emitJson('state-backup', { backupPath });
+    console.log(`state backup    ${backupPath}`);
   });
 
 program
