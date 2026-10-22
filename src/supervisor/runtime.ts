@@ -1807,6 +1807,10 @@ async function runParallelGoalCycle(
       Math.max(1, policy.maxRunMinutes) * 60 * 1000,
       maxTimeoutMs ?? Infinity,
     );
+    const { prompt } = await prepareCoordinatorPromptSmart(goal, capabilities, {
+      accountLabel: selection.accountLabel,
+      continuityBlock: '',
+    });
     updateGoal(goal.id, {
       status: 'running',
       cycle: goal.cycle + 1,
@@ -1816,10 +1820,6 @@ async function runParallelGoalCycle(
       lastAccountLabel: selection.accountLabel,
       ownerGate: undefined,
       pendingCompletion: undefined,
-    });
-    const { prompt } = await prepareCoordinatorPromptSmart(goal, capabilities, {
-      accountLabel: selection.accountLabel,
-      continuityBlock: '',
     });
     const dispatch = (
       route: Extract<CoordinatorSelection, { kind: 'route' }>,

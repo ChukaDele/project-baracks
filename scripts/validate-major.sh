@@ -263,7 +263,7 @@ if grep -R -F -n "node:child_process" src/supervisor; then
   fail "supervisor bypasses the execution gateway"
 fi
 grep -Fq "executeMajorCommand" src/supervisor/worker.ts || fail "workers are not using the successor gateway"
-grep -Fq "runGatewayCommand" src/supervisor/cli.ts || fail "worktree setup is not using the successor gateway"
+grep -Fq "runGatewayCommand" src/supervisor/parallel-dispatch.ts || fail "worktree setup is not using the successor gateway"
 grep -Fq "execution-policy.jsonl" src/security/major-gateway.ts || fail "successor gateway lacks execution audit"
 grep -Fq "globalStopRequested" src/supervisor/worker.ts || fail "active workers ignore global kill switch"
 
