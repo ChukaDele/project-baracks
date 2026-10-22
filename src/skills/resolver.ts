@@ -40,7 +40,7 @@ import {
 } from './vendor.js';
 import { CANONICAL_SKILL_SLUG, containedSkillPath } from './slug.js';
 import { validateRetainedBundle } from './sync.js';
-import { testFixturePath } from '#trust-roots';
+import { testFixturePath, trustedAccountHome } from '#trust-roots';
 import { resolveWritingRoute } from '../writing/routing.js';
 import type { WritingRoute } from '../writing/types.js';
 import { resolveCanonicalSkillRoute } from './canonical-routing.js';
@@ -597,6 +597,19 @@ function vendorMatchAllowed(entry: SkillRegistryEntry, task: string): boolean {
   );
 }
 
+/**
+ * Shared personal skills have one canonical home, `~/.agents/skills`; host
+ * directories only symlink to it. Registry entries with this source resolve
+ * there and nowhere else, so a stray host copy can never shadow the canonical one.
+ */
+export const SHARED_AGENTS_SOURCE = 'shared-agents';
+
+function sharedAgentsSkillRoot(): string {
+  return resolve(
+    testFixturePath('MAJOR_SHARED_SKILLS_ROOT') ?? join(trustedAccountHome(), '.agents', 'skills'),
+  );
+}
+
 export function installedSkillPath(
   id: string,
   cwd: string,
@@ -609,7 +622,9 @@ export function installedSkillPath(
   const roots =
     source === 'major-internal'
       ? [hotInternal, immutable, legacyMutableGlobal].filter((root): root is string => Boolean(root))
-      : [
+      : source === SHARED_AGENTS_SOURCE
+        ? [sharedAgentsSkillRoot()]
+        : [
           join(cwd, '.agents', 'skills'),
           join(cwd, '.claude', 'skills'),
           join(cwd, '.codex', 'skills'),
@@ -810,7 +825,8 @@ function scoreEntry(
     const exampleWords = new Set(words(example));
     const overlap = [...exampleWords].filter((word) => taskWords.has(word));
     const rareOverlap = overlap.filter((word) => word.length >= 8);
-    if (overlap.length < 2) continue;
+    // Two short common words ("fix", "check") are not evidence of intent.
+    if (overlap.length < 2 || (overlap.length === 2 && rareOverlap.length === 0)) continue;
     const exampleScore = overlap.length * 3 + rareOverlap.length * 2;
     if (exampleScore > score) {
       score = exampleScore;
@@ -972,11 +988,13 @@ function resolveSkillsInternal(input: {
           ? { score: 1_000, reason: `explicit skill selection: ${entry.id}` }
           : negativeFixture
             ? baseGenericScore
-            : writingRoute?.skills.includes(entry.id)
+            : writingRoute?.loadNow.includes(entry.id)
               ? {
-                  score: 1_500 - writingRoute.skills.indexOf(entry.id),
+                  score: 1_500 - writingRoute.loadNow.indexOf(entry.id),
                   reason: writingRoute.reasons[entry.id] ?? 'required by canonical writing route',
                 }
+              : writingRoute?.skills.includes(entry.id) && genericScore.score < 1_000
+                ? { score: 0, reason: 'loaded by writing-os when its writing gate runs' }
               : genericScore.score >= 1_000
                 ? genericScore
                 : canonicalRoute?.skills.includes(entry.id)
@@ -989,12 +1007,13 @@ function resolveSkillsInternal(input: {
                         score: 0,
                         reason: 'ASD-STE100 requires a canonical technical-writing route',
                       }
-                    : canonicalRoute &&
-                        sourceKind === 'INTERNAL_DURABLE' &&
+                    : (canonicalRoute || writingRoute) &&
+                        (sourceKind === 'INTERNAL_DURABLE' ||
+                          entry.source === SHARED_AGENTS_SOURCE) &&
                         genericScore.score < 100
                       ? {
                           score: 0,
-                          reason: `excluded by canonical route: ${canonicalRoute.routeIds.join(', ')}`,
+                          reason: `excluded by canonical route: ${canonicalRoute?.routeIds.join(', ') ?? 'writing'}`,
                         }
                       : genericScore;
       const vendor = generated
@@ -1026,7 +1045,7 @@ function resolveSkillsInternal(input: {
 
   const skills: ResolvedSkill[] = [];
   const canonicalSkillIds = new Set([
-    ...(writingRoute?.skills ?? []),
+    ...(writingRoute?.loadNow ?? []),
     ...(canonicalRoute?.skills ?? []),
   ]);
   const canonicalSelectionCount = canonicalSkillIds.size;

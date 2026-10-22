@@ -1,0 +1,7 @@
+{
+  "skill": "engineering-by-reference",
+  "should_trigger": [
+    "Reverse engineer how their checkout flow works so we can build the same behaviour in our stack."
+  ],
+  "should_not_trigger": ["Write a LinkedIn post about our product launch."]
+}

@@ -19,7 +19,7 @@ Full text of the global rules that are not in the always-on core. Read a section
 
 ## Trust levels
 
-- `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human/gstack driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
+- `observe`: no Major worker execution. When deliberately using the evidence-first ramp, create a concise **MAJOR SHADOW PLAN** and let a human driver perform the work. **Three consecutive passing shadow grades** may earn `assist`.
 - `assist`: visible foreground pilot, subject to the current runtime capacity and a 30-minute coordinator limit.
 - `build`: normal foreground working mode, subject to the current runtime capacity and a 120-minute coordinator limit. It may be reached either through evidence-based promotion or explicit owner approval.
 - `unattended`: background continuation within the current runtime capacity. This still requires a representative build-mode result plus a fresh independent execution grade; owner-approved build does not silently grant unattended execution.

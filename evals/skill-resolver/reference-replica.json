@@ -1,0 +1,5 @@
+{
+  "skill": "reference-replica",
+  "should_trigger": ["Recreate this landing page from the screenshot I attached, pixel perfect."],
+  "should_not_trigger": ["Reverse engineer the sync protocol this desktop app uses."]
+}

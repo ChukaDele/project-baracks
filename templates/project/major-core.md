@@ -33,7 +33,7 @@ Use the best available tool for the actual task. Prefer native connectors/APIs a
 - A failed first tool is not a failed task. Change method and follow the relevant fallback chain.
 - When the user names a primary source, obtain that source or a faithful transcript before analysing it.
 - Do not silently replace a requested video/document/page with search-result snippets or articles discussing it.
-- GitHub → native GitHub tools; connected Google data → native connectors; Figma → Figma tooling; dynamic/authenticated web → browser/GStack when needed; YouTube → `yt-dlp` captions/auto-captions → audio → local MacWhisper `mw`.
+- GitHub → native GitHub tools; connected Google data → native connectors; Figma → Figma tooling; dynamic/authenticated web → browser automation when needed; YouTube → `yt-dlp` captions/auto-captions → audio → local MacWhisper `mw`.
 - Use model capacity for reasoning, judgment and synthesis after reliable evidence exists.
 - Preserve provenance for material research claims.
 

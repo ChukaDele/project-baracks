@@ -201,7 +201,7 @@ GitHub → GitHub connector/API
 Google files/mail/calendar → native Google connectors
 Figma → Figma tooling
 public static web → direct fetch/search
-JS-heavy/authenticated web → browser/GStack when needed
+JS-heavy/authenticated web → browser automation when needed
 YouTube → yt-dlp captions → auto-captions → audio → local MacWhisper mw
 local audio/video → MacWhisper
 PDF/document/spreadsheet → native parser/skill

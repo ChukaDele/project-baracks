@@ -29,9 +29,11 @@ beforeEach(() => {
   process.env.MAJOR_HOME = majorHome;
   process.env.MAJOR_SKILLS_REGISTRY = registry;
   process.env.MAJOR_SKILLS_EVALS = root;
+  process.env.MAJOR_SHARED_SKILLS_ROOT = join(process.cwd(), 'tests', 'fixtures', 'shared-skills');
 });
 
 afterAll(() => {
+  delete process.env.MAJOR_SHARED_SKILLS_ROOT;
   rmSync(majorHome, { recursive: true, force: true });
   if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
   else process.env.MAJOR_HOME = priorMajorHome;

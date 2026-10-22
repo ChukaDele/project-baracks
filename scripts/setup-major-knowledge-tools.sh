@@ -2,7 +2,6 @@
 set -euo pipefail
 
 MODE="${1:-check}"
-GSTACK_DIR="${GSTACK_DIR:-$HOME/.claude/skills/gstack}"
 MAJOR_HOME="${MAJOR_HOME:-$HOME/.major}"
 
 case "$MODE" in
@@ -60,58 +59,11 @@ else
   printf 'INFO %-12s %s\n' "ffmpeg" "not installed; not required for the basic MacWhisper fallback, but useful for media conversions"
 fi
 
-GSTACK_OK=0
-if [ -d "$GSTACK_DIR/.git" ]; then
-  GSTACK_OK=1
-  echo "OK   gstack       $GSTACK_DIR"
-  if [ -f "$GSTACK_DIR/VERSION" ]; then echo "gstack $(cat "$GSTACK_DIR/VERSION")"; fi
-else
-  echo "MISS gstack       $GSTACK_DIR"
-fi
-
-if [ "$MODE" = "install" ]; then
-  if [ "$GSTACK_OK" -eq 1 ]; then
-    echo "Updating gstack..."
-    git -C "$GSTACK_DIR" pull --ff-only
-  else
-    mkdir -p "$(dirname "$GSTACK_DIR")"
-    echo "Installing gstack from garrytan/gstack..."
-    git clone --depth 1 https://github.com/garrytan/gstack.git "$GSTACK_DIR"
-  fi
-
-  # Major owns routing/policy. GStack is installed as a namespaced capability pack,
-  # with its own proactive routing and telemetry disabled.
-  (
-    cd "$GSTACK_DIR"
-    ./setup --host auto --prefix --no-plan-tune-hooks --quiet
-  )
-
-  if [ -x "$GSTACK_DIR/bin/gstack-config" ]; then
-    "$GSTACK_DIR/bin/gstack-config" set skill_prefix true >/dev/null 2>&1 || true
-    "$GSTACK_DIR/bin/gstack-config" set proactive false >/dev/null 2>&1 || true
-    "$GSTACK_DIR/bin/gstack-config" set telemetry off >/dev/null 2>&1 || true
-  fi
-
-  mkdir -p "$MAJOR_HOME/bin"
-  if [ -x "$GSTACK_DIR/browse/dist/browse" ]; then
-    ln -sfn "$GSTACK_DIR/browse/dist/browse" "$MAJOR_HOME/bin/gstack-browse"
-    echo "OK   gstack-browse $MAJOR_HOME/bin/gstack-browse"
-  else
-    echo "WARN gstack browser binary was not found after setup." >&2
-  fi
-fi
-
-if [ -x "$GSTACK_DIR/browse/dist/browse" ]; then
-  echo "OK   gstack browser built"
-else
-  echo "INFO gstack browser not available yet"
-fi
-
 if [ "$MW_OK" -eq 0 ]; then
   exit 4
 fi
 if [ "$MODE" = "check" ] && [ "$YTDLP_OK" -eq 0 ]; then
-  echo "Next: run '$0 install' to add yt-dlp and the namespaced GStack capability pack."
+  echo "Next: run '$0 install' to add yt-dlp."
   exit 1
 fi
 

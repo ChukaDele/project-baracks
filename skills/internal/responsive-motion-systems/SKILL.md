@@ -41,13 +41,15 @@ Do not use fixed values tuned to one screen as the narrative architecture, such 
 - large fixed `left/top/height` values used to position story elements;
 - multiple independent pinned/sticky systems that can own the same viewport region with no explicit handoff.
 
+Real examples from the incident: three independent sticky cards at `top: 92px / 114px / 136px`; `end: "+=2800"` as a universal runway; `left: 620px` because it looked right on one screen; `height: 900px` to manufacture pacing. If a pixel value decides where a narrative element sits at a given scroll point, it is wrong.
+
 ## 4. One viewport owner per overlapping region
 
 Exactly one authored sticky/pinned scene may own an overlapping narrative region at a time.
 
 The current scene owns the viewport until it ends, then **releases completely** before the next scene may pin.
 
-Encode this release contract explicitly. Add a development/regression invariant when recurrence would be costly.
+Encode this release contract explicitly. Do not rely on scroll maths happening to line up. Add a runtime development assertion that no two authored pinned scenes' bounding boxes co-occupy the viewport, and a regression invariant when recurrence would be costly.
 
 ## 5. Capability-based design modes
 
@@ -88,6 +90,8 @@ Use one debounced/coordinated response to relevant changes such as:
 
 Recompute measurements, change design mode if needed, then refresh ScrollTrigger. Avoid refresh loops.
 
+Browser zoom does **not** reliably fire the window `resize` event; treat `visualViewport` as a first-class signal. Zoom-out (for example 80%) **increases** the CSS layout viewport (`innerWidth`/`innerHeight` scale by `1/zoom`), which is exactly where fixed-pixel scenes desync.
+
 ## 8. Modular scene ownership
 
 Each authored scene owns its own:
@@ -102,7 +106,9 @@ A global PageMotion/controller may coordinate but should not secretly own every 
 
 ## 9. Browser debugging workflow
 
-Use Chrome DevTools for exploratory live diagnosis and Playwright for deterministic regression.
+Use Chrome DevTools (the full MCP mode, not `--slim`) for exploratory live diagnosis and Playwright for deterministic regression. Do not substitute one for the other.
+
+Never substitute CSS `zoom`, `transform: scale()` or resized screenshots for native browser zoom. State which method was used and never claim the methods are equivalent.
 
 For a production visual bug:
 1. confirm `/__build` or equivalent deployed SHA;
@@ -165,9 +171,11 @@ Prefer geometric/invariant tests for architecture rules such as:
 - no horizontal overflow;
 - all cards/states remain reachable.
 
-Use visual screenshots as complementary evidence, not the only proof.
+Use visual screenshots as complementary evidence, not the only proof. Add a per-bug invariant guard for each fixed defect, for example "no `.reference-case` is `position: sticky`".
 
 ## 12. Staging/production parity
+
+Serve a build fingerprint such as `/__build` from the Worker entry, returning `{ sha, builtAt, worker }` with `Cache-Control: no-store` and `X-Robots-Tag: noindex`.
 
 Before diagnosing a prod-vs-preview visual mismatch:
 - confirm exact build SHA;
@@ -185,6 +193,6 @@ The system is broken if any of these occur:
 - a headline overlaps an adjacent panel under zoom;
 - horizontal overflow appears under zoom;
 - a fallback silently removes an approved interaction without a designed capability reason;
-- a user-provided screenshot shows a defect that automated QA declares impossible.
+- a user-provided screenshot shows a defect that automated QA declares impossible, or an agent reports "geometry looks fine" while a user screenshot shows a defect.
 
 When this skill triggers, pair it with `website-design-qa` for the broader site-quality pass.

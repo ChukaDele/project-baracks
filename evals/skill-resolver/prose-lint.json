@@ -1,8 +1,5 @@
 {
   "skill": "prose-lint",
-  "should_trigger": [
-    "turn these notes into a report",
-    "run prose lint and readability diagnostics"
-  ],
+  "should_trigger": ["run prose lint and readability diagnostics"],
   "should_not_trigger": ["rewrite this email", "Fix the TypeScript resolver bug."]
 }

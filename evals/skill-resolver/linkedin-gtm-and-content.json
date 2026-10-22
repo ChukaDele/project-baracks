@@ -1,0 +1,5 @@
+{
+  "skill": "linkedin-gtm-and-content",
+  "should_trigger": ["Draft a LinkedIn post about what we learned shipping the beta."],
+  "should_not_trigger": ["Recreate this landing page from the screenshot I attached."]
+}

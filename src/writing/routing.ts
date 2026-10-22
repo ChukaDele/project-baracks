@@ -5,6 +5,18 @@ import {
   type WritingRoute,
 } from './types.js';
 
+// Gate skills stay in the route (and its receipt) but load only when their
+// gate runs; writing-os names each one. Loading them all up front only
+// spends tokens before any draft exists.
+const GATE_SKILLS = new Set([
+  'prose-craft',
+  'voice-fingerprint',
+  'prose-lint',
+  'natural-writing-qa',
+  'writing-evaluator',
+  'writing-red-team',
+]);
+
 const directWritingAction =
   /\b(?:write|rewrite|draft|prepare|polish|edit|compose|revise|proofread|summari[sz]e)\b/i;
 const EXPLICIT_WRITING_OBJECT_PATTERN = String.raw`essay|summary|report|memo|homepage|website|landing page|copy|proposal|post|newsletter|article|press release|case stud(?:y|ies)|cover letter|executive summary|product descriptions?|sop|procedure|warning|instructions?|documentation|docs?|readme|email|message|slack|reply|letter|statement|brief|prose|headline`;
@@ -113,6 +125,7 @@ export function resolveWritingRoute(task: string): WritingRoute | undefined {
           'writing-evaluator',
           ...(highStakes ? ['writing-red-team'] : []),
         ];
+  const loadNow = skills.filter((skill) => !GATE_SKILLS.has(skill));
   const reasons: Record<string, string> = {};
   for (const skill of skills)
     reasons[skill] =
@@ -140,6 +153,7 @@ export function resolveWritingRoute(task: string): WritingRoute | undefined {
     genre,
     risk: highStakes ? 'high-stakes' : 'routine',
     skills,
+    loadNow,
     reasons,
     pipelineStages:
       transactional && !highStakes ? TRANSACTIONAL_WRITING_PIPELINE : CANONICAL_WRITING_PIPELINE,
