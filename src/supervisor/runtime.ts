@@ -93,6 +93,7 @@ import {
 } from './state.js';
 import { reconcileAfterCancel } from '../resources/reconcile.js';
 import { computeProviderReadiness } from '../doctor/readiness.js';
+import { graphifyContext } from '../context/graphify.js';
 import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integration.js';
 import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
@@ -968,7 +969,7 @@ ${semanticOverride?.semanticGuidance ? `SEMANTIC SKILL ROUTING GUIDANCE (advisor
 
 ${assetContext}
 
-CURRENT PROJECT CONTEXT:
+${graphifyContext(goal.repoPath)}CURRENT PROJECT CONTEXT:
 ${context || '(No canonical project context files found. Inspect the repository directly.)'}
 ${hop ? `\n${hop.continuityBlock}\nActive subscription account: ${hop.accountLabel}\n` : ''}
 `;

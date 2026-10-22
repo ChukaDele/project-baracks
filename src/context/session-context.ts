@@ -6,12 +6,13 @@ import { parseCapacityKey } from '../providers/account.js';
 import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { loadPersistedProviderInfos } from '../providers/discovery-store.js';
 import { getProjectPolicy } from '../supervisor/policy.js';
-import { formatResourceTelemetry, resourceSnapshot } from '../supervisor/resources.js';
-import { HOST_PROVIDERS, supervisorSnapshot } from '../supervisor/runtime.js';
+import { resourceSnapshot } from '../supervisor/resources.js';
+import { HOST_PROVIDERS } from '../supervisor/runtime.js';
 import { resolveSkills } from '../skills/resolver.js';
 import {
   activeGoals,
   attachSession,
+  isLiveWorkerFresh,
   readSupervisorState,
   authorizeSessionWorkshop,
   revokeSessionWorkshop,
@@ -35,39 +36,66 @@ async function readStdin(): Promise<string> {
   return text;
 }
 
-const LEARNING_LIMIT = 10;
+const LEARNING_LIMIT = 6;
 
 function isReviewDue(candidate: { status: string; occurrences: number }): boolean {
   return candidate.status === 'candidate' && candidate.occurrences >= 2;
 }
-const SKILL_LIMIT = 8;
+const SKILL_LIMIT = 6;
 
-function projectLearningFile(repoPath: string): string {
+/** Empty sections are omitted from the banner, so these return undefined
+ * when there is nothing to say. */
+function projectLearningFile(repoPath: string): string | undefined {
   const path = join(repoPath, 'LEARNINGS.md');
-  if (!existsSync(path)) return '(No project LEARNINGS.md found.)';
+  if (!existsSync(path)) return undefined;
   const text = readFileSync(path, 'utf8').trim();
-  if (!text) return '(Project LEARNINGS.md is empty.)';
+  if (!text) return undefined;
   if (text.length <= 3_000) return text;
   return `${text.slice(0, 3_000)}\n(Truncated: read ${path} for the rest.)`;
 }
 
-/** Banner budget: the active goal in full, every other goal as one count line. */
-function goalStateSection(project: string, repoPath: string): string {
-  const activeIds = new Set(activeGoals(project, repoPath).map((goal) => goal.id));
-  const active = activeIds.size
-    ? supervisorSnapshot(undefined, (goal) => activeIds.has(goal.id))
-    : 'No active Major goal.';
+/** One line, at most `max` characters, for banner fields that can be long. */
+function clip(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
+}
+
+/** Banner budget: the decision fields of each active goal, every other goal
+ * as one count line. Policy is already in the header; `major status` has the
+ * full snapshot. */
+function goalStateLines(project: string, repoPath: string): string[] {
+  const active = activeGoals(project, repoPath);
+  const activeIds = new Set(active.map((goal) => goal.id));
+  const lines: string[] = [];
+  for (const goal of active) {
+    if (active.length > 1) lines.push(`- ${clip(goal.goal, 200)}`);
+    lines.push(
+      `  goal=${goal.id} cycle=${goal.cycle} failures=${goal.consecutiveFailures}` +
+        (goal.liveWorker
+          ? ` live worker: ${goal.liveWorker.host} (${isLiveWorkerFresh(goal.liveWorker) ? 'fresh' : 'stale, reclaimable'})`
+          : ''),
+    );
+    if (goal.ownerGate) lines.push(`  OWNER GATE: ${clip(goal.ownerGate, 300)}`);
+    if (goal.pendingCompletion) {
+      lines.push(
+        `  completion: awaiting independent grade of ${goal.pendingCompletion.coordinator} claim`,
+      );
+    }
+    if (goal.lastSummary) lines.push(`  last: ${clip(goal.lastSummary, 300)}`);
+  }
   const counts = new Map<string, number>();
   for (const goal of readSupervisorState().goals) {
     if (goal.project !== project || activeIds.has(goal.id)) continue;
     counts.set(goal.status, (counts.get(goal.status) ?? 0) + 1);
   }
-  if (counts.size === 0) return active;
-  const byStatus = [...counts].map(([status, n]) => `${n} ${status}`).join(', ');
-  return `${active}\n\nhidden inactive goals: ${byStatus}; list: major status ${project}`;
+  if (counts.size > 0) {
+    const byStatus = [...counts].map(([status, n]) => `${n} ${status}`).join(', ');
+    lines.push(`hidden inactive goals: ${byStatus}; list: major status ${project}`);
+  }
+  return lines;
 }
 
-function durableCandidates(project: string, repoPath: string): string {
+function durableCandidates(project: string, repoPath: string): string | undefined {
   let candidates;
   try {
     candidates = listLearningCandidates(project, undefined, repoPath);
@@ -81,7 +109,7 @@ function durableCandidates(project: string, repoPath: string): string {
       if (right.occurrences !== left.occurrences) return right.occurrences - left.occurrences;
       return right.updatedAt.localeCompare(left.updatedAt);
     });
-  if (learnings.length === 0) return '(No active Major learnings.)';
+  if (learnings.length === 0) return undefined;
   // REVIEW-DUE learnings are always shown: they must not become ignored notes.
   const shown = learnings.filter(
     (candidate, index) => index < LEARNING_LIMIT || isReviewDue(candidate),
@@ -94,18 +122,16 @@ function durableCandidates(project: string, repoPath: string): string {
     .map((candidate) => {
       const review = isReviewDue(candidate) ? ' REVIEW-DUE' : '';
       const key = candidate.key ? ` key=${candidate.key}` : '';
-      const summary =
-        candidate.summary.length > 240 ? `${candidate.summary.slice(0, 239)}…` : candidate.summary;
+      const summary = clip(candidate.summary, 200);
       return `- ${candidate.status.toUpperCase()} ${candidate.occurrences}x${review} [${candidate.scope}/${candidate.source}]${key} ${summary}`;
     })
     .join('\n')
     .concat(more);
 }
 
-function resolvedGoalSkills(project: string, repoPath: string): string {
+function resolvedGoalSkills(project: string, repoPath: string): string | undefined {
   const goals = activeGoals(project, repoPath);
-  if (goals.length === 0)
-    return '(No active goal. Resolve skills against the substantive task when it arrives.)';
+  if (goals.length === 0) return undefined;
   const unique = new Map<string, string>();
   try {
     for (const goal of goals) {
@@ -116,7 +142,7 @@ function resolvedGoalSkills(project: string, repoPath: string): string {
   } catch {
     return '(Major skill registry unavailable: skill context withheld without blocking session attach.)';
   }
-  if (unique.size === 0) return '(No installed skill matched the active goal.)';
+  if (unique.size === 0) return undefined;
   const shown = [...unique].slice(0, SKILL_LIMIT).map(([id, path]) => `- ${id}: ${path}`);
   if (unique.size > SKILL_LIMIT) {
     shown.push(
@@ -157,7 +183,7 @@ function currentWorkerCapacity(): string {
 function activeGoalSummary(project: string, repoPath: string): string {
   const goal = activeGoals(project, repoPath)[0];
   if (!goal) return 'none';
-  return `${goal.goal} [${goal.status}]`;
+  return `${clip(goal.goal, 300)} [${goal.status}]`;
 }
 
 export async function runSessionContextCli(args: string[]): Promise<boolean> {
@@ -337,48 +363,51 @@ export async function runSessionContextCli(args: string[]): Promise<boolean> {
     : workshopEligible
       ? 'ready — `major goal admit` activates it automatically for substantive work'
       : `not applicable (trust=${policy.trust}${policy.ownerApprovedBuild ? '' : ', not owner-approved build'})`;
-  const resources = formatResourceTelemetry(resourceSnapshot().telemetry);
-  const banner = `MAJOR CONTROL PLANE: ACTIVE
-host: ${host}
-cwd: ${resolve(cwd)}
+  const resources = resourceSnapshot().telemetry;
+  const learningFile = projectLearningFile(project.repoPath);
+  const learnings = durableCandidates(project.project, project.repoPath);
+  const skills = resolvedGoalSkills(project.project, project.repoPath);
+  const reviewDue = learnings?.includes(' REVIEW-DUE ') ?? false;
+  const repoLine = resolve(cwd) === project.repoPath ? '' : `\nrepo: ${project.repoPath}`;
+  // Only what changes this session's decisions. Stable rules live in the
+  // cached global rules file (guidance/global-worker-rules.md); a banner over
+  // the host's inline hook limit (~10k chars in Claude Code) is replaced by a
+  // short preview, so the contract below must stay small and come last.
+  const sections = [
+    `MAJOR CONTROL PLANE: ACTIVE
 project: ${project.project}
-repo: ${project.repoPath}
+cwd: ${resolve(cwd)}${repoLine}
 policy: ${policy.projectClass}/${policy.trust} maxWorkers=${policy.maxWorkers} ownerApproved=${policy.ownerApprovedBuild ? 'yes' : 'no'}
 foreground authority: ${foregroundAuthority}
 active goal: ${activeGoalSummary(project.project, project.repoPath)}
-current worker capacity: ${currentWorkerCapacity()}
+${goalStateLines(project.project, project.repoPath)
+  .map((line) => `${line}\n`)
+  .join('')}current worker capacity: ${currentWorkerCapacity()}
 ${formatCodexCapacityOverview(readCodexUsageReport())}
-
-ACTIVE GOAL STATE
-${goalStateSection(project.project, project.repoPath)}
-
-DURABLE PROJECT LEARNINGS
-${projectLearningFile(project.repoPath)}
-
-ACTIVE MAJOR LEARNINGS
-${durableCandidates(project.project, project.repoPath)}
-
-RESOLVED SKILLS FOR ACTIVE GOALS
-${resolvedGoalSkills(project.project, project.repoPath)}
-
-RESOURCE GUARD
-${resources}
-
-SESSION CONTRACT
-- Major is already active; do not ask the user to start it again.
-${
-  workshopEligible
-    ? `- Owner-approved build project. Before SUBSTANTIVE work (build/fix/redesign/implement/deploy/debug/investigate/modify the repo/multi-step build-or-research), run \`major goal admit --host ${host} --outcome "<durable outcome, not the latest step>"\`: it creates or resumes the one project goal, auto-grants foreground authority and reports another session's live work. Skip it for lightweight interaction (explain, answer, opine, summarize, read-only inspection) unless a goal is already active. Admit once per new increment, not per message while a dispatch is in flight or being reported. Read the echoed \`outcome\`; if it plainly does not match the current request, pass \`--refine\` (outcome text is preserved by default).\n- Then DISPATCH, do not implement yourself: \`major run <project> --goal-id <id> --foreground\` via a long-running/background command (up to maxRunMinutes). Major reroutes on provider rate-limit, exhaustion or auth failure and continues the SAME goal; you never pick a provider. You are the controller: report the result; never make the same edits in parallel or afterwards. 0 hops = another process held the repo lock and nothing ran; never start a second dispatch for a goal that is still running. One dispatch = one increment; for the next, admit/resume and dispatch again.\n`
-    : ''
-}- Before substantive edits, confirm any named/implied project matches this repo. If not, load project-context-integrity and reroute before mutation.
-- Run Major's skill resolver and load the exact project or immutable-runtime skill paths it returns before inventing a workflow.
-- Treat the durable learnings above as active constraints. A fresh session is not permission to repeat a prior correction.
-- A REVIEW-DUE learning has recurred at least twice. Before closing the task, either promote the proven lesson into guidance/skill or record why it remains unstable/project-specific.
-- If the user explicitly corrects behavior or says a mistake happened before: fix and verify the real task, then capture the correction with major learn capture without making the user ask. Use one stable learning key for the same failure class across runs.
-- For MCP/connectors/plugins, load mcp-integration-ops and prove the actual integration state.
-- For substantial UI/website creation, redesign, or "generic/AI-looking/too safe" feedback, load design-direction-and-taste first. It is the single Major taste authority; do not stack competing generic taste skills.
-- For customer-facing website QA, load website-design-qa; add responsive-motion-systems for GSAP/ScrollTrigger/sticky/pinned/Three.js work.
-- Owner-approved build projects may continue ordinary reversible engineering without permission ceremony. Client/PII data remains project-local.`;
-  emit(banner);
+RESOURCE GUARD: workers ${resources.workers.active}/${resources.workers.limit}, browsers ${resources.browsers.active}/${resources.browsers.limit}, builds ${resources.builds.active}/${resources.builds.limit}, queued ${resources.queued}, memory ${resources.memoryAvailablePercent}% (floor ${resources.memorySoftFloorPercent}%)`,
+  ];
+  if (learningFile) sections.push(`DURABLE PROJECT LEARNINGS (LEARNINGS.md)\n${learningFile}`);
+  if (learnings) sections.push(`ACTIVE MAJOR LEARNINGS\n${learnings}`);
+  if (skills) sections.push(`RESOLVED SKILLS FOR ACTIVE GOALS\n${skills}`);
+  const contract = [
+    '- Major is already active; do not ask the user to start it again. Global Major rules apply.',
+  ];
+  if (workshopEligible) {
+    contract.push(
+      `- Owner-approved build: for SUBSTANTIVE work run \`major goal admit --host ${host} --outcome "<durable outcome>"\`, then dispatch \`major run ${project.project} --goal-id <id> --foreground\` and report the result; skip both for lightweight interaction.`,
+    );
+  }
+  if (learningFile || learnings) {
+    contract.push(
+      '- Treat the learnings above as active constraints. A fresh session is not permission to repeat a prior correction.',
+    );
+  }
+  if (reviewDue) {
+    contract.push(
+      '- A REVIEW-DUE learning has recurred at least twice. It is listed for the weekly learning batch (`major learn digest`); do not hold this task open for it.',
+    );
+  }
+  sections.push(`SESSION CONTRACT\n${contract.join('\n')}`);
+  emit(sections.join('\n\n'));
   return true;
 }

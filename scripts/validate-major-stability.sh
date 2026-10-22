@@ -64,9 +64,9 @@ grep -Fq 'runLearningLifecycleCli' src/entry.ts || fail "learning lifecycle CLI 
 grep -Fq 'DURABLE PROJECT LEARNINGS' src/context/session-context.ts || fail "session attach does not preload project learnings"
 grep -Fq 'ACTIVE MAJOR LEARNINGS' src/context/session-context.ts || fail "session attach does not preload active and promoted learnings"
 grep -Fq 'REVIEW-DUE' src/context/session-context.ts || fail "session attach does not flag recurring learning for promotion review"
-grep -Fq 'design-direction-and-taste' src/context/session-context.ts || fail "session attach lacks canonical design direction routing reminder"
-grep -Fq 'website-design-qa' src/context/session-context.ts || fail "session attach lacks website QA routing reminder"
-grep -Fq 'mcp-integration-ops' src/context/session-context.ts || fail "session attach lacks MCP integration routing reminder"
+grep -Fq 'design-direction-and-taste' guidance/global-worker-rules.md || fail "always-on rules lack canonical design direction routing"
+grep -Fq 'website-design-qa' guidance/global-worker-rules.md || fail "always-on rules lack website QA routing"
+grep -Fq 'mcp-integration-ops' guidance/global-worker-rules.md || fail "always-on rules lack MCP integration routing"
 
 if grep -Fq "command === 'learn'" src/supervisor/cli.ts; then
   fail "duplicate learning CLI path remains in supervisor CLI"
