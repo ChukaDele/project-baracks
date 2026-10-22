@@ -764,7 +764,7 @@ function trustContract(policy: ProjectPolicy): string {
 - trust: ${policy.trust}
 - maximum concurrent workers: ${policy.maxWorkers}
 - hard global active-resource ceiling: 6 across the full task tree
-- subagent depth: maximum 1; delegated reviewers are leaf workers
+- subagent depth: no fixed cap; delegated reviewers are leaf workers
 - browser budget: maximum 2 contexts total (one visible and one headless)
 - build budget: maximum 1 production build at a time
 - maximum coordinator run: ${policy.maxRunMinutes} minutes
