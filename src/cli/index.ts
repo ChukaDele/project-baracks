@@ -541,6 +541,9 @@ program
     const { formatCleanupHuman, productionCleanupDeps, reconcileResources } =
       await import('../resources/reconcile.js');
     const deps = productionCleanupDeps();
+    const registryGc = await import('../resources/registry-gc.js');
+    const registryDb = db();
+    const registryPlan = registryGc.planRegistryGc(registryDb);
     if (opts.dryRun) {
       const result = reconcileResources({
         ...deps,
@@ -554,10 +557,12 @@ program
           wouldRemove: result.plan.wouldRemove.map((resource) => resource.id),
           estimatedReclaimBytes: result.plan.estimatedReclaimBytes,
           estimatedReclaimLabel: result.plan.estimatedReclaimLabel,
+          registry: registryPlan,
         });
         return;
       }
       console.log(formatCleanupHuman(result.plan));
+      console.log(registryGc.formatRegistryGc(registryPlan, true));
       return;
     }
     const result = reconcileResources({
@@ -566,8 +571,10 @@ program
       apply: true,
       aggressive: opts.aggressive === true,
     });
+    const registryResult = registryGc.applyRegistryGc(registryDb, registryPlan);
     if (opts.json) {
       emitJson('cleanup-result', {
+        registry: registryResult,
         inventory: result.plan.inventory,
         removed: result.applied?.removed.map((item) => item.id) ?? [],
         reclaimedBytes: result.applied?.reclaimedBytes ?? 0,
@@ -576,6 +583,7 @@ program
       return;
     }
     console.log(formatCleanupHuman(result.plan, result.applied));
+    console.log(registryGc.formatRegistryGc(registryResult, false));
   });
 
 program
