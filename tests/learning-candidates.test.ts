@@ -43,6 +43,18 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
+// Under machine load, tsx children start slowly and contend for the store lock.
+// A long, deterministic lock wait keeps the occurrence assertions about
+// correctness, not about how fast the host schedules eight processes.
+function childEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    MAJOR_LEARNING_ROOT: learningRoot(),
+    MAJOR_LEARNING_LOCK_WAIT_MS: '120000',
+  };
+}
+const SPAWN_TEST_TIMEOUT_MS = 180_000;
+
 describe('Major learning candidates', () => {
   it('treats EPERM as proof that a lock owner is still alive', () => {
     const error = Object.assign(new Error('not permitted'), { code: 'EPERM' });
@@ -267,12 +279,14 @@ describe('Major learning candidates', () => {
     ).toBe(true);
   });
 
-  it('deduplicates concurrent cross-process captures without losing occurrences', async () => {
-    const moduleUrl = pathToFileURL(
-      join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
-    );
-    const captures = Array.from({ length: 8 }, (_, index) => {
-      const script = `
+  it(
+    'deduplicates concurrent cross-process captures without losing occurrences',
+    async () => {
+      const moduleUrl = pathToFileURL(
+        join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
+      );
+      const captures = Array.from({ length: 8 }, (_, index) => {
+        const script = `
         import { captureLearning } from ${JSON.stringify(moduleUrl.href)};
         captureLearning({
           project: 'concurrent-project',
@@ -282,47 +296,51 @@ describe('Major learning candidates', () => {
           evidence: ${JSON.stringify(`process-${index}`)}
         });
       `;
-      return new Promise<void>((resolve, reject) => {
-        const child = spawn(
-          process.execPath,
-          ['--import', 'tsx', '--input-type=module', '-e', script],
-          {
-            cwd: join(import.meta.dirname, '..'),
-            env: { ...process.env, MAJOR_LEARNING_ROOT: learningRoot() },
-            stdio: ['ignore', 'ignore', 'pipe'],
-          },
-        );
-        let stderr = '';
-        child.stderr.setEncoding('utf8');
-        child.stderr.on('data', (chunk) => (stderr += String(chunk)));
-        child.once('error', reject);
-        child.once('exit', (code) =>
-          code === 0 ? resolve() : reject(new Error(`capture child exited ${code}: ${stderr}`)),
-        );
+        return new Promise<void>((resolve, reject) => {
+          const child = spawn(
+            process.execPath,
+            ['--import', 'tsx', '--input-type=module', '-e', script],
+            {
+              cwd: join(import.meta.dirname, '..'),
+              env: childEnv(),
+              stdio: ['ignore', 'ignore', 'pipe'],
+            },
+          );
+          let stderr = '';
+          child.stderr.setEncoding('utf8');
+          child.stderr.on('data', (chunk) => (stderr += String(chunk)));
+          child.once('error', reject);
+          child.once('exit', (code) =>
+            code === 0 ? resolve() : reject(new Error(`capture child exited ${code}: ${stderr}`)),
+          );
+        });
       });
-    });
-    await Promise.all(captures);
-    const [candidate] = listLearningCandidates('concurrent-project');
-    expect(candidate?.occurrences).toBe(8);
-    expect(candidate?.evidence).toHaveLength(8);
-  }, 30_000);
+      await Promise.all(captures);
+      const [candidate] = listLearningCandidates('concurrent-project');
+      expect(candidate?.occurrences).toBe(8);
+      expect(candidate?.evidence).toHaveLength(8);
+    },
+    SPAWN_TEST_TIMEOUT_MS,
+  );
 
-  it('reclaims one stale store lock before concurrent captures without losing occurrences', async () => {
-    const project = 'stale-lock-project';
-    captureLearning({ project, source: 'manual', key: 'same-lesson', summary: 'The lesson.' });
-    const projectFiles = readdirSync(join(learningRoot(), 'projects'));
-    expect(projectFiles).toHaveLength(1);
-    const projectFile = projectFiles[0]!;
-    const lock = join(learningRoot(), 'projects', `${projectFile}.lock`);
-    writeFileSync(lock, 'invalid-owner\n');
-    const stale = new Date(Date.now() - 31_000);
-    utimesSync(lock, stale, stale);
+  it(
+    'reclaims one stale store lock before concurrent captures without losing occurrences',
+    async () => {
+      const project = 'stale-lock-project';
+      captureLearning({ project, source: 'manual', key: 'same-lesson', summary: 'The lesson.' });
+      const projectFiles = readdirSync(join(learningRoot(), 'projects'));
+      expect(projectFiles).toHaveLength(1);
+      const projectFile = projectFiles[0]!;
+      const lock = join(learningRoot(), 'projects', `${projectFile}.lock`);
+      writeFileSync(lock, 'invalid-owner\n');
+      const stale = new Date(Date.now() - 31_000);
+      utimesSync(lock, stale, stale);
 
-    const moduleUrl = pathToFileURL(
-      join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
-    );
-    const captures = Array.from({ length: 8 }, (_, index) => {
-      const script = `
+      const moduleUrl = pathToFileURL(
+        join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
+      );
+      const captures = Array.from({ length: 8 }, (_, index) => {
+        const script = `
         import { captureLearning } from ${JSON.stringify(moduleUrl.href)};
         captureLearning({
           project: ${JSON.stringify(project)},
@@ -332,61 +350,77 @@ describe('Major learning candidates', () => {
           evidence: ${JSON.stringify(`stale-process-${index}`)}
         });
       `;
-      return new Promise<void>((resolve, reject) => {
-        const child = spawn(
-          process.execPath,
-          ['--import', 'tsx', '--input-type=module', '-e', script],
-          {
-            cwd: join(import.meta.dirname, '..'),
-            env: { ...process.env, MAJOR_LEARNING_ROOT: learningRoot() },
-            stdio: ['ignore', 'ignore', 'pipe'],
-          },
-        );
-        let stderr = '';
-        child.stderr.setEncoding('utf8');
-        child.stderr.on('data', (chunk) => (stderr += String(chunk)));
-        child.once('error', reject);
-        child.once('exit', (code) =>
-          code === 0 ? resolve() : reject(new Error(`capture child exited ${code}: ${stderr}`)),
-        );
+        return new Promise<void>((resolve, reject) => {
+          const child = spawn(
+            process.execPath,
+            ['--import', 'tsx', '--input-type=module', '-e', script],
+            {
+              cwd: join(import.meta.dirname, '..'),
+              env: childEnv(),
+              stdio: ['ignore', 'ignore', 'pipe'],
+            },
+          );
+          let stderr = '';
+          child.stderr.setEncoding('utf8');
+          child.stderr.on('data', (chunk) => (stderr += String(chunk)));
+          child.once('error', reject);
+          child.once('exit', (code) =>
+            code === 0 ? resolve() : reject(new Error(`capture child exited ${code}: ${stderr}`)),
+          );
+        });
       });
-    });
-    await Promise.all(captures);
-    const [candidate] = listLearningCandidates(project);
-    expect(candidate?.occurrences).toBe(9);
-    expect(candidate?.evidence).toHaveLength(8);
-  }, 30_000);
+      await Promise.all(captures);
+      const [candidate] = listLearningCandidates(project);
+      expect(candidate?.occurrences).toBe(9);
+      expect(candidate?.evidence).toHaveLength(8);
+    },
+    SPAWN_TEST_TIMEOUT_MS,
+  );
 
-  it('waits for an installation migration lock before writing', async () => {
-    const lock = join(learningRoot(), '.migration.lock');
-    mkdirSync(learningRoot(), { recursive: true });
-    writeFileSync(lock, 'installer\n');
-    const moduleUrl = pathToFileURL(
-      join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
-    );
-    const script = `
+  it(
+    'waits for an installation migration lock before writing',
+    async () => {
+      const lock = join(learningRoot(), '.migration.lock');
+      mkdirSync(learningRoot(), { recursive: true });
+      writeFileSync(lock, 'installer\n');
+      const moduleUrl = pathToFileURL(
+        join(import.meta.dirname, '..', 'src', 'learning', 'candidates.ts'),
+      );
+      const script = `
       import { captureLearning } from ${JSON.stringify(moduleUrl.href)};
+      process.stdout.write('ready\\n');
       captureLearning({ project: 'locked-project', source: 'manual', summary: 'Captured after migration.' });
     `;
-    const child = spawn(
-      process.execPath,
-      ['--import', 'tsx', '--input-type=module', '-e', script],
-      {
-        cwd: join(import.meta.dirname, '..'),
-        env: { ...process.env, MAJOR_LEARNING_ROOT: learningRoot() },
-        stdio: ['ignore', 'ignore', 'pipe'],
-      },
-    );
-    const completed = new Promise<number | null>((resolve, reject) => {
-      child.once('error', reject);
-      child.once('exit', resolve);
-    });
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(listLearningCandidates('locked-project')).toEqual([]);
-    unlinkSync(lock);
-    expect(await completed).toBe(0);
-    expect(listLearningCandidates('locked-project')[0]?.summary).toBe('Captured after migration.');
-  });
+      const child = spawn(
+        process.execPath,
+        ['--import', 'tsx', '--input-type=module', '-e', script],
+        {
+          cwd: join(import.meta.dirname, '..'),
+          env: childEnv(),
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      );
+      const completed = new Promise<number | null>((resolve, reject) => {
+        child.once('error', reject);
+        child.once('exit', resolve);
+      });
+      // Wait for the child to reach the capture (module load can take seconds
+      // under load) instead of guessing with a fixed sleep.
+      await new Promise<void>((resolve, reject) => {
+        child.stdout.setEncoding('utf8');
+        child.stdout.on('data', (chunk) => String(chunk).includes('ready') && resolve());
+        child.once('exit', (code) => reject(new Error(`child exited ${code} before ready`)));
+      });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(listLearningCandidates('locked-project')).toEqual([]);
+      unlinkSync(lock);
+      expect(await completed).toBe(0);
+      expect(listLearningCandidates('locked-project')[0]?.summary).toBe(
+        'Captured after migration.',
+      );
+    },
+    SPAWN_TEST_TIMEOUT_MS,
+  );
 
   it('recovers an abandoned stale installation migration lock', () => {
     const lock = join(learningRoot(), '.migration.lock');

@@ -40,7 +40,8 @@ import {
   type DiscoveredCapability,
 } from '../capabilities/discovery.js';
 import { isCapabilitySourceCurrent } from '../capabilities/verifier.js';
-import { captureLearning, listLearningCandidates } from '../learning/candidates.js';
+import { listLearningCandidates } from '../learning/candidates.js';
+import { runLearningStep } from '../learning/queue.js';
 import { parseCapacityKey } from '../providers/account.js';
 import {
   consumeModelRetry,
@@ -71,8 +72,7 @@ import {
   materiallySameFailure,
 } from '../intelligence/repair-gate.js';
 import { browserWorkImplicated } from '../web/semantic-decisions.js';
-import { observeSuccessfulWorkflow, recordSkillOutcome } from '../skills/lifecycle.js';
-import { formatReusableAssetDiscovery, observeReusableAssetCandidate } from '../skills/assets.js';
+import { formatReusableAssetDiscovery } from '../skills/assets.js';
 import {
   assertExecutionAllowed,
   getProjectPolicy,
@@ -2093,27 +2093,32 @@ async function runLockedGoalCycle(
       // Historical observation is best effort and cannot reverse user work.
     }
   };
-  try {
-    recordSkillOutcome({
-      project: goal.project,
-      ids: routedSkillIds,
-      success: outcome.status === 'succeeded',
-      durationMs: outcome.durationMs,
-    });
-  } catch {
-    // Skill metrics are evidence, not completion authority.
-  }
+  // Skill metrics are evidence, not completion authority: a failure queues.
+  const skillOutcomeWarning =
+    runLearningStep({
+      kind: 'skill-outcome',
+      input: {
+        project: goal.project,
+        ids: routedSkillIds,
+        success: outcome.status === 'succeeded',
+        durationMs: outcome.durationMs,
+      },
+    }) ?? '';
   const modelOutcome = modelOutcomeForWorker(outcome);
   if (modelOutcome) {
-    const outcomeState = openDb();
     try {
-      recordModelOutcome(outcomeState.db, {
-        providerName: routedSelection.provider,
-        modelRef: routedSelection.modelRef,
-        outcome: modelOutcome,
-      });
-    } finally {
-      outcomeState.sqlite.close();
+      const outcomeState = openDb();
+      try {
+        recordModelOutcome(outcomeState.db, {
+          providerName: routedSelection.provider,
+          modelRef: routedSelection.modelRef,
+          outcome: modelOutcome,
+        });
+      } finally {
+        outcomeState.sqlite.close();
+      }
+    } catch {
+      // Routing evidence is best effort and must never throw into the run.
     }
   }
   const after = getGoal(goal.id);
@@ -2139,46 +2144,49 @@ async function runLockedGoalCycle(
       return;
     }
     recordReportedCapabilityUses(capabilityResolution.capabilities, report?.capabilityUse);
-    let learningWarning = '';
+    // Each learning step is bounded and never throws into the run; a failed
+    // step is queued and replayed at the next session start.
+    let learningWarning = skillOutcomeWarning;
     if (report?.learning) {
-      try {
-        captureLearning({
-          ...report.learning,
-          project: goal.project,
-          repoPath: goal.repoPath,
-          scope: 'project',
-        });
-      } catch (error) {
-        learningWarning = ` Learning capture failed: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
-      }
+      learningWarning +=
+        runLearningStep({
+          kind: 'capture',
+          input: {
+            ...report.learning,
+            project: goal.project,
+            repoPath: goal.repoPath,
+            scope: 'project',
+          },
+        }) ?? '';
     }
     const completedWorkflowReport = completedWorkflow(report);
     if (completedWorkflowReport) {
-      try {
-        observeSuccessfulWorkflow({
-          ...completedWorkflowReport,
-          success: true,
-          project: goal.project,
-          repoPath: goal.repoPath,
-          durationMs: outcome.durationMs,
-          goalId: goal.id,
-          resolvedSkillIds: routedSkillIds,
-        });
-      } catch (error) {
-        learningWarning += ` Skillification deferred: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
-      }
+      learningWarning +=
+        runLearningStep({
+          kind: 'workflow',
+          input: {
+            ...completedWorkflowReport,
+            success: true,
+            project: goal.project,
+            repoPath: goal.repoPath,
+            durationMs: outcome.durationMs,
+            goalId: goal.id,
+            resolvedSkillIds: routedSkillIds,
+          },
+        }) ?? '';
     }
     if (report?.assetCandidate && outcome.workspaceMutated) {
-      try {
-        observeReusableAssetCandidate({
-          ...report.assetCandidate,
-          sourceProject: goal.repoPath,
-          narrative: report.summary,
-        });
-      } catch (error) {
-        learningWarning += ` Asset candidate capture deferred: ${trim(error instanceof Error ? error.message : String(error), 2_000)}`;
-      }
+      learningWarning +=
+        runLearningStep({
+          kind: 'asset',
+          input: {
+            ...report.assetCandidate,
+            sourceProject: goal.repoPath,
+            narrative: report.summary,
+          },
+        }) ?? '';
     }
+    learningWarning = trim(learningWarning, 2_000);
     if (report?.status === 'blocked') {
       updateGoal(goal.id, {
         status: 'blocked',

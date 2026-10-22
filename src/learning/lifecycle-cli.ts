@@ -2,7 +2,6 @@ import {
   LEARNING_SCOPES,
   LEARNING_SOURCES,
   LEARNING_STATUSES,
-  captureLearning,
   dismissGlobalLearning,
   dismissLearning,
   learningReviewDue,
@@ -13,6 +12,8 @@ import {
   type LearningStatus,
 } from './candidates.js';
 import { resolveProject } from '../supervisor/state.js';
+import { buildLearningDigest, formatLearningDigest } from './digest.js';
+import { captureLearningOrQueue, drainLearningQueue } from './queue.js';
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -59,7 +60,8 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
   if (args[1] === 'capture') {
     const project = resolveProject(flag(args, '--project') ?? 'current');
     const key = flag(args, '--key');
-    const candidate = captureLearning({
+    // Store-lock contention or I/O failure queues the capture; it never fails the caller.
+    const result = captureLearningOrQueue({
       source: learningSource(required(args, '--source')),
       summary: required(args, '--summary'),
       scope: learningScope(flag(args, '--scope') ?? 'undecided'),
@@ -68,7 +70,30 @@ export async function runLearningLifecycleCli(args: string[]): Promise<boolean> 
       ...(key ? { key } : {}),
       ...(flag(args, '--evidence') ? { evidence: flag(args, '--evidence') } : {}),
     });
-    console.log(JSON.stringify(candidate, null, 2));
+    console.log(
+      JSON.stringify(
+        result.queued ? { queued: true, reason: result.reason } : result.candidate,
+        null,
+        2,
+      ),
+    );
+    return true;
+  }
+
+  if (args[1] === 'digest') {
+    const digest = buildLearningDigest({
+      since: flag(args, '--since'),
+      selfWorkTarget: flag(args, '--self-work-target'),
+      catalogPath: flag(args, '--catalog'),
+    });
+    console.log(
+      args.includes('--json') ? JSON.stringify(digest, null, 2) : formatLearningDigest(digest),
+    );
+    return true;
+  }
+
+  if (args[1] === 'drain') {
+    console.log(JSON.stringify(drainLearningQueue(), null, 2));
     return true;
   }
 

@@ -64,6 +64,7 @@ import {
 import { assertRemotePreviewUrl } from '../web/remote-preview.js';
 import { redactText } from '../security/redact.js';
 import { openDb } from '../db/client.js';
+import { MAJOR_SELF_WORK_REFUSAL, isMajorSelfWork } from '../learning/self-work.js';
 import { getIndependentReviewReceipt } from '../insights/performance-history.js';
 import {
   createDecisionRequest,
@@ -472,6 +473,9 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
     // they already match, but a real identity move if this is invoked from
     // a different worktree of the same repository than where the goal was
     // admitted).
+    if (!goalIdArg && isMajorSelfWork(project) && !hasFlag(args, '--major-self-work')) {
+      throw new Error(MAJOR_SELF_WORK_REFUSAL);
+    }
     const goal = goalIdArg
       ? (() => {
           const bound = bindGoalToProject(goalIdArg, project.project, project.repoPath);
@@ -599,6 +603,10 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
           2,
         ),
       );
+      return true;
+    }
+    if (isMajorSelfWork(project) && !hasFlag(args, '--major-self-work')) {
+      console.log(JSON.stringify({ admitted: false, reason: MAJOR_SELF_WORK_REFUSAL }, null, 2));
       return true;
     }
     const sessionId =
