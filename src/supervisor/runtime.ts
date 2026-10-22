@@ -1909,13 +1909,24 @@ async function runParallelGoalCycle(
         runTaskWorker: (task, cwd) => dispatch(selection, parallelTaskPrompt(prompt, task), cwd),
         runIntegrator: async (integratorPrompt, cwd) => {
           const integrator = await routeGoalExecutionSmart(goal, { targetClass: 'sonnet' });
-          if (integrator.kind === 'checkpoint') {
+          let refusal = integrator.kind === 'checkpoint' ? integrator.reason : undefined;
+          if (integrator.kind === 'route') {
+            try {
+              const billing = routedWorkerModel(state.db, integrator).model.billingMode;
+              if (billing !== 'subscription_included') {
+                refusal = `integrator route billing is ${billing}; paid runs need approval`;
+              }
+            } catch (error) {
+              refusal = error instanceof Error ? error.message : String(error);
+            }
+          }
+          if (integrator.kind === 'checkpoint' || refusal) {
             return {
               host: selection.host,
               status: 'failed',
               exitCode: null,
               stdout: '',
-              stderr: integrator.reason,
+              stderr: refusal ?? '',
               durationMs: 0,
               rateLimited: false,
               exhausted: false,
