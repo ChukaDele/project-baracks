@@ -1428,7 +1428,7 @@ async function runPendingCompletionReview(
         : outcome.status === 'timed_out'
           ? 'timed_out'
           : 'failed',
-      reviewSessionRef ? { sessionRef: reviewSessionRef } : {},
+      { ...(reviewSessionRef ? { sessionRef: reviewSessionRef } : {}), usage: outcome.usage },
     );
   } finally {
     runStatusState.sqlite.close();
@@ -2040,7 +2040,7 @@ async function runLockedGoalCycle(
           : outcome.status === 'timed_out'
             ? 'timed_out'
             : 'failed',
-        workerSessionRef ? { sessionRef: workerSessionRef } : {},
+        { ...(workerSessionRef ? { sessionRef: workerSessionRef } : {}), usage: outcome.usage },
       );
     } finally {
       runState.sqlite.close();
