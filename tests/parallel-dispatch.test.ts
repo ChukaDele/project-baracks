@@ -55,8 +55,13 @@ function outcome(status: WorkerOutcome['status'] = 'succeeded'): WorkerOutcome {
   };
 }
 
-function queuedTask(title: string, paths?: string[]) {
-  const task = addTask(db, { projectId, title, ...(paths ? { paths } : {}) });
+function queuedTask(title: string, paths?: string[], completionCriteriaJson?: string) {
+  const task = addTask(db, {
+    projectId,
+    title,
+    ...(paths ? { paths } : {}),
+    ...(completionCriteriaJson ? { completionCriteriaJson } : {}),
+  });
   transitionTask(db, task.id, 'ready');
   transitionTask(db, task.id, 'queued');
   return task;
@@ -354,8 +359,8 @@ describe('parallel dispatch', { timeout: 30_000 }, () => {
         },
       }),
     );
-    expect(results[0]).toMatchObject({ outcome: 'requeued', detail: /session identity/ });
-    expect(getTask(db, a.id).status).toBe('queued');
+    expect(results[0]).toMatchObject({ outcome: 'blocked', detail: /session identity/ });
+    expect(getTask(db, a.id).status).toBe('needs_decision');
     expect(db.select().from(agentRuns).all()).toEqual([]);
   });
 
@@ -401,6 +406,27 @@ describe('promoteNextLandedTask', { timeout: 30_000 }, () => {
     expect(promoteNextLandedTask(db, projectId)).toBe(b.id);
     expect(getTask(db, b.id).status).toBe('ready_to_merge');
     expect(promoteNextLandedTask(db, projectId)).toBeUndefined();
+  });
+
+  it('parks a landed task whose recorded proof cannot pass instead of holding the gate', async () => {
+    const a = queuedTask('A', ['a/**'], JSON.stringify({ requireArtifact: true }));
+    const b = queuedTask('B', ['b/**']);
+    const { worker } = writingWorker({ A: ['a/a.txt', 'a\n'], B: ['b/b.txt', 'b\n'] });
+    await runParallelBatch(batchInput({ runTaskWorker: worker }));
+
+    expect(promoteNextLandedTask(db, projectId)).toBeUndefined();
+    expect(getTask(db, a.id).status).toBe('needs_decision');
+    expect(promoteNextLandedTask(db, projectId)).toBe(b.id);
+  });
+
+  it('never batches a task with progressive criteria frozen to a candidate head', () => {
+    queuedTask(
+      'frozen',
+      ['f/**'],
+      JSON.stringify({ progressiveValidation: { candidateHead: 'a'.repeat(40) } }),
+    );
+    const open = queuedTask('open', ['o/**']);
+    expect(selectParallelBatch(db, projectId, 4).map((task) => task.id)).toEqual([open.id]);
   });
 });
 

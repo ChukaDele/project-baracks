@@ -11,6 +11,7 @@ import {
   recoverExpiredClaims,
   releaseClaim,
 } from '../domain/claim-service.js';
+import { evaluateCompletionProof, parseCompletionCriteria } from '../domain/completion.js';
 import { newId } from '../domain/ids.js';
 import { createRun, recordVerificationRun, setRunStatus } from '../domain/run-service.js';
 import {
@@ -177,6 +178,9 @@ export function selectParallelBatch(db: Db, projectId: string, limit: number): P
     if (batch.length >= limit) break;
     const paths = parseTaskPaths(row.paths);
     if (!paths || batch.some((picked) => pathsOverlap(picked.paths, paths))) continue;
+    // Progressive criteria freeze a candidate head at queue time; a merge-queue
+    // landing creates a new head, so such a task could never be proven here.
+    if (parseCompletionCriteria(row.completionCriteriaSnapshotJson).progressiveValidation) continue;
     batch.push({ id: row.id, title: row.title, description: row.description, paths });
   }
   return batch;
@@ -379,15 +383,20 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
   ): Promise<ParallelTaskResult> => {
     renew(fence);
     const sessionRef = outcome.sessionRef?.trim();
-    // Like the single-worker cycle, a result without a durable session identity
-    // is refused: the landed task's canonical run must carry one.
-    const refused =
-      outcome.status !== 'succeeded'
-        ? `worker ${outcome.status}`
-        : sessionRef
-          ? undefined
-          : 'worker returned no durable session identity';
-    if (refused) {
+    if (outcome.status === 'succeeded' && !sessionRef) {
+      // Like the single-worker cycle, a result without a durable session
+      // identity is refused: the landed task's canonical run must carry one.
+      // A retry on the same host would repeat it, so park for the owner.
+      park(task, fence, 'worker returned no durable session identity');
+      return {
+        taskId: task.id,
+        outcome: 'blocked',
+        detail: `worker returned no durable session identity; branch ${tree.branch} kept`,
+        integratorRuns: 0,
+      };
+    }
+    if (outcome.status !== 'succeeded') {
+      const refused = `worker ${outcome.status}`;
       releaseClaim(input.db, { ...fence, requeue: true, reason: refused });
       // Discard only this failed attempt's own scratch tree and branch; the
       // task is retried from the integration head. Never touches the goal checkout.
@@ -434,38 +443,46 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
     // checks as its verification evidence; promoteNextLandedTask later routes
     // the task into the independent completion review.
     const landedHead = await head();
-    const agentRun = createRun(input.db, {
-      taskId: task.id,
-      ...input.runProvenance,
-      claimId: fence.claimId,
-      claimWorkerId: fence.workerId,
-      worktreeId: tree.id,
-      purpose: 'implementation',
-      sourceHead: landedHead,
-    });
-    setRunStatus(input.db, agentRun.id, 'running');
-    setRunStatus(input.db, agentRun.id, 'succeeded', {
-      sessionRef: sessionRef!,
-      usage: outcome.usage,
-    });
-    for (const check of landing.checks) {
-      const verification = recordVerificationRun(input.db, {
-        taskId: task.id,
-        command: check.command,
-        status: 'passed',
-        exitCode: 0,
-        outputSummary: clip(check.output),
-        agentRunId: agentRun.id,
-      });
-      addEvidence(input.db, {
-        taskId: task.id,
-        agentRunId: agentRun.id,
-        kind: 'verification_run',
-        ref: verification.id,
-        summary: `merge queue verification passed at ${landedHead}: ${check.command}`,
-      });
-    }
-    transitionTask(input.db, task.id, 'verifying', { fence });
+    renew(fence); // the run below is bound to the live claim
+    // One transaction: the run, its proof and the verifying transition are
+    // recorded together or not at all, under the live claim.
+    input.db.transaction(
+      (tx) => {
+        const agentRun = createRun(tx, {
+          taskId: task.id,
+          ...input.runProvenance,
+          claimId: fence.claimId,
+          claimWorkerId: fence.workerId,
+          worktreeId: tree.id,
+          purpose: 'implementation',
+          sourceHead: landedHead,
+        });
+        setRunStatus(tx, agentRun.id, 'running');
+        setRunStatus(tx, agentRun.id, 'succeeded', {
+          sessionRef: sessionRef!,
+          usage: outcome.usage,
+        });
+        for (const check of landing.checks) {
+          const verification = recordVerificationRun(tx, {
+            taskId: task.id,
+            command: check.command,
+            status: 'passed',
+            exitCode: 0,
+            outputSummary: clip(check.output),
+            agentRunId: agentRun.id,
+          });
+          addEvidence(tx, {
+            taskId: task.id,
+            agentRunId: agentRun.id,
+            kind: 'verification_run',
+            ref: verification.id,
+            summary: `merge queue verification passed at ${landedHead}: ${check.command}`,
+          });
+        }
+        applyTransition(tx, task.id, 'verifying', { fence });
+      },
+      { behavior: 'immediate' },
+    );
     completeClaim(input.db, fence.claimId, fence.workerId, 'merged');
     setWorktreeStatus(tree.id, 'merged');
     const removed = await git(input.repoPath, 'worktree', 'remove', tree.path);
@@ -558,8 +575,10 @@ export async function runParallelBatch(input: ParallelBatchInput): Promise<Paral
 /** Move the oldest merge-queue-landed (verifying) task into the existing
  * completion gate: verifying -> reviewing -> ready_to_merge. Only one task is
  * in the gate at a time, because resolveCanonicalTaskBinding accepts exactly
- * one ready_to_merge task. The goal's independent completion review is the
- * review this gate waits on; its pass grade is what completes the task. */
+ * one ready_to_merge task. `reviewing` is a pass-through here: the goal's
+ * independent completion review is the review this gate waits on, and its
+ * pass grade is what completes the task. A task whose recorded proof cannot
+ * pass is parked in needs_decision instead, so it never holds the gate. */
 export function promoteNextLandedTask(db: Db, projectId: string): string | undefined {
   return db.transaction(
     (tx) => {
@@ -575,12 +594,16 @@ export function promoteNextLandedTask(db: Db, projectId: string): string | undef
         .get();
       if (inGate) return undefined;
       const next = tx
-        .select({ id: tasks.id })
+        .select({ id: tasks.id, criteria: tasks.completionCriteriaSnapshotJson })
         .from(tasks)
         .where(and(eq(tasks.projectId, projectId), eq(tasks.status, 'verifying')))
         .orderBy(asc(tasks.createdAt))
         .get();
       if (!next) return undefined;
+      if (!evaluateCompletionProof(tx, next.id, parseCompletionCriteria(next.criteria)).ok) {
+        applyTransition(tx, next.id, 'needs_decision');
+        return undefined;
+      }
       applyTransition(tx, next.id, 'reviewing');
       applyTransition(tx, next.id, 'ready_to_merge');
       return next.id;

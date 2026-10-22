@@ -1850,6 +1850,12 @@ async function runParallelGoalCycle(
       return false;
     }
     const { provider, model } = routedWorkerModel(state.db, selection);
+    if (model.billingMode !== 'subscription_included') {
+      // Paid runs need a per-task paid_usage approval the merge queue cannot
+      // present; refuse before any worker spends.
+      console.error(`Parallel workers skipped: routed model billing is ${model.billingMode}`);
+      return false;
+    }
     const timeoutMs = Math.min(
       Math.max(1, policy.maxRunMinutes) * 60 * 1000,
       maxTimeoutMs ?? Infinity,
