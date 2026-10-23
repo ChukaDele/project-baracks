@@ -572,6 +572,16 @@ def main() -> None:
     )
     add_file(entries, claude_rule, home / ".claude" / "major-global.md")
 
+    # Built-in Explore runs on the main model with every CLAUDE.md loaded.
+    # This same-named user agent overrides it: cheaper model, low effort, no
+    # always-on rules (read-only search does not need them).
+    explore_agent = write_stage_file(
+        stage,
+        "claude-explore-agent.md",
+        (root / "adapters" / "claude-agents" / "Explore.md").read_text(),
+    )
+    add_file(entries, explore_agent, home / ".claude" / "agents" / "Explore.md")
+
     claude_root_stage = write_stage_file(
         stage,
         "claude-root.md",

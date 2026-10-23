@@ -398,13 +398,46 @@ describe('fresh session context', () => {
     vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
     await runSessionContextCli(['session', 'attach', '--host', 'claude', '--cwd', current]);
     const output = lines.join('\n');
-    expect(output).toContain('ACTIVE — Current live goal');
+    expect(output).toContain('active goal: Current live goal [active]');
     expect(output).not.toContain('Old abandoned goal');
     expect(output).not.toContain('OLD FAILURE DETAIL');
     expect(output).toContain(`hidden inactive goals: 1 failed; list: major status ${project}`);
     expect(output).toMatch(/REVIEW-DUE .*Recurring failure that is due for review\./);
     expect(output).toContain('more: major learn list --project current)');
     expect(output).not.toContain('x'.repeat(300));
+  });
+
+  it('omits empty sections and stays under the inline hook limit', async () => {
+    const current = repo('quiet-project');
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    await runSessionContextCli(['session', 'attach', '--host', 'claude', '--cwd', current]);
+    const output = lines.join('\n');
+    expect(output).toContain('SESSION CONTRACT');
+    expect(output).not.toContain('LEARNINGS');
+    expect(output).not.toContain('RESOLVED SKILLS');
+    expect(output).not.toContain('REVIEW-DUE');
+    expect(output.length).toBeLessThan(2_500);
+  });
+
+  it('routes REVIEW-DUE learnings to the weekly learning batch', async () => {
+    const current = repo('review-project');
+    for (let repeat = 0; repeat < 2; repeat += 1) {
+      captureLearning({
+        project: 'review-project',
+        repoPath: current,
+        source: 'recurring-failure',
+        scope: 'project',
+        key: 'review-due',
+        summary: 'Recurring failure.',
+      });
+    }
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => lines.push(String(value)));
+    await runSessionContextCli(['session', 'attach', '--host', 'claude', '--cwd', current]);
+    const output = lines.join('\n');
+    expect(output).toContain('listed for the weekly learning batch (`major learn digest`)');
+    expect(output).not.toContain('Before closing the task');
   });
 
   it('surfaces persisted Codex capacity for both authenticated accounts in the banner', async () => {
