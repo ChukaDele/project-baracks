@@ -341,21 +341,25 @@
     },
     {
       "id": "software-engineering",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "simple-modular-code",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "planning",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "vertical-slice-delivery",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "worktree",
@@ -368,39 +372,47 @@
     },
     {
       "id": "tdd",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "lean-quality",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "debugging",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "root-cause-qa",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "review",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "exact-head-pr-review",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "verification",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "lean-quality",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "dependency",
@@ -431,12 +443,14 @@
     },
     {
       "id": "architecture",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "engineering-design-doctrine",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "api",
@@ -467,12 +481,14 @@
     },
     {
       "id": "performance",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "performance-caching",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "observability",
@@ -638,12 +654,14 @@
     },
     {
       "id": "browser-release-qa",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "website-design-qa",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "security-audit",
@@ -656,12 +674,14 @@
     },
     {
       "id": "staged-quality-controls",
-      "disposition": "UPDATE_CANONICAL",
+      "disposition": "MERGED_AS_ALIAS",
       "source": "major-internal",
-      "status": "active",
+      "status": "merged",
       "provenance": "package/source-ledger.json",
       "historicalLineage": "staging candidate 27d65b222e1cb515052c25683285b0766771a31b7fe02655dbbb98214deb9b88",
-      "sourceHashDisposition": "localized-independent-content"
+      "sourceHashDisposition": "localized-independent-content",
+      "mergedInto": "lean-quality",
+      "note": "Hollow staged template with no procedure content; folded into the keeper as an alias on 2026-10-23 (docs/skills-canonicalization.md)."
     },
     {
       "id": "cross-modal-review",

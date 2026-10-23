@@ -15,3 +15,7 @@ description: Use for test strategy, release confidence and verification planning
 8. Add a regression test after a bug only when recurrence is likely or costly.
 9. Do not duplicate the same proof at every layer.
 10. Stop when the current outcome has enough objective evidence to proceed; do not maximize test count.
+
+## Merged aliases
+
+Also answers to the retired `verification`, `tdd` and `staged-quality-controls` skill ids (merged 2026-10-23). For TDD, write the failing focused test first, then the smallest implementation that passes it. A quality gate blocks promotion until its predicates, evidence and reviewer independence are present. A producer may not issue its own independent verdict.

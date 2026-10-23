@@ -73,4 +73,16 @@ for s in pdf playwright; do
   link "../../.agents/skills/$s" "$X/$s" codex
 done
 
+# 5. Retired per-skill /major:<id> commands (the next Major install also removes them).
+archive "$HOME_DIR/.claude/commands/major" claude-commands
+archive "${CODEX_HOME:-$HOME_DIR/.codex}/prompts/major" codex-prompts
+archive "$HOME_DIR/.cursor/commands/major" cursor-commands
+archive "$HOME_DIR/.gemini/commands/major" gemini-commands
+
+# 6. Disabled chrome-devtools-mcp plugin: archive its cache, then uninstall it.
+archive "$HOME_DIR/.claude/plugins/cache/claude-plugins-official/chrome-devtools-mcp" plugin-cache
+if grep -q 'chrome-devtools-mcp@claude-plugins-official' "$HOME_DIR/.claude/plugins/installed_plugins.json" 2>/dev/null; then
+  run claude plugin uninstall chrome-devtools-mcp@claude-plugins-official
+fi
+
 if [ "$APPLY" = 1 ]; then echo "Applied. Archive: $ARCHIVE"; else echo "Dry run only. Re-run with --apply."; fi

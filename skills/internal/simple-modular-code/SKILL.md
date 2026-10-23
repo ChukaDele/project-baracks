@@ -18,3 +18,7 @@ A major element should be replaceable like an Excel formula: keep the contract, 
 - contract tests for genuinely swappable boundaries;
 - prefer boring, widely understood patterns;
 - delete obsolete competing paths.
+
+## Merged aliases
+
+Also answers to the retired `software-engineering` skill id (merged 2026-10-23). When a single specialist procedure is already known, route directly to that specialist.

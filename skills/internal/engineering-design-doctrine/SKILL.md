@@ -12,3 +12,7 @@ Supply a compact decision lens. Reduce cognitive load with deep modules, informa
 ## Boundary
 
 Do not plan or execute broad refactors. A driver owns execution and QA. Return the principle, alternatives, recommended constraint and what remains deliberately simple.
+
+## Merged aliases
+
+Also answers to the retired `architecture` skill id (merged 2026-10-23): choose the smallest boundary for a new capability and record the decision with its tradeoffs.

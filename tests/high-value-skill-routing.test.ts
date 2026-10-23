@@ -91,26 +91,26 @@ const cases: Case[] = [
   {
     name: 'application bug',
     task: 'The app is stuck in a login loop and candidate search is broken. Find the root cause and fix it.',
-    include: ['root-cause-qa', 'debugging', 'auth-security'],
+    include: ['root-cause-qa', 'auth-security'],
     exclude: ['exact-head-pr-review', 'data-learning-loop'],
   },
   {
     name: 'browser QA',
     task: 'QA the web app in a real browser as a recruiter. Test the critical flows and fix issues you find.',
-    include: ['browser-release-qa', 'website-design-qa'],
+    include: ['website-design-qa'],
     exclude: ['academic-writing', 'academic-verify'],
   },
   {
     name: 'named source analysis',
     task: 'Deeply analyze this article and extract useful mechanisms, examples, contradictions and implications for our Writing OS.',
     include: ['source-ingestion', 'strategic-reading'],
-    exclude: ['writing-os', 'academic-writing', 'browser-release-qa'],
+    exclude: ['writing-os', 'academic-writing', 'website-design-qa'],
   },
   {
     name: 'market research',
     task: 'Research the market and competitors, synthesize the evidence, and recommend the strongest product opportunity.',
     include: ['knowledge-work', 'competitive-product-audit', 'product-management-core'],
-    exclude: ['browser-release-qa', 'capability-freshness', 'cross-modal-review'],
+    exclude: ['website-design-qa', 'capability-freshness', 'cross-modal-review'],
   },
   {
     name: 'SEO',
@@ -156,7 +156,7 @@ const cases: Case[] = [
   {
     name: 'Vercel deploy',
     task: 'Deploy this Next.js app to Vercel, verify environment variables, and test the production preview.',
-    include: ['remote-first-web-development', 'browser-release-qa'],
+    include: ['remote-first-web-development', 'website-design-qa'],
     exclude: ['academic-verify'],
   },
   {
@@ -169,7 +169,7 @@ const cases: Case[] = [
     name: 'writing critique',
     task: 'Critically evaluate this essay for thesis, evidence, specificity, reasoning, voice and source fidelity.',
     include: ['writing-evaluator'],
-    exclude: ['browser-release-qa', 'capability-freshness', 'cross-modal-review'],
+    exclude: ['website-design-qa', 'capability-freshness', 'cross-modal-review'],
   },
   {
     name: 'operations improvement',
@@ -186,7 +186,7 @@ const cases: Case[] = [
   {
     name: 'browser debugging',
     task: 'Use the browser to reproduce this frontend issue, inspect console errors and verify the fix.',
-    include: ['root-cause-qa', 'debugging', 'browser-release-qa'],
+    include: ['root-cause-qa', 'website-design-qa'],
     exclude: ['academic-verify'],
   },
   {
@@ -198,8 +198,8 @@ const cases: Case[] = [
   {
     name: 'PR code review',
     task: 'Review this pull request for correctness, regressions, maintainability, tests and release readiness.',
-    include: ['review', 'exact-head-pr-review'],
-    exclude: ['browser-release-qa', 'cross-modal-review'],
+    include: ['exact-head-pr-review'],
+    exclude: ['website-design-qa', 'cross-modal-review'],
   },
   {
     name: 'legacy and workspace cleanup',
@@ -229,7 +229,7 @@ const cases: Case[] = [
     name: 'nontechnical stuck is not debugging',
     task: 'I am stuck choosing between two product strategies.',
     include: [],
-    exclude: ['root-cause-qa', 'debugging'],
+    exclude: ['root-cause-qa'],
   },
   {
     name: 'SQL bottleneck is not operations redesign',
@@ -252,19 +252,19 @@ const cases: Case[] = [
   {
     name: 'frontend code review is not visual QA',
     task: 'Review this frontend code for correctness.',
-    include: ['review'],
+    include: ['exact-head-pr-review'],
     exclude: ['website-design-qa'],
   },
   {
     name: 'negated redesign keeps code review focused and preserves performance specialist',
     task: 'Review this frontend code for correctness and performance. I am not asking for a visual redesign.',
-    include: ['review', 'performance'],
+    include: ['exact-head-pr-review', 'performance-caching'],
     exclude: ['website-design-qa', 'design-direction-and-taste'],
   },
   {
     name: 'visual browser QA stays remote first',
     task: 'Review this landing page visually across mobile and desktop in the browser.',
-    include: ['website-design-qa', 'browser-release-qa', 'remote-first-web-development'],
+    include: ['website-design-qa', 'remote-first-web-development'],
     exclude: ['exact-head-pr-review'],
   },
 ];

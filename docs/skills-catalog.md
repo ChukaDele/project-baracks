@@ -4,7 +4,7 @@ This is the human-reviewable catalog for the recurring Major skill library.
 
 **Policy:** Major can own a broad library, but project/worker context receives only the relevant profile and triggered specialist skills. External skills are subordinate to active Major guidance.
 
-## Major internal skills — 103
+## Major internal skills — 93
 
 These are canonical Major-owned skills.
 

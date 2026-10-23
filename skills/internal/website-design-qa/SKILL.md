@@ -265,3 +265,7 @@ python3 validate.py --catalog catalog.json --profile PATH_TO_SITE_PROFILE --evid
 The scaffold produces NOT_TESTED controls and fails until real evidence is supplied. Preserve the source commit and independent reviewer identity. Never commit same-commit attestations into the release branch, because that changes the SHA; use CI artifacts or a separate audit record.
 
 A finished UI is not a finished website. Never auto-deploy or auto-transfer credentials or IP only because this skill ran.
+
+## Merged aliases
+
+Also answers to the retired `browser-release-qa` skill id (merged 2026-10-23): validate the deployed release in a browser against the critical user journey and record observed evidence.

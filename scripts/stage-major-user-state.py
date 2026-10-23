@@ -39,16 +39,6 @@ def validate_catalog_skills(catalog: dict) -> list[dict]:
     return skills
 
 
-def contained_command_path(root: Path, skill_id: str, suffix: str) -> Path:
-    if not CANONICAL_SKILL_SLUG.fullmatch(skill_id):
-        raise SystemExit("generated command id must be a safe canonical slug")
-    target = (root / "major" / f"{skill_id}{suffix}").resolve()
-    command_root = (root / "major").resolve()
-    if command_root not in target.parents:
-        raise SystemExit("generated command path escapes its root")
-    return target
-
-
 def read_text(path: Path) -> str:
     if not path.exists():
         return ""
@@ -269,7 +259,7 @@ def add_absent(entries: list[dict[str, str]], target: Path) -> None:
 def stage_skill_commands(
     stage: Path, home: Path, codex_home: Path, catalog: dict, entries: list[dict[str, str]]
 ) -> None:
-    skills = validate_catalog_skills(catalog)
+    validate_catalog_skills(catalog)
     discovery = (
         "Use Major's installed canonical catalogue. Run `major skill search --query \"$ARGUMENTS\"` "
         "for discovery, or `major skill resolve --task \"$ARGUMENTS\" --json` for automatic routing.\n"
@@ -279,18 +269,11 @@ def stage_skill_commands(
         ("codex", codex_home / "prompts", ".md"),
         ("cursor", home / ".cursor" / "commands", ".md"),
     )
+    # Per-skill /major:<id> commands are retired: every one was listed in each
+    # host session's skill index. Remove the old set; keep one discovery command.
     for host, target_root, suffix in command_roots:
         add_file(entries, write_stage_file(stage, f"{host}-major{suffix}", discovery), target_root / f"major{suffix}")
-        for skill in skills:
-            skill_id = skill.get("id") if isinstance(skill, dict) else None
-            if not isinstance(skill_id, str):
-                raise SystemExit("invalid generated skill catalogue id")
-            body = f'Run `major skill resolve --task "$ARGUMENTS" --skill {skill_id} --json`; the named skill is mandatory.\n'
-            add_file(
-                entries,
-                write_stage_file(stage, f"{host}-major-{skill_id}{suffix}", body),
-                contained_command_path(target_root, skill_id, suffix),
-            )
+        add_absent(entries, target_root / "major")
     add_file(
         entries,
         write_stage_file(
@@ -300,17 +283,7 @@ def stage_skill_commands(
         ),
         home / ".gemini" / "commands" / "major.toml",
     )
-    for skill in skills:
-        skill_id = skill["id"]
-        add_file(
-            entries,
-            write_stage_file(
-                stage,
-                f"gemini-major-{skill_id}.toml",
-                f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{{{args}}}} --skill {skill_id} --json`; the named skill is mandatory."\n',
-            ),
-            contained_command_path(home / ".gemini" / "commands", skill_id, ".toml"),
-        )
+    add_absent(entries, home / ".gemini" / "commands" / "major")
 
 
 def learning_project_path(root: Path, project: str) -> Path:

@@ -224,7 +224,7 @@ describe('runtime skill resolver', () => {
       id: 'root-cause-qa',
       name: 'root-cause-qa',
       shortDescription: expect.any(String),
-      aliases: ['root-cause-analysis', 'failure-investigation'],
+      aliases: ['root-cause-analysis', 'failure-investigation', 'debugging'],
       triggerConditions: ['bug failure regression'],
       category: 'quality',
       version: expect.any(String),

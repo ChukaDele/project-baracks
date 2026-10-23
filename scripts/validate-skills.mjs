@@ -336,7 +336,7 @@ const stagedIds = new Set(
     .filter((entry) => object(entry, 'skill registry entry').provenance?.stagingCandidateDigest)
     .map((entry) => nonEmpty(entry.id, 'staged skill registry entry id')),
 );
-if (stagedIds.size !== 43) fail(`expected 43 staged skill entries, found ${stagedIds.size}`);
+if (stagedIds.size !== 33) fail(`expected 33 staged skill entries, found ${stagedIds.size}`);
 for (const entry of registry.entries.filter((item) =>
   stagedIds.has(nonEmpty(item.id, 'skill registry entry id')),
 )) {

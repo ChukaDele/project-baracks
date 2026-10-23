@@ -3,7 +3,8 @@
   "should_trigger": [
     "Use vertical-slice-delivery for this task.",
     "Ship the smallest end-to-end user outcome with a visible result and evidence that it works.",
-    "Turn this feature into one thin vertical slice that crosses UI, logic, and persistence without building unused layers."
+    "Turn this feature into one thin vertical slice that crosses UI, logic, and persistence without building unused layers.",
+    "Break a bounded feature request into an acceptance contract, dependencies, and the smallest shippable sequence."
   ],
   "should_not_trigger": [
     "This unrelated request must not activate vertical slice delivery workflow."
