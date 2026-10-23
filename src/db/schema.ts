@@ -87,6 +87,9 @@ export const tasks = sqliteTable(
     /** Immutable criteria captured at the first dispatch to queued. */
     completionCriteriaSnapshotJson: text('completion_criteria_snapshot_json'),
     completionCriteriaLockedAt: text('completion_criteria_locked_at'),
+    /** Optional JSON array of repo-relative globs the task will touch. Parallel
+     * dispatch runs only tasks whose declared paths are disjoint. */
+    paths: text('paths'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

@@ -877,20 +877,30 @@ task
       .choices(TASK_COMPLEXITIES)
       .default('bounded'),
   )
+  .option(
+    '--paths <globs>',
+    'comma-separated repo-relative globs this task will touch (enables parallel dispatch)',
+  )
   .action(
     (opts: {
       project: string;
       title: string;
       description: string;
       complexity: (typeof TASK_COMPLEXITIES)[number];
+      paths?: string;
     }) => {
       const database = db();
       const projectRow = requireProject(database, opts.project);
+      const paths = opts.paths
+        ?.split(',')
+        .map((path) => path.trim())
+        .filter(Boolean);
       const row = addTask(database, {
         projectId: projectRow.id,
         title: opts.title,
         description: opts.description,
         complexity: opts.complexity,
+        ...(paths?.length ? { paths } : {}),
       });
       console.log(`added task ${row.id} [${row.status}] ${row.title}`);
     },

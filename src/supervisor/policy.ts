@@ -47,6 +47,8 @@ export interface ProjectPolicy {
   allowCrossProjectMemory: boolean;
   allowPaidSpend: boolean;
   ownerApprovedBuild: boolean;
+  /** Opt-in: run disjoint-path tasks in parallel worktrees with a merge queue. */
+  parallelWorkers?: boolean;
   shadowRuns: number;
   shadowPasses: number;
   updatedAt: string;
@@ -118,6 +120,7 @@ function normalizePolicy(policy: ProjectPolicy): ProjectPolicy {
     maxRunMinutes: policy.maxRunMinutes ?? limitsFor(policy.trust).maxRunMinutes,
     allowPaidSpend: policy.allowPaidSpend ?? false,
     ownerApprovedBuild: policy.ownerApprovedBuild ?? false,
+    parallelWorkers: policy.parallelWorkers ?? false,
     shadowRuns: policy.shadowRuns ?? 0,
     shadowPasses: policy.shadowPasses ?? 0,
   };
@@ -157,6 +160,7 @@ export function defaultProjectPolicy(project: string, repoPath: string): Project
     allowCrossProjectMemory: false,
     allowPaidSpend: false,
     ownerApprovedBuild: false,
+    parallelWorkers: false,
     shadowRuns: 0,
     shadowPasses: 0,
     updatedAt: new Date().toISOString(),
@@ -212,6 +216,7 @@ export function configureProjectPolicy(input: {
   allowExternalWrites?: boolean;
   allowPaidSpend?: boolean;
   ownerApprovedBuild?: boolean;
+  parallelWorkers?: boolean;
 }): ProjectPolicy {
   const store = readStore();
   const canonicalPath = resolve(input.repoPath);
@@ -274,6 +279,7 @@ export function configureProjectPolicy(input: {
       input.projectClass !== 'client' && (input.trust === 'build' || input.trust === 'unattended'),
     allowPaidSpend: input.allowPaidSpend ?? existing?.allowPaidSpend ?? false,
     ownerApprovedBuild,
+    parallelWorkers: input.parallelWorkers ?? existing?.parallelWorkers ?? false,
     shadowRuns: existing?.shadowRuns ?? 0,
     shadowPasses: existing?.shadowPasses ?? 0,
     updatedAt: new Date().toISOString(),

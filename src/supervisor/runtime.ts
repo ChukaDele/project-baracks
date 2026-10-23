@@ -22,7 +22,7 @@ import {
 import { assessPromotion, planProgressiveValidation } from '../domain/sdlc.js';
 import { addTask } from '../domain/task-service.js';
 import { createRun, setRunStatus } from '../domain/run-service.js';
-import { getOrAddProject, getProjectByRepoPath } from '../config/project-service.js';
+import { getOrAddProject, getProjectByRepoPath, projectConfig } from '../config/project-service.js';
 import { projectConfigSchema } from '../config/project-config.js';
 import {
   listCapabilities,
@@ -97,6 +97,13 @@ import { graphifyContext } from '../context/graphify.js';
 import { hostIntegrationStatus, SUPPORTED_HOSTS } from '../context/host-integration.js';
 import { formatCodexCapacityOverview, readCodexUsageReport } from '../providers/codex-usage.js';
 import { hostAvailable, runWorker, workerCommand, type WorkerOutcome } from './worker.js';
+import { currentResourceLimits } from './resources.js';
+import {
+  parallelRefusal,
+  runParallelBatch,
+  selectParallelBatch,
+  type ParallelTask,
+} from './parallel-dispatch.js';
 import {
   completedWorkflow,
   assessSupervisorAdmissionRisk,
@@ -1770,6 +1777,134 @@ export async function runForegroundGoal(
   return { hops };
 }
 
+export function parallelTaskPrompt(goalPrompt: string, task: ParallelTask): string {
+  return `${goalPrompt}
+
+PARALLEL TASK (Major merge queue)
+You are one of several workers running at the same time, each in its own git worktree.
+Work only on task ${task.id}: ${task.title}
+${task.description}
+Change only files matching: ${task.paths.join(', ')}
+Major commits, rebases, verifies and merges this worktree after you finish. Do not push or merge.
+Report status "done" when this task is done; it does not mean the whole goal is done.`;
+}
+
+/** Opt-in parallel path (policy.parallelWorkers). Returns false when no
+ * queued task declares paths, so the ordinary single-worker cycle runs. */
+async function runParallelGoalCycle(
+  goal: SupervisorGoal,
+  policy: ProjectPolicy,
+  selection: Extract<CoordinatorSelection, { kind: 'route' }>,
+  capabilities: readonly CapabilityRecord[],
+  maxTimeoutMs?: number,
+): Promise<boolean> {
+  const state = openDb();
+  try {
+    let project;
+    try {
+      project = getProjectByRepoPath(state.db, goal.repoPath);
+    } catch {
+      return false;
+    }
+    const limit = Math.max(1, Math.min(policy.maxWorkers, currentResourceLimits().workers));
+    const batch = selectParallelBatch(state.db, project.id, limit);
+    if (batch.length === 0) return false;
+    const { verificationCommands } = projectConfig(project);
+    const refusal = await parallelRefusal(goal.repoPath, verificationCommands);
+    if (refusal) {
+      console.error(`Parallel workers skipped: ${refusal}`);
+      return false;
+    }
+    const timeoutMs = Math.min(
+      Math.max(1, policy.maxRunMinutes) * 60 * 1000,
+      maxTimeoutMs ?? Infinity,
+    );
+    const { prompt } = await prepareCoordinatorPromptSmart(goal, capabilities, {
+      accountLabel: selection.accountLabel,
+      continuityBlock: '',
+    });
+    updateGoal(goal.id, {
+      status: 'running',
+      cycle: goal.cycle + 1,
+      lastStartedAt: new Date().toISOString(),
+      activePid: process.pid,
+      lastCoordinator: selection.host,
+      lastAccountLabel: selection.accountLabel,
+      ownerGate: undefined,
+      pendingCompletion: undefined,
+    });
+    const dispatch = (
+      route: Extract<CoordinatorSelection, { kind: 'route' }>,
+      workerPrompt: string,
+      cwd: string,
+    ) =>
+      runWorker({
+        host: route.host,
+        taskId: goal.id,
+        resourceId: `worker:${goal.project}`,
+        prompt: workerPrompt,
+        cwd,
+        timeoutMs,
+        modelRef: route.modelRef,
+        effort: route.effort,
+        accountLabel: route.accountLabel,
+      });
+    let results;
+    try {
+      results = await runParallelBatch({
+        db: state.db,
+        repoPath: goal.repoPath,
+        projectId: project.id,
+        tasks: batch,
+        verificationCommands,
+        leaseMs: 10 * 60 * 1000,
+        runTaskWorker: (task, cwd) => dispatch(selection, parallelTaskPrompt(prompt, task), cwd),
+        runIntegrator: async (integratorPrompt, cwd) => {
+          const integrator = await routeGoalExecutionSmart(goal, { targetClass: 'sonnet' });
+          if (integrator.kind === 'checkpoint') {
+            return {
+              host: selection.host,
+              status: 'failed',
+              exitCode: null,
+              stdout: '',
+              stderr: integrator.reason,
+              durationMs: 0,
+              rateLimited: false,
+              exhausted: false,
+            };
+          }
+          return dispatch(integrator, integratorPrompt, cwd);
+        },
+      });
+    } catch (error) {
+      updateGoal(goal.id, {
+        status: 'active',
+        activePid: undefined,
+        lastFinishedAt: new Date().toISOString(),
+        lastSummary: trim(
+          `Parallel cycle failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+        nextRunAt: new Date(Date.now() + 60_000).toISOString(),
+        retryImmediately: false,
+      });
+      throw error;
+    }
+    updateGoal(goal.id, {
+      status: 'active',
+      activePid: undefined,
+      lastFinishedAt: new Date().toISOString(),
+      lastSummary: trim(
+        `Parallel cycle: ${results.map((result) => `${result.taskId} ${result.outcome} (${result.detail})`).join('; ')}`,
+      ),
+      nextRunAt: new Date(Date.now() + 10_000).toISOString(),
+      retryImmediately: false,
+    });
+    return true;
+  } finally {
+    state.sqlite.close();
+  }
+}
+
 async function runLockedGoalCycle(
   goal: SupervisorGoal,
   maxTimeoutMs?: number,
@@ -1838,6 +1973,18 @@ async function runLockedGoalCycle(
       retryImmediately: false,
     });
     console.error(capabilityResolution.reason);
+    return;
+  }
+  if (
+    policy.parallelWorkers &&
+    (await runParallelGoalCycle(
+      goal,
+      policy,
+      routedSelection,
+      capabilityResolution.capabilities,
+      maxTimeoutMs,
+    ))
+  ) {
     return;
   }
   let routedSkillIds: string[] = [];

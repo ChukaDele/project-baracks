@@ -86,6 +86,8 @@ export interface NewTaskInput {
   roadmapItemId?: string;
   suggestionId?: string;
   completionCriteriaJson?: string;
+  /** Repo-relative globs the task will touch (parallel dispatch eligibility). */
+  paths?: readonly string[];
 }
 
 /**
@@ -104,6 +106,7 @@ interface TaskInputSnapshot {
   readonly roadmapItemId: string | undefined;
   readonly suggestionId: string | undefined;
   readonly completionCriteriaJson: string | undefined;
+  readonly paths: readonly string[] | undefined;
 }
 
 /**
@@ -121,6 +124,7 @@ function snapshotTaskInput(input: NewTaskInput): TaskInputSnapshot {
     roadmapItemId: input.roadmapItemId,
     suggestionId: input.suggestionId,
     completionCriteriaJson: input.completionCriteriaJson,
+    paths: input.paths ? Object.freeze([...input.paths]) : undefined,
   });
 }
 
@@ -146,6 +150,7 @@ function insertTask(db: DbConn, input: TaskInputSnapshot) {
     status: 'draft' as const,
     complexity: input.complexity ?? ('bounded' as const),
     completionCriteriaJson: input.completionCriteriaJson ?? null,
+    paths: input.paths?.length ? JSON.stringify(input.paths) : null,
   };
   db.insert(tasks).values(row).run();
   return getTask(db, row.id);
