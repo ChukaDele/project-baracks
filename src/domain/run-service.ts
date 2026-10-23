@@ -62,7 +62,7 @@ export interface NewRunInput {
  * Paid billing requires authoritative model billing plus an exact unexpired,
  * unconsumed approval. Claim-bound runs require the current live worker fence.
  */
-export function createRun(db: Db, rawInput: NewRunInput) {
+export function createRun(db: DbConn, rawInput: NewRunInput) {
   // Single-read snapshot of the caller-owned input (see task-service.ts
   // snapshotTaskInput): the paid-billing and claim-bound capability gates
   // below and the persisted row must observe the same values even against a
