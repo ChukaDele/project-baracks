@@ -117,7 +117,7 @@
       "id": "responsive-motion-systems",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion"
+      "load": "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion lenis smooth scroll orchestration"
     },
     {
       "id": "human-blocker-orchestration",

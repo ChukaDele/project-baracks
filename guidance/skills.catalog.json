@@ -2874,11 +2874,11 @@
       "id": "responsive-motion-systems",
       "name": "responsive-motion-systems",
       "title": "Responsive Motion Systems",
-      "description": "Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.",
-      "shortDescription": "Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.",
+      "description": "Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, Lenis or other smooth-scroll controllers, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.",
+      "shortDescription": "Use whenever frontend work involves GSAP, ScrollTrigger, sticky/pinned scenes, scrollytelling, card stacking, hero video, viewport animation, scroll scrub, parallax, Three.js, Lenis or other smooth-scroll controllers, matchMedia, ResizeObserver or zoom-sensitive motion. Preserve approved interactions, use one viewport owner per overlapping narrative region, relational geometry and explicit handoffs. Canonical visual design is judged at 100% browser zoom; zoom levels are robustness tests, not bespoke design modes.",
       "aliases": [],
       "triggerConditions": [
-        "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion"
+        "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion lenis smooth scroll orchestration"
       ],
       "category": "uncategorized",
       "version": "24",
@@ -2895,9 +2895,9 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 24,
-      "contentSha256": "84fc266efa40301f478dce3e1b307f4610bc0d15946e85fa901436b272c9a125",
+      "contentSha256": "0c48ea6eb962f5d40d2f96a23382fd1b0338e598d4a7bc6b78637e06aced70c0",
       "triggers": [
-        "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion"
+        "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion lenis smooth scroll orchestration"
       ]
     },
     {
