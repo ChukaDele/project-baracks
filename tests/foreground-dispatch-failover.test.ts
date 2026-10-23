@@ -178,7 +178,9 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
       expect(identity?.resolution).toBe('no_task');
       expect(identity?.sourceHead).toMatch(/^[a-f0-9]{40}$/);
       expect(identity?.sourceTreeDigest).toMatch(/^[a-f0-9]{64}$/);
-      expect(input.prompt).toContain('FROZEN CANDIDATE');
+      expect(input.prompt).toContain('FROZEN STARTING CANDIDATE');
+      expect(input.prompt).toContain('You may and should change files');
+      expect(input.prompt).not.toContain('Validate and report only this exact candidate');
       return {
         host: 'codex',
         status: 'succeeded',
