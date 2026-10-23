@@ -288,9 +288,11 @@ describe('parallel dispatch', { timeout: 30_000 }, () => {
 
   it('keeps a claim alive past its lease while waiting, via heartbeat', async () => {
     const a = queuedTask('A', ['a/**']);
-    const { worker } = writingWorker({ A: ['a/a.txt', 'a\n', 700] });
+    // The worker outlives the lease twice over; the heartbeat margin (15x) keeps
+    // a loaded event loop from letting the lease lapse between beats.
+    const { worker } = writingWorker({ A: ['a/a.txt', 'a\n', 3000] });
     const results = await runParallelBatch(
-      batchInput({ leaseMs: 300, heartbeatMs: 50, runTaskWorker: worker }),
+      batchInput({ leaseMs: 1500, heartbeatMs: 100, runTaskWorker: worker }),
     );
     expect(results[0]?.outcome).toBe('merged');
     expect(getTask(db, a.id).status).toBe('verifying');
