@@ -773,15 +773,84 @@ describe('major run --goal-id (dispatch an already-admitted goal)', () => {
     const goalId = (lastLog(logs) as { goalId: string }).goalId;
 
     await expect(
-      runSupervisorCli(['run', 'jss-tool', '--goal-id', goalId, '--coordinator', 'claude']),
-    ).rejects.toThrow(/cannot be combined/);
-    await expect(
       runSupervisorCli(['run', 'jss-tool', '--goal-id', goalId, '--capability', 'x']),
     ).rejects.toThrow(/cannot be combined/);
     await expect(
       runSupervisorCli(['run', 'jss-tool', '--goal-id', goalId, '--goal', 'something else']),
     ).rejects.toThrow(/cannot be combined/);
     expect(runWorkerMock).not.toHaveBeenCalled();
+  });
+
+  it('sets the owner coordinator pin on --goal-id resume without redefining the goal', async () => {
+    const repoPath = repo();
+    configureProjectPolicy({
+      project: 'jss-tool',
+      repoPath,
+      projectClass: 'workshop',
+      trust: 'build',
+      ownerApprovedBuild: true,
+    });
+    const { db, sqlite } = openDb(process.env.MAJOR_DB_PATH);
+    for (const [name, modelRef, routingClass] of [
+      ['codex', 'gpt-codex', 'codex'],
+      ['claude-code', 'opus', 'opus'],
+    ] as const) {
+      persistProviderDiscovery(
+        db,
+        { name, installed: true, authenticated: true, models: [model({ modelRef, routingClass })] },
+        { source: 'cli' },
+      );
+      recordBillingObservation(db, {
+        providerName: name,
+        modelRef,
+        billingMode: 'subscription_included',
+        source: 'human',
+      });
+    }
+    sqlite.close();
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((value) => logs.push(String(value)));
+    await runSupervisorCli([
+      'goal',
+      'admit',
+      '--cwd',
+      repoPath,
+      '--host',
+      'claude',
+      '--outcome',
+      'Ship the MVP',
+      '--session-id',
+      'thread-a',
+    ]);
+    const goalId = (lastLog(logs) as { goalId: string }).goalId;
+    expect(getGoal(goalId)?.pinnedCoordinator).toBeUndefined();
+    runWorkerMock.mockImplementationOnce(async (input: { host: string }) => ({
+      host: input.host,
+      status: 'succeeded',
+      exitCode: 0,
+      stdout: resultEnvelope('active', 'implemented'),
+      stderr: '',
+      durationMs: 5,
+      rateLimited: false,
+      exhausted: false,
+      sessionRef: 'pinned-session',
+    }));
+
+    await runSupervisorCli([
+      'run',
+      'jss-tool',
+      '--goal-id',
+      goalId,
+      '--foreground',
+      '--coordinator',
+      'codex',
+    ]);
+
+    const goal = getGoal(goalId)!;
+    expect(goal.pinnedCoordinator).toBe('codex');
+    expect(goal.preferredCoordinator).toBe('codex');
+    expect(goal.goal).toBe('Ship the MVP');
+    expect((runWorkerMock.mock.calls[0]?.[0] as { host: string }).host).toBe('codex');
   });
 
   it('tells the caller plainly when a dispatch did nothing because another integration owner holds the repo lock', async () => {

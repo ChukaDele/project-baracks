@@ -454,14 +454,11 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
         `project ${project.project} is ${policy.projectClass}/${policy.trust}; unattended execution is not allowed`,
       );
     }
-    if (
-      goalIdArg &&
-      (flag(args, '--goal') || preferredRaw || requestedAutonomy || requiredOperations.length > 0)
-    ) {
+    if (goalIdArg && (flag(args, '--goal') || requestedAutonomy || requiredOperations.length > 0)) {
       throw new Error(
         '--goal-id dispatches an already-admitted goal as-is; it cannot be combined with --goal, ' +
-          '--coordinator, --autonomous, or --capability, which only take effect when a goal is ' +
-          'first created via --goal',
+          '--autonomous, or --capability, which only take effect when a goal is first created ' +
+          'via --goal (--coordinator may set the owner pin on resume)',
       );
     }
     // --goal-id dispatches an already-admitted goal (e.g. from `goal admit`)
@@ -483,7 +480,11 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
           if (!bound) {
             throw new Error(`goal ${goalIdArg} does not belong to project ${project.project}`);
           }
-          return bound;
+          if (!preferredRaw) return bound;
+          // The owner coordinator choice is the one routing input a resume may
+          // change; the admitted outcome stays as-is.
+          const pinned = validHost(preferredRaw);
+          return updateGoal(bound.id, { pinnedCoordinator: pinned, preferredCoordinator: pinned });
         })()
       : startGoal({
           project: project.project,
