@@ -20,3 +20,7 @@ description: Use when a real workflow, page, query, build or integration is meas
 5. Do not optimise theoretical future scale before measuring a real bottleneck.
 6. Re-measure the same path after the change.
 7. Keep the fix only when it improves the target without unacceptable correctness/staleness cost.
+
+## Merged aliases
+
+Also answers to the retired `performance` skill id (merged 2026-10-23): set a measurable budget before optimizing and prove the improvement.

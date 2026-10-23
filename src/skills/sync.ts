@@ -26,7 +26,6 @@ import { cloneGitBranch } from '../resources/tools.js';
 import { buildSkillCatalog } from './catalog.js';
 import {
   assertCanonicalSkillSlug,
-  containedGeneratedCommandPath,
   containedSkillPath,
 } from './slug.js';
 import {
@@ -502,6 +501,8 @@ interface ArtifactReplacement {
   stage: string;
   backup: string;
   hadTarget: boolean;
+  /** Retire the target: move it aside and install nothing in its place. */
+  remove?: boolean;
 }
 
 function assertSafeHostPath(anchor: string, target: string, targetKind: 'file' | 'directory'): void {
@@ -584,7 +585,7 @@ function authenticatedBundlesRoot(create = false): string {
   return bundlesRoot;
 }
 
-function preflightHostArtifactTargets(ids: string[]): void {
+function preflightHostArtifactTargets(): void {
   const { home, codexHome } = hostRoots();
   const files: Array<[string, string]> = [
     [home, join(majorHome(), 'skills.catalog.json')],
@@ -601,7 +602,6 @@ function preflightHostArtifactTargets(ids: string[]): void {
   ] as const) {
     files.push([anchor, join(root, `major${suffix}`)]);
     assertSafeHostPath(anchor, join(root, 'major'), 'directory');
-    for (const id of ids) files.push([anchor, join(root, 'major', `${id}${suffix}`)]);
   }
   for (const [anchor, path] of files) assertSafeHostPath(anchor, path, 'file');
 }
@@ -628,6 +628,10 @@ function commitArtifactTransaction(replacements: ArtifactReplacement[]): void {
   try {
     for (const replacement of replacements) {
       if (replacement.hadTarget) renameSync(replacement.target, replacement.backup);
+      if (replacement.remove) {
+        committed.push(replacement);
+        continue;
+      }
       try {
         renameSync(replacement.stage, replacement.target);
       } catch (error) {
@@ -661,12 +665,9 @@ function hostSkillArtifactReplacements(
   catalogPath: string,
   adaptersRoot: string,
 ): ArtifactReplacement[] {
-  const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as {
-    entries: Array<{ id: string }>;
-  };
   preflightHostSkillArtifacts();
   const { home, codexHome } = hostRoots();
-  preflightHostArtifactTargets(catalog.entries.map(({ id }) => id));
+  preflightHostArtifactTargets();
   const replacements: ArtifactReplacement[] = [];
   const stageFile = (target: string, content: string) => {
     replacements.push(stageArtifact(target, (stage) => writeFileSync(stage, content)));
@@ -685,23 +686,19 @@ function hostSkillArtifactReplacements(
     join(home, '.cursor', 'commands'),
   ];
   const discovery = 'Use the installed Major catalogue. Run `major skill search --query "$ARGUMENTS"` or `major skill resolve --task "$ARGUMENTS" --json`.\n';
+  // Per-skill commands (`/major:<id>`) are retired: every one was listed in
+  // each host session's skill index. Skills stay reachable through native
+  // skill discovery and `major skill resolve`; installs remove the old set.
+  const retire = (target: string) => {
+    if (existsSync(target)) replacements.push({ ...stageArtifact(target, () => {}), remove: true });
+  };
   for (const root of markdownRoots) {
     stageFile(join(root, 'major.md'), discovery);
-    replacements.push(stageArtifact(join(root, 'major'), (stage) => {
-      mkdirSync(stage, { recursive: true });
-      for (const { id } of catalog.entries) {
-        writeFileSync(containedGeneratedCommandPath(stage, id, '.md'), `Run \`major skill resolve --task "$ARGUMENTS" --skill ${id} --json\`; the named skill is mandatory.\n`);
-      }
-    }));
+    retire(join(root, 'major'));
   }
   const geminiRoot = join(home, '.gemini', 'commands');
   stageFile(join(geminiRoot, 'major.toml'), 'description = "Discover Major skills"\nprompt = "Run `major skill search --query {{args}}`."\n');
-  replacements.push(stageArtifact(join(geminiRoot, 'major'), (stage) => {
-    mkdirSync(stage, { recursive: true });
-    for (const { id } of catalog.entries) {
-      writeFileSync(containedGeneratedCommandPath(stage, id, '.toml'), `description = "Invoke Major skill ${id}"\nprompt = "Run \`major skill resolve --task {{args}} --skill ${id} --json\`."\n`);
-    }
-  }));
+  retire(join(geminiRoot, 'major'));
   return replacements;
 }
 

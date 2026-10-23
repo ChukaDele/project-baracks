@@ -121,12 +121,9 @@ describe('Major hot skill sync', () => {
       expect.objectContaining({ id: 'project-context-integrity', disclosure: 'hot' }),
     );
     const hostRoot = join(home, '..');
-    const catalogEntries = syncedRegistry.entries.map((entry) => entry.id).sort();
-    expect(
-      readdirSync(join(hostRoot, '.codex', 'prompts', 'major'))
-        .map((name) => name.replace(/\.md$/, ''))
-        .sort(),
-    ).toEqual(catalogEntries);
+    // Per-skill commands are retired; one discovery command remains.
+    expect(existsSync(join(hostRoot, '.codex', 'prompts', 'major'))).toBe(false);
+    expect(existsSync(join(hostRoot, '.codex', 'prompts', 'major.md'))).toBe(true);
     expect(readFileSync(join(home, 'skills.catalog.json'), 'utf8')).toBe(
       readFileSync(join(current, 'guidance', 'skills.catalog.json'), 'utf8'),
     );
@@ -515,11 +512,7 @@ describe('Major hot skill sync', () => {
     expect(readFileSync(join(hostRoot, '.codex', 'MAJOR_SKILLS.md'), 'utf8')).toBe(
       'bundle A rule\n',
     );
-    expect(
-      readdirSync(join(hostRoot, '.codex', 'prompts', 'major')).every((name) =>
-        name.endsWith('.md'),
-      ),
-    ).toBe(true);
+    expect(existsSync(join(hostRoot, '.codex', 'prompts', 'major'))).toBe(false);
   });
 
   it('rebuilds matching host rules, catalogue, and namespaced commands on rollback', () => {
@@ -530,11 +523,15 @@ describe('Major hot skill sync', () => {
     process.env.MAJOR_HOME = home;
     writeFileSync(join(sourceA, 'adapters', 'skills', 'CODEX.md'), 'bundle A rule\n');
     writeFileSync(join(sourceB, 'adapters', 'skills', 'CODEX.md'), 'bundle B rule\n');
+    const hostRoot = join(home, '..');
+    const retired = join(hostRoot, '.codex', 'prompts', 'major');
+    mkdirSync(retired, { recursive: true });
+    writeFileSync(join(retired, 'old-skill.md'), 'stale per-skill command\n');
     const first = syncMajorSkills({ sourceRoot: sourceA });
+    expect(existsSync(retired)).toBe(false);
     syncMajorSkills({ sourceRoot: sourceB });
 
     const rolledBack = rollbackMajorSkills();
-    const hostRoot = join(home, '..');
     expect(rolledBack.bundleId).toBe(first.bundleId);
     expect(readFileSync(join(hostRoot, '.codex', 'MAJOR_SKILLS.md'), 'utf8')).toBe(
       'bundle A rule\n',
@@ -542,12 +539,7 @@ describe('Major hot skill sync', () => {
     expect(readFileSync(join(home, 'skills.catalog.json'), 'utf8')).toBe(
       readFileSync(join(rolledBack.activeBundle, 'guidance', 'skills.catalog.json'), 'utf8'),
     );
-    const ids = JSON.parse(readFileSync(join(home, 'skills.catalog.json'), 'utf8')) as {
-      entries: Array<{ id: string }>;
-    };
-    expect(readdirSync(join(hostRoot, '.codex', 'prompts', 'major')).sort()).toEqual(
-      ids.entries.map(({ id }) => `${id}.md`).sort(),
-    );
+    expect(existsSync(retired)).toBe(false);
   });
 
   it('returns a project-local asset before the metadata index', () => {

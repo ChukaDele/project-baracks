@@ -3,7 +3,8 @@
   "should_trigger": [
     "Use performance-caching for this task.",
     "This page is measurably slow. Profile the dominant bottleneck and apply the smallest high-leverage performance fix.",
-    "The build and data fetch are too slow. Measure where time is going before changing the architecture."
+    "The build and data fetch are too slow. Measure where time is going before changing the architecture.",
+    "Profile a slow query path, set a measurable budget, and prove the improvement."
   ],
   "should_not_trigger": ["This unrelated request must not activate performance caching workflow."]
 }

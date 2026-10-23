@@ -230,30 +230,15 @@ for entry in catalog.get('entries', []):
             raise SystemExit(f'ERROR: duplicate generated skill id or alias: {slug}')
         owners[slug] = skill_id
 
-def command_path(root, skill_id, suffix):
-    path = (root / 'major' / f'{skill_id}{suffix}').resolve()
-    command_root = (root / 'major').resolve()
-    if command_root not in path.parents:
-        raise SystemExit('ERROR: generated command path escapes its root')
-    return path
-
+# Per-skill /major:<id> commands are retired (they filled every session's
+# skill index); only the single discovery command remains.
 discovery = 'Use the installed Major catalogue. Run `major skill search --query "$ARGUMENTS"` or `major skill resolve --task "$ARGUMENTS" --json`.\n'
 for root in (target / '.claude/commands', target / '.codex/prompts', target / '.cursor/commands'):
-    (root / 'major').mkdir(parents=True, exist_ok=True)
+    root.mkdir(parents=True, exist_ok=True)
     (root / 'major.md').write_text(discovery)
-    for entry in catalog['entries']:
-        skill_id = entry['id']
-        command_path(root, skill_id, '.md').write_text(
-            f'Run `major skill resolve --task "$ARGUMENTS" --skill {skill_id} --json`; the named skill is mandatory.\n'
-        )
 gemini = target / '.gemini/commands'
-(gemini / 'major').mkdir(parents=True, exist_ok=True)
+gemini.mkdir(parents=True, exist_ok=True)
 (gemini / 'major.toml').write_text('description = "Discover Major skills"\nprompt = "Run `major skill search --query {{args}}`."\n')
-for entry in catalog['entries']:
-    skill_id = entry['id']
-    command_path(gemini, skill_id, '.toml').write_text(
-        f'description = "Invoke Major skill {skill_id}"\nprompt = "Run `major skill resolve --task {{{{args}}}} --skill {skill_id} --json`."\n'
-    )
 PY
 
 {

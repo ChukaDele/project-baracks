@@ -7,7 +7,8 @@
     "Check production parity, SEO, accessibility, performance and critical journeys before we call the site ready.",
     "The website is ready. Do the final release checks, verify live URL and get owner signoff before closeout.",
     "Add a website SOP so no project can be closed until missing SEO, privacy and QA items are flagged.",
-    "Hand over this finished customer-facing website and confirm GitHub and production deployment approval gates."
+    "Hand over this finished customer-facing website and confirm GitHub and production deployment approval gates.",
+    "Validate the deployed release in a browser against the critical user journey and record observed evidence."
   ],
   "should_not_trigger": [
     "Fix this backend SQL query.",

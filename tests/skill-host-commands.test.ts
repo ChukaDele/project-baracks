@@ -136,7 +136,11 @@ exec ${JSON.stringify(root)} "$@"
   return bin;
 }
 
-function markdownAdapter(discovery: string, explicit: string): CommandAdapter {
+// Per-skill /major:<id> commands are retired; explicit invocation is the CLI form.
+const EXPLICIT_ROOT_CAUSE = 'major skill resolve --task "$ARGUMENTS" --skill root-cause-qa --json';
+
+function markdownAdapter(discovery: string, retired: string): CommandAdapter {
+  expect(existsSync(retired), retired).toBe(false);
   const parse = (artifact: string, path: string): string[] => {
     const lines = artifact.trimEnd().split('\n');
     expect(lines, path).toHaveLength(1);
@@ -146,11 +150,12 @@ function markdownAdapter(discovery: string, explicit: string): CommandAdapter {
   };
   return {
     discovery: parse(readFileSync(discovery, 'utf8'), discovery)[0]!,
-    explicit: parse(readFileSync(explicit, 'utf8'), explicit)[0]!,
+    explicit: EXPLICIT_ROOT_CAUSE,
   };
 }
 
-function geminiTomlAdapter(discovery: string, explicit: string): CommandAdapter {
+function geminiTomlAdapter(discovery: string, retired: string): CommandAdapter {
+  expect(existsSync(retired), retired).toBe(false);
   const parse = (artifact: string, path: string): { description: string; command: string } => {
     const fields = new Map<string, string>();
     for (const line of artifact.trimEnd().split('\n')) {
@@ -165,12 +170,10 @@ function geminiTomlAdapter(discovery: string, explicit: string): CommandAdapter 
     return { description: fields.get('description')!, command: command! };
   };
   const discoveryArtifact = parse(readFileSync(discovery, 'utf8'), discovery);
-  const explicitArtifact = parse(readFileSync(explicit, 'utf8'), explicit);
   return {
     discovery: discoveryArtifact.command,
-    explicit: explicitArtifact.command,
+    explicit: EXPLICIT_ROOT_CAUSE.replace('"$ARGUMENTS"', '{{args}}'),
     discoveryDescription: discoveryArtifact.description,
-    explicitDescription: explicitArtifact.description,
   };
 }
 
@@ -429,7 +432,7 @@ describe('installed host skill commands', () => {
     expect(JSON.stringify(snapshotTree(target))).toBe(before);
   });
 
-  it('stages discovery and namespaced per-skill commands for every supported host', () => {
+  it('stages one discovery command per host and retires the per-skill command namespace', () => {
     const home = mkdtempSync(join(realpathSync(tmpdir()), 'major-command-home-'));
     const stage = mkdtempSync(join(realpathSync(tmpdir()), 'major-command-stage-'));
     roots.push(home, stage);
@@ -440,11 +443,7 @@ describe('installed host skill commands', () => {
     );
     expect(result.status, result.stderr).toBe(0);
     const manifest = JSON.parse(readFileSync(join(stage, 'manifest.json'), 'utf8')) as {
-      entries: Array<{ target: string; source?: string }>;
-    };
-    const targets = manifest.entries.map((entry) => entry.target);
-    const catalog = JSON.parse(readFileSync('guidance/skills.catalog.json', 'utf8')) as {
-      entries: Array<{ id: string }>;
+      entries: Array<{ type: string; target: string; source?: string }>;
     };
     for (const [root, suffix] of [
       [join(home, '.claude/commands'), '.md'],
@@ -452,13 +451,13 @@ describe('installed host skill commands', () => {
       [join(home, '.cursor/commands'), '.md'],
       [join(home, '.gemini/commands'), '.toml'],
     ] as const) {
-      expect(targets).toContain(join(root, `major${suffix}`));
+      expect(manifest.entries).toContainEqual(
+        expect.objectContaining({ type: 'file', target: join(root, `major${suffix}`) }),
+      );
+      expect(manifest.entries).toContainEqual({ type: 'absent', target: join(root, 'major') });
       expect(
-        targets
-          .filter((target) => dirname(target) === join(root, 'major'))
-          .map((target) => target.slice(join(root, 'major').length + 1, -suffix.length))
-          .sort(),
-      ).toEqual(catalog.entries.map((entry) => entry.id).sort());
+        manifest.entries.filter((entry) => dirname(entry.target) === join(root, 'major')),
+      ).toEqual([]);
     }
   });
 
@@ -608,16 +607,14 @@ describe('installed host skill commands', () => {
     expect(result.status, result.stderr).toBe(0);
     expect(readFileSync(custom, 'utf8')).toBe('# project owned\n');
     expect(existsSync(join(target, '.agents', 'skills.catalog.json'))).toBe(true);
-    expect(existsSync(join(target, '.codex', 'prompts', 'major', 'root-cause-qa.md'))).toBe(true);
+    expect(existsSync(join(target, '.codex', 'prompts', 'major', 'root-cause-qa.md'))).toBe(false);
     expect(readFileSync(join(target, 'MAJOR_SKILLS.lock'), 'utf8')).toContain('[skills]');
 
     const discoveryPath = join(target, '.gemini', 'commands', 'major.toml');
     const explicitPath = join(target, '.gemini', 'commands', 'major', 'root-cause-qa.toml');
     expect(readFileSync(discoveryPath, 'utf8')).toContain('{{args}}');
-    expect(readFileSync(explicitPath, 'utf8')).toContain('{{args}}');
     const adapter = geminiTomlAdapter(discoveryPath, explicitPath);
     expect(adapter.discoveryDescription).toBe('Discover Major skills');
-    expect(adapter.explicitDescription).toBe('Invoke Major skill root-cause-qa');
     expect(adapter.discovery).toBe('major skill search --query {{args}}');
     expect(adapter.explicit).toBe(
       'major skill resolve --task {{args}} --skill root-cause-qa --json',
@@ -724,12 +721,12 @@ describe('installed host skill commands', () => {
       '\nproject-owned\n',
     );
     expect(readdirSync(join(home, '.major', 'project-skill-receipts'))).toHaveLength(1);
-    for (const id of managed) {
-      expect(existsSync(join(target, '.claude', 'commands', 'major', `${id}.md`))).toBe(true);
-      expect(existsSync(join(target, '.codex', 'prompts', 'major', `${id}.md`))).toBe(true);
-      expect(existsSync(join(target, '.cursor', 'commands', 'major', `${id}.md`))).toBe(true);
-      expect(existsSync(join(target, '.gemini', 'commands', 'major', `${id}.toml`))).toBe(true);
-    }
+    // Per-skill command namespaces are retired; only the discovery command remains.
+    expect(existsSync(join(target, '.claude', 'commands', 'major'))).toBe(false);
+    expect(existsSync(join(target, '.codex', 'prompts', 'major'))).toBe(false);
+    expect(existsSync(join(target, '.cursor', 'commands', 'major'))).toBe(false);
+    expect(existsSync(join(target, '.gemini', 'commands', 'major'))).toBe(false);
+    expect(existsSync(join(target, '.claude', 'commands', 'major.md'))).toBe(true);
     const cli = (args: string[]) =>
       spawnSync(process.execPath, [fixtureEntry, ...args], {
         cwd: target,

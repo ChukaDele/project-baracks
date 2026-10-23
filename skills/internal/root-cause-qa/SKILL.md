@@ -14,3 +14,7 @@ description: Diagnose failures and regressions, fix the underlying cause and add
 7. Add regression protection when recurrence is likely/costly.
 8. Run critical path.
 9. Record reusable lesson and evidence.
+
+## Merged aliases
+
+Also answers to the retired `debugging` skill id (merged 2026-10-23).

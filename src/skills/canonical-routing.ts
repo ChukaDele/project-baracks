@@ -279,10 +279,9 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
     add('web-ui-review', [
       'website-design-qa',
       'remote-first-web-development',
-      ...(browserQa ? ['browser-release-qa'] : []),
     ]);
   } else if (web && browserQa) {
-    add('web-browser-qa', ['browser-release-qa', 'remote-first-web-development']);
+    add('web-browser-qa', ['website-design-qa', 'remote-first-web-development']);
   }
 
   if (motion) {
@@ -306,8 +305,7 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
   if (bug) {
     add('debug', [
       'root-cause-qa',
-      'debugging',
-      ...(web || browserQa ? ['browser-release-qa'] : []),
+      ...(web || browserQa ? ['website-design-qa'] : []),
     ]);
   }
 
@@ -355,15 +353,14 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
       'deploy-to-vercel',
       'vercel-cli-with-tokens',
       'remote-first-web-development',
-      ...(browserQa ? ['browser-release-qa'] : []),
+      ...(browserQa ? ['website-design-qa'] : []),
     ]);
   }
 
   if (codeReview) {
     add('code-review', [
-      'review',
-      ...(performanceConcern ? ['performance'] : []),
-      ...(pr ? ['exact-head-pr-review'] : []),
+      'exact-head-pr-review',
+      ...(performanceConcern ? ['performance-caching'] : []),
     ]);
   }
 
