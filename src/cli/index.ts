@@ -305,7 +305,14 @@ program
     } else {
       console.log(`OS: ${report.os}`);
       for (const check of report.checks) {
-        const icon = check.status === 'ok' ? '✓' : check.status === 'warn' ? '!' : '✗';
+        const icon =
+          check.status === 'ok'
+            ? '✓'
+            : check.status === 'info'
+              ? 'i'
+              : check.status === 'warn'
+                ? '!'
+                : '✗';
         console.log(`${icon} ${check.name}: ${check.detail}`);
       }
       for (const provider of report.providers) {

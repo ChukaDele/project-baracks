@@ -8,7 +8,11 @@
   "should_not_trigger": [
     "Show the latest git commit for this file.",
     "Summarize our current product thesis only.",
-    "Merge these duplicate contact records."
+    "Merge these duplicate contact records.",
+    "Show the project status.",
+    "Review our operations.",
+    "Plan the database migration.",
+    "Summarize this month's costs."
   ],
   "conflicts": [
     "concept-synthesis compares a bounded concept set; idea-lineage reconstructs change through time without inventing history."

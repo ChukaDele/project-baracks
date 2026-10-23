@@ -5,4 +5,4 @@ description: Use for process maps, workflow improvement, constraint analysis, SO
 
 # operations-improvement-core
 
-Map flow, handoffs, bottleneck, evidence, failure mode, owner and smallest reversible improvement. Reuse Management OS and GBrain procedures. Stage with a dry run and rollback. Do not activate a workflow or duplicate scheduler/runtime.
+Map flow, handoffs, bottleneck, evidence, failure mode, owner and smallest reversible improvement. Reuse Management OS procedures and existing skills. Stage with a dry run and rollback. Do not activate a workflow or duplicate scheduler/runtime.

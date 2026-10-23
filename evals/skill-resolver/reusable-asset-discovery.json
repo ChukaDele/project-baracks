@@ -3,5 +3,11 @@
   "should_trigger": [
     "Before implementation, search the project map, organisational index, canonical catalog, candidates, and prior art for a reusable module."
   ],
-  "should_not_trigger": ["Turn a repeated procedure into a documented operating skill."]
+  "should_not_trigger": [
+    "Turn a repeated procedure into a documented operating skill.",
+    "Show the project status.",
+    "Review our operations.",
+    "Plan the database migration.",
+    "Summarize this month's costs."
+  ]
 }

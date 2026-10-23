@@ -228,23 +228,45 @@ describe('Major self-work budget', () => {
 });
 
 describe('GBrain autopilot doctor check', () => {
-  it('flags a disabled autopilot and a missing repo path with the owner command', () => {
+  it('reports a disabled or uninstalled autopilot as GBrain on-demand mode info', () => {
+    const home = join(root, 'gbrain');
+    mkdirSync(home);
+    const missing = gbrainAutopilotCheck({ MAJOR_GBRAIN_HOME: home });
+    expect(missing?.status).toBe('info');
+    expect(missing?.detail).toMatch(/GBrain on-demand mode \(autopilot not installed\)/);
+    writeFileSync(join(home, 'autopilot-run.sh'), "exec gbrain autopilot --repo '/gone/repo'\n");
+    writeFileSync(join(home, 'autopilot-disabled'), 'retired by owner\n');
+    const disabled = gbrainAutopilotCheck({ MAJOR_GBRAIN_HOME: home });
+    expect(disabled?.status).toBe('info');
+    expect(disabled?.detail).toMatch(
+      /GBrain on-demand mode \(autopilot disabled: retired by owner\)/,
+    );
+  });
+
+  it('flags a disabled autopilot and a missing repo path when autopilot mode is required', () => {
     const home = join(root, 'gbrain');
     mkdirSync(home);
     writeFileSync(join(home, 'autopilot-run.sh'), "exec gbrain autopilot --repo '/gone/repo'\n");
     writeFileSync(join(home, 'autopilot-disabled'), 'repo path gone: /gone/repo\n');
-    const check = gbrainAutopilotCheck({ MAJOR_GBRAIN_HOME: home });
+    const check = gbrainAutopilotCheck({ MAJOR_GBRAIN_HOME: home, MAJOR_GBRAIN_MODE: 'autopilot' });
     expect(check?.status).toBe('warn');
     expect(check?.detail).toMatch(/autopilot disabled \(repo path gone: \/gone\/repo\)/);
     expect(check?.detail).toMatch(/autopilot repo path missing: \/gone\/repo/);
     expect(check?.detail).toMatch(/gbrain autopilot --install --repo <existing-brain-repo>/);
+    expect(
+      gbrainAutopilotCheck({
+        MAJOR_GBRAIN_HOME: join(root, 'none'),
+        MAJOR_GBRAIN_MODE: 'autopilot',
+      }),
+    ).toBeUndefined();
   });
 
-  it('is ok for a healthy install and silent when autopilot was never installed', () => {
+  it('is ok for a healthy install and warns when an enabled wrapper lost its repo', () => {
     const home = join(root, 'gbrain');
     mkdirSync(home);
-    expect(gbrainAutopilotCheck({ MAJOR_GBRAIN_HOME: home })).toBeUndefined();
     writeFileSync(join(home, 'autopilot-run.sh'), `exec gbrain autopilot --repo '${root}'\n`);
     expect(gbrainAutopilotCheck({ MAJOR_GBRAIN_HOME: home })?.status).toBe('ok');
+    writeFileSync(join(home, 'autopilot-run.sh'), "exec gbrain autopilot --repo '/gone/repo'\n");
+    expect(gbrainAutopilotCheck({ MAJOR_GBRAIN_HOME: home })?.status).toBe('warn');
   });
 });

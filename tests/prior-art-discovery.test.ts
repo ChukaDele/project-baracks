@@ -64,7 +64,7 @@ describe('prior-art discovery gate', () => {
     const directive = priorArtDiscoveryDirective('isolated-local-runtime');
     expect(directive).toContain('DEFINE CAPABILITY');
     expect(directive).toContain('CHECK EXISTING MAJOR');
-    expect(directive).toContain('CHECK GBRAIN/SKILLS');
+    expect(directive).toContain('CHECK SKILLS (AND GBRAIN IF CONFIGURED)');
     expect(directive).toContain('CHECK OFFICIAL PROVIDER TOOLS');
     expect(directive).toContain('CHECK MCP/ACP ECOSYSTEM');
     expect(directive).toContain('CHECK MATURE OSS');
