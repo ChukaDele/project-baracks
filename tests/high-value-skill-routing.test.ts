@@ -36,13 +36,13 @@ const cases: Case[] = [
   {
     name: 'technical SOP',
     task: 'Turn these rough operating notes into a clear SOP with warnings, steps, and acceptance checks.',
-    include: ['writing-os', 'technical-writing', 'asd-ste100', 'prose-craft'],
+    include: ['writing-os', 'technical-writing', 'asd-ste100'],
     exclude: ['product-management-core', 'concept-synthesis', 'knowledge-ingest'],
   },
   {
     name: 'personal brand post',
     task: 'Turn these ideas into a LinkedIn post that strengthens my operator personal brand without sounding generic.',
-    include: ['writing-os', 'personal-brand-strategy', 'prose-craft', 'natural-writing-qa'],
+    include: ['writing-os', 'personal-brand-strategy'],
     exclude: ['observability', 'brand-strategy'],
   },
   {

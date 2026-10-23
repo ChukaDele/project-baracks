@@ -136,7 +136,7 @@ When repeated deterministic operations would otherwise require many model turns,
 Typical primitives:
 
 - search/retrieval adapters;
-- browser/GStack;
+- browser automation;
 - GitHub;
 - Google connectors;
 - Figma;
@@ -155,7 +155,7 @@ Typical routes:
 - Google files/mail/calendar → native Google connectors;
 - Figma → Figma tooling;
 - public static web → direct fetch/search;
-- dynamic/authenticated web → GStack/browser when needed;
+- dynamic/authenticated web → browser automation when needed;
 - YouTube → `yt-dlp` captions → auto-captions → audio → local MacWhisper `mw`;
 - local audio/video → MacWhisper;
 - PDF/document/spreadsheet → native parser/skill;

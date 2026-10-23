@@ -36,9 +36,11 @@ beforeEach(() => {
   process.env.MAJOR_HOME = home;
   process.env.MAJOR_SKILLS_REGISTRY = join(process.cwd(), 'guidance', 'skills.registry.json');
   process.env.MAJOR_SKILLS_EVALS = join(process.cwd(), 'evals', 'skill-resolver');
+  process.env.MAJOR_SHARED_SKILLS_ROOT = join(process.cwd(), 'tests', 'fixtures', 'shared-skills');
 });
 
 afterEach(() => {
+  delete process.env.MAJOR_SHARED_SKILLS_ROOT;
   if (priorMajorHome === undefined) delete process.env.MAJOR_HOME;
   else process.env.MAJOR_HOME = priorMajorHome;
   if (priorSkillsRegistry === undefined) delete process.env.MAJOR_SKILLS_REGISTRY;
@@ -223,7 +225,7 @@ describe('runtime skill resolver', () => {
       name: 'root-cause-qa',
       shortDescription: expect.any(String),
       aliases: ['root-cause-analysis', 'failure-investigation'],
-      triggerConditions: ['bug-failure-regression'],
+      triggerConditions: ['bug failure regression'],
       category: 'quality',
       version: expect.any(String),
       lifecycle: 'active',

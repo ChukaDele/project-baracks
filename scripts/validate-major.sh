@@ -20,6 +20,8 @@ for p in Path('.').rglob('*.json'):
 PY
 
 node scripts/validate-skills.mjs || fail "skills, YAML frontmatter, resolver fixtures, or reusable asset metadata"
+python3 scripts/check-skill-drift.py --self-test >/dev/null || fail "skill drift checker self-test"
+python3 scripts/check-skill-drift.py || fail "duplicate or copied skills across ~/.claude, ~/.codex and ~/.agents skill directories"
 PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/major-validation-pycache" python3 -m unittest discover -s skills/internal/reference-engineering/tests -q || fail "reference-engineering coverage-gate tests"
 node scripts/generate-skill-catalog.mjs
 git diff --exit-code -- guidance/skills.catalog.json adapters/skills || fail "generated skill catalogue or host adapters are stale"
@@ -203,11 +205,9 @@ fi
 
 [ -f scripts/major-ingest-youtube.sh ] || fail "YouTube ingestion script missing"
 [ -f scripts/setup-major-knowledge-tools.sh ] || fail "knowledge tool setup/doctor missing"
+! grep -qi "gstack" scripts/setup-major-knowledge-tools.sh || fail "uninstalled GStack must not be reinstalled by knowledge-tool setup"
 grep -Fq "yt-dlp" scripts/major-ingest-youtube.sh || fail "YouTube ingestion missing yt-dlp"
 grep -Fq "mw transcribe" scripts/major-ingest-youtube.sh || fail "YouTube ingestion missing MacWhisper fallback"
-grep -Fq -- "--prefix" scripts/setup-major-knowledge-tools.sh || fail "GStack namespacing missing"
-grep -Fq "proactive false" scripts/setup-major-knowledge-tools.sh || fail "GStack proactive routing must be disabled under Major"
-grep -Fq "telemetry off" scripts/setup-major-knowledge-tools.sh || fail "GStack telemetry default must be off under Major setup"
 
 grep -Fq "Major Build" docs/architecture.md || fail "Major Build profile missing"
 grep -Fq "Major Knowledge" docs/architecture.md || fail "Major Knowledge profile missing"

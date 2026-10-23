@@ -92,6 +92,7 @@ A repeated explicit correction should increase the candidate's occurrence count 
 Use:
 
 - `major learn review --project current` to list recurring candidates requiring a decision;
+- `major learn digest` for the weekly batch of promotion proposals the owner decides on, and `major learn drain` to replay learning that was queued while capture was unavailable;
 - project promotion: `major learn promote --id <id> --scope project --evidence "<durable replacement/evidence>"`;
 - global promotion: `major learn promote --id <id> --scope global --summary "<sanitized reusable lesson>" --evidence "<sanitized durable replacement/evidence>"`;
 - `major learn dismiss --id <id> --evidence "<why this candidate should not be promoted>"` when the non-promotion decision is deliberate and evidenced.

@@ -68,11 +68,11 @@ Use Figma tooling/connector for file/node/design operations. Browser use is a fa
 
 ### Public static web page
 
-Use direct fetch/search first. Use GStack/browser when rendering, interaction, JS state, authentication or structured extraction requires a real browser.
+Use direct fetch/search first. Use browser automation when rendering, interaction, JS state, authentication or structured extraction requires a real browser.
 
 ### Dynamic/authenticated web
 
-Use GStack/browser capability when installed. GStack is a subordinate tool provider; Major policy remains authoritative. Prefer namespaced GStack commands/capabilities and keep GStack proactive routing disabled so it does not compete with Major's router.
+Use the host's browser automation (built-in browser, Playwright or Chrome DevTools). Browser tools are subordinate tool providers; Major policy remains authoritative.
 
 ### Repeated web extraction
 
@@ -127,7 +127,7 @@ For material knowledge work, preserve:
 
 - source URL/file/reference;
 - retrieval time when freshness matters;
-- ingestion method (`connector`, `yt-dlp-captions`, `macwhisper`, `gstack-browser`, etc.);
+- ingestion method (`connector`, `yt-dlp-captions`, `macwhisper`, `browser`, etc.);
 - whether content is primary or secondary;
 - known extraction gaps;
 - citations/anchors sufficient to trace load-bearing claims.

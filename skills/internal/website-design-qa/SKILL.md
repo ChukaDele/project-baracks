@@ -1,6 +1,6 @@
 ---
 name: website-design-qa
-description: Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, mobile-first review, browser debugging, launch readiness, website release acceptance/closeout and handover, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.
+description: Use for website, landing-page, marketing-site, frontend design, responsive QA, visual QA, production QA, Awwwards/FWA-style reviews, vague closeout requests such as "looks done", "go live", "final QA", "send to client" or "mark complete", mobile-first review, browser debugging, launch readiness, website release acceptance/closeout and handover, live-site parity, performance or accessibility work. Treat 100% browser zoom as the canonical visual baseline; use breakpoints/capability modes for design changes and browser zoom as robustness QA. Pair with responsive-motion-systems whenever the site uses GSAP, ScrollTrigger, sticky/pinned storytelling, card stacking, hero video, parallax or Three.js.
 ---
 
 # Website Design & QA
@@ -244,3 +244,24 @@ Authoritative policy: [Website Launch QA v2.0 in Notion](https://app.notion.com/
 8. Check the site against the actual supported GitHub plan and Cloudflare/Vercel deployment path. If authenticated approval, required checks, code-owner review or host protection is unavailable, mark enforcement `ENFORCEMENT_PARTIAL` and do not assert automatic enforcement or completion.
 
 Keep the 100% zoom, responsive-geometry, accessibility, reduced-motion and interaction-preservation doctrine above. Use risk-scaled tests for simple static sites and deeper security/data checks for authenticated apps. Record observations in the scoped project, not as generic claims about all websites.
+
+## 18. Automatic routing, phase evidence and validator (merged from the shared ~/.agents copy, 2026-10-23)
+
+Load this skill whenever a task creates, changes, checks, optimises, ships, hands over or closes a website, including vague instructions such as "looks done", "go live", "send to client", "final QA" or "mark complete". Do not wait for the user to name a checklist.
+
+- Discover the actual repository, working-tree state, stack, CI, host, live/staging URLs, market, forms/integrations, owners and critical journeys first. Never overwrite another agent's uncommitted work.
+- CI must execute tests, not merely record statuses. Use Playwright/axe, link checks, dependency/security scans and app-specific end-to-end journeys where applicable. Visual, accessibility, legal and client review need human sign-off.
+- Phase evidence: PRELAUNCH requires staging evidence. LIVE requires a production smoke test that covers forms, consent, analytics, TLS, sitemap, canonical and alert routes. CLOSEOUT also requires owner-approved handover and support. Post-launch monitoring is a separate phase.
+- A missing control, a stale or wrong-commit artifact, an unreviewed test, a P0 or an unapproved P1 blocks the phase. Never mark an incomplete check PASS to make delivery green.
+- Give the owner a short readiness report: exact site, environment, commit, date, passes, blockers, conditional NA decisions and owner-approved waivers, missing human actions, branch/deploy gate state and links to evidence.
+
+Validator (shared reference implementation, canonical source [ChukaDele/websites](https://github.com/ChukaDele/websites) `tooling/website-release-gate`; local development copy on the owner's Mac: `/Users/chukwuka/Documents/ChatGPT/Website Release Gate`). Do not assume a new project has adopted it.
+
+```bash
+python3 validate.py --catalog catalog.json --profile PATH_TO_SITE_PROFILE --phase intake
+python3 validate.py --catalog catalog.json --profile PATH_TO_SITE_PROFILE --evidence EXTERNAL_EVIDENCE_JSON --sha RELEASE_SHA --phase closeout
+```
+
+The scaffold produces NOT_TESTED controls and fails until real evidence is supplied. Preserve the source commit and independent reviewer identity. Never commit same-commit attestations into the release branch, because that changes the SHA; use CI artifacts or a separate audit record.
+
+A finished UI is not a finished website. Never auto-deploy or auto-transfer credentials or IP only because this skill ran.

@@ -58,6 +58,8 @@ export interface WritingRoute {
   genre: WritingGenre;
   risk: WritingRisk;
   skills: string[];
+  /** Skills loaded at routing time; the remaining `skills` load at their gate. */
+  loadNow: string[];
   reasons: Record<string, string>;
   pipelineStages: readonly WritingPipelineStage[];
   gates: WritingGate[];

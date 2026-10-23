@@ -175,6 +175,71 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
     /\b(?:duplicate (?:local )?(?:repo|repository|project|workspace)|redundant local project|disk pressure|archive project|delete project copy|project copies)\b/u,
   );
 
+  const ciFailure =
+    matches(text, /\b(?:debug|fix|repair)\s+(?:the\s+)?ci\b/u) ||
+    (matches(
+      text,
+      /\b(?:ci|github actions|actions run|workflow run|pipeline|status checks|checks|build)\b/u,
+    ) &&
+      matches(
+        text,
+        /\b(?:fail(?:s|ed|ing|ures?)?|red|broken|flaky|stuck|timed? ?out)\b/u,
+      ) &&
+      matches(
+        text,
+        /\b(?:ci|github actions|actions run|workflow run|pull request|pr|status checks|checks)\b/u,
+      ));
+  // `major` is also an adjective ("fix major layout issues"), so the verb form
+  // must end the phrase or name a Major-only noun.
+  const majorNoun = String.raw`(?:repo|repository|skills?|resolver|router|routing|installer|learning loop|control plane|validator|self[- ]maintenance)`;
+  const majorSelfChange =
+    matches(
+      text,
+      new RegExp(
+        String.raw`\b(?:audit|review|fix|change|update|improve|repair|refactor|maintain|harden|debug|clean up)\s+(?:of\s+)?(?:the\s+)?major(?:'s)?(?=\s*$|\s*[.,;:!?]|\s+(?:and|itself|so|to|for)\b|\s+${majorNoun}\b)`,
+        'u',
+      ),
+    ) || matches(text, new RegExp(String.raw`\bmajor's\s+(?:own\s+)?${majorNoun}\b`, 'u'));
+  const forecasting =
+    matches(
+      text,
+      /\b(?:financial model|fp&a|fpa|financial projections?|revenue projections?|three[- ]statement)\b/u,
+    ) ||
+    (matches(text, /\b(?:forecast(?:s|ing)?|budget(?:s|ing)?|cash ?flow|runway)\b/u) &&
+      matches(
+        text,
+        /\b(?:revenue|p&l|profit|cash|burn|hiring|headcount|financial|finance|quarter(?:ly)?|fiscal|months|expenses?|margins?|spreadsheet|next year|annual)\b/u,
+      ));
+  const reverseEngineering = matches(
+    text,
+    /\b(?:reverse[- ]engineer(?:s|ed|ing)?|replicate (?:the|its|their) behaviou?r|make ours work like|interoperate with)\b/u,
+  );
+  const visualReference =
+    matches(text, /\b(?:pixel[- ]perfect|make it look like|clone (?:this|the|their) (?:ui|site|website|page|design|app))\b/u) ||
+    (matches(text, /\b(?:screenshots?|mockups?|mock-ups?|screen recording)\b/u) &&
+      matches(
+        text,
+        /\b(?:recreate|replicate|clone|rebuild|match|copy|port)\b|\bbuild (?:this|the|it|that)\b(?:\s+\w+){0,3}\s+from\b/u,
+      ));
+  const wholeProductRebuild = matches(
+    text,
+    /\b(?:rebuild|recreate|clone|reconstruct|replicate)\s+(?:their|the competitor'?s?|an existing|[a-z]+'s)\s+(?:whole|entire|full|complete)\s+(?:product|app|application|platform|system)\b|\bfeature parity\b/u,
+  );
+  const websiteRelease =
+    web &&
+    matches(
+      text,
+      /\b(?:go live|going live|launch (?:the )?(?:site|website|landing page)|before launch|pre-launch|ready to launch|handover|hand over|hand it over|closeout|close out|final qa|release[- ]ready|ready to ship|looks done|mark (?:it |this )?(?:as )?complete|send (?:it )?to (?:the )?client)\b/u,
+    );
+
+  if (ciFailure) add('ci-recovery', ['ci-recovery']);
+  if (majorSelfChange) add('major-self-maintenance', ['major-self-maintenance']);
+  if (forecasting) add('forecasting', ['fpa-forecasting-extrapolation']);
+  if (reverseEngineering) add('reverse-engineering', ['engineering-by-reference']);
+  if (wholeProductRebuild) add('whole-product-reconstruction', ['reference-engineering']);
+  if (websiteRelease) add('website-release', ['website-design-qa']);
+  if (visualReference) add('visual-reference', ['reference-replica']);
+
   if (presentation) {
     add('presentation', [
       'presentation-storylining',
@@ -263,7 +328,11 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
   }
 
   if (technicalWriting) add('technical-writing', ['technical-writing', 'asd-ste100']);
-  if (personalBrand) add('personal-brand', ['personal-brand-strategy']);
+  if (personalBrand)
+    add('personal-brand', [
+      'personal-brand-strategy',
+      ...(matches(text, /\blinkedin\b/u) ? ['linkedin-gtm-and-content'] : []),
+    ]);
   if (writingEvaluation) add('writing-evaluation', ['writing-evaluator']);
 
   if (security || auth) {

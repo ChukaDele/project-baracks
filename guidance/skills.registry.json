@@ -1,5 +1,5 @@
 {
-  "version": 23,
+  "version": 24,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -23,151 +23,151 @@
       "id": "project-start",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "project-start"
+      "load": "project start"
     },
     {
       "id": "project-context-integrity",
       "disclosure": "hot",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "named-project-repository-path-cross-project-edit-handoff-migration-wrong-project"
+      "load": "named project repository path cross project edit handoff migration wrong project"
     },
     {
       "id": "workspace-lifecycle-management",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "project-create-clone-locate-move-park-delete-archive-storage-disk-pressure-duplicate-repo-large-assets-local-cloud"
+      "load": "project create clone locate move park delete archive storage disk pressure duplicate repo large assets local cloud"
     },
     {
       "id": "mvp-speed-prioritisation",
       "disclosure": "hot",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "always-on-project-and-large-feature-planning"
+      "load": "always on project and large feature planning"
     },
     {
       "id": "legacy-cleanup",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "rename-migration-provider-swap-architecture-replacement"
+      "load": "rename migration provider swap architecture replacement"
     },
     {
       "id": "major-self-maintenance",
       "disclosure": "hot",
       "source": "major-internal",
       "availability": "major-repo",
-      "load": "major-self-change-skill-routing-learning-policy-runtime-installer-execution-independent-review-provenance"
+      "load": "major self change skill routing learning policy runtime installer execution independent review provenance"
     },
     {
       "id": "skill-resolver",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "start-of-substantive-work-select-relevant-skills"
+      "load": "start of substantive work select relevant skills"
     },
     {
       "id": "learning-capture",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "explicit-user-correction-repeated-mistake-recurring-failure-reusable-success"
+      "load": "explicit user correction repeated mistake recurring failure reusable success"
     },
     {
       "id": "skillify",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "reusable-successful-procedure-or-recurring-solved-failure"
+      "load": "reusable successful procedure or recurring solved failure"
     },
     {
       "id": "tools-as-code",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "repeated-retrieval-filter-dedupe-rank-transform-tool-composition"
+      "load": "repeated retrieval filter dedupe rank transform tool composition"
     },
     {
       "id": "design-direction-and-taste",
       "source": "major-internal",
       "availability": "ui-projects",
-      "load": "substantial-ui-website-creation-redesign-art-direction-generic-ai-design-too-safe-too-loud-taste"
+      "load": "substantial ui website creation redesign art direction generic ai design too safe too loud taste"
     },
     {
       "id": "remote-first-web-development",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "all-web-project-ui-work-browser-preview-visual-qa-acceptance"
+      "load": "all web project ui work browser preview visual qa acceptance"
     },
     {
       "id": "reference-engineering",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "whole-product-functional-reconstruction-with-data-roles-permissions-workflows-evidence-and-tested-parity"
+      "load": "whole product functional reconstruction with data roles permissions workflows evidence and tested parity"
     },
     {
       "id": "website-design-qa",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "website-landing-marketing-responsive-visual-browser-production-launch-accessibility-performance-seo-qa",
+      "load": "website landing marketing responsive visual browser production launch accessibility performance seo qa",
       "version": 24
     },
     {
       "id": "seo-os",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "seo-search-engine-optimization-organic-search-keyword-serp-gsc-search-console-technical-seo-on-page-seo-content-seo-site-architecture-internal-linking-backlinks-authority-local-seo-geo-aeo-ai-search-open-seo-openseo-rank-tracking-founder-led-content-linkedin-article-distribution-firsthand-evidence-search-experiment-publishing-serp-test"
+      "load": "seo search engine optimization organic search keyword serp gsc search console technical seo on page seo content seo site architecture internal linking backlinks authority local seo geo aeo ai search open seo openseo rank tracking founder led content linkedin article distribution firsthand evidence search experiment publishing serp test"
     },
     {
       "id": "responsive-motion-systems",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "gsap-scrolltrigger-sticky-pinned-scrollytelling-card-stacking-hero-video-parallax-threejs-zoom-motion"
+      "load": "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion"
     },
     {
       "id": "human-blocker-orchestration",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "authentication-oauth-consent-2fa-captcha-payment-or-irreversible-human-only-decision"
+      "load": "authentication oauth consent 2fa captcha payment or irreversible human only decision"
     },
     {
       "id": "dev-server-management",
       "source": "major-internal",
       "availability": "web-projects",
-      "load": "explicit-owner-approved-localhost-exception-only"
+      "load": "explicit owner approved localhost exception only"
     },
     {
       "id": "mcp-integration-ops",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "mcp-connector-plugin-integration-authentication-tool-exposure-reconnect-permission-provider-operation"
+      "load": "mcp connector plugin integration authentication tool exposure reconnect permission provider operation"
     },
     {
       "id": "analytics-with-shaper",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "taleshape-shaper-sql-dashboard-analytics-observability-telemetry-csv",
+      "load": "taleshape shaper sql dashboard analytics observability telemetry csv",
       "disclosure": "specialist"
     },
     {
       "id": "gaussian-splatting-spatial-reconstruction",
       "source": "major-internal",
       "availability": "spatial-projects",
-      "load": "3d-gaussian-splatting-spatial-reconstruction-radiance-field-colmap-novel-view-splat",
+      "load": "3d gaussian splatting spatial reconstruction radiance field colmap novel view splat",
       "disclosure": "specialist"
     },
     {
       "id": "source-ingestion",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "named-url-file-video-audio-document-primary-source"
+      "load": "named url file video audio document primary source"
     },
     {
       "id": "knowledge-work",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "research-strategy-synthesis-comparison-decision-work"
+      "load": "research strategy synthesis comparison decision work"
     },
     {
       "id": "writing-os",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "write-rewrite-draft-prepare-report-essay-homepage-proposal-sop-email-message-copy",
+      "load": "write rewrite draft prepare report essay homepage proposal sop email message copy",
       "aliases": [
         "writing-system"
       ],
@@ -181,14 +181,14 @@
       "id": "prose-craft",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "sentence-paragraph-prose-cadence-diction-edit-rewrite",
+      "load": "sentence paragraph prose cadence diction edit rewrite",
       "category": "writing"
     },
     {
       "id": "academic-writing",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "academic-essay-critical-summary-literature-review-assignment-source-analysis",
+      "load": "academic essay critical summary literature review assignment source analysis",
       "category": "writing",
       "dependencies": [
         "academic-verify"
@@ -198,28 +198,28 @@
       "id": "brand-strategy",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "brand-product-positioning-messaging-homepage-website-landing-page",
+      "load": "brand product positioning messaging homepage website landing page",
       "category": "writing"
     },
     {
       "id": "personal-brand-strategy",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "linkedin-thought-leadership-personal-essay-newsletter-authority",
+      "load": "linkedin thought leadership personal essay newsletter authority",
       "category": "writing"
     },
     {
       "id": "direct-response-writing",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "direct-response-buy-book-register-subscribe-apply-request-demo-conversion",
+      "load": "direct response buy book register subscribe apply request demo conversion",
       "category": "writing"
     },
     {
       "id": "technical-writing",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "sop-procedure-warning-operating-instruction-controlled-technical-documentation",
+      "load": "sop procedure warning operating instruction controlled technical documentation",
       "category": "writing",
       "dependencies": [
         "asd-ste100"
@@ -229,28 +229,28 @@
       "id": "asd-ste100",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "asd-ste100-controlled-technical-sop-procedure-warning-operating-instruction",
+      "load": "asd ste100 controlled technical sop procedure warning operating instruction",
       "category": "writing"
     },
     {
       "id": "voice-fingerprint",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "approved-writing-corpus-voice-style-fingerprint-profile-fidelity",
+      "load": "approved writing corpus voice style fingerprint profile fidelity",
       "category": "writing"
     },
     {
       "id": "prose-lint",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "prose-lint-vale-readability-grammar-style-diagnostic",
+      "load": "prose lint vale readability grammar style diagnostic",
       "category": "writing"
     },
     {
       "id": "natural-writing-qa",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "natural-writing-qa-ai-pattern-audit-humanizer-claim-preserving",
+      "load": "natural writing qa ai pattern audit humanizer claim preserving",
       "aliases": [
         "humanizer"
       ],
@@ -260,75 +260,75 @@
       "id": "writing-evaluator",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "writing-evaluate-thesis-specificity-evidence-reasoning-genre-source-fidelity",
+      "load": "writing evaluate thesis specificity evidence reasoning genre source fidelity",
       "category": "writing"
     },
     {
       "id": "writing-red-team",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "independent-writing-red-team-academic-client-public-proposal-sensitive",
+      "load": "independent writing red team academic client public proposal sensitive",
       "category": "writing"
     },
     {
       "id": "presentation-storylining",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "presentation-slide-deck-board-deck-strategy-deck-consulting-deck-investor-deck-sales-deck-proposal-executive-update-pitch-storyline-action-title-ghost-deck"
+      "load": "presentation slide deck board deck strategy deck consulting deck investor deck sales deck proposal executive update pitch storyline action title ghost deck"
     },
     {
       "id": "competitive-product-audit",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "project-start-or-material-product-work"
+      "load": "project start or material product work"
     },
     {
       "id": "open-source-leverage",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "project-start-or-commodity-build"
+      "load": "project start or commodity build"
     },
     {
       "id": "prior-art-discovery",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "new-subsystem-provider-integration-agent-runtime-sandbox-router-memory-auth-scraper-workflow-engine-browser-mcp-installation-deployment-major-dependency"
+      "load": "new subsystem provider integration agent runtime sandbox router memory auth scraper workflow engine browser mcp installation deployment major dependency"
     },
     {
       "id": "simple-modular-code",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "architecture-or-implementation"
+      "load": "architecture or implementation"
     },
     {
       "id": "vertical-slice-delivery",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "planning-or-implementation"
+      "load": "planning or implementation"
     },
     {
       "id": "nontechnical-ux",
       "source": "major-internal",
       "availability": "all-product-projects",
-      "load": "operator-or-user-workflow"
+      "load": "operator or user workflow"
     },
     {
       "id": "lean-graph-engineering",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "complex-autonomous-or-parallel-work"
+      "load": "complex autonomous or parallel work"
     },
     {
       "id": "behavior-reward-system",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "autonomous-or-long-running-work"
+      "load": "autonomous or long running work"
     },
     {
       "id": "root-cause-qa",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "bug-failure-regression",
+      "load": "bug failure regression",
       "aliases": [
         "root-cause-analysis",
         "failure-investigation"
@@ -351,13 +351,13 @@
       "id": "ci-recovery",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "ci-github-actions-pr-check-failure"
+      "load": "ci github actions pr check failure"
     },
     {
       "id": "lean-quality",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "test-strategy-verification-release-confidence",
+      "load": "test strategy verification release confidence",
       "aliases": [
         "quality-gate",
         "lean-verification"
@@ -380,13 +380,13 @@
       "id": "performance-caching",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "measured-slow-workflow-page-query-build-integration"
+      "load": "measured slow workflow page query build integration"
     },
     {
       "id": "exact-head-pr-review",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "pr-review-or-release",
+      "load": "pr review or release",
       "aliases": [
         "immutable-pr-review",
         "frozen-candidate-review"
@@ -409,37 +409,37 @@
       "id": "rapid-ui-prototype",
       "source": "major-internal",
       "availability": "ui-projects",
-      "load": "multiple-credible-ui-options"
+      "load": "multiple credible ui options"
     },
     {
       "id": "data-learning-loop",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "outcome-data-scoring-learning"
+      "load": "outcome data scoring learning"
     },
     {
       "id": "source-adapter-engineering",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "api-scraping-feed-external-data"
+      "load": "api scraping feed external data"
     },
     {
       "id": "pdf-reporting-qa",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "generated-pdf-reporting"
+      "load": "generated pdf reporting"
     },
     {
       "id": "cost-control",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "provider-model-browser-infrastructure-cost"
+      "load": "provider model browser infrastructure cost"
     },
     {
       "id": "exploratory-creative-dev",
       "source": "major-internal",
       "availability": "ui-projects",
-      "load": "exploratory-awwwards-fwa-heavy-motion-immersive-illustrative"
+      "load": "exploratory awwwards fwa heavy motion immersive illustrative"
     },
     {
       "id": "emil-kowalski-complete",
@@ -597,7 +597,7 @@
       "sourceKind": "VENDOR_LIVE",
       "vendorSkill": "vercel-optimize",
       "availability": "vercel-projects",
-      "load": "vercel-performance-cost-reliability-caching-functions-billing",
+      "load": "vercel performance cost reliability caching functions billing",
       "aliases": [
         "vercel-optimize",
         "vercel-performance",
@@ -1765,6 +1765,34 @@
         "paper-verification",
         "literature-verification"
       ]
+    },
+    {
+      "id": "engineering-by-reference",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "reverse engineer shipped external feature workflow protocol binary app behaviour replicate interoperate port",
+      "aliases": [
+        "reverse-engineering"
+      ],
+      "category": "reference"
+    },
+    {
+      "id": "reference-replica",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "recreate replicate clone match screenshot mockup image visual reference ui pixel perfect fidelity",
+      "aliases": [
+        "visual-replica"
+      ],
+      "category": "reference"
+    },
+    {
+      "id": "linkedin-gtm-and-content",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "linkedin post content profile audit gtm networking personal brand",
+      "aliases": [],
+      "category": "writing"
     }
   ],
   "reconciliation": {

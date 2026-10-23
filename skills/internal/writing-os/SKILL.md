@@ -54,6 +54,17 @@ Run voice matching only from an approved corpus. Writing samples outrank generic
 
 Run every gate in the route receipt. Lint and Natural Writing QA detect before targeted edits. The evaluator returns findings only. High-stakes work requires a critic that did not draft the text.
 
+Routing loads only this skill and the genre specialist. Load each gate skill when its gate runs, not before:
+
+| Gate | Skill | When |
+|---|---|---|
+| draft and edit | `prose-craft` | every substantive route |
+| voice | `voice-fingerprint` | non-technical routes with an approved corpus |
+| prose-lint | `prose-lint` | every substantive route |
+| natural-writing-qa | `natural-writing-qa` | every route |
+| substantive-evaluation | `writing-evaluator` | every substantive route |
+| independent-red-team | `writing-red-team` | high-stakes routes, run by a critic that did not draft |
+
 Revise identified defects, then rerun affected checks. Verify claims and source meaning. Detector scores never override facts or determine quality.
 
 Treat accepted edits through the existing learning lifecycle using GLOBAL, GENRE, BRAND, PERSONAL VOICE, PROJECT, or ONE-OFF classification. Do not generalize one-off edits.

@@ -49,7 +49,8 @@ describe('canonical writing system', () => {
     for (const id of fixture.forbidden) expect(route.skills).not.toContain(id);
     const resolved = resolveSkills({ task: fixture.prompt });
     expect(resolved.receipt.writing?.lifecycle).toBe('RESOLVED_NOT_EXECUTED');
-    expect(resolved.skills.map((skill) => skill.id)).toEqual(route.skills);
+    expect(resolved.skills.map((skill) => skill.id)).toEqual(route.loadNow);
+    expect(resolved.receipt.writing?.skills).toEqual(route.skills);
   });
 
   it.each(routeFixtures.negativeFixtures)('does not route negative fixture $id', (fixture) => {
@@ -119,7 +120,7 @@ describe('canonical writing system', () => {
       perBodyBytes: 20_000,
     });
     const bodies = disclosure.bodies.map((body) => body.id);
-    expect(bodies).toEqual(expect.arrayContaining(['writing-os', 'brand-strategy', 'prose-craft']));
+    expect(bodies).toEqual(expect.arrayContaining(['writing-os', 'brand-strategy']));
     expect(disclosure.bodies.find((body) => body.id === 'writing-os')?.content).toContain(
       'Build the source packet before drafting',
     );
@@ -143,13 +144,15 @@ describe('canonical writing system', () => {
     const task = 'make this SOP clearer';
     const route = resolveWritingRoute(task)!;
     expect(route.skills).not.toContain('voice-fingerprint');
-    expect(resolveSkills({ task }).skills.map((skill) => skill.id)).toEqual(route.skills);
+    expect(resolveSkills({ task }).skills.map((skill) => skill.id)).toEqual(route.loadNow);
   });
 
   it('does not let a caller limit truncate a mandatory automatic writing route', () => {
     const task = 'write a LinkedIn post about these notes';
     const route = resolveWritingRoute(task)!;
-    expect(resolveSkills({ task, limit: 2 }).skills.map((skill) => skill.id)).toEqual(route.skills);
+    expect(resolveSkills({ task, limit: 1 }).skills.map((skill) => skill.id)).toEqual(
+      route.loadNow,
+    );
   });
 
   it('keeps the Writing OS authorities separated by decision type and carries concrete simplicity tests', () => {

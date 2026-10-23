@@ -1,5 +1,7 @@
 {
   "skill": "prose-craft",
-  "should_trigger": ["rewrite this email", "write the homepage", "make this SOP clearer"],
+  "should_trigger": [
+    "tighten the sentences and cadence in this paragraph without changing the meaning"
+  ],
   "should_not_trigger": ["Fix the TypeScript resolver bug."]
 }

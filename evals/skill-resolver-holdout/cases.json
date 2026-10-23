@@ -1,0 +1,184 @@
+{
+  "purpose": "Held-out natural-language routing cases. The resolver never reads this directory, so a case cannot pass by exact-example matching. Each case states the skills that must be selected, skills that must not be selected, and an optional ceiling on how many skills one prompt may load.",
+  "cases": [
+    {
+      "id": "seo-audit",
+      "task": "Can you do an SEO audit of our marketing site?",
+      "expect": ["seo-os"]
+    },
+    {
+      "id": "debug-ci",
+      "task": "debug CI",
+      "expect": ["ci-recovery"]
+    },
+    {
+      "id": "ci-red-on-pr",
+      "task": "The GitHub Actions check keeps failing on my PR, can you sort it out?",
+      "expect": ["ci-recovery"]
+    },
+    {
+      "id": "ci-flaky",
+      "task": "CI is red again after the last merge, figure out why",
+      "expect": ["ci-recovery"]
+    },
+    {
+      "id": "audit-major",
+      "task": "audit Major",
+      "expect": ["major-self-maintenance"]
+    },
+    {
+      "id": "critical-review-major",
+      "task": "I want you to do a critical review of Major and find its weaknesses as an independent auditor",
+      "expect": ["major-self-maintenance"]
+    },
+    {
+      "id": "major-skills-change",
+      "task": "Clean up Major's skills so they stop overlapping",
+      "expect": ["major-self-maintenance"]
+    },
+    {
+      "id": "major-adjective-is-not-major",
+      "task": "Fix the major bug in the checkout page",
+      "forbid": ["major-self-maintenance"]
+    },
+    {
+      "id": "linkedin-post",
+      "task": "Write a LinkedIn post about our launch",
+      "expect": ["writing-os", "personal-brand-strategy", "linkedin-gtm-and-content"],
+      "forbid": ["seo-os", "prose-lint", "voice-fingerprint"],
+      "maxSkills": 4
+    },
+    {
+      "id": "financial-model",
+      "task": "Build a financial model for next year",
+      "expect": ["fpa-forecasting-extrapolation"]
+    },
+    {
+      "id": "cash-runway",
+      "task": "How many months of runway do we have if hiring slows? Give me a forecast.",
+      "expect": ["fpa-forecasting-extrapolation"]
+    },
+    {
+      "id": "reverse-engineer-app",
+      "task": "reverse-engineer this app",
+      "expect": ["engineering-by-reference"],
+      "forbid": ["data-learning-loop"]
+    },
+    {
+      "id": "reverse-engineer-data-word",
+      "task": "Reverse engineer how this app syncs its data between devices",
+      "expect": ["engineering-by-reference"],
+      "forbid": ["data-learning-loop"]
+    },
+    {
+      "id": "ui-from-screenshot",
+      "task": "Build this UI from a screenshot",
+      "expect": ["reference-replica"]
+    },
+    {
+      "id": "clone-page-look",
+      "task": "Make it look like the mockup I sent, pixel perfect",
+      "expect": ["reference-replica"]
+    },
+    {
+      "id": "website-looks-done",
+      "task": "The website looks done, can we go live and send it to the client?",
+      "expect": ["website-design-qa"]
+    },
+    {
+      "id": "website-final-qa",
+      "task": "Run final QA on the landing page before launch",
+      "expect": ["website-design-qa"]
+    },
+    {
+      "id": "motion-zoom-overlap",
+      "task": "The sticky cards overlap the headline at 80% browser zoom on the homepage",
+      "expect": ["responsive-motion-systems"]
+    },
+    {
+      "id": "motion-gsap",
+      "task": "Fix the GSAP ScrollTrigger pinning so the next scene does not start early",
+      "expect": ["responsive-motion-systems"]
+    },
+    {
+      "id": "whole-product-rebuild",
+      "task": "Rebuild their whole product with the same roles, permissions, workflows and data, and prove feature parity",
+      "expect": ["reference-engineering"]
+    },
+    {
+      "id": "plain-bugfix-stays-small",
+      "task": "Fix the TypeScript resolver bug",
+      "forbid": ["ci-recovery", "major-self-maintenance", "reference-replica"]
+    },
+    {
+      "id": "blog-post-not-linkedin",
+      "task": "Draft a blog post about our hiring process",
+      "forbid": ["linkedin-gtm-and-content"]
+    },
+    {
+      "id": "null-check-not-ci",
+      "task": "add a check for null to fix the crash",
+      "forbid": ["ci-recovery"]
+    },
+    {
+      "id": "health-check-not-ci",
+      "task": "add a health check endpoint and fix the error handler",
+      "forbid": ["ci-recovery"]
+    },
+    {
+      "id": "major-dependencies",
+      "task": "update major dependencies",
+      "forbid": ["major-self-maintenance"]
+    },
+    {
+      "id": "major-layout",
+      "task": "fix major layout issues on mobile",
+      "forbid": ["major-self-maintenance"]
+    },
+    {
+      "id": "major-runtime-error",
+      "task": "fix major runtime error in parser",
+      "forbid": ["major-self-maintenance"]
+    },
+    {
+      "id": "weather-forecast",
+      "task": "Weather forecast widget for the dashboard",
+      "forbid": ["fpa-forecasting-extrapolation"]
+    },
+    {
+      "id": "budget-field",
+      "task": "add a budget field to the signup form",
+      "forbid": ["fpa-forecasting-extrapolation"]
+    },
+    {
+      "id": "token-budget",
+      "task": "budget the token usage for the agent",
+      "forbid": ["fpa-forecasting-extrapolation"]
+    },
+    {
+      "id": "screenshot-bug",
+      "task": "the screenshot shows the modal does not close; make it close",
+      "forbid": ["reference-replica"]
+    },
+    {
+      "id": "own-code-not-reverse",
+      "task": "figure out how this function works",
+      "forbid": ["engineering-by-reference"]
+    },
+    {
+      "id": "ui-crash-on-launch",
+      "task": "ui crashes on launch",
+      "forbid": ["website-design-qa"]
+    },
+    {
+      "id": "launch-email",
+      "task": "write a launch email for the website",
+      "forbid": ["website-design-qa"]
+    },
+    {
+      "id": "rebuild-after-tsconfig",
+      "task": "rebuild the full app after changing tsconfig",
+      "forbid": ["reference-engineering"]
+    }
+  ]
+}

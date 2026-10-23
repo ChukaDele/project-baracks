@@ -52,6 +52,16 @@ These are canonical Major-owned skills.
 | `cost-control` | Subscription/rate-limit/paid-spend routing and usage discipline. |
 | `exploratory-creative-dev` | Awwwards/FWA/heavy-motion/immersive execution after art direction is settled. |
 
+## Shared skills routed by Major — 3
+
+These live once in `~/.agents/skills` (source `shared-agents`). The resolver loads them only from that directory; host directories symlink to it. See `docs/skills-canonicalization.md`.
+
+| Skill | Use |
+|---|---|
+| `engineering-by-reference` | Reverse engineer a shipped feature, protocol, app or binary and rebuild its behaviour in our stack. |
+| `reference-replica` | Recreate or verify a UI from a screenshot, mockup, recording or live reference. |
+| `linkedin-gtm-and-content` | LinkedIn content, profile and GTM work within the permitted-source rules. |
+
 ## Skill-pack standard
 
 A procedure becomes durable only after the real task works. `skillify` then prefers this bundle when justified:
@@ -161,7 +171,7 @@ These are tools/capability packs, not policy authorities and not necessarily age
 |---|---|---|
 | MacWhisper `mw` | Local audio/video transcription | Prefer local transcription; never duplicate it with another Whisper stack unless needed. |
 | `yt-dlp` | YouTube/media metadata, subtitles and audio extraction | Captions first; audio + MacWhisper fallback. |
-| GStack | Dynamic/authenticated browser work, scraping and codifying repeated browser procedures | Install namespaced; proactive routing and telemetry off; Major remains the router. |
+| Browser automation | Dynamic/authenticated browser work and scraping (host built-in browser, Playwright, Chrome DevTools) | Major remains the router. GStack was uninstalled on 2026-10-23; see `docs/skills-canonicalization.md`. |
 | Native connectors/APIs | GitHub, Google, Figma, mail/calendar etc. | Prefer over browser scraping when available. |
 | Major remote-preview preflight | Block local or non-Cloudflare browser targets | `major web preflight` before browser work. |
 | Major project context guard | Prevent edits in the wrong repo and provide the canonical target path | `major project guard <target>` / `major project locate <target>`. |
@@ -175,7 +185,7 @@ All Major internal skills. Heavy bodies remain trigger-loaded.
 
 ### `knowledge`
 
-`core` with knowledge-work semantics: `source-ingestion` + `knowledge-work` route named sources through native/deterministic tools. `tools-as-code` handles repeated retrieval mechanics. GStack/yt-dlp/MacWhisper remain machine capabilities rather than prompt baggage.
+`core` with knowledge-work semantics: `source-ingestion` + `knowledge-work` route named sources through native/deterministic tools. `tools-as-code` handles repeated retrieval mechanics. Browser automation, yt-dlp and MacWhisper remain machine capabilities rather than prompt baggage.
 
 ### `web-ui`
 
@@ -234,4 +244,4 @@ The installer must:
 6. sync canonical internal skills globally so a newly promoted cross-project skill is reachable by fresh sessions without re-bootstrapping every existing repo;
 7. never claim a profile is installed when validation fails.
 
-Tool setup must separately verify machine capabilities such as `mw`, `yt-dlp` and GStack rather than pretending that a skill file means the executable exists.
+Tool setup must separately verify machine capabilities such as `mw`, `yt-dlp` and the browser tooling rather than pretending that a skill file means the executable exists.
