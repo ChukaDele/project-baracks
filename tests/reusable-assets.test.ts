@@ -11,6 +11,42 @@ afterEach(() => {
 });
 
 describe('reusable asset lifecycle', () => {
+  it('retrieves Lenis only for relevant scroll orchestration', () => {
+    const previous = process.env.MAJOR_GBRAIN_ASSET_INDEX;
+    const previousHome = process.env.MAJOR_HOME;
+    const indexPath = join(process.cwd(), 'guidance', 'gbrain-reusable-assets.index.json');
+    process.env.MAJOR_GBRAIN_ASSET_INDEX = indexPath;
+    // Isolate from the host's installed skill bundle so the repo catalog is read.
+    const home = mkdtempSync(join(tmpdir(), 'major-assets-home-'));
+    roots.push(home);
+    process.env.MAJOR_HOME = home;
+    try {
+      const relevant = retrieveReusableAssets({
+        task: 'Integrate Lenis with GSAP ScrollTrigger',
+        cwd: process.cwd(),
+      });
+      const match = relevant.assets.find((asset) => asset.id === 'lenis-scroll-orchestration');
+      expect(match?.source).toBe('gbrain-org-index');
+
+      const unrelated = retrieveReusableAssets({
+        task: 'Audit static business homepage SEO',
+        cwd: process.cwd(),
+      });
+      expect(unrelated.assets.map((asset) => asset.id)).not.toContain('lenis-scroll-orchestration');
+
+      const writing = retrieveReusableAssets({
+        task: 'Make this reference letter sound smooth and polished',
+        cwd: process.cwd(),
+      });
+      expect(writing.assets.map((asset) => asset.id)).not.toContain('lenis-scroll-orchestration');
+    } finally {
+      if (previous === undefined) delete process.env.MAJOR_GBRAIN_ASSET_INDEX;
+      else process.env.MAJOR_GBRAIN_ASSET_INDEX = previous;
+      if (previousHome === undefined) delete process.env.MAJOR_HOME;
+      else process.env.MAJOR_HOME = previousHome;
+    }
+  });
+
   it('records a successful implementation only as a project-local reuse candidate', () => {
     const project = mkdtempSync(join(tmpdir(), 'major-asset-candidate-'));
     roots.push(project);

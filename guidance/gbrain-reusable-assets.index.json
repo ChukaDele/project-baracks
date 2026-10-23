@@ -10,13 +10,51 @@
       "title": "Project goal-state template",
       "summary": "A project-independent current-goal record with outcome, evidence, owners, decisions, risks, and next actions.",
       "locator": "templates/project/GOAL_STATE.md",
-      "tags": ["template", "goal", "project", "state", "planning"],
+      "tags": [
+        "template",
+        "goal",
+        "project",
+        "state",
+        "planning"
+      ],
       "lifecycle": "PROMOTED",
       "scope": "shared",
       "owner": "Major",
-      "compatibility": ["markdown", "all-projects"],
+      "compatibility": [
+        "markdown",
+        "all-projects"
+      ],
       "latestVerifiedVersion": "1.0.0",
-      "limitations": ["The consumer supplies project-specific facts."]
+      "limitations": [
+        "The consumer supplies project-specific facts."
+      ]
+    },
+    {
+      "id": "lenis-scroll-orchestration",
+      "kind": "lenis-pattern",
+      "title": "Lenis scroll orchestration",
+      "summary": "Lenis/GSAP/ScrollTrigger wheel synchronisation, interpolation, ticker ownership.",
+      "locator": "skills/internal/responsive-motion-systems/SKILL.md",
+      "tags": [
+        "lenis",
+        "gsap",
+        "scrolltrigger",
+        "smoothscroll"
+      ],
+      "lifecycle": "REUSE_CANDIDATE",
+      "scope": "shared",
+      "owner": "Major",
+      "compatibility": [
+        "web-projects",
+        "Astro",
+        "GSAP",
+        "ScrollTrigger"
+      ],
+      "limitations": [
+        "Only a conditional runtime candidate; no project-global installation or production acceptance.",
+        "Local GBrain database ingestion remains to be verified."
+      ],
+      "latestVerifiedVersion": "routing-only"
     }
   ]
 }
