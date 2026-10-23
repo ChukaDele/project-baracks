@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   renameSync,
   statSync,
@@ -163,6 +164,12 @@ function writeStore(path: string, store: LearningStore): void {
   renameSync(temp, path);
 }
 
+/** Bounded store-lock wait; tests under load raise it via MAJOR_LEARNING_LOCK_WAIT_MS. */
+function learningLockWaitMs(): number {
+  const value = Number(process.env.MAJOR_LEARNING_LOCK_WAIT_MS);
+  return Number.isFinite(value) && value > 0 ? value : 5_000;
+}
+
 function migrationLockPath(): string {
   return join(learningRoot(), '.migration.lock');
 }
@@ -201,7 +208,7 @@ function waitForMigration(deadline: number): void {
 function withMigrationLock<T>(stores: string[], action: () => T): T {
   const lock = migrationLockPath();
   mkdirSync(dirname(lock), { recursive: true });
-  const deadline = Date.now() + 5_000;
+  const deadline = Date.now() + learningLockWaitMs();
   let fd: number | undefined;
   while (fd === undefined) {
     try {
@@ -268,7 +275,7 @@ export function learningLockOwnerIsLive(pid: number): boolean {
 function withStoreLock<T>(path: string, action: () => T): T {
   mkdirSync(dirname(path), { recursive: true });
   const lock = `${path}.lock`;
-  const deadline = Date.now() + 5_000;
+  const deadline = Date.now() + learningLockWaitMs();
   let fd: number | undefined;
   while (fd === undefined) {
     waitForMigration(deadline);
@@ -463,6 +470,24 @@ export function listLearningCandidates(
     return !status || candidate.status === status;
   });
   return [...global, ...local];
+}
+
+/** Every project store, read-only, for the weekly digest. Unreadable stores are reported, not thrown. */
+export function allProjectLearningCandidates(): {
+  candidates: LearningCandidate[];
+  unreadableStores: string[];
+} {
+  const dir = join(learningRoot(), 'projects');
+  const result = { candidates: [] as LearningCandidate[], unreadableStores: [] as string[] };
+  if (!existsSync(dir)) return result;
+  for (const name of readdirSync(dir).filter((item) => /^[a-f0-9]{24}\.json$/.test(item))) {
+    try {
+      result.candidates.push(...readStore(join(dir, name)).candidates);
+    } catch {
+      result.unreadableStores.push(name);
+    }
+  }
+  return result;
 }
 
 export function learningReviewDue(project: string, repoPath?: string): LearningCandidate[] {

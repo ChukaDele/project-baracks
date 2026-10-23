@@ -22,6 +22,7 @@ import {
 import { buildStorageReport, type StorageReport } from '../resources/storage-report.js';
 import type { BrainFinding, KnowledgeFact } from '../knowledge/semantics.js';
 import { inspectBrain } from '../knowledge/semantics.js';
+import { gbrainAutopilotCheck } from './gbrain.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'missing';
 
@@ -161,6 +162,8 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
   add('pnpm', true, resolve('pnpm'), 'pnpm not found on PATH');
   add('git', true, resolve('git'), 'git not found on PATH');
   add('github-cli', false, resolve('gh'), 'GitHub CLI (gh) not found');
+  const gbrain = gbrainAutopilotCheck(env, fileExists);
+  if (gbrain) checks.push(gbrain);
 
   const providerInfos: ProviderInfo[] = [];
   for (const provider of inputs.providers) {
