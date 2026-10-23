@@ -8,6 +8,7 @@ import { captureLearning, promoteLearning } from '../src/learning/candidates.js'
 import { configureProjectPolicy, recordShadowGrade } from '../src/supervisor/policy.js';
 import {
   classifyInconclusiveReviewAttempt,
+  completionReviewPrompt,
   coordinatorPrompt,
   modelOutcomeForWorker,
   nonSuccessCyclePatch,
@@ -921,6 +922,38 @@ describe('Major coordinator contract', () => {
     expect(prompt).not.toContain(
       'load the exact project or immutable-runtime skill paths it returns',
     );
+  });
+
+  it('lets an implementation dispatch mutate the frozen candidate while review stays read-only', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'major-runtime-candidate-'));
+    roots.push(repo);
+    process.env.MAJOR_HOME = join(repo, '.major');
+    process.env.MAJOR_POLICY_PATH = join(repo, 'policies.json');
+    const current = goal(repo);
+    current.candidate = freezeSupervisorCandidate(
+      { ok: false, kind: 'no_task', failure: 'no canonical task' },
+      {
+        sourceHead: 'a'.repeat(40),
+        sourceTreeDigest: 'b'.repeat(64),
+        frozenAt: '2026-10-23T00:00:00.000Z',
+      },
+    );
+    const prompt = coordinatorPrompt(current);
+    expect(prompt).toContain('FROZEN STARTING CANDIDATE:');
+    expect(prompt).toContain('You may and should change files inside your bound workspace');
+    expect(prompt).toContain('Major re-freezes a new candidate after a change');
+    expect(prompt).not.toContain('Validate and report only this exact candidate');
+    expect(prompt).not.toContain('any mutation or binding change requires a new candidate cycle');
+
+    const review = completionReviewPrompt(current, {
+      summary: 'done',
+      coordinator: 'codex',
+      claimedAt: '2026-10-23T00:00:00.000Z',
+      sourceHead: 'a'.repeat(40),
+      candidate: structuredClone(current.candidate),
+    });
+    expect(review).toContain('Use read-only exact-head checks. Do not implement');
+    expect(review).not.toContain('You may and should change files');
   });
 
   it('states the isolated Lima workspace contract without host-only verification gates', () => {
