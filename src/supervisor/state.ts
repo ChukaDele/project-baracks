@@ -92,6 +92,10 @@ export interface SupervisorGoal {
   autonomous: boolean;
   status: GoalStatus;
   preferredCoordinator: WorkerHost;
+  /** Owner's explicit `major run --coordinator` choice. Unlike the
+   * preferredCoordinator tie-break, it pins task routing to this host while
+   * that provider has routable capacity. */
+  pinnedCoordinator?: WorkerHost | undefined;
   cycle: number;
   consecutiveFailures: number;
   createdAt: string;
@@ -321,6 +325,8 @@ export function startGoal(input: {
   goal: string;
   autonomous: boolean;
   preferredCoordinator?: WorkerHost;
+  /** Explicit owner coordinator; pins routing and becomes the preference. */
+  pinnedCoordinator?: WorkerHost;
   requiredOperations?: string[];
   admissionRiskAssessment?: SupervisorAdmissionRiskAssessment;
 }): SupervisorGoal {
@@ -339,6 +345,9 @@ export function startGoal(input: {
         existing.goal = input.goal;
         existing.repoPath = resolve(input.repoPath);
         existing.autonomous = input.autonomous;
+        // The redefining dispatch owns the coordinator choice for this outcome.
+        existing.pinnedCoordinator = input.pinnedCoordinator;
+        if (input.pinnedCoordinator) existing.preferredCoordinator = input.pinnedCoordinator;
         existing.requiredOperations = input.requiredOperations;
         existing.admissionRiskAssessment = input.admissionRiskAssessment;
         existing.promotionContract = deriveSupervisorPromotionContract({
@@ -365,7 +374,8 @@ export function startGoal(input: {
       goal: input.goal,
       autonomous: input.autonomous,
       status: 'active',
-      preferredCoordinator: input.preferredCoordinator ?? 'claude',
+      preferredCoordinator: input.pinnedCoordinator ?? input.preferredCoordinator ?? 'claude',
+      ...(input.pinnedCoordinator ? { pinnedCoordinator: input.pinnedCoordinator } : {}),
       ...(input.requiredOperations && input.requiredOperations.length > 0
         ? { requiredOperations: input.requiredOperations }
         : {}),

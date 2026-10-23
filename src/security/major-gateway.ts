@@ -347,6 +347,52 @@ export function spawnReadOnlyCodexAppServer(codexHome: string): {
   };
 }
 
+/** Env names the host-path gateway passes to a contained provider CLI. */
+export const HOST_RUNTIME_ENV_ALLOWLIST: readonly string[] = [
+  'MAJOR_HOME',
+  'MAJOR_RESOURCE_LEASE_ID',
+  'CODEX_HOME',
+  'CLAUDE_CONFIG_DIR',
+  'CLAUDE_CODE_TMPDIR',
+  'XDG_CONFIG_HOME',
+  'XDG_DATA_HOME',
+  'XDG_CACHE_HOME',
+  'GIT_CONFIG_NOSYSTEM',
+];
+
+/** Per-project runtime root for the host path. Every temp, cache, config and
+ * data location a provider CLI writes points inside it, because Seatbelt
+ * denies /tmp. Claude Code ignores TMPDIR for its own per-uid directory and
+ * falls back to /tmp/claude-<uid> unless CLAUDE_CODE_TMPDIR is set. */
+export function hostRuntimeEnv(
+  executable: string,
+  runtimeHome: string,
+  cwd: string,
+): { executionRoot: string; env: Record<string, string> } {
+  const projectKey = createHash('sha256').update(resolve(cwd)).digest('hex').slice(0, 24);
+  const executionRoot = join(runtimeHome, 'execution', projectKey);
+  const runtimeTmp = join(executionRoot, 'tmp');
+  const runtimeCache = join(executionRoot, 'cache');
+  const runtimeConfig = join(executionRoot, 'config');
+  const runtimeData = join(executionRoot, 'data');
+  for (const path of [runtimeTmp, runtimeCache, runtimeConfig, runtimeData]) {
+    mkdirSync(path, { recursive: true, mode: 0o700 });
+  }
+  return {
+    executionRoot,
+    env: {
+      ...(executable === 'git' ? { HOME: executionRoot, GIT_CONFIG_NOSYSTEM: '1' } : {}),
+      MAJOR_HOME: runtimeHome,
+      ...(executable === 'codex' ? { CODEX_HOME: prepareHostCodexHome(runtimeData) } : {}),
+      TMPDIR: runtimeTmp,
+      CLAUDE_CODE_TMPDIR: runtimeTmp,
+      XDG_CACHE_HOME: runtimeCache,
+      XDG_CONFIG_HOME: runtimeConfig,
+      XDG_DATA_HOME: runtimeData,
+    },
+  };
+}
+
 /** Production adapter for the single canonical execution gateway. */
 export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle {
   const executable = basename(request.executable);
@@ -555,25 +601,11 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
   // Host path only: the Lima guest has its own provider-auth store.
   const credentialEnv = backendEnabled ? {} : providerTokenEnv(executable);
   if (!backendEnabled) {
-    const projectKey = createHash('sha256').update(resolve(request.cwd)).digest('hex').slice(0, 24);
-    const executionRoot = join(runtimeHome, 'execution', projectKey);
-    const runtimeTmp = join(executionRoot, 'tmp');
-    const runtimeCache = join(executionRoot, 'cache');
-    const runtimeConfig = join(executionRoot, 'config');
-    const runtimeData = join(executionRoot, 'data');
-    for (const path of [runtimeTmp, runtimeCache, runtimeConfig, runtimeData]) {
-      mkdirSync(path, { recursive: true, mode: 0o700 });
-    }
-    roots.push(executionRoot);
+    const runtime = hostRuntimeEnv(executable, runtimeHome, request.cwd);
+    roots.push(runtime.executionRoot);
     baseEnv = {
       ...process.env,
-      ...(executable === 'git' ? { HOME: executionRoot, GIT_CONFIG_NOSYSTEM: '1' } : {}),
-      MAJOR_HOME: runtimeHome,
-      ...(executable === 'codex' ? { CODEX_HOME: prepareHostCodexHome(runtimeData) } : {}),
-      TMPDIR: runtimeTmp,
-      XDG_CACHE_HOME: runtimeCache,
-      XDG_CONFIG_HOME: runtimeConfig,
-      XDG_DATA_HOME: runtimeData,
+      ...runtime.env,
       ...(request.resourceLeaseId ? { MAJOR_RESOURCE_LEASE_ID: request.resourceLeaseId } : {}),
     };
   }
@@ -622,16 +654,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
       : {}),
     baseEnv,
     credentialEnv,
-    envAllowlist: [
-      'MAJOR_HOME',
-      'MAJOR_RESOURCE_LEASE_ID',
-      'CODEX_HOME',
-      'CLAUDE_CONFIG_DIR',
-      'XDG_CONFIG_HOME',
-      'XDG_DATA_HOME',
-      'XDG_CACHE_HOME',
-      'GIT_CONFIG_NOSYSTEM',
-    ],
+    envAllowlist: HOST_RUNTIME_ENV_ALLOWLIST,
     recordDecision: recordExecution,
   });
 

@@ -364,13 +364,47 @@ function selectCoordinatorForRequest(
   goal: SupervisorGoal,
   providers: ProviderInfo[],
   request: RoutingRequest,
+  pin?: WorkerHost,
 ): CoordinatorSelection {
-  const preferred = HOST_PROVIDERS[goal.preferredCoordinator];
+  if (!pin) return routeAcrossProviders(goal, providers, request);
+  // The class ladder alone would pick Claude/fable over a healthy pinned
+  // Codex. Route inside the pinned provider's accounts first (quota rotation
+  // stays on them); leave it only when none can route, and record why.
+  const pinnedProvider = HOST_PROVIDERS[pin];
+  const pinnedPool = providers.filter(
+    (provider) => parseCapacityKey(provider.name).providerName === pinnedProvider,
+  );
+  const pinned =
+    pinnedPool.length > 0 ? routeAcrossProviders(goal, pinnedPool, request, pin) : undefined;
+  if (pinned?.kind === 'route') {
+    return { ...pinned, reason: `owner pinned coordinator=${pin}; ${pinned.reason}` };
+  }
+  const fallback = routeAcrossProviders(goal, providers, request);
+  return {
+    ...fallback,
+    reason:
+      `owner pinned coordinator=${pin} unavailable ` +
+      `(${pinned?.reason ?? 'no account'}); ladder fallback; ${fallback.reason}`,
+  };
+}
+
+function routeAcrossProviders(
+  goal: SupervisorGoal,
+  providers: ProviderInfo[],
+  request: RoutingRequest,
+  pin?: WorkerHost,
+): CoordinatorSelection {
+  const preferred = HOST_PROVIDERS[pin ?? goal.preferredCoordinator];
+  // Inside a pin the pinned host is sticky even when a previous hop ran
+  // elsewhere, so quota rotation picks among its sibling accounts.
+  const stickyHost = pin ?? goal.lastCoordinator;
   const stickyKey = lastCapacityKey({
     preferredCoordinator: goal.preferredCoordinator,
     hostProviders: HOST_PROVIDERS,
-    ...(goal.lastCoordinator ? { lastCoordinator: goal.lastCoordinator } : {}),
-    ...(goal.lastAccountLabel ? { lastAccountLabel: goal.lastAccountLabel } : {}),
+    ...(stickyHost ? { lastCoordinator: stickyHost } : {}),
+    ...(goal.lastAccountLabel && stickyHost === goal.lastCoordinator
+      ? { lastAccountLabel: goal.lastAccountLabel }
+      : {}),
   });
   const pooled = subscriptionAccountPool({
     providers,
@@ -441,12 +475,22 @@ export function taskRoutingRequest(goal: SupervisorGoal): RoutingRequest {
   }
 }
 
+/** With no explicit request this routes the goal's own task, so the owner's
+ * `--coordinator` pin applies. An explicit request is a non-task route (the
+ * independent completion review), which the pin never steers. */
 export function selectCoordinator(
   goal: SupervisorGoal,
   providers: ProviderInfo[],
-  request: RoutingRequest = taskRoutingRequest(goal),
+  request?: RoutingRequest,
 ): CoordinatorSelection {
-  return selectCoordinatorForRequest(goal, providers, request);
+  return request
+    ? selectCoordinatorForRequest(goal, providers, request)
+    : selectCoordinatorForRequest(
+        goal,
+        providers,
+        taskRoutingRequest(goal),
+        goal.pinnedCoordinator,
+      );
 }
 
 function implementedByProvider(goal: SupervisorGoal): string | undefined {
@@ -467,7 +511,12 @@ export async function selectCoordinatorSmart(
   const policy = getProjectPolicy(goal.project, goal.repoPath);
   const owner = ownerTargetClass ? { targetClass: ownerTargetClass } : {};
   if (!decisionKernelEnabled(adapter) || !semanticEgressAllowed(policy)) {
-    return selectCoordinator(goal, providers, { ...taskRoutingRequest(goal), ...owner });
+    return selectCoordinatorForRequest(
+      goal,
+      providers,
+      { ...taskRoutingRequest(goal), ...owner },
+      goal.pinnedCoordinator,
+    );
   }
   const classification = await classifyRoutingRequest(goal.goal, {
     ...(adapter ? { adapter } : {}),
@@ -482,8 +531,9 @@ export async function selectCoordinatorSmart(
   if (request.purpose === 'review') {
     const provider = implementedByProvider(goal);
     if (provider) request.implementedByProvider = provider;
+    return selectCoordinatorForRequest(goal, providers, request);
   }
-  return selectCoordinatorForRequest(goal, providers, request);
+  return selectCoordinatorForRequest(goal, providers, request, goal.pinnedCoordinator);
 }
 
 /** Resolve and persist the one provider/model/account decision used by every
