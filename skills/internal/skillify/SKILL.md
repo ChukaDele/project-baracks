@@ -7,7 +7,7 @@ description: Use after a novel workflow succeeds or a recurring failure is solve
 
 Use **after the real task works**. Do not pause an active P0 merely to create infrastructure.
 
-Major's GBrain lifecycle may capture a bounded structured workflow from the final worker result. A single observation stays a project-local candidate. Semantically recurring, independently validated procedures may be synthesized and promoted automatically when they do not overlap an existing skill. Project evidence never becomes a global generated skill directly.
+Major's learning lifecycle may capture a bounded structured workflow from the final worker result. A single observation stays a project-local candidate. Semantically recurring, independently validated procedures may be synthesized and promoted automatically when they do not overlap an existing skill. Project evidence never becomes a global generated skill directly.
 
 ## Decide whether to skillify
 

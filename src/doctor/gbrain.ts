@@ -53,7 +53,7 @@ function onDemandCheck(state: string): DoctorCheck {
     name: 'gbrain-autopilot',
     required: false,
     status: 'info',
-    detail: `GBrain on-demand mode (${state}); use the GBrain MCP only when explicitly asked`,
+    detail: `GBrain on-demand mode (${state}); use the GBrain MCP only when explicitly asked or a named hand-written entity page is relevant`,
   };
 }
 
