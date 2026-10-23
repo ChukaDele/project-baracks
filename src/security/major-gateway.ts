@@ -35,6 +35,7 @@ import { openDb } from '../db/client.js';
 import { consumeApprovedDecision, isApprovedDecision } from '../domain/decision-service.js';
 import { resolveProjectForCwd } from '../supervisor/state.js';
 import { trustedMajorHome } from '#trust-roots';
+import { providerTokenEnv } from '../providers/provider-token.js';
 import {
   assertActiveResourceLease,
   assertActiveResourceLeaseForProcess,
@@ -551,6 +552,8 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
   const admittedSourceRoots = new Set(request.allowedRoots.map((root) => resolve(root)));
   const roots = [...admittedSourceRoots];
   let baseEnv: NodeJS.ProcessEnv = {};
+  // Host path only: the Lima guest has its own provider-auth store.
+  const credentialEnv = backendEnabled ? {} : providerTokenEnv(executable);
   if (!backendEnabled) {
     const projectKey = createHash('sha256').update(resolve(request.cwd)).digest('hex').slice(0, 24);
     const executionRoot = join(runtimeHome, 'execution', projectKey);
@@ -618,6 +621,7 @@ export function executeMajorCommand(request: MajorGatewayRequest): ExecuteHandle
         }
       : {}),
     baseEnv,
+    credentialEnv,
     envAllowlist: [
       'MAJOR_HOME',
       'MAJOR_RESOURCE_LEASE_ID',

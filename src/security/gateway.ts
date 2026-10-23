@@ -115,6 +115,11 @@ export interface GatewayOptions {
   envAllowlist?: readonly string[];
   /** Sensitive env vars require a valid DecisionRequest to pass through. */
   authorizedEnv?: { names: readonly string[]; decisionId: string };
+  /**
+   * Owner-imported provider credential injected after sanitisation. Names are
+   * audited as authorised; values are scrubbed from child output.
+   */
+  credentialEnv?: Readonly<Record<string, string>>;
   /** Verifies the authorising DecisionRequest is approved. */
   verifyDecision?: (decisionId: string) => boolean;
   /** Verifies provider action authority against durable, scoped decisions. */
@@ -274,7 +279,14 @@ export class ExecutionGateway {
     if (this.options.envAllowlist !== undefined) {
       sanitizeOptions.allowlist = this.options.envAllowlist;
     }
-    return sanitizeEnv(this.options.baseEnv ?? process.env, sanitizeOptions);
+    const sanitized = sanitizeEnv(this.options.baseEnv ?? process.env, sanitizeOptions);
+    const credentialEnv = this.options.credentialEnv ?? {};
+    if (Object.keys(credentialEnv).length === 0) return sanitized;
+    return {
+      env: { ...sanitized.env, ...credentialEnv },
+      stripped: sanitized.stripped,
+      authorized: [...new Set([...sanitized.authorized, ...Object.keys(credentialEnv)])].sort(),
+    };
   }
 
   /** Execute only through the complete M1 trust and containment boundary. */
@@ -492,6 +504,7 @@ export class ExecutionGateway {
       cwd: canonicalCwd,
       env: env.env,
       allowedRoots: this.options.allowedRoots,
+      redactValues: Object.values(this.options.credentialEnv ?? {}),
       // Process-tree containment: spawn as a group leader so the whole
       // descendant tree is terminated together (never only the direct child).
       detached: true,

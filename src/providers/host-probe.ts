@@ -2,6 +2,37 @@ import { executeMajorCommand } from '../security/major-gateway.js';
 import { providerExecutable, type ProviderCommandHost } from './commands.js';
 import type { BackendProviderStatus } from '../execution/backend.js';
 import type { ProviderEvent } from './types.js';
+import { hasKeychainEntry, keychainServiceName } from './host-credential.js';
+import { readProviderToken } from './provider-token.js';
+
+const TOKEN_SETUP: Partial<Record<ProviderCommandHost, string>> = {
+  claude:
+    'run `claude setup-token`, then pipe the printed token: `major provider import-token claude-code`',
+  cursor:
+    'create a Cursor User API Key (Cursor dashboard > Integrations), then pipe it: `major provider import-token cursor`',
+};
+
+/** Why the host CLI is not authenticated, with the owner's next step when known. */
+function unauthenticatedDetail(host: ProviderCommandHost, output: string): string {
+  if (/bind: operation not permitted/i.test(output)) {
+    return (
+      `sandbox-blocked: ${providerExecutable(host)} must open a localhost listener, which ` +
+      "Major's Seatbelt profile denies; this needs a containment policy change, not a login"
+    );
+  }
+  const setup = TOKEN_SETUP[host];
+  if (setup && readProviderToken(host)) {
+    return `the Major-held ${host} token was not accepted; replace it: ${setup}`;
+  }
+  const service = keychainServiceName(host);
+  if (setup && service && hasKeychainEntry(service)) {
+    return (
+      `host-keychain-only: the ${host} login is in the macOS Keychain, which Major's sandbox ` +
+      `cannot read and Major never extracts; ${setup}`
+    );
+  }
+  return 'provider is installed but host CLI authentication was not confirmed';
+}
 
 interface HostProbeSpec {
   statusArgs: string[];
@@ -22,8 +53,10 @@ const HOST_PROBES: Readonly<Record<ProviderCommandHost, HostProbeSpec>> = Object
     authenticated: /(?:authenticated|logged in|status\s*:\s*ok)/i,
   },
   antigravity: {
-    statusArgs: ['auth', 'status'],
-    authenticated: /(?:authenticated|logged in|signed in|oauth)/i,
+    // agy has no auth/status subcommand. `models` lists the account's models
+    // (no prompt is sent) and succeeds only when signed in.
+    statusArgs: ['models'],
+    authenticated: /^[a-z0-9][\w.-]*\t\S/m,
   },
 });
 
@@ -82,7 +115,7 @@ export async function probeHostProvider(host: ProviderCommandHost): Promise<Back
       authenticated,
       detail: authenticated
         ? 'provider is installed and authenticated through the host CLI'
-        : 'provider is installed but host CLI authentication was not confirmed',
+        : unauthenticatedDetail(host, auth.output),
       ...(versionMatch ? { version: versionMatch } : {}),
     };
   } catch (error) {

@@ -66,6 +66,8 @@ export interface StreamingSpawnSpec {
   /** Extract a resumable session ref from a parsed event. */
   extractSessionRef?: (event: ProviderEvent) => string | undefined;
   extractUsage?: (event: ProviderEvent) => unknown;
+  /** Exact secret values (injected credentials) to scrub from stdout and stderr. */
+  redactValues?: readonly string[];
 }
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
@@ -85,7 +87,11 @@ function spawnStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
   if (spec.allowedRoots) assertWithinRoots(spec.cwd, spec.allowedRoots);
 
   const queue = new EventQueue<ProviderEvent>();
-  const parseLine = spec.parseLine ?? defaultParseLine;
+  const parse = spec.parseLine ?? defaultParseLine;
+  const secrets = (spec.redactValues ?? []).filter(Boolean);
+  const scrub = (text: string) =>
+    secrets.reduce((out, secret) => out.replaceAll(secret, '[REDACTED]'), text);
+  const parseLine = (line: string) => parse(scrub(line));
   const stderrChunks: string[] = [];
   let sessionRef: string | undefined;
   let usage: unknown;
@@ -140,7 +146,7 @@ function spawnStreaming(spec: StreamingSpawnSpec): ExecuteHandle {
     const finish = (exitCode: number | null) => {
       clearTimeout(timeout);
       queue.close();
-      const stderrText = stderrChunks.join('');
+      const stderrText = scrub(stderrChunks.join(''));
       const status: ExecuteOutcome['status'] = cancelled
         ? 'cancelled'
         : timedOut

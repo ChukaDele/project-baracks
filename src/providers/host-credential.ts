@@ -54,7 +54,7 @@ export function hostCredentialPath(host: ProviderCommandHost): string | undefine
  * some installations (e.g. Linux, where Keychain doesn't exist) still use the
  * flat file.
  */
-function keychainServiceName(host: ProviderCommandHost): string | undefined {
+export function keychainServiceName(host: ProviderCommandHost): string | undefined {
   switch (host) {
     case 'claude':
       return 'Claude Code-credentials';
@@ -84,7 +84,7 @@ export type HostCredentialCheck =
 /** True only if a macOS Keychain entry for the given service exists. Uses
  * `security find-generic-password` WITHOUT `-w`: this confirms presence via
  * exit code only and never reads or prints the stored secret. */
-function hasKeychainEntry(service: string): boolean {
+export function hasKeychainEntry(service: string): boolean {
   if (platform() !== 'darwin') return false;
   try {
     execFileSync('/usr/bin/security', ['find-generic-password', '-s', service], {
@@ -105,7 +105,8 @@ function keychainFallback(host: ProviderCommandHost): HostCredentialCheck | unde
       `${providerLabel(host)} is authenticated on this Mac via the macOS Keychain, not a flat ` +
       'file. Major cannot safely extract a Keychain secret without reading its content, which is ' +
       'not permitted for this operation — sign in with it directly inside the isolated worker ' +
-      'instead, or see docs/readiness-model.md for a manual export procedure.',
+      'instead. On the host path, import a headless token: see docs/readiness-model.md ' +
+      '("Keychain logins on the host path").',
   };
 }
 

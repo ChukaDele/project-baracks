@@ -122,3 +122,60 @@ performance, skills and evidence-qualified effects, failures, interventions,
 quality, outcomes and recurrence. An optional Langfuse/OpenTelemetry exporter
 can consume high-volume telemetry later. Exporter health must never block the
 active objective or invalidate the durable Major receipt.
+
+## Keychain logins on the host path (Claude Code, Cursor)
+
+On macOS, Claude Code and the Cursor CLI keep their interactive login in the
+Keychain (`Claude Code-credentials`, `cursor-access-token`). Major's Seatbelt
+sandbox cannot read the Keychain, and Major never extracts a Keychain secret.
+So a Mac where `claude auth status` says `loggedIn: true` still probes as
+`AUTH_REQUIRED`. The probe detail now starts with `host-keychain-only:` and
+names the fix.
+
+The fix uses each provider's official headless credential. The owner creates
+it with the provider's own tool and gives it to Major on stdin. It is never an
+argument, never echoed and never logged.
+
+Claude Code (subscription OAuth token, no API billing):
+
+```bash
+claude setup-token                                # sign in; it prints a long-lived token
+pbpaste | major provider import-token claude-code # after you copy the token
+pbcopy < /dev/null                                # clear the clipboard
+```
+
+`claude setup-token | major provider import-token claude-code` also works when
+the sign-in can complete with stdout piped; Major picks the single
+`sk-ant-oat…` word out of the output.
+
+Cursor (User API Key from the Cursor dashboard, Integrations page):
+
+```bash
+pbpaste | major provider import-token cursor
+pbcopy < /dev/null
+```
+
+Major stores the token at `<majorHome>/credentials/claude-code` or
+`<majorHome>/credentials/cursor` (mode 0600, directory 0700) and re-probes.
+It injects the token only into that provider's host processes, as
+`CLAUDE_CODE_OAUTH_TOKEN` or `CURSOR_API_KEY`. Any copy of these names in
+Major's own environment is still stripped. The audit log records the name
+only, and Major scrubs the exact value from worker output. Major refuses a
+token file that is a symlink, owned by another user or readable by group or
+other.
+
+Notes:
+
+- The Claude probe confirms that the token is present, not that it is valid.
+  The first worker run validates it. The Cursor probe validates the key.
+- The token is in the provider process's environment, so every command that
+  worker runs inherits it. The output scrub matches the exact value only; it
+  cannot stop a worker that encodes or writes the token elsewhere. Treat a
+  provider worker as able to use the token, as it can with an interactive
+  login.
+- To revoke, delete the file and revoke the token at the provider.
+- Antigravity has a different cause. `agy` has no `auth status` command; the
+  probe now runs `agy models`, which sends no prompt. Inside Major's Seatbelt
+  profile `agy` cannot start, because it must bind a `127.0.0.1` listener and
+  write logs under `~/.gemini/antigravity-cli`. The probe reports this as
+  `sandbox-blocked:`. The fix is a containment policy change, not a login.
