@@ -478,6 +478,90 @@ describe('Major coordinator contract', () => {
     expect(selectCoordinator(goal(repo), providers)).toMatchObject({ kind: 'checkpoint' });
   });
 
+  describe('owner --coordinator pin', () => {
+    // The evidence case: an architectural/high-risk task whose class ladder
+    // prefers Claude fable, with a healthy Codex account also available.
+    const ladderProviders = (codexAvailability: 'available' | 'exhausted' = 'available') => [
+      {
+        name: 'claude-code',
+        installed: true,
+        models: [model({ modelRef: 'fable', routingClass: 'fable' })],
+      },
+      {
+        name: 'codex',
+        installed: true,
+        models: [
+          model({
+            modelRef: 'gpt-codex',
+            routingClass: 'codex',
+            availability: codexAvailability,
+          }),
+        ],
+      },
+    ];
+
+    it('routes the task to the pinned healthy provider over the class ladder', () => {
+      const current = goal('/tmp/project');
+      current.preferredCoordinator = 'codex';
+      current.pinnedCoordinator = 'codex';
+      // A prior hop ran on Claude; the pin still wins.
+      current.lastCoordinator = 'claude';
+      current.lastAccountLabel = 'default';
+      const selection = selectCoordinator(current, ladderProviders());
+      expect(selection).toMatchObject({ kind: 'route', host: 'codex', provider: 'codex' });
+      expect(selection.reason).toContain('owner pinned coordinator=codex');
+    });
+
+    it('falls back through the ladder and records why when the pinned provider is exhausted', () => {
+      const current = goal('/tmp/project');
+      current.pinnedCoordinator = 'codex';
+      const selection = selectCoordinator(current, ladderProviders('exhausted'));
+      expect(selection).toMatchObject({ kind: 'route', host: 'claude', provider: 'claude-code' });
+      expect(selection.reason).toMatch(
+        /owner pinned coordinator=codex unavailable \(.+\); ladder fallback/,
+      );
+    });
+
+    it('leaves the pinned provider when every one of its accounts is exhausted', () => {
+      const current = goal('/tmp/project');
+      current.pinnedCoordinator = 'codex';
+      current.lastCoordinator = 'claude';
+      const exhaustedCodex = (name: string) => ({
+        name,
+        installed: true,
+        models: [
+          model({ modelRef: 'gpt-codex', routingClass: 'codex', availability: 'exhausted' }),
+        ],
+      });
+      const selection = selectCoordinator(current, [
+        ...ladderProviders('exhausted'),
+        exhaustedCodex('codex#work-b'),
+      ]);
+      expect(selection).toMatchObject({ kind: 'route', provider: 'claude-code' });
+      expect(selection.reason).toContain('ladder fallback');
+    });
+
+    it('keeps the unpinned preference a tie-break only', () => {
+      const current = goal('/tmp/project');
+      current.preferredCoordinator = 'codex';
+      expect(selectCoordinator(current, ladderProviders())).toMatchObject({
+        kind: 'route',
+        provider: 'claude-code',
+      });
+    });
+
+    it('never steers an explicit non-task request such as the completion review', () => {
+      const current = goal('/tmp/project');
+      current.pinnedCoordinator = 'codex';
+      const selection = selectCoordinator(current, ladderProviders(), {
+        purpose: 'analysis',
+        complexity: 'architectural',
+      });
+      expect(selection).toMatchObject({ kind: 'route', provider: 'claude-code' });
+      expect(selection.reason).not.toContain('owner pinned');
+    });
+  });
+
   it('rotates after two coordinator failures when another provider is usable', () => {
     const current = goal('/tmp/project');
     current.preferredCoordinator = 'claude';

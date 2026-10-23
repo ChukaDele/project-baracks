@@ -89,6 +89,32 @@ describe('Major supervisor state', () => {
     expect(readSupervisorState().goals).toHaveLength(1);
   });
 
+  it('records an explicit coordinator as a pin and lets a redefining dispatch replace it', () => {
+    const repoPath = fakeRepo('pin-goal');
+    const first = startGoal({
+      project: 'pin-goal',
+      repoPath,
+      goal: 'First objective',
+      autonomous: false,
+    });
+    expect(first.preferredCoordinator).toBe('claude');
+    expect(first.pinnedCoordinator).toBeUndefined();
+    const pinned = startGoal({
+      project: 'pin-goal',
+      repoPath,
+      goal: 'Second objective',
+      autonomous: false,
+      pinnedCoordinator: 'codex',
+    });
+    expect(pinned.id).toBe(first.id);
+    expect(getGoal(first.id)).toMatchObject({
+      preferredCoordinator: 'codex',
+      pinnedCoordinator: 'codex',
+    });
+    startGoal({ project: 'pin-goal', repoPath, goal: 'Third objective', autonomous: false });
+    expect(getGoal(first.id)?.pinnedCoordinator).toBeUndefined();
+  });
+
   it('attaches sessions to the git project and preserves the host', () => {
     const repoPath = fakeRepo('surface-talent');
     const project = resolveProjectForCwd(repoPath);

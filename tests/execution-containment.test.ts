@@ -21,6 +21,8 @@ import {
 import { ExecutionGateway, type ExecutionPolicyDecision } from '../src/security/gateway.js';
 import {
   executeLocalDiagnostic,
+  HOST_RUNTIME_ENV_ALLOWLIST,
+  hostRuntimeEnv,
   trustedExecutableRegistry,
 } from '../src/security/major-gateway.js';
 import { gatewayAllowedRoots } from '../src/supervisor/worker.js';
@@ -209,6 +211,53 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
     });
     expect(readFileSync(source, 'utf8')).toBe('frozen');
     expect(readFileSync(runtimeMarker, 'utf8')).toBe('ok');
+  });
+
+  it('gives a contained provider CLI a writable TMPDIR and Claude temp dir without opening /tmp', async () => {
+    const workspace = tempDir();
+    const runtime = hostRuntimeEnv('claude', tempDir(), workspace);
+    const blockedTmp = `/tmp/major-tmpdir-probe-${process.pid}-${Date.now()}`;
+    // A fake provider CLI that writes where Claude Code writes: its per-uid
+    // directory under CLAUDE_CODE_TMPDIR (else /tmp, which Seatbelt denies),
+    // plus a plain $TMPDIR scratch file.
+    const fakeCli = join(workspace, 'fake-claude.mjs');
+    writeFileSync(
+      fakeCli,
+      [
+        "import { mkdirSync, writeFileSync } from 'node:fs';",
+        "const uidDir = `${process.env.CLAUDE_CODE_TMPDIR || '/tmp'}/claude-${process.getuid()}`;",
+        'mkdirSync(uidDir, { recursive: true, mode: 0o700 });',
+        "writeFileSync(`${uidDir}/session.json`, '{}');",
+        "writeFileSync(`${process.env.TMPDIR}/scratch.txt`, 'ok');",
+        'let tmpDenied = false;',
+        `try { writeFileSync(${JSON.stringify(blockedTmp)}, 'bad'); } catch { tmpDenied = true; }`,
+        'console.log(JSON.stringify({ tmpDenied }));',
+      ].join('\n'),
+    );
+    const registry = new TrustedExecutableRegistry();
+    registry.pin(NODE);
+    const gateway = new ExecutionGateway({
+      allowedRoots: [workspace, runtime.executionRoot],
+      commandPolicy: { allowedExecutables: ['node'] },
+      trustedExecutables: registry,
+      baseEnv: { PATH: process.env.PATH ?? '/usr/bin:/bin', ...runtime.env },
+      envAllowlist: HOST_RUNTIME_ENV_ALLOWLIST,
+      recordDecision: () => undefined,
+      containment: darwinSeatbeltContainment(),
+    });
+    const handle = gateway.execute({ executable: NODE, args: [fakeCli], cwd: workspace });
+    const events = [];
+    for await (const event of handle.events) events.push(event);
+    const outcome = await handle.outcome;
+    expect(outcome.status, outcome.stderrTail).toBe('succeeded');
+    expect(JSON.stringify(events)).toContain('tmpDenied');
+    expect(JSON.stringify(events)).not.toContain('tmpDenied\\":false');
+    const runtimeTmp = runtime.env.TMPDIR!;
+    expect(runtime.env.CLAUDE_CODE_TMPDIR).toBe(runtimeTmp);
+    expect(runtimeTmp.startsWith(runtime.executionRoot)).toBe(true);
+    expect(readFileSync(join(runtimeTmp, 'scratch.txt'), 'utf8')).toBe('ok');
+    expect(existsSync(join(runtimeTmp, `claude-${process.getuid!()}`, 'session.json'))).toBe(true);
+    expect(existsSync(blockedTmp)).toBe(false);
   });
 
   it('allows the declared root and denies sibling reads, writes and descendant escapes', () => {

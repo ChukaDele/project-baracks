@@ -496,7 +496,7 @@ export async function runSupervisorCli(args: string[]): Promise<boolean> {
             policy,
           }),
           ...(requiredOperations.length > 0 ? { requiredOperations } : {}),
-          ...(preferredRaw ? { preferredCoordinator: validHost(preferredRaw) } : {}),
+          ...(preferredRaw ? { pinnedCoordinator: validHost(preferredRaw) } : {}),
         });
     console.log(`Major goal active: ${goal.id}`);
     console.log(`project: ${goal.project}`);
