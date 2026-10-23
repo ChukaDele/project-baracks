@@ -64,7 +64,7 @@ Representative behaviour proof: [unproven / proven]
 ## Failure regression
 
 - [Project-specific failure → reproduction → expected result → focused verification artifact]
-- [Optional separate sanitized, generalisable learning candidate → existing GBrain learning path]
+- [Optional separate sanitized, generalisable learning candidate → existing Major learning path]
 
 ## Next executable action
 

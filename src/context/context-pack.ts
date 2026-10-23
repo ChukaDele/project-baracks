@@ -55,7 +55,8 @@ function evidence(
 
 /**
  * Convert the existing dashboard into a deterministic, progressive context
- * pack. GBrain and run history remain the sources of truth; this is only a
+ * pack. Project files, run history and the Major learning store remain the
+ * sources of truth (GBrain is optional and on demand); this is only a
  * bounded projection for clients and provider prompts.
  */
 export function buildContextPack(dashboard: MajorDashboard, options: ContextPackOptions = {}) {
@@ -135,7 +136,7 @@ export function buildContextPack(dashboard: MajorDashboard, options: ContextPack
     };
     evidenceIndex.memory = [
       evidence(
-        'Project-local GBrain context and sanitized learning store',
+        'Project-local context and sanitized Major learning store',
         'reported',
         dashboard.generatedAt,
       ),

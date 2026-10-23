@@ -13,17 +13,19 @@ Load this skill before implementing a substantial new subsystem, provider integr
 
 ## Ordered process
 
-DEFINE CAPABILITY -> CHECK EXISTING MAJOR -> CHECK GBRAIN/SKILLS -> CHECK OFFICIAL PROVIDER TOOLS -> CHECK MCP/ACP ECOSYSTEM -> CHECK MATURE OSS -> CHECK PACKAGE ECOSYSTEM -> COMPARE -> DECIDE
+DEFINE CAPABILITY -> CHECK EXISTING MAJOR -> CHECK SKILLS (AND GBRAIN IF CONFIGURED) -> CHECK OFFICIAL PROVIDER TOOLS -> CHECK MCP/ACP ECOSYSTEM -> CHECK MATURE OSS -> CHECK PACKAGE ECOSYSTEM -> COMPARE -> DECIDE
 
 1. DEFINE CAPABILITY
 2. CHECK EXISTING MAJOR
-3. CHECK GBRAIN/SKILLS
+3. CHECK SKILLS (AND GBRAIN IF CONFIGURED)
 4. CHECK OFFICIAL PROVIDER TOOLS
 5. CHECK MCP/ACP ECOSYSTEM
 6. CHECK MATURE OSS
 7. CHECK PACKAGE ECOSYSTEM
 8. COMPARE
 9. DECIDE
+
+Step 3 checks the Skills Library first. Check a GBrain index only if one is configured; a missing or empty GBrain index never fails or blocks this gate.
 
 Search by capability, never by the implementation already imagined. Bad: "find a Lima replacement". Good: "isolated local runtime for coding agents with provider credential separation".
 
@@ -52,7 +54,7 @@ Append a decision record to `docs/prior-art-decisions.md` before the build start
 External engines must sit underneath rather than replace:
 
 - durable cross-project goals
-- GBrain and learning
+- learning and knowledge routing
 - skillification
 - Toolsmith
 - policy and autonomy

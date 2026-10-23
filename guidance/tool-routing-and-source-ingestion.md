@@ -110,7 +110,7 @@ Use native vision for understanding. Use image-generation/editing tools for actu
 
 **Source precedence**
 
-1. For the *current project's operational state*, use authorized project files and project-scoped GBrain records. A current project decision outranks an older global Notion note. Do not mix data from unrelated clients or projects.
+1. For the *current project's operational state*, use authorized project files. Use GBrain on demand only: when the owner explicitly asks, or when a named hand-written GBrain entity page is relevant. Never retrieve from GBrain on every task or treat it as primary memory. A current project decision outranks an older global Notion note. Do not mix data from unrelated clients or projects.
 2. For *maintained conceptual knowledge*, use the Notion Knowledge Bank → comprehensive Knowledge Piece. GBrain notes or saved social posts are not substitutes for a maintained Notion synthesis.
 3. For facts that decay (regulations, finance, vendor behavior, prices, external tools), verify against the latest primary/official evidence. If Notion and current evidence disagree, keep the distinction visible.
 4. For design tasks, inspect the appropriate maintained Notion Design Knowledge Piece and optionally Eagle for visual references when authorized. Do not assume inspiration media or assets are licensed for copying.

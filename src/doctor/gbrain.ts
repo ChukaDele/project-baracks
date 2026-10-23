@@ -4,9 +4,11 @@ import { join } from 'node:path';
 import type { DoctorCheck } from './doctor.js';
 
 /**
- * Read-only GBrain autopilot probe. It flags a self-disabled autopilot or a
- * wrapper whose --repo path is gone, and prints the owner's repair command.
- * Major never edits ~/.gbrain itself.
+ * Read-only GBrain autopilot probe. GBrain is an optional, on-demand MCP by
+ * owner policy, so a disabled or uninstalled autopilot is reported as info.
+ * Set MAJOR_GBRAIN_MODE=autopilot to restore the warning for a self-disabled
+ * autopilot. An enabled wrapper whose --repo path is gone always warns with the
+ * owner's repair command. Major never edits ~/.gbrain itself.
  */
 export function gbrainAutopilotCheck(
   env: NodeJS.ProcessEnv = process.env,
@@ -15,12 +17,17 @@ export function gbrainAutopilotCheck(
 ): DoctorCheck | undefined {
   const home = env.MAJOR_GBRAIN_HOME ?? join(homedir(), '.gbrain');
   const wrapper = join(home, 'autopilot-run.sh');
-  if (!fileExists(wrapper)) return undefined; // Autopilot was never installed.
+  const onDemand = env.MAJOR_GBRAIN_MODE !== 'autopilot';
+  if (!fileExists(wrapper)) {
+    return onDemand ? onDemandCheck('autopilot not installed') : undefined;
+  }
   const marker = join(home, 'autopilot-disabled');
   const repo = /autopilot --repo '([^']+)'/.exec(safeRead(readFile, wrapper))?.[1];
   const problems: string[] = [];
   if (fileExists(marker)) {
-    problems.push(`autopilot disabled (${safeRead(readFile, marker).trim() || marker})`);
+    const reason = safeRead(readFile, marker).trim() || marker;
+    if (onDemand) return onDemandCheck(`autopilot disabled: ${reason}`);
+    problems.push(`autopilot disabled (${reason})`);
   }
   if (repo && !fileExists(repo)) problems.push(`autopilot repo path missing: ${repo}`);
   if (problems.length === 0) {
@@ -38,6 +45,15 @@ export function gbrainAutopilotCheck(
     detail:
       `${problems.join('; ')}. Owner action: gbrain autopilot --install --repo <existing-brain-repo> ` +
       '(reinstall rewrites the wrapper and clears the disabled marker; Major does not edit ~/.gbrain)',
+  };
+}
+
+function onDemandCheck(state: string): DoctorCheck {
+  return {
+    name: 'gbrain-autopilot',
+    required: false,
+    status: 'info',
+    detail: `GBrain on-demand mode (${state}); use the GBrain MCP only when explicitly asked or a named hand-written entity page is relevant`,
   };
 }
 

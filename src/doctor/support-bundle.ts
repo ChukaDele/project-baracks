@@ -138,7 +138,7 @@ export function buildSupportBundle(
       milestone: c.milestone,
     })),
     errorChecks: report.checks
-      .filter((c) => c.status !== 'ok')
+      .filter((c) => c.status !== 'ok' && c.status !== 'info')
       .map((c) => ({ name: c.name, status: c.status, detail: c.detail })),
     installHistory: readInstallHistory(join(home, 'install-history.jsonl'), 10),
   };

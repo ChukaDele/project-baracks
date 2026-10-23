@@ -1,16 +1,20 @@
 {
   "skill": "knowledge-ingest",
   "should_trigger": [
-    "Use knowledge-ingest on these meeting notes and route only durable meaning to GBrain.",
+    "Use knowledge-ingest on these meeting notes and route only durable meaning to the Notion Knowledge Library.",
     "Ingest this transcript with provenance, identity resolution, dedupe and notability filtering.",
     "Dispatch this repository research into claims, conclusions and durable knowledge without storing noise."
   ],
   "should_not_trigger": [
     "Summarize this one document for my immediate reply.",
     "Search the web for current exchange rates.",
-    "Create a new database for notes."
+    "Create a new database for notes.",
+    "Show the project status.",
+    "Review our operations.",
+    "Plan the database migration.",
+    "Summarize this month's costs."
   ],
   "conflicts": [
-    "source-ingestion obtains faithful content; knowledge-ingest classifies and routes its durable meaning through existing GBrain interfaces."
+    "source-ingestion obtains faithful content; knowledge-ingest classifies and routes its durable meaning to Notion or Major learning; GBrain is on demand only."
   ]
 }

@@ -8,7 +8,11 @@
   "should_not_trigger": [
     "Deduplicate these identical CSV rows by key.",
     "Trace when this single idea first appeared.",
-    "Summarize this article."
+    "Summarize this article.",
+    "Show the project status.",
+    "Review our operations.",
+    "Plan the database migration.",
+    "Summarize this month's costs."
   ],
   "conflicts": [
     "idea-lineage owns temporal evolution; concept-synthesis owns relationships among existing knowledge records."

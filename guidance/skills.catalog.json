@@ -1608,13 +1608,13 @@
       "id": "knowledge-ingest",
       "name": "knowledge-ingest",
       "title": "Knowledge Ingest",
-      "description": "Use to dispatch notes, pasted text, documents, transcripts, URLs, research or repositories into existing Major and GBrain knowledge interfaces with provenance, identity resolution, dedupe and notability filtering.",
-      "shortDescription": "Use to dispatch notes, pasted text, documents, transcripts, URLs, research or repositories into existing Major and GBrain knowledge interfaces with provenance, identity resolution, dedupe and notability filtering.",
+      "description": "Use to dispatch notes, pasted text, documents, transcripts, URLs, research or repositories into the maintained Notion Knowledge Library or Major learning with provenance, identity resolution, dedupe and notability filtering.",
+      "shortDescription": "Use to dispatch notes, pasted text, documents, transcripts, URLs, research or repositories into the maintained Notion Knowledge Library or Major learning with provenance, identity resolution, dedupe and notability filtering.",
       "aliases": [
         "knowledge-dispatcher"
       ],
       "triggerConditions": [
-        "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability"
+        "ingest notes pasted text documents transcripts urls research repositories notion provenance dedupe notability"
       ],
       "category": "uncategorized",
       "version": "25",
@@ -1631,9 +1631,9 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 25,
-      "contentSha256": "2d6897d9767ef81560a869c1b496ec21579ccc6d30f4f76fae48c095cc5954b8",
+      "contentSha256": "7ca6d2cfa21102c55aea23fec9b1f93f6b839fa8a3a80213aad2dbfe8817d725",
       "triggers": [
-        "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability"
+        "ingest notes pasted text documents transcripts urls research repositories notion provenance dedupe notability"
       ]
     },
     {
@@ -2139,7 +2139,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 25,
-      "contentSha256": "e9596e7931a1420cfb011a74f3ca22dc46f3373f1a6f4dc809172cf9bb4f93fb",
+      "contentSha256": "d085179bcc6c0b67b9630ae54e73fab33cdc5ebf66c362ce48c2470fbb568246",
       "triggers": [
         "operations process improvement workflow efficiency"
       ]
@@ -2354,7 +2354,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 25,
-      "contentSha256": "0aad51fd5528ec867a0d452978ccad188d82a8b0ad529768e5da51ed0b2893de",
+      "contentSha256": "b03f9d67b66ada609f1d0cecc7a1f4c43880bbd97555dcc1d28f863b3fcbe3c4",
       "triggers": [
         "new subsystem provider integration agent runtime sandbox router memory auth scraper workflow engine browser mcp installation deployment major dependency"
       ]
@@ -2736,8 +2736,8 @@
       "id": "reusable-asset-discovery",
       "name": "reusable-asset-discovery",
       "title": "Reusable Asset Discovery",
-      "description": "Use before material new implementation to retrieve a compatible reusable implementation in the required local-map, GBrain-index, canonical-package, historical-candidate and prior-art order. Use when deciding whether code, a component, a template, a validator, a schema, an adapter or a calculator should be reused, wrapped, promoted or built. Do not create a new asset registry or copy source trees into GBrain.",
-      "shortDescription": "Use before material new implementation to retrieve a compatible reusable implementation in the required local-map, GBrain-index, canonical-package, historical-candidate and prior-art order. Use when deciding whether code, a component, a template, a validator, a schema, an adapter or a calculator should be reused, wrapped, promoted or built. Do not create a new asset registry or copy source trees into GBrain.",
+      "description": "Use before material new implementation to retrieve a compatible reusable implementation in the required local-map, optional GBrain-index, canonical-package, historical-candidate and prior-art order. Use when deciding whether code, a component, a template, a validator, a schema, an adapter or a calculator should be reused, wrapped, promoted or built. Do not create a new asset registry or copy source trees into GBrain.",
+      "shortDescription": "Use before material new implementation to retrieve a compatible reusable implementation in the required local-map, optional GBrain-index, canonical-package, historical-candidate and prior-art order. Use when deciding whether code, a component, a template, a validator, a schema, an adapter or a calculator should be reused, wrapped, promoted or built. Do not create a new asset registry or copy source trees into GBrain.",
       "aliases": [
         "reusable-asset-discovery"
       ],
@@ -2762,7 +2762,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 25,
-      "contentSha256": "582f47594b1b4e1ba33f8b9f166a70b0b9795e4aebcc6de708547f57590f9863",
+      "contentSha256": "c8171ddf31d5151018ae671fc97822a5b64d534b7eb6a41f2e88d53e9b21b6b1",
       "triggers": [
         "reusable asset component template package discovery reuse"
       ]
@@ -3029,7 +3029,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 25,
-      "contentSha256": "0beaaada6bf7cd167871ae16cfbfdfbcdaf5e485425724b7bac410c2cf246fa0",
+      "contentSha256": "8d933cb9c4c14b0b7e8c4b6af8a65f9c28fc51c1c329298e3585247cb48a2345",
       "triggers": [
         "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
       ]
@@ -3089,7 +3089,7 @@
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
       "registryVersion": 25,
-      "contentSha256": "5d2c0f7e2a7d2d19b779788fc741e7e9e54e41e90d5c8483506a4cea1458c831",
+      "contentSha256": "ccef0ae11b45eecd5a7c4805038ce7797732f95b5a9bbb71e55ed7e99f32e53a",
       "triggers": [
         "reusable successful procedure or recurring solved failure"
       ]

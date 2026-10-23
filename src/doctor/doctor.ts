@@ -24,7 +24,7 @@ import type { BrainFinding, KnowledgeFact } from '../knowledge/semantics.js';
 import { inspectBrain } from '../knowledge/semantics.js';
 import { gbrainAutopilotCheck } from './gbrain.js';
 
-export type CheckStatus = 'ok' | 'warn' | 'missing';
+export type CheckStatus = 'ok' | 'info' | 'warn' | 'missing';
 
 export interface DoctorCheck {
   name: string;

@@ -1513,7 +1513,7 @@
       "id": "knowledge-ingest",
       "source": "major-internal",
       "availability": "all-projects",
-      "load": "ingest notes pasted text documents transcripts urls research repositories gbrain provenance dedupe notability",
+      "load": "ingest notes pasted text documents transcripts urls research repositories notion provenance dedupe notability",
       "aliases": [
         "knowledge-dispatcher"
       ]

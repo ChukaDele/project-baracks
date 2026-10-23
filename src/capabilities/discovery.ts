@@ -9,7 +9,7 @@ export interface DiscoveredCapability {
 export function priorArtDiscoveryDirective(operation: string): string {
   return (
     `Before building ${operation}, run prior-art discovery in order ` +
-    '(DEFINE CAPABILITY -> CHECK EXISTING MAJOR -> CHECK GBRAIN/SKILLS -> ' +
+    '(DEFINE CAPABILITY -> CHECK EXISTING MAJOR -> CHECK SKILLS (AND GBRAIN IF CONFIGURED) -> ' +
     'CHECK OFFICIAL PROVIDER TOOLS -> CHECK MCP/ACP ECOSYSTEM -> CHECK MATURE OSS -> ' +
     'CHECK PACKAGE ECOSYSTEM -> COMPARE -> DECIDE) and record the decision in ' +
     'docs/prior-art-decisions.md before building.'

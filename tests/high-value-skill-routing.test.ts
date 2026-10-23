@@ -231,6 +231,23 @@ const cases: Case[] = [
     include: [],
     exclude: ['root-cause-qa'],
   },
+  ...[
+    'Show the project status.',
+    'Review our operations.',
+    'Plan the database migration.',
+    "Summarize this month's costs.",
+  ].map((task) => ({
+    name: `generic wording does not pull GBrain skills: ${task}`,
+    task,
+    include: [],
+    exclude: [
+      'knowledge-ingest',
+      'concept-synthesis',
+      'idea-lineage',
+      'research-compendium',
+      'reusable-asset-discovery',
+    ],
+  })),
   {
     name: 'SQL bottleneck is not operations redesign',
     task: 'Find the bottleneck in this SQL query.',

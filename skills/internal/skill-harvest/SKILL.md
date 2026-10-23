@@ -5,7 +5,7 @@ description: Use to discover and assess prior art for a recurring capability, th
 
 # Skill harvest
 
-Keep GBrain as durable organizational meaning and Major as the sole routing and activation authority. Record the prior-art decision before substantial helper code.
+Keep the Notion Knowledge Library as durable distilled knowledge and Major as the sole routing and activation authority; use GBrain only on demand. Record the prior-art decision before substantial helper code.
 
 1. Define the capability and representative tasks; search existing Major skills, project capabilities and permissible upstream prior art.
 2. Inspect maturity, maintenance, licence, provenance, dependencies, authority and private assumptions.

@@ -8,7 +8,11 @@
   "should_not_trigger": [
     "Find one source for this fact.",
     "Write a literature-free project status note.",
-    "Download and archive the full books."
+    "Download and archive the full books.",
+    "Show the project status.",
+    "Review our operations.",
+    "Plan the database migration.",
+    "Summarize this month's costs."
   ],
   "conflicts": [
     "knowledge-ingest routes durable inputs; research-compendium structures a bounded reusable research asset."
