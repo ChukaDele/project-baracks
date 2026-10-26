@@ -1,0 +1,8 @@
+{
+  "skill": "emil-surfaces",
+  "should_trigger": [
+    "Tune the border radius, shadows and layered borders on the card and panel surfaces.",
+    "Design the elevation, glass and inner shadow treatment for these dialog surfaces."
+  ],
+  "should_not_trigger": ["Fix the failing Python import.", "Write an investor FAQ."]
+}

@@ -1,0 +1,7 @@
+{
+  "skill": "emil-unslop-code",
+  "should_trigger": [
+    "Clean up the AI slop in this generated code: needless comments, over-abstraction and defensive try catch."
+  ],
+  "should_not_trigger": ["Choose a color palette.", "Plan a Lagos market entry."]
+}

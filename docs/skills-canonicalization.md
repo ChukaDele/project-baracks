@@ -395,3 +395,10 @@ Cause: **a** needed but never fired · **b** duplicate or overlap · **c** not n
 | `writing-os` | reg:internal | 16 | 2026-10-21 | d | KEEP |
 | `writing-red-team` | reg:internal | 6 | 2026-10-21 | d | KEEP: writing gate; now loads at its gate, not up front |
 | `xlsx` | claude-org-synced | 0 | - | c | OWNER DECISION (claude.ai org skills, not local) |
+
+## Addendum: AIforUI `emil-*` specialists (registry v26)
+
+- 28 skills installed by `npx @aiforui/install` are registered as `shared-agents` entries (canonical home `~/.agents/skills`, hosts symlink). No content is copied into this repo; the installer token is not stored anywhere.
+- `emil-kowalski-complete` stays an opt-in project-install bundle of the open-source repo. It does not contain these 28, so the entries are added next to it, not merged into it.
+- `src/skills/canonical-routing.ts` appends an `emil-craft` route after all existing routes, so `design-direction-and-taste`, `website-design-qa` and `responsive-motion-systems` keep their positions. Scroll-motion prompts (GSAP, ScrollTrigger, sticky, parallax) get no `emil-animations`.
+- Evidence: `tests/emil-skill-routing.test.ts` and `evals/skill-resolver/emil-*.json`.

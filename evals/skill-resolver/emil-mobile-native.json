@@ -1,0 +1,11 @@
+{
+  "skill": "emil-mobile-native",
+  "should_trigger": [
+    "My web app works in Chrome but feels wrong on my iPhone: the 100vh layout jumps and hover states stick after a tap.",
+    "Make this PWA feel native on a phone: safe area insets, pull-to-refresh and the notch."
+  ],
+  "should_not_trigger": [
+    "Fix the Android Kotlin gradle build.",
+    "Explain how Postgres indexes work."
+  ]
+}

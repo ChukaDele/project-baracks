@@ -1,0 +1,8 @@
+{
+  "skill": "emil-ui-review",
+  "should_trigger": [
+    "Review this UI diff the way a design engineer would and catch the polish mistakes the agent left behind.",
+    "Do a design review of the generated component pull request: does this look right?"
+  ],
+  "should_not_trigger": ["Review this Terraform plan for cost.", "Write release notes for the CLI."]
+}

@@ -1,0 +1,8 @@
+{
+  "skill": "emil-animations",
+  "should_trigger": [
+    "Review the easing and duration on this modal and drawer enter animation; it feels slow and janky.",
+    "Pick an ease-out cubic-bezier and a spring for this popover and add prefers-reduced-motion support."
+  ],
+  "should_not_trigger": ["Fix this SQL migration.", "Write a quarterly revenue forecast."]
+}

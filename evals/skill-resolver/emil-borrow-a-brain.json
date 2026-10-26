@@ -1,0 +1,7 @@
+{
+  "skill": "emil-borrow-a-brain",
+  "should_trigger": [
+    "Make a skill out of this founder's essays so my agent answers the way they would, with sources for every claim."
+  ],
+  "should_not_trigger": ["Plan the quarterly budget.", "Resize these images."]
+}

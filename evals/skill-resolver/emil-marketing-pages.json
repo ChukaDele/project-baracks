@@ -1,0 +1,8 @@
+{
+  "skill": "emil-marketing-pages",
+  "should_trigger": [
+    "Build a landing page with a hero section, pricing page and blog without scroll hijacking or parallax.",
+    "Set up the changelog, RSS feed and font preload for our marketing site."
+  ],
+  "should_not_trigger": ["Debug this Kubernetes crash loop.", "Reconcile the bank statement."]
+}

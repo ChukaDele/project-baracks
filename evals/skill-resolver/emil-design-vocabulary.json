@@ -1,0 +1,7 @@
+{
+  "skill": "emil-design-vocabulary",
+  "should_trigger": [
+    "What is the design term for the space between two specific letters, and how is a badge different from a tag?"
+  ],
+  "should_not_trigger": ["Write a cron job.", "Draft a lease agreement."]
+}

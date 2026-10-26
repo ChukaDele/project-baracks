@@ -1,0 +1,7 @@
+{
+  "skill": "emil-product-thinking",
+  "should_trigger": [
+    "I have a product idea; grill me on whether it is worth building and what I should build first."
+  ],
+  "should_not_trigger": ["Patch the nginx config.", "Format this spreadsheet."]
+}

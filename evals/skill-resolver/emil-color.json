@@ -1,0 +1,8 @@
+{
+  "skill": "emil-color",
+  "should_trigger": [
+    "Convert the hex palette to OKLCH and build a tonal scale with APCA contrast checks.",
+    "Derive the dark mode colors and define Tailwind v4 theme tokens in a wide gamut."
+  ],
+  "should_not_trigger": ["Rotate the API keys.", "Plan the sales territory map."]
+}

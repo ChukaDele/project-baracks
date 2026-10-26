@@ -1,0 +1,8 @@
+{
+  "skill": "emil-get-creative",
+  "should_trigger": [
+    "I am stuck and only have a vibe; walk the pipeline to a generator with knobs and a save button for the winning configuration.",
+    "I need inspiration and cannot picture it yet; I want endless variations of one visual idea."
+  ],
+  "should_not_trigger": ["Fix the CSV export bug.", "Summarize the earnings call."]
+}

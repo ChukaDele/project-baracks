@@ -1,0 +1,8 @@
+{
+  "skill": "emil-ask-emil",
+  "should_trigger": [
+    "Which skill should I use to fix this screen, and in which order should I run them?",
+    "Do you have a skill for this? List the skills and tell me what order to run them in."
+  ],
+  "should_not_trigger": ["Book a flight to Lagos.", "Calculate net present value."]
+}

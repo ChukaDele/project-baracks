@@ -52,7 +52,7 @@ These are canonical Major-owned skills.
 | `cost-control` | Subscription/rate-limit/paid-spend routing and usage discipline. |
 | `exploratory-creative-dev` | Awwwards/FWA/heavy-motion/immersive execution after art direction is settled. |
 
-## Shared skills routed by Major — 3
+## Shared skills routed by Major — 3 personal skills
 
 These live once in `~/.agents/skills` (source `shared-agents`). The resolver loads them only from that directory; host directories symlink to it. See `docs/skills-canonicalization.md`.
 
@@ -61,6 +61,20 @@ These live once in `~/.agents/skills` (source `shared-agents`). The resolver loa
 | `engineering-by-reference` | Reverse engineer a shipped feature, protocol, app or binary and rebuild its behaviour in our stack. |
 | `reference-replica` | Recreate or verify a UI from a screenshot, mockup, recording or live reference. |
 | `linkedin-gtm-and-content` | LinkedIn content, profile and GTM work within the permitted-source rules. |
+
+## Emil Kowalski / AIforUI craft specialists — 28
+
+Installed by `npx @aiforui/install` into `~/.agents/skills` (source `shared-agents`; host directories symlink to it). Content is not vendored in this repo. They are specialists **beneath** `design-direction-and-taste`, which stays the single taste authority: they are appended after every other canonical route and never replace one. Triggers come from each skill's own `Triggers on:` list (or its `Use when` clause where none exists).
+
+| Group | Skills |
+|---|---|
+| Craft | `emil-design-foundations`, `emil-typography`, `emil-color`, `emil-surfaces`, `emil-component-design`, `emil-forms-and-inputs`, `emil-animations`, `emil-ui-polish`, `emil-performance`, `emil-touch-and-accessibility`, `emil-mobile-native` |
+| Surfaces and review | `emil-marketing-pages`, `emil-unslop-design`, `emil-ui-review`, `emil-prep-for-prod`, `emil-design-system-docs` |
+| Exploration and tools | `emil-prototype`, `emil-get-creative`, `emil-build-a-tool`, `emil-ask-lapse` |
+| Router and vocabulary | `emil-ask-emil`, `emil-design-vocabulary`, `emil-engineering-vocabulary` |
+| Code, writing, product | `emil-unslop-code`, `emil-unslop-writing`, `emil-writing-skills`, `emil-borrow-a-brain`, `emil-product-thinking` |
+
+`emil-kowalski-complete` is kept as the opt-in project-install bundle (it installs the open-source `emilkowalski/skills` repo, a different set). The 28 skills above are not part of that bundle, so there is nothing to merge. Narrow craft triggers (mobile, easing, forms, landing pages, pre-launch, UI diff review, typography, colour, surfaces, performance, accessibility, polish, design-system docs, prototype, Lapse, router) are routed in `src/skills/canonical-routing.ts`; the rest score through their registry `load` text.
 
 ## Skill-pack standard
 

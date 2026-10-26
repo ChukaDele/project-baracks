@@ -1,0 +1,8 @@
+{
+  "skill": "emil-performance",
+  "should_trigger": [
+    "This long list is janky: virtualize it and stop transition all from causing layout shift.",
+    "The UI feels slow, find re-render storms, GPU compositing issues and unpreloaded fonts."
+  ],
+  "should_not_trigger": ["Draft a product requirements document.", "Rename the Git branch."]
+}

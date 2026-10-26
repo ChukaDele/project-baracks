@@ -367,6 +367,40 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
   if (legacyCleanup) add('legacy-cleanup', ['legacy-cleanup']);
   if (workspaceCleanup) add('workspace-cleanup', ['workspace-lifecycle-management']);
 
+  // Emil Kowalski (AIforUI) craft specialists. They sit beneath
+  // design-direction-and-taste, which stays the single taste authority, so they
+  // are appended after every other route and only on narrow craft triggers.
+  const uiSurface =
+    web ||
+    matches(
+      text,
+      /\b(?:ui|ux|interface|css|html|react|component|iphone|ios|android|safari|pwa|modal|drawer|popover|tooltip|toast|dropdown|button|signup|sign[- ]up|login|webpage|web page)\b/u,
+    );
+  if (uiSurface) {
+    const emil: Array<[RegExp, string, boolean?]> = [
+      [/\b(?:100vh|dvh|svh|safe[- ]area|notch|dynamic island|pull[- ]to[- ]refresh|sticky hover|tap highlight|feels? (?:native|like a website)|native feel|pwa|iphone|ios|android|safari)\b/u, 'emil-mobile-native'],
+      [/\b(?:easing|ease[- ]?(?:in|out)|cubic[- ]bezier|springs?|animation duration|enter animation|exit animation|micro-?interactions?|animations? (?:feel|is|are|looks?))\b|\b(?:review|fix|tune) (?:the )?(?:\w+ )?animations?\b/u, 'emil-animations', motion],
+      [/\b(?:forms?|inputs?|textarea|checkbox|autofocus|double[- ]submit|form validation)\b/u, 'emil-forms-and-inputs'],
+      [/\b(?:landing page|marketing (?:site|page)|homepage|hero section|pricing page|changelog|rss feed|waitlist)\b/u, 'emil-marketing-pages'],
+      [/\b(?:pre-?launch|prep(?:are)? for prod(?:uction)?|production[- ]ready|ready to ship|ship check|launch checklist|before (?:launch|release|the demo)|go(?:ing)? live|final sweep)\b/u, 'emil-prep-for-prod'],
+      [/\b(?:ui|design|component|interface) (?:diff|review|pull request|pr)\b|\breview (?:this |the )?(?:ui|interface|generated component)\b/u, 'emil-ui-review'],
+      [/\b(?:ai[- ]generated|vibe[- ]coded|ai slop|de-?slop|unslop|cookie[- ]cutter|purple gradient|glassmorphism)\b/u, 'emil-unslop-design'],
+      [/\b(?:typography|typeface|font pairing|kerning|letter-spacing|line-height|tabular nums?)\b/u, 'emil-typography'],
+      [/\b(?:oklch|color palette|colour palette|tonal scale|apca|contrast ratio)\b/u, 'emil-color'],
+      [/\b(?:border[- ]radius|box-shadow|shadows?|elevation|concentric radius)\b/u, 'emil-surfaces'],
+      [/\b(?:compound components?|props api|component api|aschild|controlled (?:or|vs\.?) uncontrolled)\b/u, 'emil-component-design'],
+      [/\b(?:virtuali[sz](?:e|ation)|layout shift|cls|re-?renders?|jank(?:y)?|transition: ?all)\b/u, 'emil-performance'],
+      [/\b(?:tap targets?|hit areas?|screen readers?|aria|focus trap|keyboard navigation|reduced motion|a11y)\b/u, 'emil-touch-and-accessibility'],
+      [/\b(?:polish pass|feels? (?:off|unfinished)|font[- ]smoothing)\b/u, 'emil-ui-polish'],
+      [/\b(?:design\.md|design system docs?|design system documentation)\b/u, 'emil-design-system-docs'],
+      [/\b(?:live picker|several versions|a few versions|prototype)\b/u, 'emil-prototype'],
+    ];
+    const picked = emil.filter(([pattern, , skip]) => !skip && matches(text, pattern)).map(([, id]) => id);
+    if (picked.length > 0) add('emil-craft', picked);
+  }
+  if (matches(text, /\blapse\b/u)) add('emil-lapse', ['emil-ask-lapse']);
+  if (matches(text, /\bwhich (?:emil )?skills?\b/u)) add('emil-router', ['emil-ask-emil']);
+
   if (routes.length === 0) return undefined;
 
   const routeIds = unique(routes.map((route) => route.id));

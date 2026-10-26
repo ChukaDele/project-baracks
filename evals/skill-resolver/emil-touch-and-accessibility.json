@@ -1,0 +1,8 @@
+{
+  "skill": "emil-touch-and-accessibility",
+  "should_trigger": [
+    "Fix tap targets, hit areas and focus management for keyboard and screen reader users on this dialog.",
+    "Add aria labels, focus trap and reduced motion handling to the menu and tooltip."
+  ],
+  "should_not_trigger": ["Calculate the invoice totals.", "Back up the Postgres database."]
+}
