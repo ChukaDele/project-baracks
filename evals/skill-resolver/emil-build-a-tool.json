@@ -1,0 +1,8 @@
+{
+  "skill": "emil-build-a-tool",
+  "should_trigger": [
+    "Prompting keeps landing on closer but not quite; build me a small tool that produces this artifact with live controls.",
+    "I have burned two rounds of re-prompting on the same artifact, so build a tool for this instead."
+  ],
+  "should_not_trigger": ["Fix the typo in the README.", "Chase the overdue invoices."]
+}

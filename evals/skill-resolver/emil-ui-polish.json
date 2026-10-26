@@ -1,0 +1,8 @@
+{
+  "skill": "emil-ui-polish",
+  "should_trigger": [
+    "Do a polish pass: font smoothing, layout shift, focus rings and scale on press feel unfinished.",
+    "Something feels off and unfinished in these components; check the invisible details like tabular nums and z-index."
+  ],
+  "should_not_trigger": ["Explain the ledger entries.", "Deploy the backend worker."]
+}

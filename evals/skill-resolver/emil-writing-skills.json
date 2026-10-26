@@ -1,0 +1,7 @@
+{
+  "skill": "emil-writing-skills",
+  "should_trigger": [
+    "Write a SKILL.md for my agent with a good description and trigger phrases so the skill triggers reliably."
+  ],
+  "should_not_trigger": ["Fix the flaky test.", "Chart the sales funnel."]
+}

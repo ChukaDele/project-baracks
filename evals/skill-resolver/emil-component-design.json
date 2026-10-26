@@ -1,0 +1,8 @@
+{
+  "skill": "emil-component-design",
+  "should_trigger": [
+    "Review the props API of this React component and make it composable with compound components.",
+    "Should this component be controlled or uncontrolled? Redesign the asChild and slots API for our component library."
+  ],
+  "should_not_trigger": ["Compare mortgage rates.", "Fix the Docker image build."]
+}

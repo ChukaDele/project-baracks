@@ -1,0 +1,7 @@
+{
+  "skill": "emil-engineering-vocabulary",
+  "should_trigger": [
+    "What is it called when the search waits until I stop typing, and when the UI updates before the server confirms?"
+  ],
+  "should_not_trigger": ["Design a logo.", "Reconcile the trial balance."]
+}

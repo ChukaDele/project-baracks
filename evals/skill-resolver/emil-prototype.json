@@ -1,0 +1,8 @@
+{
+  "skill": "emil-prototype",
+  "should_trigger": [
+    "Build a few genuinely different versions of this toast behind a live picker so I can compare options.",
+    "I am not sure which approach to take; prototype three variations of the onboarding flow side by side."
+  ],
+  "should_not_trigger": ["Fix the broken CI workflow.", "Translate this contract into French."]
+}

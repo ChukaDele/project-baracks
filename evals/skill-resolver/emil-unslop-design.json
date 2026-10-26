@@ -1,0 +1,8 @@
+{
+  "skill": "emil-unslop-design",
+  "should_trigger": [
+    "This landing page looks AI generated and vibe coded with purple gradients and glassmorphism; strip the slop.",
+    "De-slop the dashboard: it looks like every other template with a bento grid and emoji feature grid."
+  ],
+  "should_not_trigger": ["Reconcile the invoices.", "Write a Rust parser."]
+}

@@ -1,0 +1,11 @@
+{
+  "skill": "emil-design-foundations",
+  "should_trigger": [
+    "This screen looks off: audit the visual hierarchy, spacing and button hierarchy.",
+    "Review the empty states and error messages microcopy for design problems."
+  ],
+  "should_not_trigger": [
+    "Provision a new S3 bucket.",
+    "Compute the payback period for this investment."
+  ]
+}

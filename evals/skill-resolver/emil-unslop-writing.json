@@ -1,0 +1,7 @@
+{
+  "skill": "emil-unslop-writing",
+  "should_trigger": [
+    "Strip the AI tells from this copy: em dashes, rule of three and filler so it stops sounding like slop."
+  ],
+  "should_not_trigger": ["Optimize the SQL join.", "Configure the VPN."]
+}

@@ -1,0 +1,8 @@
+{
+  "skill": "emil-typography",
+  "should_trigger": [
+    "Choose a type pairing and fix the line-height, letter-spacing and kerning of the headings.",
+    "Tune font loading, tabular numbers and measure line length for the article page."
+  ],
+  "should_not_trigger": ["Resolve the merge conflict.", "Draft a board update."]
+}

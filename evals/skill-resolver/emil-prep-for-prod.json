@@ -1,0 +1,8 @@
+{
+  "skill": "emil-prep-for-prod",
+  "should_trigger": [
+    "Run a pre-launch sweep of this web app before we go live and tell me what is left before shipping.",
+    "Is this ready to ship? Do a production-ready final pass across accessibility, performance and forms."
+  ],
+  "should_not_trigger": ["Draft a hiring plan for next quarter.", "Fix this failing unit test."]
+}

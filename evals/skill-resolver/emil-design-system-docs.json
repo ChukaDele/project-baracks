@@ -1,0 +1,8 @@
+{
+  "skill": "emil-design-system-docs",
+  "should_trigger": [
+    "Write DESIGN.md design system documentation so the agent stops hardcoding colors and inventing variants.",
+    "Document our components and tokens so an AI agent picks the right component."
+  ],
+  "should_not_trigger": ["Update the tax filing.", "Debug the OAuth redirect."]
+}

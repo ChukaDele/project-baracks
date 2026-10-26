@@ -1,0 +1,8 @@
+{
+  "skill": "emil-forms-and-inputs",
+  "should_trigger": [
+    "Build a signup form with label association, validation timing and no double submit.",
+    "Inputs zoom the page on iOS and the submit button needs a loading state."
+  ],
+  "should_not_trigger": ["Summarize this PDF contract.", "Tune the database connection pool."]
+}

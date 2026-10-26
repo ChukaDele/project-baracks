@@ -1,5 +1,5 @@
 {
-  "version": 25,
+  "version": 26,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -486,6 +486,230 @@
         ],
         "skillPathPattern": "skills/{id}"
       }
+    },
+    {
+      "id": "emil-prototype",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "prototype prototyping explore exploration variation variations variants versions options directions try a few show me some couple of which feels better not sure if compare side by riff mock up playground sandbox throwaway route proto control panel sliders dialkit tweak the values slow motion replay",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-design-foundations",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "design ui visual hierarchy spacing padding margin gap whitespace typography font kerning tracking letter line height length color palette dark mode contrast wcag border shadow radius icon iconography illustration layout grid breakpoint alignment empty state error message microcopy copywriting button tooltip popover badge tag toast form input focus ring accessibility a11y information architecture navigation tabs onboarding looks off feels cheap polish review critique",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-typography",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "typography typeface fonts woff2 font formats variable opentype feature settings weight tabular numbers letter spacing tracking line height leading type scale measure length readability text wrap clamp truncation ellipsis underline decoration selection placeholder caret ios input zoom smoothing antialiased contrast box smart punctuation drop cap rtl",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-color",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "oklch oklab color space convert hex rgb hsl palette scale tonal ramp shades contrast checking wcag apca a11y colors readability gamut wide display p3 srgb chroma hue lightness saturation dark mode theme design tokens tailwind variables",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-surfaces",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "box shadow border borders radius rounded corners nested concentric elevation depth layering surface card container gradient banding eased mask image fade out hairline 0 5px divider outline dark mode theme variables color scale oklch looks flat harsh feels off",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-component-design",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "component api props design compound components composition configuration controlled uncontrolled defaultvalue aschild slot render forwardref ref forwarding variants classname override system reusable library radix shadcn prop drilling boolean slots children context",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-forms-and-inputs",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "form input textarea select button checkbox radio toggle submit onsubmit validation error message placeholder label autofocus autocomplete spellcheck ios zoom font size 16px focus ring visible loading state disabled double duplicate request enter to cmd keyboard shortcut destructive action confirmation delete clear icon prefix suffix search field login signup 1password password manager",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-marketing-pages",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "landing page marketing site homepage hero section pricing blog post docs documentation changelog rss feed seo cta call to action sign up button get started scroll animation fade in on parallax carousel hijacking intro load font preload layout shift static generation ssg code snippet copy as markdown nav dropdown header navigation waitlist",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-animations",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "animation transition easing ease out in cubic bezier spring bounce duration timing keyframes transform opacity fade slide scale stagger hover press active state microinteraction modal dialog drawer sheet popover dropdown tooltip toast framer motion react animatepresence waapi will change gpu janky choppy feels slow off make it smooth prefers reduced",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-ui-polish",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "polish details font smoothing antialiased rendering tabular nums numbers layout shift cls jumping text skeleton placeholder scrollbar z index stacking context isolation focus ring outline selection hover state active pressed scale on press hit area tap target touch optical alignment icon centering truncation line clamp ellipsis curly quotes wrap balance safe scroll margin empty pointer events user select flash refresh feels off unfinished make it feel better",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-performance",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "performance slow janky lag stutter fps frame drops virtualization virtual list infinite scroll long re render storm transition all will change gpu compositing layout shift cls thrash reflow preload prefetch lazy loading image optimization video font fout skeleton perceived intersectionobserver static generation ssg theme switch blur filter css variables framer motion",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-touch-and-accessibility",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "touch mobile tap target hit area hover state ios safari iphone ipad keyboard navigation tab order tabbing focus trap aria label accessibility a11y screen reader prefers reduced motion inert action double zoom pinch playsinline autoplay video tooltip delay submenu dropdown dialog modal cmd ctrl shortcut",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-mobile-native",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "mobile phone iphone ios safari android touch tap native feel feels like a website pwa installed app standalone sticky hover highlight 100vh dvh svh url bar input zoom 16px delay 300ms action pull to refresh overscroll rubber band notch dynamic island home indicator safe area viewport fit keyboard covers interactive widget long press user select callout carousel swipe scroll snap bottom sheet theme color status playsinline device emulation remote debugging",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-unslop-design",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "slop ai design de unslop looks generated vibe coded generic template look cookie cutter purple gradient indigo violet text bg clip glassmorphism backdrop blur glow neon orb blob bento grid feature icon cards emoji icons sparkles centered hero announcement badge pill stats row testimonial logo wall dark mode default inter tracking tight font black rounded 2xl hover scale fade in on scroll make it less unique give personality distinctive",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-unslop-code",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "code slop ai de unslop clean up this obvious comments redundant narrated commented out stale try catch swallowed error silent failure fallback defensive null checks as any ts ignore non assertion console log debug logs todo dead unused imports duplicate helper one call wrapper v2 enhanced legacy alias backwards compatibility minimal diff drive by changes tautological test skipped reads like copilot wrote it",
+      "aliases": [],
+      "category": "engineering"
+    },
+    {
+      "id": "emil-ui-review",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "review code ui design pr critique does this look right is good feels off catch mistakes ai generated component polish pass quality bar ship it sign nitpick qa",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-prep-for-prod",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "prep for prod production ready is this to ship check pre launch prelaunch checklist before release the demo go live going day final pass sweep candidate qa audit hardening works on my machine what did i forget s left shipping",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-build-a-tool",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "the user says build me a tool for this describes result agent keeps missing or has burned round two of re prompting on same artifact",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-design-system-docs",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "design md docs system documentation component guidelines token document the our components rules for agents claude section agent invented a variant hardcoded color picked wrong",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-get-creative",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "the user invokes get creative says i m stuck need inspiration can t picture it yet describes a mood rather than an image wants endless variations of one visual idea or has rejected round prompted variants",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-ask-emil",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "which skill what should i use ask emil one covers do you have a for s the right this list skills where does belong order",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-design-vocabulary",
+      "source": "shared-agents",
+      "availability": "ui-projects",
+      "load": "reaching for the exact word a design concept what s term space between two specific letters when ui idea is described loosely and needs its proper name choosing confusable near synonyms badge vs tag tooltip popover opacity visibility kerning tracking or writing reviewing copy specs commits you want terminology instead of vague language",
+      "aliases": [],
+      "category": "design"
+    },
+    {
+      "id": "emil-engineering-vocabulary",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "the user asks what s it called when or describes a behavior pattern browser quirk without knowing its name and wants right word to prompt an ai engineer with for naming concept not implementing one",
+      "aliases": [],
+      "category": "engineering"
+    },
+    {
+      "id": "emil-writing-skills",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "skill md file write a create improve agent instructions claude agents system prompt rules taste conventions decision tree the ignores my doesn t work package preferences transfer",
+      "aliases": [],
+      "category": "writing"
+    },
+    {
+      "id": "emil-borrow-a-brain",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "the user says make a skill out of x s essays build knowledge bank from someone writing i want my agent to think like or asks where store and how structure distilled else public work",
+      "aliases": [],
+      "category": "knowledge"
+    },
+    {
+      "id": "emil-product-thinking",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "the user has a product idea feature or pivot and says should i build this review my grill me on is worth building what first asks how to validate position scope price",
+      "aliases": [],
+      "category": "product"
+    },
+    {
+      "id": "emil-unslop-writing",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "slop de unslop ai tells sounds like reads chatgpt robotic writing humanize rewrite this delve leverage crucial testament landscape tapestry em dash dashes rule of three not just hedging puffery filler words passive voice chatbot phrases i hope helps readme changelog release notes blog post docs copy marketing microcopy tone",
+      "aliases": [],
+      "category": "writing"
+    },
+    {
+      "id": "emil-ask-lapse",
+      "source": "shared-agents",
+      "availability": "web-projects",
+      "load": "the user mentions lapse aiforui mcp playwright panel or extension asks how to slow a page s animations down record scrub an interaction scope take elements load annotate frame copy llm export address time by named moments diff two builds read jank report trigger causality when mo isn t behaving",
+      "aliases": [],
+      "category": "design"
     },
     {
       "id": "frontend-design",
