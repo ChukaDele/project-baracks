@@ -194,6 +194,23 @@ Software delivery: MVP planning, implementation, worktrees, browser QA, previews
 
 Research/strategy/synthesis: primary-source ingestion, source-specific tool routing, Tools-as-Code for repeated retrieval mechanics, materially different research angles, skeptic review where justified and decision-focused synthesis.
 
+### Optional knowledge snapshot inspection
+
+`major doctor` reports `knowledge-source` as informational and "not in use" when
+`MAJOR_KNOWLEDGE_SNAPSHOT` is unset. Major does not produce this optional snapshot.
+To enable inspection, supply a project-local JSON file containing an array of
+knowledge records. Each record requires string fields `id`, `entityId`, `predicate`,
+`value`, and `observedAt`. See [KnowledgeFact](src/knowledge/semantics.ts) for optional
+provenance, sensitivity, and temporal fields used by the inspection.
+
+```sh
+MAJOR_KNOWLEDGE_SNAPSHOT="$PWD/knowledge.json" major doctor
+```
+
+Doctor inspects at most the first 100 records and reports maintenance candidates
+without modifying the snapshot. An unreadable or malformed configured snapshot
+remains a warning. Unset the variable to stop using snapshot inspection.
+
 ## Tool/capability router
 
 ```text

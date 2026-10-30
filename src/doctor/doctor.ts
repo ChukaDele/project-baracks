@@ -109,8 +109,8 @@ export async function runDoctor(inputs: DoctorInputs): Promise<DoctorReport> {
       checks.push({
         name: 'knowledge-source',
         required: false,
-        status: 'warn',
-        detail: 'MAJOR_KNOWLEDGE_SNAPSHOT not configured; knowledge maintenance unavailable',
+        status: 'info',
+        detail: 'Knowledge snapshot not in use; set MAJOR_KNOWLEDGE_SNAPSHOT to enable inspection',
       });
       knowledgeRecords = [];
     } else {
