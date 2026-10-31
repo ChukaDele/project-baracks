@@ -385,3 +385,12 @@ Detector outputs are diagnostic only; none of these components is used to concea
 - MERGE: generic editing, proofreading, tone, reader-empathy, and “humanizer” behavior live behind `writing-os`, `prose-craft`, and `natural-writing-qa` rather than separate overlapping skills.
 - NEW: `writing-os`, `prose-craft`, genre specialists, `voice-fingerprint`, `prose-lint`, `natural-writing-qa`, `writing-evaluator`, and `writing-red-team`.
 - DEPRECATE: no registered Major skill is removed in P0. Vercel `writing-guidelines` remains scoped to Vercel work and is not the general writing system.
+
+## 2026-10-31 — supervisor-side validation and shipping
+
+| Upstream | Decision | Major use |
+| --- | --- | --- |
+| `git worktree` | ADOPT | The supervisor validates the committed head in a detached throwaway worktree, so build output never changes the canonical tree the review is bound to. |
+| `gh pr create` / `gh pr list` with the owner's keychain auth | WRAP | The supervisor pushes and opens (or reuses) the PR on the host after the independent review passes. No token enters the worker. |
+| Merge-queue verification loop (`src/supervisor/parallel-dispatch.ts`) | BORROW | Same `RunCommand` seam and whitespace-split `verificationCommands`. It runs on the host through the gateway's audited `executeSupervisorHostCommand`, not inside Seatbelt, because the contained path has no package-manager launcher or dependencies. |
+| Allowlisting pnpm, node, corepack and the pnpm store for workers | REJECTED | This would widen every worker's sandbox, and gives no credential for the PR. Supervisor-side validation keeps the worker boundary unchanged. |
