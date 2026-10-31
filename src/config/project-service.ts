@@ -42,15 +42,29 @@ export function getProjectByRepoPath(db: Db, repoPath: string) {
  */
 export function getOrAddProject(db: Db, config: ProjectConfig) {
   const validated = projectConfigSchema.parse(config);
-  const byPath = listProjects(db).find(
-    (candidate) => resolve(candidate.repoPath) === resolve(validated.repoPath),
+  return findProject(db, validated.name, validated.repoPath) ?? addProject(db, validated);
+}
+
+/** The lookup half of getOrAddProject: by path first, then by name. */
+export function findProject(db: Db, name: string, repoPath: string) {
+  return (
+    listProjects(db).find((candidate) => resolve(candidate.repoPath) === resolve(repoPath)) ??
+    db.select().from(projects).where(eq(projects.name, name)).get()
   );
-  if (byPath) return byPath;
+}
 
-  const byName = db.select().from(projects).where(eq(projects.name, validated.name)).get();
-  if (byName) return byName;
-
-  return addProject(db, validated);
+/** Replace a project's verificationCommands, which gate supervisor shipping. */
+export function setVerificationCommands(db: Db, name: string, commands: readonly string[]) {
+  const row = getProjectByName(db, name);
+  const config = projectConfigSchema.parse({
+    ...projectConfig(row),
+    verificationCommands: [...commands],
+  });
+  db.update(projects)
+    .set({ configJson: JSON.stringify(config) })
+    .where(eq(projects.id, row.id))
+    .run();
+  return config;
 }
 
 export function projectConfig(row: { configJson: string }): ProjectConfig {

@@ -1,3 +1,4 @@
+import type { HostValidation } from './ship.js';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
@@ -147,6 +148,13 @@ export interface SupervisorGoal {
    * subsequent sessions can distinguish recovered control state from a
    * human-approved ownership transfer. */
   lastOwnershipReconciliation?: OwnershipReconciliation | undefined;
+  /** Branch the goal checkout was on before the first worker dispatch; the
+   * supervisor returns the checkout here once the goal is done. */
+  originBranch?: string | undefined;
+  /** Supervisor host validation of the latest committed candidate head. */
+  hostValidation?: (HostValidation & { sourceTreeDigest: string }) | undefined;
+  /** PR the supervisor opened for this goal's branch. */
+  pullRequestUrl?: string | undefined;
   pendingCompletion?:
     | {
         summary: string;

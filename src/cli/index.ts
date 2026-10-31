@@ -17,7 +17,12 @@ import {
   SuggestionApprovalUnavailableError,
 } from '../domain/task-service.js';
 import { loadProjectConfig, resolveRepoPath } from '../config/project-config.js';
-import { addProject, getProjectByName, listProjects } from '../config/project-service.js';
+import {
+  addProject,
+  getProjectByName,
+  listProjects,
+  setVerificationCommands,
+} from '../config/project-service.js';
 import { runDoctor, type DoctorReport } from '../doctor/doctor.js';
 import { formatStorageHuman } from '../resources/storage-report.js';
 import {
@@ -755,6 +760,18 @@ project
         `${row.id}  ${row.name}  ${row.repoPath}${row.githubRepo ? `  ${row.githubRepo}` : ''}`,
       );
     }
+  });
+
+project
+  .command('set-verification <name> [commands...]')
+  .description(
+    'Set the commands the supervisor runs on the host to validate a committed head before shipping (no arguments clears them)',
+  )
+  .action((name: string, commands: string[]) => {
+    const config = setVerificationCommands(db(), name, commands);
+    console.log(
+      `${name}: verificationCommands = ${config.verificationCommands.length ? config.verificationCommands.join('; ') : '(none: supervisor shipping off)'}`,
+    );
   });
 
 const capability = program

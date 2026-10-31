@@ -25,6 +25,7 @@ import { providerWorkshopArgs } from '../providers/commands.js';
 import { assertCapabilityAvailable } from './capabilities.js';
 import { darwinSeatbeltContainment, detectContainment } from './containment.js';
 import { ExecutionGateway, type ExecutionPolicyDecision } from './gateway.js';
+import { sanitizeEnv } from './env.js';
 import { TrustedExecutableRegistry } from './trusted-executables.js';
 import { providerReadOnlyRoots } from './provider-access.js';
 import { LimaBackend } from '../execution/lima-backend.js';
@@ -299,6 +300,59 @@ function recordExecution(decision: ExecutionPolicyDecision): void {
   appendFileSync(log, `${JSON.stringify(decision)}\n`, { mode: 0o600 });
 }
 
+/**
+ * The supervisor's own host steps after a worker exits: validation of the
+ * committed head in a throwaway worktree, and the push/PR. They run outside
+ * worker containment on purpose (the worker has no dependencies or GitHub
+ * credential), with the sanitized env (provider and GitHub tokens stripped,
+ * so git and gh use the owner's keychain), a name-only executable, a timeout,
+ * and an audit line in execution-policy.jsonl.
+ */
+export function executeSupervisorHostCommand(
+  executable: string,
+  args: readonly string[],
+  cwd: string,
+  timeoutMs = 30 * 60 * 1000,
+): Promise<{ ok: boolean; output: string }> {
+  if (!/^[\w.+-]+$/.test(executable)) {
+    return Promise.resolve({ ok: false, output: `refused non-name executable ${executable}` });
+  }
+  const sanitized = sanitizeEnv(process.env, { allowlist: ['SSH_AUTH_SOCK'] });
+  recordExecution({
+    kind: 'execute',
+    allowed: true,
+    executable,
+    argv: args.map((arg) => (arg.length > 200 ? `${arg.slice(0, 200)}…` : arg)),
+    cwd,
+    reason: 'supervisor host step (validation or ship) outside worker containment',
+    strippedEnv: sanitized.stripped,
+    authorizedEnv: [],
+    at: new Date().toISOString(),
+  });
+  return new Promise((resolveResult) => {
+    const child = spawn(executable, [...args], {
+      cwd,
+      env: sanitized.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '';
+    const collect = (chunk: Buffer) => {
+      output = (output + chunk.toString('utf8')).slice(-64_000);
+    };
+    child.stdout.on('data', collect);
+    child.stderr.on('data', collect);
+    const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      resolveResult({ ok: false, output: error.message });
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolveResult({ ok: code === 0, output: output.trim() });
+    });
+  });
+}
+
 export function trustedExecutableRegistry(executable: string): TrustedExecutableRegistry {
   const registry = new TrustedExecutableRegistry();
   const name = basename(executable);
@@ -358,16 +412,62 @@ export const HOST_RUNTIME_ENV_ALLOWLIST: readonly string[] = [
   'XDG_DATA_HOME',
   'XDG_CACHE_HOME',
   'GIT_CONFIG_NOSYSTEM',
+  'GIT_CONFIG_GLOBAL',
+  'TMPPREFIX',
 ];
+
+export interface GitIdentity {
+  name: string;
+  email: string;
+}
+
+/** The owner's git identity, read on the host (outside Seatbelt, which denies
+ * ~/.gitconfig to contained workers). */
+export function hostGitIdentity(): GitIdentity | undefined {
+  const read = (key: string) => {
+    try {
+      return execFileSync('/usr/bin/git', ['config', '--global', '--get', key], {
+        encoding: 'utf8',
+        env: { HOME: homedir(), PATH: '/usr/bin:/bin' },
+      }).trim();
+    } catch {
+      return '';
+    }
+  };
+  const name = read('user.name');
+  const email = read('user.email');
+  return name && email ? { name, email } : undefined;
+}
+
+/** A minimal global gitconfig that holds only the identity, so a contained
+ * worker never reads the host ~/.gitconfig and still commits as the owner. */
+function writeWorkerGitConfig(configDir: string, identity: GitIdentity | undefined): string {
+  const file = join(configDir, 'gitconfig');
+  const quote = (value: string) =>
+    `"${value
+      .replace(/[\r\n]/g, ' ')
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')}"`;
+  writeFileSync(
+    file,
+    identity
+      ? `[user]\n\tname = ${quote(identity.name)}\n\temail = ${quote(identity.email)}\n`
+      : '',
+    { mode: 0o600 },
+  );
+  return file;
+}
 
 /** Per-project runtime root for the host path. Every temp, cache, config and
  * data location a provider CLI writes points inside it, because Seatbelt
  * denies /tmp. Claude Code ignores TMPDIR for its own per-uid directory and
- * falls back to /tmp/claude-<uid> unless CLAUDE_CODE_TMPDIR is set. */
+ * falls back to /tmp/claude-<uid> unless CLAUDE_CODE_TMPDIR is set, and zsh
+ * writes here-documents under TMPPREFIX (default /tmp/zsh), not TMPDIR. */
 export function hostRuntimeEnv(
   executable: string,
   runtimeHome: string,
   cwd: string,
+  gitIdentity: GitIdentity | undefined = hostGitIdentity(),
 ): { executionRoot: string; env: Record<string, string> } {
   const projectKey = createHash('sha256').update(resolve(cwd)).digest('hex').slice(0, 24);
   const executionRoot = join(runtimeHome, 'execution', projectKey);
@@ -386,6 +486,8 @@ export function hostRuntimeEnv(
       ...(executable === 'codex' ? { CODEX_HOME: prepareHostCodexHome(runtimeData) } : {}),
       TMPDIR: runtimeTmp,
       CLAUDE_CODE_TMPDIR: runtimeTmp,
+      TMPPREFIX: join(runtimeTmp, 'zsh'),
+      GIT_CONFIG_GLOBAL: writeWorkerGitConfig(runtimeConfig, gitIdentity),
       XDG_CACHE_HOME: runtimeCache,
       XDG_CONFIG_HOME: runtimeConfig,
       XDG_DATA_HOME: runtimeData,

@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
-import { platform, tmpdir } from 'node:os';
+import { homedir, platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { darwinSeatbeltContainment, detectContainment } from '../src/security/containment.js';
@@ -394,6 +394,66 @@ describe.runIf(platform() === 'darwin')('macOS Seatbelt integration', () => {
     expect(readFileSync(join(runRoot, 'validation', 'workspace', 'passed.txt'), 'utf8')).toBe(
       'yes',
     );
+  });
+
+  it('lets a contained worker commit as the owner without reading ~/.gitconfig', () => {
+    const workspace = tempDir();
+    const identity = { name: 'Major "The" Owner', email: 'owner@example.invalid' };
+    const runtime = hostRuntimeEnv('codex', tempDir(), workspace, identity);
+    const init = spawnSync('git', ['init', '--initial-branch=main', workspace], {
+      encoding: 'utf8',
+    });
+    expect(init.status, init.stderr).toBe(0);
+    writeFileSync(join(workspace, 'a.txt'), 'a\n');
+    const git = realpathSync('/usr/bin/git');
+    const run = (args: string[]) => {
+      const wrapped = darwinSeatbeltContainment().wrap({
+        executable: git,
+        canonicalExecutable: git,
+        args,
+        allowedRoots: [workspace, runtime.executionRoot],
+      });
+      return spawnSync(wrapped.executable, wrapped.args, {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: { HOME: homedir(), PATH: '/usr/bin:/bin', ...runtime.env },
+      });
+    };
+    for (const args of [
+      ['add', 'a.txt'],
+      ['commit', '-m', 'contained'],
+    ]) {
+      const result = run(args);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stderr).not.toContain('.gitconfig');
+    }
+    const author = spawnSync('git', ['-C', workspace, 'log', '-1', '--format=%an <%ae>|%cn'], {
+      encoding: 'utf8',
+    });
+    expect(author.stdout.trim()).toBe(
+      'Major "The" Owner <owner@example.invalid>|Major "The" Owner',
+    );
+  }, 30_000);
+
+  it('lets a contained zsh write here-documents under the runtime tmp', () => {
+    const workspace = tempDir();
+    const runtime = hostRuntimeEnv('codex', tempDir(), workspace, undefined);
+    const zsh = realpathSync('/bin/zsh');
+    const wrapped = darwinSeatbeltContainment().wrap({
+      executable: zsh,
+      canonicalExecutable: zsh,
+      args: ['-fc', 'cat <<EOF\nheredoc-ok\nEOF'],
+      allowedRoots: [workspace, runtime.executionRoot],
+    });
+    const result = spawnSync(wrapped.executable, wrapped.args, {
+      cwd: workspace,
+      encoding: 'utf8',
+      env: { HOME: homedir(), PATH: '/usr/bin:/bin', ...runtime.env },
+    });
+    expect(result.stderr).not.toContain("can't create temp file");
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe('heredoc-ok');
+    expect(runtime.env.TMPPREFIX!.startsWith(runtime.env.TMPDIR!)).toBe(true);
   });
 
   it('allows a linked worktree to update only its external Git common directory', () => {

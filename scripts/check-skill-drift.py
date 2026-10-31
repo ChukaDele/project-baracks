@@ -7,6 +7,10 @@ Canonical homes:
 Every other host entry (~/.claude/skills, ~/.codex/skills) must be a symlink that
 resolves to the same directory. A copy can drift; a symlink cannot.
 
+Exception: a vendor bundle that installs and manages its own per-host copies
+(gstack: ~/.claude/skills/gstack-*, ~/.codex/skills/gstack-* -> .../gstack/.agents/skills/*)
+counts as one source, as long as every copy stays inside a host skill directory.
+
 Usage: check-skill-drift.py [--repo PATH] [--home PATH] | --self-test
 Skips (exit 0) when no host skill directory exists, such as in CI.
 """
@@ -18,6 +22,8 @@ from collections import defaultdict
 from pathlib import Path
 
 HOST_DIRS = ('.agents/skills', '.claude/skills', '.codex/skills')
+# Vendor bundle name -> skill-name prefixes that the bundle owns.
+VENDOR_BUNDLES = {'gstack': ('gstack-', '_gstack-')}
 
 
 def host_entries(home: Path):
@@ -36,6 +42,17 @@ def major_roots(repo: Path, home: Path) -> set:
     return {(r / 'skills' / 'internal').resolve() for r in (repo, main)} | {(home / '.major' / 'skills' / 'internal').resolve()}
 
 
+def vendor_managed(name: str, reals: set, home: Path) -> bool:
+    """True when every copy of a vendor-bundle skill lives in a host dir or its bundle root."""
+    for bundle, prefixes in VENDOR_BUNDLES.items():
+        if name != bundle and not name.startswith(prefixes):
+            continue
+        allowed = [(home / rel).resolve() for rel in HOST_DIRS]
+        bundle_roots = [root / bundle for root in allowed]
+        return all(real.parent in allowed or any(root in real.parents for root in bundle_roots) for real in reals)
+    return False
+
+
 def check(home: Path, repo: Path) -> list[str]:
     major_owned = {p.name for p in (repo / 'skills' / 'internal').iterdir() if (p / 'SKILL.md').is_file()}
     by_name = defaultdict(list)
@@ -45,11 +62,13 @@ def check(home: Path, repo: Path) -> list[str]:
     errors = []
     for name, rows in sorted(by_name.items()):
         reals = {real for _, _, real in rows}
-        if len(reals) > 1:
+        if len(reals) > 1 and not (name not in major_owned and vendor_managed(name, reals, home)):
             where = ', '.join(f"{rel}{' (symlink)' if e.is_symlink() else ' (copy)'} -> {real}" for rel, e, real in rows)
             errors.append(f'{name}: {len(reals)} different sources: {where}')
             continue
         real = next(iter(reals))
+        if len(reals) > 1:
+            continue
         if name in major_owned and real.parent not in roots:
             errors.append(f'{name}: Major-owned skill must symlink to skills/internal/{name}, found {real}')
     return errors
@@ -77,7 +96,21 @@ def self_test() -> None:
         skill(home / '.agents/skills/owned2')
         os.rename(repo / 'skills/internal/owned', repo / 'skills/internal/owned-moved')
         skill(repo / 'skills/internal/owned2')
+        # gstack layout: per-host copies plus Codex links into the bundle's .agents/skills.
+        bundle = home / '.claude/skills/gstack'
+        skill(bundle)
+        skill(home / '.codex/skills/gstack', 'codex copy')
+        skill(home / '.claude/skills/gstack-review')
+        os.symlink(skill(bundle / '.agents/skills/gstack-review', 'bundle'), home / '.codex/skills/gstack-review')
+        outside = skill(Path(tmp) / 'elsewhere/gstack-ship')
+        skill(home / '.claude/skills/gstack-ship')
+        os.symlink(outside, home / '.codex/skills/gstack-ship')
+        skill(home / '.claude/skills/gstackish')
+        skill(home / '.codex/skills/gstackish', 'drifted')
         errors = check(home, repo)
+        assert not any(e.startswith(('gstack:', 'gstack-review')) for e in errors), errors
+        assert any(e.startswith('gstack-ship: 2 different sources') for e in errors), errors
+        assert any(e.startswith('gstackish: 2 different sources') for e in errors), errors
         assert any(e.startswith('shared: 2 different sources') for e in errors), errors
         assert not any(e.startswith('solo') for e in errors), errors
         assert any(e.startswith('owned2: Major-owned skill must symlink') for e in errors), errors
