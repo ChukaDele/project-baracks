@@ -47,6 +47,24 @@ describe('major doctor', () => {
     detail: 'test containment enforced',
   });
 
+  it('reports an unconfigured knowledge snapshot as informational and not in use', async () => {
+    const report = await runDoctor({
+      providers: [],
+      configuredProjects: [],
+      resolve: fullToolchain,
+      env: {},
+    });
+    expect(report.checks.filter((check) => check.name === 'knowledge-source')).toEqual([
+      {
+        name: 'knowledge-source',
+        required: false,
+        status: 'info',
+        detail: 'Knowledge snapshot not in use; set MAJOR_KNOWLEDGE_SNAPSHOT to enable inspection',
+      },
+    ]);
+    expect(report.knowledgeMaintenance).toEqual([]);
+  });
+
   it('includes typed knowledge maintenance findings when records are supplied', async () => {
     const report = await runDoctor({
       providers: [],
