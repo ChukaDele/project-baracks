@@ -1,0 +1,5 @@
+{
+  "skill": "ic-memo",
+  "should_trigger": ["Draft the investment committee memo for this deal."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

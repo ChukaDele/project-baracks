@@ -1,0 +1,5 @@
+{
+  "skill": "catalyst-calendar",
+  "should_trigger": ["Build a catalyst calendar across my coverage universe."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

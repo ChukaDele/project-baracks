@@ -1,0 +1,5 @@
+{
+  "skill": "pitch-deck",
+  "should_trigger": ["Populate this investment banking pitch deck from the source files."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

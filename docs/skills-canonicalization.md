@@ -402,3 +402,13 @@ Cause: **a** needed but never fired · **b** duplicate or overlap · **c** not n
 - `emil-kowalski-complete` stays an opt-in project-install bundle of the open-source repo. It does not contain these 28, so the entries are added next to it, not merged into it.
 - `src/skills/canonical-routing.ts` appends an `emil-craft` route after all existing routes, so `design-direction-and-taste`, `website-design-qa` and `responsive-motion-systems` keep their positions. Scroll-motion prompts (GSAP, ScrollTrigger, sticky, parallax) get no `emil-animations`.
 - Evidence: `tests/emil-skill-routing.test.ts` and `evals/skill-resolver/emil-*.json`.
+
+## Addendum: Anthropic finance specialists (registry v27)
+
+- 48 skills from the six vertical plugins of `anthropics/financial-services` at `60565064557ca77b12f62aa7877f365d111c129d` are registered as `shared-agents` entries (canonical home `~/.agents/skills`, hosts symlink). No skill content is copied into this repo; `~/.agents/finance-skills.lock.json` holds the per-skill hashes.
+- Not taken: `skill-creator` (id collision), partner LSEG and S&P skills (paid data), agent plugins (copies of the same skills plus wrappers), plugin slash commands and paid MCP connectors.
+- Finance vocabulary is common English ("plan", "model", "update"), so these entries set `routeOnly`. Keyword routing fired them on 65 of 545 existing eval prompts; route-only selection leaves one, a genuine general-ledger reconciliation.
+- `src/skills/canonical-routing.ts` adds an additive `anthropic-finance` route: clear software-work terms veto it, ambiguous words such as "app" or "page" block only the less distinctive specialists, it never excludes other skills, and it adds the `finance-skills-routing` guide. Accounting routes keep `reconciliation-close-statements`.
+- Naming a `routeOnly` id in prose needs the word "skill" ("use the deal-tracker skill"), because these ids are ordinary phrases. `--skill <id>` is unchanged.
+- Known gap, shared with the `emil-*` entries: `scripts/materialize-project-skill-registry.mjs` does not emit `shared-agents` entries, so a validated project registry does not select them. The host skills and the prompt hook still work there.
+- Evidence: `tests/anthropic-finance-skill-routing.test.ts` and `evals/skill-resolver/`.

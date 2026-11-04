@@ -1,0 +1,5 @@
+{
+  "skill": "model-update",
+  "should_trigger": ["Update the financial model for the new earnings and guidance."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

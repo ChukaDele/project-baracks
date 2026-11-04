@@ -1,0 +1,5 @@
+{
+  "skill": "dd-meeting-prep",
+  "should_trigger": ["Prepare for the expert network call in this due diligence."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

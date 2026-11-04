@@ -1,0 +1,5 @@
+{
+  "skill": "nav-tieout",
+  "should_trigger": ["Tie this LP statement to the NAV pack."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

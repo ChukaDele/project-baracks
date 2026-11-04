@@ -1,0 +1,5 @@
+{
+  "skill": "deal-tracker",
+  "should_trigger": ["Set up a deal tracker for our live deals."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

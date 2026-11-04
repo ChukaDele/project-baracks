@@ -1,0 +1,5 @@
+{
+  "skill": "sector-overview",
+  "should_trigger": ["Write a sector overview of West African agribusiness."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

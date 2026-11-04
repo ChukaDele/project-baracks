@@ -1,0 +1,5 @@
+{
+  "skill": "break-trace",
+  "should_trigger": ["Root-cause this reconciliation break to its source posting."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

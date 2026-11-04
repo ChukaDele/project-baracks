@@ -1,0 +1,5 @@
+{
+  "skill": "thesis-tracker",
+  "should_trigger": ["Update the investment thesis tracker for this position."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

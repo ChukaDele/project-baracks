@@ -1,0 +1,5 @@
+{
+  "skill": "3-statement-model",
+  "should_trigger": ["Populate this 3-statement model template and link the balance sheet."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

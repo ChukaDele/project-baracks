@@ -1,5 +1,5 @@
 {
-  "version": 26,
+  "version": 27,
   "policy": {
     "installedDoesNotMeanLoaded": true,
     "loadMode": "triggered",
@@ -1815,6 +1815,1119 @@
       "load": "linkedin post content profile audit gtm networking personal brand",
       "aliases": [],
       "category": "writing"
+    },
+    {
+      "id": "dcf-model",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "dcf discounted cash flow valuation wacc terminal value sensitivity equity model",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "8d3bfe70a50b1d5fa4b27fc838afc3363fec2f66e2542777c3f547f16a851a01",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "lbo-model",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "lbo leveraged buyout model sponsor debt schedule template",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "7c98e2a35b2ff33a9b7d715ddffcabce9be695ed406dd436bf2eb3d3971c7c8d",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "3-statement-model",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "3-statement three-statement financial model income statement balance sheet cash flow template",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "2c551b7d7add1a4b0917dde4fb7f478d9bb9cf3a3aef61850ad475b3c800345e",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "comps-analysis",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "comparable company analysis trading comps peer multiples valuation multiples",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "0e0c5e94e64e20d734874daf2afab71dfcb7e48f2064d34146e09128f1de6fdd",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "merger-model",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "merger model accretion dilution pro forma eps synergy",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "c66c60b864312119c0ff7b4c87d4f55057a702868d3367eb3f26b93abdeb72b4",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "returns-analysis",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "irr moic sensitivity private equity returns entry multiple exit",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "5a0d9a63204c8cedacb4c4c07dfe0e9d27f50298f1478e7a0672953337b9b5d5",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "audit-xls",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "audit spreadsheet workbook formula errors financial model integrity",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "890ac2385d133a0fe7f11bf7dc0b6ebe4a844fdbe2eccdecb1d863b298517584",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "clean-data-xls",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "clean messy spreadsheet data whitespace casing numbers stored as text duplicates",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "a8cd312f1c7d91022f61f1a3be8c0e82d04d63c584e681bd934f36a679c139b6",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "competitive-analysis",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "competitive landscape deck market positioning competitor deep dives",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "8ccfa90517c49fdbe638bfb08e4fbcd7241e47f302a3a0c4e5c89ed62da64c6f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "deck-refresh",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "refresh update deck presentation new numbers quarterly earnings comps roll",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "77c6ea935b75eeb50db6663a9b9e2217cc5f2b2342be38e3f59fb82ce79b7e8c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "ib-check-deck",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "investment banking presentation quality check pitch deck client-ready qc",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "0c1d0a2d975ee032ddf663b6421757e5fd14647275b10bcc9c3413db2d285aff",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "pitch-deck",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "investment banking pitch deck pitch book template populate source files",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "6ce87dde3139941184c37485ec144f40080dbda4e193fc86aacbef2321163953",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "ppt-template-creator",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "powerpoint ppt template skill self-contained branded",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "4bf6e49b5a539c04f26d99ca82e1d0d9203927dc3f499b5d3b09a3a616eb655a",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "xlsx-author",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "headless xlsx excel file artifact no office app managed agent",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "98b55e4a1b56dde97c99b1a3fa90b53bf51c4dc091efedd0f8289f73e66571b3",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "pptx-author",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "headless pptx powerpoint file artifact no office app managed agent",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "4d0afa02319170344aec499dd69c852e198998ec914ce82120a3e1a1178759cd",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "earnings-analysis",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "equity research earnings update report quarterly results beat miss",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "91969210b6a9a70cf0a57438d0ca2831d0113755dd3163db072a5b7d98695ee2",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "earnings-preview",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "pre-earnings preview estimate scenario metrics to watch",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "822d1cd70d4e79b928795f6a5e213e5c3435858cfd28c40f7fff2997b4d3cb2e",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "initiating-coverage",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "initiating coverage equity research initiation report",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "505fb5d185016d34e13fb1aa4974f7fa37dabfde851c78b159976c6256ebfcae",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "morning-note",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "morning meeting note overnight developments trade ideas",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "20b2f8f56e5e60e44a6638d6967cfb7a5ddebee582405abaab0b5e154fb2515f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "thesis-tracker",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "investment thesis tracker portfolio position watchlist data points",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "da5c02de051d41f1120918f482ef34def6b1dd96cd04668778478bf43fd12e00",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "catalyst-calendar",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "catalyst calendar coverage universe earnings dates events",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "2a0eb640f32537406366f5971927bf4424e84f86509a5cda32adcd7efb799397",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "idea-generation",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "stock screening investment idea sourcing quantitative thematic screen",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "aec2ba80c097b95c9b8b6cee1866d223daec62fd6ec037e899dc7c9e6048d337",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "sector-overview",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "sector industry overview landscape primer market dynamics report",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "1eefbf303f6045e69dc65f4eb1df28aeb69305dedeaa444570b0f575df95c2f0",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "model-update",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "update financial model earnings guidance estimates quarter",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "af3e7cd79dadf29d7d682d6d78cca5bf8310c86ead9d06abdecc251f4f0af0ed",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "cim-builder",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "cim confidential information memorandum sell-side",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "c3ec0efddb1b764f74e7793445d414d28581207e3f446ff571fccfb61268885f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "teaser",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "anonymous company teaser sell-side one-page m&a",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "4866c2a5eafc020daf4ccffb35e4d42dbe6583435fd77841c39fa4b30d19e28a",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "buyer-list",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "buyer list universe strategic financial acquirers sell-side",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "09001c06e419fb3ebba5cf9fce32390b1befabe80890ac996afd0fc48f9d955d",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "process-letter",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "process letter bid instructions indication of interest sell-side",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "1e037084b9bd4cef1e2efd598af107a56d46df344b25b7575077e76233fb3737",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "datapack-builder",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "data pack datapack cim offering memorandum excel financial services",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "cce2626741bf1a34e300afedd538bcbcdc3e8ba2f9b3df333a62ef91538ad6db",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "strip-profile",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "strip profile company profile pitch book",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "1a0b1b4492de09c99cd2dae6ea3fd86074430781b066ae8f40e57cf1e361fc4b",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "deal-tracker",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "deal tracker live deals milestones deadlines action items",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "9571fc7ea8e195f45c93c03a9219f10bdd0a9fdbbf05bed008667b03ac44c950",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "deal-screening",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "screen inbound deal flow cim teaser investment criteria private equity",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "18a78b0b4c1b5734e5059ed1aa8f66a9585d07fb262d4eeba25634250483a3d7",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "deal-sourcing",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "private equity deal sourcing target companies crm founder outreach",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "a8b6a93e42b93b4f39753685fa3a19eb504d8160a25319b01594a3df5b63a523",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "dd-checklist",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "due diligence checklist sector target workstream",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "13f62c693b0ec022963db9268f9fe10b946b66df1b5c0fb1e7a06d05a8d371c5",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "dd-meeting-prep",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "due diligence meeting prep management presentation expert network call",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "a043c5dc084e0eae921ddc54ba7a922b95744d0f6562a1f4069bb71ea1551f4f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "ic-memo",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "investment committee ic memo deal approval",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "c3152ece617802961d6b553b97543b768d68a1d73e7305e58578478ba64d27a1",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "portfolio-monitoring",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "portfolio monitoring company performance plan kpi covenant",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "101cc67c17ee3c63d1830addc6625f6f558338323cfd535024f7bf6c7723014b",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "unit-economics",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "unit economics arr cohorts ltv cac net retention payback",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "4445a8301c2152555e6b9fc1ae4bca7bbc58c944962b44b07eb1d609f0a33274",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "value-creation-plan",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "value creation plan post-acquisition levers 100-day",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "345684cb8962541a5dabfaf388108742a610559ff6b473d3d59099c04b3813c8",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "ai-readiness",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "portfolio ai readiness opportunities operating leverage",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "3d160776fda9a76a97254a4d32f6c4f77d050928091ec1ce3a7ed3b80efab35f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "gl-recon",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "general ledger gl subledger reconciliation trade date",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "b637c23603f6cd17ae5f8c924446d80169a74531d8014935ffea6ec1bdd88c6c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "break-trace",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "reconciliation break root cause trace audit trail posting",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "5d7d3fe7ecf69c8ddf4f9e279fb8ff84273e7066863cd0eea55ce527a2a09287",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "accrual-schedule",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "accrual schedule period-end entries support",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "07725e005e6ce8a92012e4f9ddb0fed52a9998087e6c7e157d1b28fa272b22b1",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "nav-tieout",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "lp statement nav tie out capital account fund pack",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "256f5c912769cc9fcd6db7717eff0e9c1c91cc44510705d7db2c4a64281c9a6c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "roll-forward",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "roll-forward schedule balance sheet account beginning balance activity",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "d42c9400038edbd0d694fbbeb83912e425d9271f666bff095660f196b3fcb38c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "variance-commentary",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "flux variance commentary p&l threshold current prior period",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "2b08d7e682ce05bb087796995fbe9ee255098f27d139fa4103bbcc5c633244ce",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "kyc-doc-parse",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "kyc onboarding packet parse identity ownership structured fields",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "operations",
+        "contentSha256": "3d8499b484cf48bc06058f773a5e1c734cb6170c74c4475379a9c3579d4960de",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "kyc-rules",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "kyc aml rules grid risk rating onboarding record",
+      "aliases": [],
+      "category": "finance-accounting",
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "operations",
+        "contentSha256": "23530e7d284fef693d2e1b9edc90b4f081731c6783000c09a00dedbdd7ae201c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "routeOnly": true
+    },
+    {
+      "id": "finance-skills-routing",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "finance skills routing guide boundaries runtime",
+      "aliases": [],
+      "category": "finance-accounting",
+      "routeOnly": true
     }
   ],
   "reconciliation": {

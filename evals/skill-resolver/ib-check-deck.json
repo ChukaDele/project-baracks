@@ -1,0 +1,5 @@
+{
+  "skill": "ib-check-deck",
+  "should_trigger": ["QC this investment banking deck before it goes to the client."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

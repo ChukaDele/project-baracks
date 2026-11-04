@@ -1,0 +1,5 @@
+{
+  "skill": "dd-checklist",
+  "should_trigger": ["Generate a due diligence checklist for this target."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

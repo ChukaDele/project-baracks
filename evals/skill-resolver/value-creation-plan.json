@@ -1,0 +1,5 @@
+{
+  "skill": "value-creation-plan",
+  "should_trigger": ["Structure a value creation plan for this acquisition."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

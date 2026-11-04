@@ -1,0 +1,5 @@
+{
+  "skill": "pptx-author",
+  "should_trigger": ["Produce the slides headless as a pptx file artifact."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

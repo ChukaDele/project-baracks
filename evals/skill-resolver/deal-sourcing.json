@@ -1,0 +1,5 @@
+{
+  "skill": "deal-sourcing",
+  "should_trigger": ["Run deal sourcing for founder-owned targets."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

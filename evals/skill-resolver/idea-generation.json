@@ -1,0 +1,5 @@
+{
+  "skill": "idea-generation",
+  "should_trigger": ["Run a stock screen and shortlist investment ideas."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

@@ -1,0 +1,5 @@
+{
+  "skill": "strip-profile",
+  "should_trigger": ["Create a strip profile of this company."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}
