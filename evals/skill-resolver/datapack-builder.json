@@ -1,0 +1,5 @@
+{
+  "skill": "datapack-builder",
+  "should_trigger": ["Build a data pack from this offering memorandum."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

@@ -1,0 +1,5 @@
+{
+  "skill": "deal-screening",
+  "should_trigger": ["Screen this inbound deal flow against our fund criteria."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

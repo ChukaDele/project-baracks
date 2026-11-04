@@ -1,0 +1,5 @@
+{
+  "skill": "client-review",
+  "should_trigger": ["Prepare for the client review meeting next week."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

@@ -56,6 +56,8 @@ const registryEntrySchema = z.object({
   load: z.string(),
   aliases: z.array(canonicalSkillSlug).default([]),
   disclosure: z.enum(['hot', 'specialist']).default('specialist'),
+  /** Common-word triggers: select only through a canonical route or by explicit name. */
+  routeOnly: z.boolean().optional(),
   category: z.string().min(1).optional(),
   version: z.union([z.string().min(1), z.number().positive()]).optional(),
   experimental: z.boolean().optional(),
@@ -569,6 +571,12 @@ function explicitlyInvokesSkill(task: string, term: string): boolean {
   return invocation.test(normalizedTask) || leadingInvocation.test(normalizedTask);
 }
 
+/** A route-only id can be an ordinary phrase, so naming it needs the word "skill". */
+function namesSkill(task: string, term: string, routeOnly: boolean | undefined): boolean {
+  if (!explicitlyInvokesSkill(task, term)) return false;
+  return !routeOnly || new RegExp(`\\b${escapeRegex(normalizedText(term)).replace(/ /g, '\\s+')}\\s+skill\\b`, 'u').test(normalizedText(task));
+}
+
 function matchesNegativeExample(task: string, example: string): boolean {
   if (normalizedText(example) === normalizedText(task)) return true;
   const taskWords = new Set(words(task));
@@ -801,7 +809,7 @@ function scoreEntry(
     return { score: 0, reason: 'matched a negative trigger example' };
   }
   const explicitTerm = [entry.id, ...entry.aliases].find((term) =>
-    explicitlyInvokesSkill(task, term),
+    namesSkill(task, term, entry.routeOnly),
   );
   if (explicitTerm) {
     // A short id can be a substring of a more specific explicit id, such as
@@ -872,7 +880,7 @@ function resolveSkillsInternal(input: {
       ? [
           ...registry
             .filter((entry) =>
-              [entry.id, ...entry.aliases].some((term) => explicitlyInvokesSkill(task, term)),
+              [entry.id, ...entry.aliases].some((term) => namesSkill(task, term, entry.routeOnly)),
             )
             .map((entry) => entry.id),
           ...generated
@@ -1002,12 +1010,14 @@ function resolveSkillsInternal(input: {
                       score: 900 - canonicalRoute.skills.indexOf(entry.id),
                       reason: canonicalRoute.reasons[entry.id] ?? 'required by canonical task route',
                     }
+                  : entry.routeOnly
+                    ? { score: 0, reason: 'requires a canonical route or explicit selection' }
                   : entry.id === 'asd-ste100' && !explicitlyNamesAsdSte100
                     ? {
                         score: 0,
                         reason: 'ASD-STE100 requires a canonical technical-writing route',
                       }
-                    : (canonicalRoute || writingRoute) &&
+                    : ((canonicalRoute && !canonicalRoute.additive) || writingRoute) &&
                         (sourceKind === 'INTERNAL_DURABLE' ||
                           entry.source === SHARED_AGENTS_SOURCE) &&
                         genericScore.score < 100
@@ -1061,7 +1071,8 @@ function resolveSkillsInternal(input: {
   ).length;
   const selectionLimit =
     canonicalSelectionCount > 0
-      ? canonicalSelectionCount + strongAdditionalCount + externalAdditionalCount
+      ? canonicalSelectionCount +
+        (canonicalRoute?.additive ? (input.limit ?? 6) : strongAdditionalCount + externalAdditionalCount)
       : naturalExplicitIds.length > 0
         ? naturalExplicitIds.length
         : (input.limit ?? (explicitEntries.length || 6));

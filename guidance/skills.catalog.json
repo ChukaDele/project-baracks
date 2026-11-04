@@ -1,7 +1,43 @@
 {
   "version": 1,
-  "registryVersion": 26,
+  "registryVersion": 27,
   "entries": [
+    {
+      "id": "3-statement-model",
+      "name": "3-statement-model",
+      "title": "3 Statement Model",
+      "description": "3 statement three statement financial model income statement balance sheet cash flow template",
+      "shortDescription": "3 statement three statement financial model income statement balance sheet cash flow template",
+      "aliases": [],
+      "triggerConditions": [
+        "3-statement three-statement financial model income statement balance sheet cash flow template"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "2c551b7d7add1a4b0917dde4fb7f478d9bb9cf3a3aef61850ad475b3c800345e",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "3",
+        "statement three",
+        "statement financial model income statement balance sheet cash flow template"
+      ]
+    },
     {
       "id": "academic-verify",
       "name": "academic-verify",
@@ -16,7 +52,7 @@
         "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -25,11 +61,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "99e915b35c946da66c05bb5f3b6ba501096bed346fbc89216c648b2f9ecfe98b",
       "triggers": [
         "verify scholarly scientific claim paper methodology result limitations replication contradiction citation support"
@@ -46,7 +82,7 @@
         "academic essay critical summary literature review assignment source analysis"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -55,16 +91,85 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [
         "academic-verify"
       ],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "fd0e5a177773e6103ec832f59b8487f5573d836af18d38404bb800e753650c75",
       "triggers": [
         "academic essay critical summary literature review assignment source analysis"
+      ]
+    },
+    {
+      "id": "accrual-schedule",
+      "name": "accrual-schedule",
+      "title": "Accrual Schedule",
+      "description": "accrual schedule period end entries support",
+      "shortDescription": "accrual schedule period end entries support",
+      "aliases": [],
+      "triggerConditions": [
+        "accrual schedule period-end entries support"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "07725e005e6ce8a92012e4f9ddb0fed52a9998087e6c7e157d1b28fa272b22b1",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "accrual schedule period",
+        "end entries support"
+      ]
+    },
+    {
+      "id": "ai-readiness",
+      "name": "ai-readiness",
+      "title": "Ai Readiness",
+      "description": "portfolio ai readiness opportunities operating leverage",
+      "shortDescription": "portfolio ai readiness opportunities operating leverage",
+      "aliases": [],
+      "triggerConditions": [
+        "portfolio ai readiness opportunities operating leverage"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "3d160776fda9a76a97254a4d32f6c4f77d050928091ec1ce3a7ed3b80efab35f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "portfolio ai readiness opportunities operating leverage"
       ]
     },
     {
@@ -78,7 +183,7 @@
         "generative-art-particles-flow-fields-p5"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "exploratory-ui-projects",
       "applicableProjects": [
@@ -87,11 +192,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "generative",
         "art",
@@ -112,7 +217,7 @@
         "taleshape shaper sql dashboard analytics observability telemetry csv"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -121,11 +226,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "4fc41b18312d7f03fb9b9b5e387704df985d9468ece058d9f718505e18c8e193",
       "triggers": [
         "taleshape shaper sql dashboard analytics observability telemetry csv"
@@ -144,7 +249,7 @@
         "api endpoint contract integration"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -160,7 +265,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "c43fd443763e3d71f9d26b20cd40d2626ff4377bcd24f495f88cb771a69594b0",
       "triggers": [
         "api endpoint contract integration"
@@ -179,7 +284,7 @@
         "accounts receivable payable invoice collections"
       ],
       "category": "finance-accounting",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -195,7 +300,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "73f38ae00f3a53f64e822c971d3cd59f78b0dec5420e9623a7686733030a91fc",
       "triggers": [
         "accounts receivable payable invoice collections"
@@ -212,7 +317,7 @@
         "asd ste100 controlled technical sop procedure warning operating instruction"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -221,14 +326,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "fd9ea52a2f347f2ec5f2218a3b15011bb44310b533c600a77dbed597815b76e3",
       "triggers": [
         "asd ste100 controlled technical sop procedure warning operating instruction"
+      ]
+    },
+    {
+      "id": "audit-xls",
+      "name": "audit-xls",
+      "title": "Audit Xls",
+      "description": "audit spreadsheet workbook formula errors financial model integrity",
+      "shortDescription": "audit spreadsheet workbook formula errors financial model integrity",
+      "aliases": [],
+      "triggerConditions": [
+        "audit spreadsheet workbook formula errors financial model integrity"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "890ac2385d133a0fe7f11bf7dc0b6ebe4a844fdbe2eccdecb1d863b298517584",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "audit spreadsheet workbook formula errors financial model integrity"
       ]
     },
     {
@@ -244,7 +383,7 @@
         "authentication authorization security access"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -260,7 +399,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "6793ab8ca4caea86d7dc81f264559e5016d9d24696a9d23f959840f7b53202d2",
       "triggers": [
         "authentication authorization security access"
@@ -277,7 +416,7 @@
         "autonomous or long running work"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -286,11 +425,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "195b9c192a84630c0bec7ca94e28580da60ecbd8e1898f20de82a8ccc0e39ac3",
       "triggers": [
         "autonomous or long running work"
@@ -307,7 +446,7 @@
         "brand product positioning messaging homepage website landing page"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -316,14 +455,83 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "4d2b2163df35cd064f1bb3047604845fea817e50b8cbe0e647aecc5a8b0d8b8a",
       "triggers": [
         "brand product positioning messaging homepage website landing page"
+      ]
+    },
+    {
+      "id": "break-trace",
+      "name": "break-trace",
+      "title": "Break Trace",
+      "description": "reconciliation break root cause trace audit trail posting",
+      "shortDescription": "reconciliation break root cause trace audit trail posting",
+      "aliases": [],
+      "triggerConditions": [
+        "reconciliation break root cause trace audit trail posting"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "5d7d3fe7ecf69c8ddf4f9e279fb8ff84273e7066863cd0eea55ce527a2a09287",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "reconciliation break root cause trace audit trail posting"
+      ]
+    },
+    {
+      "id": "buyer-list",
+      "name": "buyer-list",
+      "title": "Buyer List",
+      "description": "buyer list universe strategic financial acquirers sell side",
+      "shortDescription": "buyer list universe strategic financial acquirers sell side",
+      "aliases": [],
+      "triggerConditions": [
+        "buyer list universe strategic financial acquirers sell-side"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "09001c06e419fb3ebba5cf9fce32390b1befabe80890ac996afd0fc48f9d955d",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "buyer list universe strategic financial acquirers sell",
+        "side"
       ]
     },
     {
@@ -339,7 +547,7 @@
         "capability freshness version compatibility evidence"
       ],
       "category": "system",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -355,10 +563,44 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "d1613aea2540a1dfd49c8b0589ebb66047f6c71f31b208210287ebf744dc7ec3",
       "triggers": [
         "capability freshness version compatibility evidence"
+      ]
+    },
+    {
+      "id": "catalyst-calendar",
+      "name": "catalyst-calendar",
+      "title": "Catalyst Calendar",
+      "description": "catalyst calendar coverage universe earnings dates events",
+      "shortDescription": "catalyst calendar coverage universe earnings dates events",
+      "aliases": [],
+      "triggerConditions": [
+        "catalyst calendar coverage universe earnings dates events"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "2a0eb640f32537406366f5971927bf4424e84f86509a5cda32adcd7efb799397",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "catalyst calendar coverage universe earnings dates events"
       ]
     },
     {
@@ -374,7 +616,7 @@
         "chief of staff strategic coordination executive assistant boundary"
       ],
       "category": "management",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -390,7 +632,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "13a45f3fe3b7d9ad6fa1f84bf58424bb654ce8e2d4881bfa13348b9cbfe681a8",
       "triggers": [
         "chief of staff strategic coordination executive assistant boundary"
@@ -407,7 +649,7 @@
         "ci github actions pr check failure"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -416,14 +658,151 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "c2d79aea6453c8d299fa6439b0b1e31cd3d9200ec985713973576dccaa21bf48",
       "triggers": [
         "ci github actions pr check failure"
+      ]
+    },
+    {
+      "id": "cim-builder",
+      "name": "cim-builder",
+      "title": "Cim Builder",
+      "description": "cim confidential information memorandum sell side",
+      "shortDescription": "cim confidential information memorandum sell side",
+      "aliases": [],
+      "triggerConditions": [
+        "cim confidential information memorandum sell-side"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "c3ec0efddb1b764f74e7793445d414d28581207e3f446ff571fccfb61268885f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "cim confidential information memorandum sell",
+        "side"
+      ]
+    },
+    {
+      "id": "clean-data-xls",
+      "name": "clean-data-xls",
+      "title": "Clean Data Xls",
+      "description": "clean messy spreadsheet data whitespace casing numbers stored as text duplicates",
+      "shortDescription": "clean messy spreadsheet data whitespace casing numbers stored as text duplicates",
+      "aliases": [],
+      "triggerConditions": [
+        "clean messy spreadsheet data whitespace casing numbers stored as text duplicates"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "a8cd312f1c7d91022f61f1a3be8c0e82d04d63c584e681bd934f36a679c139b6",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "clean messy spreadsheet data whitespace casing numbers stored as text duplicates"
+      ]
+    },
+    {
+      "id": "client-report",
+      "name": "client-report",
+      "title": "Client Report",
+      "description": "client performance portfolio report quarterly investment",
+      "shortDescription": "client performance portfolio report quarterly investment",
+      "aliases": [],
+      "triggerConditions": [
+        "client performance portfolio report quarterly investment"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "db7dbd21ca615db6e2f0a0c93eaef17554392aa4cea153f690962edb590945ba",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "client performance portfolio report quarterly investment"
+      ]
+    },
+    {
+      "id": "client-review",
+      "name": "client-review",
+      "title": "Client Review",
+      "description": "client review meeting prep allocation talking points",
+      "shortDescription": "client review meeting prep allocation talking points",
+      "aliases": [],
+      "triggerConditions": [
+        "client review meeting prep allocation talking points"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "ec37f6171c2bc1706cf31fb91f3e7c8da90a67576b6a15d87a4d411f7c7611a2",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "client review meeting prep allocation talking points"
       ]
     },
     {
@@ -439,7 +818,7 @@
         "codebase design module ownership boundaries"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -455,10 +834,44 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "8a1420cba0d0865e578c0578ae07d0788110c846fc7eda8fdad1ead9c8d504ee",
       "triggers": [
         "codebase design module ownership boundaries"
+      ]
+    },
+    {
+      "id": "competitive-analysis",
+      "name": "competitive-analysis",
+      "title": "Competitive Analysis",
+      "description": "competitive landscape deck market positioning competitor deep dives",
+      "shortDescription": "competitive landscape deck market positioning competitor deep dives",
+      "aliases": [],
+      "triggerConditions": [
+        "competitive landscape deck market positioning competitor deep dives"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "8ccfa90517c49fdbe638bfb08e4fbcd7241e47f302a3a0c4e5c89ed62da64c6f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "competitive landscape deck market positioning competitor deep dives"
       ]
     },
     {
@@ -472,7 +885,7 @@
         "project start or material product work"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -481,14 +894,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "ead6f57d152c5170a4542e17b3c366348e4db8ce670eda0bb3c392dd2b02aa87",
       "triggers": [
         "project start or material product work"
+      ]
+    },
+    {
+      "id": "comps-analysis",
+      "name": "comps-analysis",
+      "title": "Comps Analysis",
+      "description": "comparable company analysis trading comps peer multiples valuation multiples",
+      "shortDescription": "comparable company analysis trading comps peer multiples valuation multiples",
+      "aliases": [],
+      "triggerConditions": [
+        "comparable company analysis trading comps peer multiples valuation multiples"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "0e0c5e94e64e20d734874daf2afab71dfcb7e48f2064d34146e09128f1de6fdd",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "comparable company analysis trading comps peer multiples valuation multiples"
       ]
     },
     {
@@ -504,7 +951,7 @@
         "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -513,11 +960,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "5a4bdfb5d3b1c580334981f95ba61f5915d441ee033a5c55ea094c22b9f9e285",
       "triggers": [
         "synthesize duplicate related contradictory knowledge provenance backlinks minority abandoned branches retrieval noise"
@@ -536,7 +983,7 @@
         "concurrency race condition parallel locking"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -552,7 +999,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "a8658aa189a6f1cae53dce54768e2f586b965edc1c2077bf30b8c32ada5fb38b",
       "triggers": [
         "concurrency race condition parallel locking"
@@ -571,7 +1018,7 @@
         "bookkeeping ledger journal controller accounting"
       ],
       "category": "finance-accounting",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -587,7 +1034,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "75446c6d410a8258fbabee1dddbbf99b3ae67b22a5a33f8a3c81eced07c5ba9d",
       "triggers": [
         "bookkeeping ledger journal controller accounting"
@@ -604,7 +1051,7 @@
         "provider model browser infrastructure cost"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -613,11 +1060,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "d3ac07d364b178bbf15179e35c919a9ffecb06a140f0bc29eef26614eb2d07cb",
       "triggers": [
         "provider model browser infrastructure cost"
@@ -636,7 +1083,7 @@
         "cross modal visual document evidence execution-independent read-only review provenance"
       ],
       "category": "quality",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -652,7 +1099,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "9cb8f26dc0b44cc9a9c1f1db7207b362b3a36e843b664ccebd5c988efbf16994",
       "triggers": [
         "cross modal visual document evidence execution",
@@ -671,7 +1118,7 @@
         "outcome data scoring learning"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -680,11 +1127,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "bd19b04746cd87883a84d80e7b092cfeb93ea4e1b9187718789aeadc8ec81e2f",
       "triggers": [
         "outcome data scoring learning"
@@ -703,7 +1150,7 @@
         "database schema query migration"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -719,10 +1166,282 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "ed8312ba05a500e2ab5b7aec75cb8fcb1927c52bd594b8de1cca95f78bbf7fd6",
       "triggers": [
         "database schema query migration"
+      ]
+    },
+    {
+      "id": "datapack-builder",
+      "name": "datapack-builder",
+      "title": "Datapack Builder",
+      "description": "data pack datapack cim offering memorandum excel financial services",
+      "shortDescription": "data pack datapack cim offering memorandum excel financial services",
+      "aliases": [],
+      "triggerConditions": [
+        "data pack datapack cim offering memorandum excel financial services"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "cce2626741bf1a34e300afedd538bcbcdc3e8ba2f9b3df333a62ef91538ad6db",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "data pack datapack cim offering memorandum excel financial services"
+      ]
+    },
+    {
+      "id": "dcf-model",
+      "name": "dcf-model",
+      "title": "Dcf Model",
+      "description": "dcf discounted cash flow valuation wacc terminal value sensitivity equity model",
+      "shortDescription": "dcf discounted cash flow valuation wacc terminal value sensitivity equity model",
+      "aliases": [],
+      "triggerConditions": [
+        "dcf discounted cash flow valuation wacc terminal value sensitivity equity model"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "8d3bfe70a50b1d5fa4b27fc838afc3363fec2f66e2542777c3f547f16a851a01",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "dcf discounted cash flow valuation wacc terminal value sensitivity equity model"
+      ]
+    },
+    {
+      "id": "dd-checklist",
+      "name": "dd-checklist",
+      "title": "Dd Checklist",
+      "description": "due diligence checklist sector target workstream",
+      "shortDescription": "due diligence checklist sector target workstream",
+      "aliases": [],
+      "triggerConditions": [
+        "due diligence checklist sector target workstream"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "13f62c693b0ec022963db9268f9fe10b946b66df1b5c0fb1e7a06d05a8d371c5",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "due diligence checklist sector target workstream"
+      ]
+    },
+    {
+      "id": "dd-meeting-prep",
+      "name": "dd-meeting-prep",
+      "title": "Dd Meeting Prep",
+      "description": "due diligence meeting prep management presentation expert network call",
+      "shortDescription": "due diligence meeting prep management presentation expert network call",
+      "aliases": [],
+      "triggerConditions": [
+        "due diligence meeting prep management presentation expert network call"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "a043c5dc084e0eae921ddc54ba7a922b95744d0f6562a1f4069bb71ea1551f4f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "due diligence meeting prep management presentation expert network call"
+      ]
+    },
+    {
+      "id": "deal-screening",
+      "name": "deal-screening",
+      "title": "Deal Screening",
+      "description": "screen inbound deal flow cim teaser investment criteria private equity",
+      "shortDescription": "screen inbound deal flow cim teaser investment criteria private equity",
+      "aliases": [],
+      "triggerConditions": [
+        "screen inbound deal flow cim teaser investment criteria private equity"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "18a78b0b4c1b5734e5059ed1aa8f66a9585d07fb262d4eeba25634250483a3d7",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "screen inbound deal flow cim teaser investment criteria private equity"
+      ]
+    },
+    {
+      "id": "deal-sourcing",
+      "name": "deal-sourcing",
+      "title": "Deal Sourcing",
+      "description": "private equity deal sourcing target companies crm founder outreach",
+      "shortDescription": "private equity deal sourcing target companies crm founder outreach",
+      "aliases": [],
+      "triggerConditions": [
+        "private equity deal sourcing target companies crm founder outreach"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "a8b6a93e42b93b4f39753685fa3a19eb504d8160a25319b01594a3df5b63a523",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "private equity deal sourcing target companies crm founder outreach"
+      ]
+    },
+    {
+      "id": "deal-tracker",
+      "name": "deal-tracker",
+      "title": "Deal Tracker",
+      "description": "deal tracker live deals milestones deadlines action items",
+      "shortDescription": "deal tracker live deals milestones deadlines action items",
+      "aliases": [],
+      "triggerConditions": [
+        "deal tracker live deals milestones deadlines action items"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "9571fc7ea8e195f45c93c03a9219f10bdd0a9fdbbf05bed008667b03ac44c950",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "deal tracker live deals milestones deadlines action items"
+      ]
+    },
+    {
+      "id": "deck-refresh",
+      "name": "deck-refresh",
+      "title": "Deck Refresh",
+      "description": "refresh update deck presentation new numbers quarterly earnings comps roll",
+      "shortDescription": "refresh update deck presentation new numbers quarterly earnings comps roll",
+      "aliases": [],
+      "triggerConditions": [
+        "refresh update deck presentation new numbers quarterly earnings comps roll"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "77c6ea935b75eeb50db6663a9b9e2217cc5f2b2342be38e3f59fb82ce79b7e8c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "refresh update deck presentation new numbers quarterly earnings comps roll"
       ]
     },
     {
@@ -738,7 +1457,7 @@
         "dependency package upgrade vulnerability"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -754,7 +1473,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "712ff2f8070dd56ed6a3ee0528693828d853f0613c5b2ba990027f5793ed0988",
       "triggers": [
         "dependency package upgrade vulnerability"
@@ -813,7 +1532,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "c68d870b86cb4e7d4aa18af3a170287ec0a2980f65a53b2eaa426fb20a44918d",
       "triggers": [
         "current Vercel deploy deployment preview claim framework detection guidance"
@@ -832,7 +1551,7 @@
         "deployment release rollout rollback"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -848,7 +1567,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "4d1201f0fa5dfd622f2452963f1a318a502da636dcf85a16a73aa8a8705b68d7",
       "triggers": [
         "deployment release rollout rollback"
@@ -865,7 +1584,7 @@
         "substantial ui website creation redesign art direction generic ai design too safe too loud taste"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -874,11 +1593,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "3b1cd1f5c8d978fe3fe14ff30cb36d2a9c924612cdc2cc681c23ea953f309a45",
       "triggers": [
         "substantial ui website creation redesign art direction generic ai design too safe too loud taste"
@@ -897,7 +1616,7 @@
         "deterministic accounting arithmetic ledger balances"
       ],
       "category": "finance-accounting",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -913,7 +1632,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "443889fcb395fd811edb39d7481da99686306351646f1295d26d6c9b0cda3c4c",
       "triggers": [
         "deterministic accounting arithmetic ledger balances"
@@ -930,7 +1649,7 @@
         "explicit owner approved localhost exception only"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -939,11 +1658,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "bf89604a352477741ca16c436d6674930d6c10dee5b2447244fc06f2a6c536fc",
       "triggers": [
         "explicit owner approved localhost exception only"
@@ -960,7 +1679,7 @@
         "direct response buy book register subscribe apply request demo conversion"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -969,11 +1688,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "96aa9fde9f09c7bd8289f411362fe7e9d8dd41c758396b6b55e9ce0cc5eb60e3",
       "triggers": [
         "direct response buy book register subscribe apply request demo conversion"
@@ -992,7 +1711,7 @@
         "domain model entities business rules"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1008,10 +1727,79 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "27a3be1d77fe91707f29a652c89de4b25f3d76d20415d8c097bdfc58e70fbf9f",
       "triggers": [
         "domain model entities business rules"
+      ]
+    },
+    {
+      "id": "earnings-analysis",
+      "name": "earnings-analysis",
+      "title": "Earnings Analysis",
+      "description": "equity research earnings update report quarterly results beat miss",
+      "shortDescription": "equity research earnings update report quarterly results beat miss",
+      "aliases": [],
+      "triggerConditions": [
+        "equity research earnings update report quarterly results beat miss"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "91969210b6a9a70cf0a57438d0ca2831d0113755dd3163db072a5b7d98695ee2",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "equity research earnings update report quarterly results beat miss"
+      ]
+    },
+    {
+      "id": "earnings-preview",
+      "name": "earnings-preview",
+      "title": "Earnings Preview",
+      "description": "pre earnings preview estimate scenario metrics to watch",
+      "shortDescription": "pre earnings preview estimate scenario metrics to watch",
+      "aliases": [],
+      "triggerConditions": [
+        "pre-earnings preview estimate scenario metrics to watch"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "822d1cd70d4e79b928795f6a5e213e5c3435858cfd28c40f7fff2997b4d3cb2e",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "pre",
+        "earnings preview estimate scenario metrics to watch"
       ]
     },
     {
@@ -1025,7 +1813,7 @@
         "animation transition easing ease out in cubic bezier spring bounce duration timing keyframes transform opacity fade slide scale stagger hover press active state microinteraction modal dialog drawer sheet popover dropdown tooltip toast framer motion react animatepresence waapi will change gpu janky choppy feels slow off make it smooth prefers reduced"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1034,11 +1822,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "animation transition easing ease out in cubic bezier spring bounce duration timing keyframes transform opacity fade slide scale stagger hover press active state microinteraction modal dialog drawer sheet popover dropdown tooltip toast framer motion react animatepresence waapi will change gpu janky choppy feels slow off make it smooth prefers reduced"
       ]
@@ -1054,7 +1842,7 @@
         "which skill what should i use ask emil one covers do you have a for s the right this list skills where does belong order"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1063,11 +1851,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "which skill what should i use ask emil one covers do you have a for s the right this list skills where does belong order"
       ]
@@ -1083,7 +1871,7 @@
         "the user mentions lapse aiforui mcp playwright panel or extension asks how to slow a page s animations down record scrub an interaction scope take elements load annotate frame copy llm export address time by named moments diff two builds read jank report trigger causality when mo isn t behaving"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -1092,11 +1880,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "the user mentions lapse aiforui mcp playwright panel or extension asks how to slow a page s animations down record scrub an interaction scope take elements load annotate frame copy llm export address time by named moments diff two builds read jank report trigger causality when mo isn t behaving"
       ]
@@ -1112,7 +1900,7 @@
         "the user says make a skill out of x s essays build knowledge bank from someone writing i want my agent to think like or asks where store and how structure distilled else public work"
       ],
       "category": "knowledge",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1121,11 +1909,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "the user says make a skill out of x s essays build knowledge bank from someone writing i want my agent to think like or asks where store and how structure distilled else public work"
       ]
@@ -1141,7 +1929,7 @@
         "the user says build me a tool for this describes result agent keeps missing or has burned round two of re prompting on same artifact"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1150,11 +1938,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "the user says build me a tool for this describes result agent keeps missing or has burned round two of re prompting on same artifact"
       ]
@@ -1170,7 +1958,7 @@
         "oklch oklab color space convert hex rgb hsl palette scale tonal ramp shades contrast checking wcag apca a11y colors readability gamut wide display p3 srgb chroma hue lightness saturation dark mode theme design tokens tailwind variables"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1179,11 +1967,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "oklch oklab color space convert hex rgb hsl palette scale tonal ramp shades contrast checking wcag apca a11y colors readability gamut wide display p3 srgb chroma hue lightness saturation dark mode theme design tokens tailwind variables"
       ]
@@ -1199,7 +1987,7 @@
         "component api props design compound components composition configuration controlled uncontrolled defaultvalue aschild slot render forwardref ref forwarding variants classname override system reusable library radix shadcn prop drilling boolean slots children context"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1208,11 +1996,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "component api props design compound components composition configuration controlled uncontrolled defaultvalue aschild slot render forwardref ref forwarding variants classname override system reusable library radix shadcn prop drilling boolean slots children context"
       ]
@@ -1228,7 +2016,7 @@
         "design ui visual hierarchy spacing padding margin gap whitespace typography font kerning tracking letter line height length color palette dark mode contrast wcag border shadow radius icon iconography illustration layout grid breakpoint alignment empty state error message microcopy copywriting button tooltip popover badge tag toast form input focus ring accessibility a11y information architecture navigation tabs onboarding looks off feels cheap polish review critique"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1237,11 +2025,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "design ui visual hierarchy spacing padding margin gap whitespace typography font kerning tracking letter line height length color palette dark mode contrast wcag border shadow radius icon iconography illustration layout grid breakpoint alignment empty state error message microcopy copywriting button tooltip popover badge tag toast form input focus ring accessibility a11y information architecture navigation tabs onboarding looks off feels cheap polish review critique"
       ]
@@ -1257,7 +2045,7 @@
         "design md docs system documentation component guidelines token document the our components rules for agents claude section agent invented a variant hardcoded color picked wrong"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1266,11 +2054,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "design md docs system documentation component guidelines token document the our components rules for agents claude section agent invented a variant hardcoded color picked wrong"
       ]
@@ -1286,7 +2074,7 @@
         "reaching for the exact word a design concept what s term space between two specific letters when ui idea is described loosely and needs its proper name choosing confusable near synonyms badge vs tag tooltip popover opacity visibility kerning tracking or writing reviewing copy specs commits you want terminology instead of vague language"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1295,11 +2083,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "reaching for the exact word a design concept what s term space between two specific letters when ui idea is described loosely and needs its proper name choosing confusable near synonyms badge vs tag tooltip popover opacity visibility kerning tracking or writing reviewing copy specs commits you want terminology instead of vague language"
       ]
@@ -1315,7 +2103,7 @@
         "the user asks what s it called when or describes a behavior pattern browser quirk without knowing its name and wants right word to prompt an ai engineer with for naming concept not implementing one"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1324,11 +2112,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "the user asks what s it called when or describes a behavior pattern browser quirk without knowing its name and wants right word to prompt an ai engineer with for naming concept not implementing one"
       ]
@@ -1344,7 +2132,7 @@
         "form input textarea select button checkbox radio toggle submit onsubmit validation error message placeholder label autofocus autocomplete spellcheck ios zoom font size 16px focus ring visible loading state disabled double duplicate request enter to cmd keyboard shortcut destructive action confirmation delete clear icon prefix suffix search field login signup 1password password manager"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1353,11 +2141,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "form input textarea select button checkbox radio toggle submit onsubmit validation error message placeholder label autofocus autocomplete spellcheck ios zoom font size 16px focus ring visible loading state disabled double duplicate request enter to cmd keyboard shortcut destructive action confirmation delete clear icon prefix suffix search field login signup 1password password manager"
       ]
@@ -1373,7 +2161,7 @@
         "the user invokes get creative says i m stuck need inspiration can t picture it yet describes a mood rather than an image wants endless variations of one visual idea or has rejected round prompted variants"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1382,11 +2170,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "the user invokes get creative says i m stuck need inspiration can t picture it yet describes a mood rather than an image wants endless variations of one visual idea or has rejected round prompted variants"
       ]
@@ -1402,7 +2190,7 @@
         "task-relevant"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-ui-projects",
       "applicableProjects": [
@@ -1411,11 +2199,11 @@
       "source": "github:emilkowalski/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "task",
         "relevant"
@@ -1432,7 +2220,7 @@
         "landing page marketing site homepage hero section pricing blog post docs documentation changelog rss feed seo cta call to action sign up button get started scroll animation fade in on parallax carousel hijacking intro load font preload layout shift static generation ssg code snippet copy as markdown nav dropdown header navigation waitlist"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1441,11 +2229,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "landing page marketing site homepage hero section pricing blog post docs documentation changelog rss feed seo cta call to action sign up button get started scroll animation fade in on parallax carousel hijacking intro load font preload layout shift static generation ssg code snippet copy as markdown nav dropdown header navigation waitlist"
       ]
@@ -1461,7 +2249,7 @@
         "mobile phone iphone ios safari android touch tap native feel feels like a website pwa installed app standalone sticky hover highlight 100vh dvh svh url bar input zoom 16px delay 300ms action pull to refresh overscroll rubber band notch dynamic island home indicator safe area viewport fit keyboard covers interactive widget long press user select callout carousel swipe scroll snap bottom sheet theme color status playsinline device emulation remote debugging"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1470,11 +2258,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "mobile phone iphone ios safari android touch tap native feel feels like a website pwa installed app standalone sticky hover highlight 100vh dvh svh url bar input zoom 16px delay 300ms action pull to refresh overscroll rubber band notch dynamic island home indicator safe area viewport fit keyboard covers interactive widget long press user select callout carousel swipe scroll snap bottom sheet theme color status playsinline device emulation remote debugging"
       ]
@@ -1490,7 +2278,7 @@
         "performance slow janky lag stutter fps frame drops virtualization virtual list infinite scroll long re render storm transition all will change gpu compositing layout shift cls thrash reflow preload prefetch lazy loading image optimization video font fout skeleton perceived intersectionobserver static generation ssg theme switch blur filter css variables framer motion"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1499,11 +2287,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "performance slow janky lag stutter fps frame drops virtualization virtual list infinite scroll long re render storm transition all will change gpu compositing layout shift cls thrash reflow preload prefetch lazy loading image optimization video font fout skeleton perceived intersectionobserver static generation ssg theme switch blur filter css variables framer motion"
       ]
@@ -1519,7 +2307,7 @@
         "prep for prod production ready is this to ship check pre launch prelaunch checklist before release the demo go live going day final pass sweep candidate qa audit hardening works on my machine what did i forget s left shipping"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1528,11 +2316,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "prep for prod production ready is this to ship check pre launch prelaunch checklist before release the demo go live going day final pass sweep candidate qa audit hardening works on my machine what did i forget s left shipping"
       ]
@@ -1548,7 +2336,7 @@
         "the user has a product idea feature or pivot and says should i build this review my grill me on is worth building what first asks how to validate position scope price"
       ],
       "category": "product",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1557,11 +2345,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "the user has a product idea feature or pivot and says should i build this review my grill me on is worth building what first asks how to validate position scope price"
       ]
@@ -1577,7 +2365,7 @@
         "prototype prototyping explore exploration variation variations variants versions options directions try a few show me some couple of which feels better not sure if compare side by riff mock up playground sandbox throwaway route proto control panel sliders dialkit tweak the values slow motion replay"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1586,11 +2374,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "prototype prototyping explore exploration variation variations variants versions options directions try a few show me some couple of which feels better not sure if compare side by riff mock up playground sandbox throwaway route proto control panel sliders dialkit tweak the values slow motion replay"
       ]
@@ -1606,7 +2394,7 @@
         "box shadow border borders radius rounded corners nested concentric elevation depth layering surface card container gradient banding eased mask image fade out hairline 0 5px divider outline dark mode theme variables color scale oklch looks flat harsh feels off"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1615,11 +2403,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "box shadow border borders radius rounded corners nested concentric elevation depth layering surface card container gradient banding eased mask image fade out hairline 0 5px divider outline dark mode theme variables color scale oklch looks flat harsh feels off"
       ]
@@ -1635,7 +2423,7 @@
         "touch mobile tap target hit area hover state ios safari iphone ipad keyboard navigation tab order tabbing focus trap aria label accessibility a11y screen reader prefers reduced motion inert action double zoom pinch playsinline autoplay video tooltip delay submenu dropdown dialog modal cmd ctrl shortcut"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1644,11 +2432,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "touch mobile tap target hit area hover state ios safari iphone ipad keyboard navigation tab order tabbing focus trap aria label accessibility a11y screen reader prefers reduced motion inert action double zoom pinch playsinline autoplay video tooltip delay submenu dropdown dialog modal cmd ctrl shortcut"
       ]
@@ -1664,7 +2452,7 @@
         "typography typeface fonts woff2 font formats variable opentype feature settings weight tabular numbers letter spacing tracking line height leading type scale measure length readability text wrap clamp truncation ellipsis underline decoration selection placeholder caret ios input zoom smoothing antialiased contrast box smart punctuation drop cap rtl"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1673,11 +2461,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "typography typeface fonts woff2 font formats variable opentype feature settings weight tabular numbers letter spacing tracking line height leading type scale measure length readability text wrap clamp truncation ellipsis underline decoration selection placeholder caret ios input zoom smoothing antialiased contrast box smart punctuation drop cap rtl"
       ]
@@ -1693,7 +2481,7 @@
         "polish details font smoothing antialiased rendering tabular nums numbers layout shift cls jumping text skeleton placeholder scrollbar z index stacking context isolation focus ring outline selection hover state active pressed scale on press hit area tap target touch optical alignment icon centering truncation line clamp ellipsis curly quotes wrap balance safe scroll margin empty pointer events user select flash refresh feels off unfinished make it feel better"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1702,11 +2490,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "polish details font smoothing antialiased rendering tabular nums numbers layout shift cls jumping text skeleton placeholder scrollbar z index stacking context isolation focus ring outline selection hover state active pressed scale on press hit area tap target touch optical alignment icon centering truncation line clamp ellipsis curly quotes wrap balance safe scroll margin empty pointer events user select flash refresh feels off unfinished make it feel better"
       ]
@@ -1722,7 +2510,7 @@
         "review code ui design pr critique does this look right is good feels off catch mistakes ai generated component polish pass quality bar ship it sign nitpick qa"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1731,11 +2519,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "review code ui design pr critique does this look right is good feels off catch mistakes ai generated component polish pass quality bar ship it sign nitpick qa"
       ]
@@ -1751,7 +2539,7 @@
         "code slop ai de unslop clean up this obvious comments redundant narrated commented out stale try catch swallowed error silent failure fallback defensive null checks as any ts ignore non assertion console log debug logs todo dead unused imports duplicate helper one call wrapper v2 enhanced legacy alias backwards compatibility minimal diff drive by changes tautological test skipped reads like copilot wrote it"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1760,11 +2548,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "code slop ai de unslop clean up this obvious comments redundant narrated commented out stale try catch swallowed error silent failure fallback defensive null checks as any ts ignore non assertion console log debug logs todo dead unused imports duplicate helper one call wrapper v2 enhanced legacy alias backwards compatibility minimal diff drive by changes tautological test skipped reads like copilot wrote it"
       ]
@@ -1780,7 +2568,7 @@
         "slop ai design de unslop looks generated vibe coded generic template look cookie cutter purple gradient indigo violet text bg clip glassmorphism backdrop blur glow neon orb blob bento grid feature icon cards emoji icons sparkles centered hero announcement badge pill stats row testimonial logo wall dark mode default inter tracking tight font black rounded 2xl hover scale fade in on scroll make it less unique give personality distinctive"
       ],
       "category": "design",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -1789,11 +2577,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "slop ai design de unslop looks generated vibe coded generic template look cookie cutter purple gradient indigo violet text bg clip glassmorphism backdrop blur glow neon orb blob bento grid feature icon cards emoji icons sparkles centered hero announcement badge pill stats row testimonial logo wall dark mode default inter tracking tight font black rounded 2xl hover scale fade in on scroll make it less unique give personality distinctive"
       ]
@@ -1809,7 +2597,7 @@
         "slop de unslop ai tells sounds like reads chatgpt robotic writing humanize rewrite this delve leverage crucial testament landscape tapestry em dash dashes rule of three not just hedging puffery filler words passive voice chatbot phrases i hope helps readme changelog release notes blog post docs copy marketing microcopy tone"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1818,11 +2606,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "slop de unslop ai tells sounds like reads chatgpt robotic writing humanize rewrite this delve leverage crucial testament landscape tapestry em dash dashes rule of three not just hedging puffery filler words passive voice chatbot phrases i hope helps readme changelog release notes blog post docs copy marketing microcopy tone"
       ]
@@ -1838,7 +2626,7 @@
         "skill md file write a create improve agent instructions claude agents system prompt rules taste conventions decision tree the ignores my doesn t work package preferences transfer"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1847,11 +2635,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "skill md file write a create improve agent instructions claude agents system prompt rules taste conventions decision tree the ignores my doesn t work package preferences transfer"
       ]
@@ -1869,7 +2657,7 @@
         "reverse engineer shipped external feature workflow protocol binary app behaviour replicate interoperate port"
       ],
       "category": "reference",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1878,11 +2666,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "reverse engineer shipped external feature workflow protocol binary app behaviour replicate interoperate port"
       ]
@@ -1901,7 +2689,7 @@
         "engineering design doctrine maintainable modular code"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1917,7 +2705,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "e3b45861814e212446ee2f07fa8f54d98a7cbf501a1badb9e2c4ee953e15b6a9",
       "triggers": [
         "engineering design doctrine maintainable modular code"
@@ -1938,7 +2726,7 @@
         "pr review or release"
       ],
       "category": "quality",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1954,7 +2742,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "7ce414a0f6dc0266585ec5324e3b89c993965fdbcfe8cbcc0368fb18e5aaa271",
       "triggers": [
         "pr review or release"
@@ -1973,7 +2761,7 @@
         "executive assistant calendar correspondence meeting preparation"
       ],
       "category": "management",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -1989,7 +2777,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "44bf8ee0d7fd29e661c0d8535cbfa8486710e72519b2fffdc46af01b7f2c2d16",
       "triggers": [
         "executive assistant calendar correspondence meeting preparation"
@@ -2006,7 +2794,7 @@
         "exploratory awwwards fwa heavy motion immersive illustrative"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -2015,11 +2803,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "0aae7785b0567d43e88a8d1dd152f168d59bf33f417946ba321c2e315c1ff5fb",
       "triggers": [
         "exploratory awwwards fwa heavy motion immersive illustrative"
@@ -2036,7 +2824,7 @@
         "create-or-update-figma-screen"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "figma-enabled-projects",
       "applicableProjects": [
@@ -2045,11 +2833,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "create",
         "or",
@@ -2069,7 +2857,7 @@
         "implement-code-from-figma"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "figma-enabled-projects",
       "applicableProjects": [
@@ -2078,11 +2866,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "implement",
         "code",
@@ -2101,7 +2889,7 @@
         "programmatic-figma-read-write"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "figma-enabled-projects",
       "applicableProjects": [
@@ -2110,16 +2898,45 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "programmatic",
         "figma",
         "read",
         "write"
+      ]
+    },
+    {
+      "id": "finance-skills-routing",
+      "name": "finance-skills-routing",
+      "title": "Finance Skills Routing",
+      "description": "finance skills routing guide boundaries runtime",
+      "shortDescription": "finance skills routing guide boundaries runtime",
+      "aliases": [],
+      "triggerConditions": [
+        "finance skills routing guide boundaries runtime"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "canonical-registry",
+        "registryVersion": 27
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "finance skills routing guide boundaries runtime"
       ]
     },
     {
@@ -2135,7 +2952,7 @@
         "financial planning forecast extrapolation budget"
       ],
       "category": "finance-accounting",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2151,7 +2968,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "d5ef270f3c973e8bf0fcd3ed33aa953952ff06db824b44b5512091c18403ba53",
       "triggers": [
         "financial planning forecast extrapolation budget"
@@ -2170,7 +2987,7 @@
         "frontend ui component interface"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2186,7 +3003,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "84dbb80a7e45b1c100ff3b904ff30f4f46b34540e50c949181730d86fb2043d4",
       "triggers": [
         "frontend ui component interface"
@@ -2203,7 +3020,7 @@
         "frontend-design-work"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-ui-projects",
       "applicableProjects": [
@@ -2212,11 +3029,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "frontend",
         "design",
@@ -2234,7 +3051,7 @@
         "3d gaussian splatting spatial reconstruction radiance field colmap novel view splat"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "spatial-projects",
       "applicableProjects": [
@@ -2243,14 +3060,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "3ee26a2b29bd7766bd6c50326ca05f52be3e1596245adf3b35aa4671eab8ce55",
       "triggers": [
         "3d gaussian splatting spatial reconstruction radiance field colmap novel view splat"
+      ]
+    },
+    {
+      "id": "gl-recon",
+      "name": "gl-recon",
+      "title": "Gl Recon",
+      "description": "general ledger gl subledger reconciliation trade date",
+      "shortDescription": "general ledger gl subledger reconciliation trade date",
+      "aliases": [],
+      "triggerConditions": [
+        "general ledger gl subledger reconciliation trade date"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "b637c23603f6cd17ae5f8c924446d80169a74531d8014935ffea6ec1bdd88c6c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "general ledger gl subledger reconciliation trade date"
       ]
     },
     {
@@ -2264,7 +3115,7 @@
         "deep-graph-orchestration"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2273,11 +3124,11 @@
       "source": "github:codejunkie99/graph-engineering",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "deep",
         "graph",
@@ -2295,7 +3146,7 @@
         "authentication oauth consent 2fa captcha payment or irreversible human only decision"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2304,14 +3155,117 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "4f84c39863bb4f4cdfdb672097698413951f20bc14e373ba91e51697131f11d8",
       "triggers": [
         "authentication oauth consent 2fa captcha payment or irreversible human only decision"
+      ]
+    },
+    {
+      "id": "ib-check-deck",
+      "name": "ib-check-deck",
+      "title": "Ib Check Deck",
+      "description": "investment banking presentation quality check pitch deck client ready qc",
+      "shortDescription": "investment banking presentation quality check pitch deck client ready qc",
+      "aliases": [],
+      "triggerConditions": [
+        "investment banking presentation quality check pitch deck client-ready qc"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "0c1d0a2d975ee032ddf663b6421757e5fd14647275b10bcc9c3413db2d285aff",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "investment banking presentation quality check pitch deck client",
+        "ready qc"
+      ]
+    },
+    {
+      "id": "ic-memo",
+      "name": "ic-memo",
+      "title": "Ic Memo",
+      "description": "investment committee ic memo deal approval",
+      "shortDescription": "investment committee ic memo deal approval",
+      "aliases": [],
+      "triggerConditions": [
+        "investment committee ic memo deal approval"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "c3152ece617802961d6b553b97543b768d68a1d73e7305e58578478ba64d27a1",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "investment committee ic memo deal approval"
+      ]
+    },
+    {
+      "id": "idea-generation",
+      "name": "idea-generation",
+      "title": "Idea Generation",
+      "description": "stock screening investment idea sourcing quantitative thematic screen",
+      "shortDescription": "stock screening investment idea sourcing quantitative thematic screen",
+      "aliases": [],
+      "triggerConditions": [
+        "stock screening investment idea sourcing quantitative thematic screen"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "aec2ba80c097b95c9b8b6cee1866d223daec62fd6ec037e899dc7c9e6048d337",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "stock screening investment idea sourcing quantitative thematic screen"
       ]
     },
     {
@@ -2327,7 +3281,7 @@
         "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2336,11 +3290,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "a73e4523bc031f48109184327116e1428b81a6a5b1b9599f1e460375204b2397",
       "triggers": [
         "idea history first appearance view changes superseded versions temporal conflicts abandoned branches canonical view"
@@ -2359,7 +3313,7 @@
         "production incident outage recovery"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2375,10 +3329,44 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "35eac013c91841f66a665b98bc47a15952d7139b29ea22d91a098c60067a0e59",
       "triggers": [
         "production incident outage recovery"
+      ]
+    },
+    {
+      "id": "initiating-coverage",
+      "name": "initiating-coverage",
+      "title": "Initiating Coverage",
+      "description": "initiating coverage equity research initiation report",
+      "shortDescription": "initiating coverage equity research initiation report",
+      "aliases": [],
+      "triggerConditions": [
+        "initiating coverage equity research initiation report"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "505fb5d185016d34e13fb1aa4974f7fa37dabfde851c78b159976c6256ebfcae",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "initiating coverage equity research initiation report"
       ]
     },
     {
@@ -2394,7 +3382,7 @@
         "third party integration adapter connector"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2410,10 +3398,44 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "86aa985f78d21750193e89aa6f8b9b52567a20761f616587d5ce737a1c373f89",
       "triggers": [
         "third party integration adapter connector"
+      ]
+    },
+    {
+      "id": "investment-proposal",
+      "name": "investment-proposal",
+      "title": "Investment Proposal",
+      "description": "investment proposal client allocation recommendation",
+      "shortDescription": "investment proposal client allocation recommendation",
+      "aliases": [],
+      "triggerConditions": [
+        "investment proposal client allocation recommendation"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "ad15b23307708f1510585e258eacc760d4e2a1c2da43098a5a7e35140eda3b4c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "investment proposal client allocation recommendation"
       ]
     },
     {
@@ -2429,7 +3451,7 @@
         "ingest notes pasted text documents transcripts urls research repositories notion provenance dedupe notability"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2438,11 +3460,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "7ca6d2cfa21102c55aea23fec9b1f93f6b839fa8a3a80213aad2dbfe8817d725",
       "triggers": [
         "ingest notes pasted text documents transcripts urls research repositories notion provenance dedupe notability"
@@ -2459,7 +3481,7 @@
         "research strategy synthesis comparison decision work"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2468,14 +3490,116 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "ae8a0f1a5daf6757e778a6f698ae79cf95708daf5e961bee41ae1ccf38132038",
       "triggers": [
         "research strategy synthesis comparison decision work"
+      ]
+    },
+    {
+      "id": "kyc-doc-parse",
+      "name": "kyc-doc-parse",
+      "title": "Kyc Doc Parse",
+      "description": "kyc onboarding packet parse identity ownership structured fields",
+      "shortDescription": "kyc onboarding packet parse identity ownership structured fields",
+      "aliases": [],
+      "triggerConditions": [
+        "kyc onboarding packet parse identity ownership structured fields"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "operations",
+        "contentSha256": "3d8499b484cf48bc06058f773a5e1c734cb6170c74c4475379a9c3579d4960de",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "kyc onboarding packet parse identity ownership structured fields"
+      ]
+    },
+    {
+      "id": "kyc-rules",
+      "name": "kyc-rules",
+      "title": "Kyc Rules",
+      "description": "kyc aml rules grid risk rating onboarding record",
+      "shortDescription": "kyc aml rules grid risk rating onboarding record",
+      "aliases": [],
+      "triggerConditions": [
+        "kyc aml rules grid risk rating onboarding record"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "operations",
+        "contentSha256": "23530e7d284fef693d2e1b9edc90b4f081731c6783000c09a00dedbdd7ae201c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "kyc aml rules grid risk rating onboarding record"
+      ]
+    },
+    {
+      "id": "lbo-model",
+      "name": "lbo-model",
+      "title": "Lbo Model",
+      "description": "lbo leveraged buyout model sponsor debt schedule template",
+      "shortDescription": "lbo leveraged buyout model sponsor debt schedule template",
+      "aliases": [],
+      "triggerConditions": [
+        "lbo leveraged buyout model sponsor debt schedule template"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "7c98e2a35b2ff33a9b7d715ddffcabce9be695ed406dd436bf2eb3d3971c7c8d",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "lbo leveraged buyout model sponsor debt schedule template"
       ]
     },
     {
@@ -2489,7 +3613,7 @@
         "complex autonomous or parallel work"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2498,11 +3622,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "4ab2a81c53c998a60b672fc8d48f44665c484dadf4f7152a78f49335c2b9a2df",
       "triggers": [
         "complex autonomous or parallel work"
@@ -2525,7 +3649,7 @@
         "test strategy verification release confidence"
       ],
       "category": "quality",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2541,7 +3665,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "7674524aad4e10841094f7b9f2ee2f01d98b6ddfb911e8b3a6e1ef2d0f3aaa96",
       "triggers": [
         "test strategy verification release confidence"
@@ -2558,7 +3682,7 @@
         "explicit user correction repeated mistake recurring failure reusable success"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2567,11 +3691,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "9d854ea81da216b2bd4b20b7d0abdd97b36ea71ec3325120bfbc0fb85de72331",
       "triggers": [
         "explicit user correction repeated mistake recurring failure reusable success"
@@ -2588,7 +3712,7 @@
         "rename migration provider swap architecture replacement"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2597,11 +3721,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "55cea083641968cdde74a1c3016245043c26557c851d8cf9cbc0d3f4c3ca618e",
       "triggers": [
         "rename migration provider swap architecture replacement"
@@ -2618,7 +3742,7 @@
         "linkedin post content profile audit gtm networking personal brand"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2627,11 +3751,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "linkedin post content profile audit gtm networking personal brand"
       ]
@@ -2647,7 +3771,7 @@
         "major self change skill routing learning policy runtime installer execution independent review provenance"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "major-repo",
       "applicableProjects": [
@@ -2656,11 +3780,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "450b9588acd1a333bdf93d077ee674c2ea33b450b594327074eddc483f0b9904",
       "triggers": [
         "major self change skill routing learning policy runtime installer execution independent review provenance"
@@ -2677,7 +3801,7 @@
         "build-or-improve-mcp-server"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2686,11 +3810,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "build",
         "or",
@@ -2710,7 +3834,7 @@
         "mcp connector plugin integration authentication tool exposure reconnect permission provider operation"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2719,14 +3843,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "06bab0e3f1d24fa4aefb518f8cdaacccb5d22abbe9febf0e1fd12727d3748dff",
       "triggers": [
         "mcp connector plugin integration authentication tool exposure reconnect permission provider operation"
+      ]
+    },
+    {
+      "id": "merger-model",
+      "name": "merger-model",
+      "title": "Merger Model",
+      "description": "merger model accretion dilution pro forma eps synergy",
+      "shortDescription": "merger model accretion dilution pro forma eps synergy",
+      "aliases": [],
+      "triggerConditions": [
+        "merger model accretion dilution pro forma eps synergy"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "c66c60b864312119c0ff7b4c87d4f55057a702868d3367eb3f26b93abdeb72b4",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "merger model accretion dilution pro forma eps synergy"
       ]
     },
     {
@@ -2742,7 +3900,7 @@
         "data schema platform migration"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2758,10 +3916,78 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "47d7e41aeb232bc3f1c4bef82903aebf78d177fca17845e261457b4104c45662",
       "triggers": [
         "data schema platform migration"
+      ]
+    },
+    {
+      "id": "model-update",
+      "name": "model-update",
+      "title": "Model Update",
+      "description": "update financial model earnings guidance estimates quarter",
+      "shortDescription": "update financial model earnings guidance estimates quarter",
+      "aliases": [],
+      "triggerConditions": [
+        "update financial model earnings guidance estimates quarter"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "af3e7cd79dadf29d7d682d6d78cca5bf8310c86ead9d06abdecc251f4f0af0ed",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "update financial model earnings guidance estimates quarter"
+      ]
+    },
+    {
+      "id": "morning-note",
+      "name": "morning-note",
+      "title": "Morning Note",
+      "description": "morning meeting note overnight developments trade ideas",
+      "shortDescription": "morning meeting note overnight developments trade ideas",
+      "aliases": [],
+      "triggerConditions": [
+        "morning meeting note overnight developments trade ideas"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "20b2f8f56e5e60e44a6638d6967cfb7a5ddebee582405abaab0b5e154fb2515f",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "morning meeting note overnight developments trade ideas"
       ]
     },
     {
@@ -2775,7 +4001,7 @@
         "always on project and large feature planning"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2784,11 +4010,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "f2e0e9793639987d40c9bb70e633586712effcbfe666b31a20c2cfbf8a56baec",
       "triggers": [
         "always on project and large feature planning"
@@ -2807,7 +4033,7 @@
         "natural writing qa ai pattern audit humanizer claim preserving"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2816,14 +4042,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "eae6bce2d77a8eed23ffe3b72cdceb3bb00a668ac351f701fab14b74c9110d49",
       "triggers": [
         "natural writing qa ai pattern audit humanizer claim preserving"
+      ]
+    },
+    {
+      "id": "nav-tieout",
+      "name": "nav-tieout",
+      "title": "Nav Tieout",
+      "description": "lp statement nav tie out capital account fund pack",
+      "shortDescription": "lp statement nav tie out capital account fund pack",
+      "aliases": [],
+      "triggerConditions": [
+        "lp statement nav tie out capital account fund pack"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "256f5c912769cc9fcd6db7717eff0e9c1c91cc44510705d7db2c4a64281c9a6c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "lp statement nav tie out capital account fund pack"
       ]
     },
     {
@@ -2837,7 +4097,7 @@
         "operator or user workflow"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-product-projects",
       "applicableProjects": [
@@ -2846,11 +4106,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "c4b81201ed5eff9d54fb8d2b2350600534fe95a1582ab56cb29575f5498e26df",
       "triggers": [
         "operator or user workflow"
@@ -2869,7 +4129,7 @@
         "logging metrics tracing observability"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2885,7 +4145,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "0fda860b56a7bf35d4003e0a158f9ed4789e7887890a0c84f1edd4ae395eb19b",
       "triggers": [
         "logging metrics tracing observability"
@@ -2902,7 +4162,7 @@
         "project start or commodity build"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2911,11 +4171,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "d2c5db532ed2cec1041e280a593e0693eeae3b4b35d6a21803875cb656150784",
       "triggers": [
         "project start or commodity build"
@@ -2934,7 +4194,7 @@
         "operations process improvement workflow efficiency"
       ],
       "category": "operations",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2950,7 +4210,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "d085179bcc6c0b67b9630ae54e73fab33cdc5ebf66c362ce48c2470fbb568246",
       "triggers": [
         "operations process improvement workflow efficiency"
@@ -2967,7 +4227,7 @@
         "pdf-task"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -2976,11 +4236,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "pdf",
         "task"
@@ -2997,7 +4257,7 @@
         "generated pdf reporting"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3006,11 +4266,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "14f4b23a56ee0179fe078dab6870fc4ae742f7bba4e3cbf36aac2b5b4f80be0e",
       "triggers": [
         "generated pdf reporting"
@@ -3029,7 +4289,7 @@
         "measured slow workflow page query build integration"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3038,11 +4298,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "13642cc5bfa6077835d60ac167f0e83548f57679517a7d4023763515fe49fc83",
       "triggers": [
         "measured slow workflow page query build integration"
@@ -3059,7 +4319,7 @@
         "linkedin thought leadership personal essay newsletter authority"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3068,14 +4328,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "63b07461fca317a80c87b2e2db6e551a9298286cc28c64e71ef1cfa25387e775",
       "triggers": [
         "linkedin thought leadership personal essay newsletter authority"
+      ]
+    },
+    {
+      "id": "pitch-deck",
+      "name": "pitch-deck",
+      "title": "Pitch Deck",
+      "description": "investment banking pitch deck pitch book template populate source files",
+      "shortDescription": "investment banking pitch deck pitch book template populate source files",
+      "aliases": [],
+      "triggerConditions": [
+        "investment banking pitch deck pitch book template populate source files"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "6ce87dde3139941184c37485ec144f40080dbda4e193fc86aacbef2321163953",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "investment banking pitch deck pitch book template populate source files"
       ]
     },
     {
@@ -3089,7 +4383,7 @@
         "real-browser-automation-debugging-qa"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -3098,17 +4392,120 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "real",
         "browser",
         "automation",
         "debugging",
         "qa"
+      ]
+    },
+    {
+      "id": "portfolio-monitoring",
+      "name": "portfolio-monitoring",
+      "title": "Portfolio Monitoring",
+      "description": "portfolio monitoring company performance plan kpi covenant",
+      "shortDescription": "portfolio monitoring company performance plan kpi covenant",
+      "aliases": [],
+      "triggerConditions": [
+        "portfolio monitoring company performance plan kpi covenant"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "101cc67c17ee3c63d1830addc6625f6f558338323cfd535024f7bf6c7723014b",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "portfolio monitoring company performance plan kpi covenant"
+      ]
+    },
+    {
+      "id": "ppt-template-creator",
+      "name": "ppt-template-creator",
+      "title": "Ppt Template Creator",
+      "description": "powerpoint ppt template skill self contained branded",
+      "shortDescription": "powerpoint ppt template skill self contained branded",
+      "aliases": [],
+      "triggerConditions": [
+        "powerpoint ppt template skill self-contained branded"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "4bf6e49b5a539c04f26d99ca82e1d0d9203927dc3f499b5d3b09a3a616eb655a",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "powerpoint ppt template skill self",
+        "contained branded"
+      ]
+    },
+    {
+      "id": "pptx-author",
+      "name": "pptx-author",
+      "title": "Pptx Author",
+      "description": "headless pptx powerpoint file artifact no office app managed agent",
+      "shortDescription": "headless pptx powerpoint file artifact no office app managed agent",
+      "aliases": [],
+      "triggerConditions": [
+        "headless pptx powerpoint file artifact no office app managed agent"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "4d0afa02319170344aec499dd69c852e198998ec914ce82120a3e1a1178759cd",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "headless pptx powerpoint file artifact no office app managed agent"
       ]
     },
     {
@@ -3122,7 +4519,7 @@
         "presentation slide deck board deck strategy deck consulting deck investor deck sales deck proposal executive update pitch storyline action title ghost deck"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3131,11 +4528,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "4a5f476c91e1abaa3f2f3192c434d20d1c39b70712eed87bfd097eb7c0f8c61c",
       "triggers": [
         "presentation slide deck board deck strategy deck consulting deck investor deck sales deck proposal executive update pitch storyline action title ghost deck"
@@ -3152,7 +4549,7 @@
         "new subsystem provider integration agent runtime sandbox router memory auth scraper workflow engine browser mcp installation deployment major dependency"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3161,14 +4558,49 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "b03f9d67b66ada609f1d0cecc7a1f4c43880bbd97555dcc1d28f863b3fcbe3c4",
       "triggers": [
         "new subsystem provider integration agent runtime sandbox router memory auth scraper workflow engine browser mcp installation deployment major dependency"
+      ]
+    },
+    {
+      "id": "process-letter",
+      "name": "process-letter",
+      "title": "Process Letter",
+      "description": "process letter bid instructions indication of interest sell side",
+      "shortDescription": "process letter bid instructions indication of interest sell side",
+      "aliases": [],
+      "triggerConditions": [
+        "process letter bid instructions indication of interest sell-side"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "1e037084b9bd4cef1e2efd598af107a56d46df344b25b7575077e76233fb3737",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "process letter bid instructions indication of interest sell",
+        "side"
       ]
     },
     {
@@ -3184,7 +4616,7 @@
         "product management discovery roadmap prioritisation"
       ],
       "category": "product",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3200,7 +4632,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "2b55a0b626a3a5857be71c2a81638fcb92619f837b8f1c504944106a07a3a8f9",
       "triggers": [
         "product management discovery roadmap prioritisation"
@@ -3217,7 +4649,7 @@
         "named project repository path cross project edit handoff migration wrong project"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3226,11 +4658,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "93df50e5ae6dbb205bcd3b8564fb62264ddb11878f34a57356364a7b60145e66",
       "triggers": [
         "named project repository path cross project edit handoff migration wrong project"
@@ -3247,7 +4679,7 @@
         "project start"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3256,11 +4688,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "c50aced7f243bda2184eccfbf7dbec3729f62a2893497ed6c36d11f26cb1fb8e",
       "triggers": [
         "project start"
@@ -3277,7 +4709,7 @@
         "sentence paragraph prose cadence diction edit rewrite"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3286,11 +4718,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "6e562bd77de3542e783811f75f65594f02bcf3fd24b1e1c24b4c447619ea0664",
       "triggers": [
         "sentence paragraph prose cadence diction edit rewrite"
@@ -3307,7 +4739,7 @@
         "prose lint vale readability grammar style diagnostic"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3316,11 +4748,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "4eeb30d0ed56373451ef2be82b9fcea0f696ed5d04688f1fa7aea76d1580131d",
       "triggers": [
         "prose lint vale readability grammar style diagnostic"
@@ -3337,7 +4769,7 @@
         "multiple credible ui options"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "ui-projects",
       "applicableProjects": [
@@ -3346,11 +4778,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "c30a39d7464a9e78a764fd755235aefc73c63d15ac6229e88d81862ca4f4fc40",
       "triggers": [
         "multiple credible ui options"
@@ -3369,7 +4801,7 @@
         "account reconciliation close financial statements"
       ],
       "category": "finance-accounting",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3385,7 +4817,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "419f1725d2df08819bb28338a04ad2d033889182dcb5f2c076f4741eb557d218",
       "triggers": [
         "account reconciliation close financial statements"
@@ -3402,7 +4834,7 @@
         "whole product functional reconstruction with data roles permissions workflows evidence and tested parity"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3411,11 +4843,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "45baddb1e9a035304c82cb2ed91f7bc1d64db141edbbe4915e1953eae7c4bb06",
       "triggers": [
         "whole product functional reconstruction with data roles permissions workflows evidence and tested parity"
@@ -3434,7 +4866,7 @@
         "recreate replicate clone match screenshot mockup image visual reference ui pixel perfect fidelity"
       ],
       "category": "reference",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3443,11 +4875,11 @@
       "source": "shared-agents",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "recreate replicate clone match screenshot mockup image visual reference ui pixel perfect fidelity"
       ]
@@ -3463,7 +4895,7 @@
         "all web project ui work browser preview visual qa acceptance"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -3472,11 +4904,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "44d6b983aa08e6a49117cbadfafa1f7bedd4024116851edfcc5025201e731e1c",
       "triggers": [
         "all web project ui work browser preview visual qa acceptance"
@@ -3495,7 +4927,7 @@
         "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3504,11 +4936,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "2064277af81ad0f72fc8104be0631035f9de2fc378392931131024f4689451db",
       "triggers": [
         "research asset question scope source index claim map findings contradictions uncertainty gaps synthesis freshness"
@@ -3525,7 +4957,7 @@
         "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion lenis smooth scroll orchestration"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -3534,14 +4966,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "0c48ea6eb962f5d40d2f96a23382fd1b0338e598d4a7bc6b78637e06aced70c0",
       "triggers": [
         "gsap scrolltrigger sticky pinned scrollytelling card stacking hero video parallax threejs zoom motion lenis smooth scroll orchestration"
+      ]
+    },
+    {
+      "id": "returns-analysis",
+      "name": "returns-analysis",
+      "title": "Returns Analysis",
+      "description": "irr moic sensitivity private equity returns entry multiple exit",
+      "shortDescription": "irr moic sensitivity private equity returns entry multiple exit",
+      "aliases": [],
+      "triggerConditions": [
+        "irr moic sensitivity private equity returns entry multiple exit"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "5a0d9a63204c8cedacb4c4c07dfe0e9d27f50298f1478e7a0672953337b9b5d5",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "irr moic sensitivity private equity returns entry multiple exit"
       ]
     },
     {
@@ -3557,7 +5023,7 @@
         "reusable asset component template package discovery reuse"
       ],
       "category": "system",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3573,10 +5039,45 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "c8171ddf31d5151018ae671fc97822a5b64d534b7eb6a41f2e88d53e9b21b6b1",
       "triggers": [
         "reusable asset component template package discovery reuse"
+      ]
+    },
+    {
+      "id": "roll-forward",
+      "name": "roll-forward",
+      "title": "Roll Forward",
+      "description": "roll forward schedule balance sheet account beginning balance activity",
+      "shortDescription": "roll forward schedule balance sheet account beginning balance activity",
+      "aliases": [],
+      "triggerConditions": [
+        "roll-forward schedule balance sheet account beginning balance activity"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "d42c9400038edbd0d694fbbeb83912e425d9271f666bff095660f196b3fcb38c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "roll",
+        "forward schedule balance sheet account beginning balance activity"
       ]
     },
     {
@@ -3594,7 +5095,7 @@
         "bug failure regression"
       ],
       "category": "quality",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3610,7 +5111,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "7a0c44bf333c5f231966a923680a40c74109b2fded0d637184b5f5390f47da39",
       "triggers": [
         "bug failure regression"
@@ -3629,7 +5130,7 @@
         "sales commercial pipeline customer revenue"
       ],
       "category": "sales",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3645,10 +5146,44 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "f2ab6231938a9c1c316ff27f6c27183affed667cfd9d7626cd15c830e7b116e2",
       "triggers": [
         "sales commercial pipeline customer revenue"
+      ]
+    },
+    {
+      "id": "sector-overview",
+      "name": "sector-overview",
+      "title": "Sector Overview",
+      "description": "sector industry overview landscape primer market dynamics report",
+      "shortDescription": "sector industry overview landscape primer market dynamics report",
+      "aliases": [],
+      "triggerConditions": [
+        "sector industry overview landscape primer market dynamics report"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "1eefbf303f6045e69dc65f4eb1df28aeb69305dedeaa444570b0f575df95c2f0",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "sector industry overview landscape primer market dynamics report"
       ]
     },
     {
@@ -3664,7 +5199,7 @@
         "security audit vulnerability review"
       ],
       "category": "quality",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3680,7 +5215,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "25b8ccdecddb2ca4d9968da61f668174d8679ad4db426187bb7435851335da81",
       "triggers": [
         "security audit vulnerability review"
@@ -3697,7 +5232,7 @@
         "material-security-risk"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3706,11 +5241,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "material",
         "security",
@@ -3728,7 +5263,7 @@
         "seo search engine optimization organic search keyword serp gsc search console technical seo on page seo content seo site architecture internal linking backlinks authority local seo geo aeo ai search open seo openseo rank tracking founder led content linkedin article distribution firsthand evidence search experiment publishing serp test"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -3737,11 +5272,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "f6ab74623a31007252d0c8dd814810a2d553f6b4c1a094f2a0f434448e41ab09",
       "triggers": [
         "seo search engine optimization organic search keyword serp gsc search console technical seo on page seo content seo site architecture internal linking backlinks authority local seo geo aeo ai search open seo openseo rank tracking founder led content linkedin article distribution firsthand evidence search experiment publishing serp test"
@@ -3760,7 +5295,7 @@
         "architecture or implementation"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3769,11 +5304,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "5a0ab1920ae6a42ec9e220e8583c5af680bdf5182a7aa361ed7718d32fa380d8",
       "triggers": [
         "architecture or implementation"
@@ -3790,7 +5325,7 @@
         "create-evaluate-or-improve-persistent-skill"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3799,11 +5334,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "create",
         "evaluate",
@@ -3827,7 +5362,7 @@
         "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3836,11 +5371,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "8d933cb9c4c14b0b7e8c4b6af8a65f9c28fc51c1c329298e3585247cb48a2345",
       "triggers": [
         "prior art donor capability maturity licence provenance compare harvest pattern missing delta skill activation"
@@ -3857,7 +5392,7 @@
         "start of substantive work select relevant skills"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3866,11 +5401,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "5c751f66e011b59f7c872cd91fb7dc1ddd69cdcf398b04cab9fb2cd177495dae",
       "triggers": [
         "start of substantive work select relevant skills"
@@ -3887,7 +5422,7 @@
         "reusable successful procedure or recurring solved failure"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3896,11 +5431,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "ccef0ae11b45eecd5a7c4805038ce7797732f95b5a9bbb71e55ed7e99f32e53a",
       "triggers": [
         "reusable successful procedure or recurring solved failure"
@@ -3917,7 +5452,7 @@
         "api scraping feed external data"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3926,11 +5461,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "b4e9a03052478484df757a3b5e0af9566da17d43514716937abe69454846d9f6",
       "triggers": [
         "api scraping feed external data"
@@ -3947,7 +5482,7 @@
         "named url file video audio document primary source"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3956,11 +5491,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "49b0bd95bf0b1289d09e512959201a10e03105675b3b378fe364f25ee122c6c8",
       "triggers": [
         "named url file video audio document primary source"
@@ -3979,7 +5514,7 @@
         "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -3988,14 +5523,84 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "f4f9d6ed4549a19f40da77ab777d457d42085edf41b23de4b0ad3bdf910ab496",
       "triggers": [
         "substantive reading mechanisms causes limits counterexamples contradictions implications actions risks indicators"
+      ]
+    },
+    {
+      "id": "strip-profile",
+      "name": "strip-profile",
+      "title": "Strip Profile",
+      "description": "strip profile company profile pitch book",
+      "shortDescription": "strip profile company profile pitch book",
+      "aliases": [],
+      "triggerConditions": [
+        "strip profile company profile pitch book"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "1a0b1b4492de09c99cd2dae6ea3fd86074430781b066ae8f40e57cf1e361fc4b",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "strip profile company profile pitch book"
+      ]
+    },
+    {
+      "id": "teaser",
+      "name": "teaser",
+      "title": "Teaser",
+      "description": "anonymous company teaser sell side one page m&a",
+      "shortDescription": "anonymous company teaser sell side one page m&a",
+      "aliases": [],
+      "triggerConditions": [
+        "anonymous company teaser sell-side one-page m&a"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "investment-banking",
+        "contentSha256": "4866c2a5eafc020daf4ccffb35e4d42dbe6583435fd77841c39fa4b30d19e28a",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "anonymous company teaser sell",
+        "side one",
+        "page m&a"
       ]
     },
     {
@@ -4009,7 +5614,7 @@
         "sop procedure warning operating instruction controlled technical documentation"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4018,16 +5623,50 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [
         "asd-ste100"
       ],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "d1232f868af0e5bacee9c70734e01aadd260b8f00aaedc2d93ea8e3ff4ba0c59",
       "triggers": [
         "sop procedure warning operating instruction controlled technical documentation"
+      ]
+    },
+    {
+      "id": "thesis-tracker",
+      "name": "thesis-tracker",
+      "title": "Thesis Tracker",
+      "description": "investment thesis tracker portfolio position watchlist data points",
+      "shortDescription": "investment thesis tracker portfolio position watchlist data points",
+      "aliases": [],
+      "triggerConditions": [
+        "investment thesis tracker portfolio position watchlist data points"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "equity-research",
+        "contentSha256": "da5c02de051d41f1120918f482ef34def6b1dd96cd04668778478bf43fd12e00",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "investment thesis tracker portfolio position watchlist data points"
       ]
     },
     {
@@ -4041,7 +5680,7 @@
         "repeated retrieval filter dedupe rank transform tool composition"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4050,14 +5689,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "5b85fd0fcb033b91d56e6580afc3036e9217f04d2817a52b4891b399b828adf4",
       "triggers": [
         "repeated retrieval filter dedupe rank transform tool composition"
+      ]
+    },
+    {
+      "id": "unit-economics",
+      "name": "unit-economics",
+      "title": "Unit Economics",
+      "description": "unit economics arr cohorts ltv cac net retention payback",
+      "shortDescription": "unit economics arr cohorts ltv cac net retention payback",
+      "aliases": [],
+      "triggerConditions": [
+        "unit economics arr cohorts ltv cac net retention payback"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "4445a8301c2152555e6b9fc1ae4bca7bbc58c944962b44b07eb1d609f0a33274",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "unit economics arr cohorts ltv cac net retention payback"
       ]
     },
     {
@@ -4073,7 +5746,7 @@
         "valuation investment merger acquisition financial model"
       ],
       "category": "finance-accounting",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4089,10 +5762,80 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "13828d64bbf51971a4055953a56e652f7db870e2e246cf1d6228c1099096d8dc",
       "triggers": [
         "valuation investment merger acquisition financial model"
+      ]
+    },
+    {
+      "id": "value-creation-plan",
+      "name": "value-creation-plan",
+      "title": "Value Creation Plan",
+      "description": "value creation plan post acquisition levers 100 day",
+      "shortDescription": "value creation plan post acquisition levers 100 day",
+      "aliases": [],
+      "triggerConditions": [
+        "value creation plan post-acquisition levers 100-day"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "private-equity",
+        "contentSha256": "345684cb8962541a5dabfaf388108742a610559ff6b473d3d59099c04b3813c8",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "value creation plan post",
+        "acquisition levers 100",
+        "day"
+      ]
+    },
+    {
+      "id": "variance-commentary",
+      "name": "variance-commentary",
+      "title": "Variance Commentary",
+      "description": "flux variance commentary p&l threshold current prior period",
+      "shortDescription": "flux variance commentary p&l threshold current prior period",
+      "aliases": [],
+      "triggerConditions": [
+        "flux variance commentary p&l threshold current prior period"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "fund-admin",
+        "contentSha256": "2b08d7e682ce05bb087796995fbe9ee255098f27d139fa4103bbcc5c633244ce",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "flux variance commentary p&l threshold current prior period"
       ]
     },
     {
@@ -4149,7 +5892,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "d684e18ec4d72f17df0c6e9a514962718534f4fd3e5b31cd38cdd31d193b2421",
       "triggers": [
         "current Vercel CLI token authentication project environment deployment configuration guidance"
@@ -4208,7 +5951,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "6a950d834ba8069caac0a57b03e1647093033f87fa645a82c08ffdb0c6add319",
       "triggers": [
         "current React component composition compound components state props guidance"
@@ -4225,7 +5968,7 @@
         "preview-or-production-vercel-deployment"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "vercel-projects",
       "applicableProjects": [
@@ -4234,11 +5977,11 @@
       "source": "github:openai/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "preview",
         "or",
@@ -4302,7 +6045,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "197f895fa3a4c99de3403a42c8c2663e9286f863710c8e1f8d40ac4799737b61",
       "triggers": [
         "vercel performance cost reliability caching functions billing"
@@ -4362,7 +6105,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "e4c5c6230b80f47f465ec72951e26fcfbcaf5c81cb1816260b374ff12c2302a8",
       "triggers": [
         "current React Next.js performance rendering bundle server guidance"
@@ -4421,7 +6164,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "4bfa3dfb14d0d9ddc48da2192cff70ee3827e6fa506bf439628882bcb5ee43de",
       "triggers": [
         "current React Native mobile list navigation animation guidance"
@@ -4480,7 +6223,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "cf28cb585a530c884104a8dcba7f7532e0f1d41eac804fb9c9568a36cd2f22aa",
       "triggers": [
         "current React view transitions animation navigation guidance"
@@ -4499,7 +6242,7 @@
         "planning or implementation"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4508,11 +6251,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "8e3e197b4227189d1001aa1738dca1a5a527b0dd20e62bc95cf8318cb9392e03",
       "triggers": [
         "planning or implementation"
@@ -4529,7 +6272,7 @@
         "approved writing corpus voice style fingerprint profile fidelity"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4538,11 +6281,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "1e11247035ced8f228ee3c2ff12fa29feb3436c9b4ea6c5964fce155525a555a",
       "triggers": [
         "approved writing corpus voice style fingerprint profile fidelity"
@@ -4602,7 +6345,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "9728bd3d4b3823a3e80deec1c116b370323c5cc652150f6372edb421ea0750e0",
       "triggers": [
         "current web design accessibility UX performance guidance"
@@ -4619,7 +6362,7 @@
         "browser-or-webapp-qa"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "web-projects",
       "applicableProjects": [
@@ -4628,11 +6371,11 @@
       "source": "github:anthropics/skills",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "DORMANT_REFERENCE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "triggers": [
         "browser",
         "or",
@@ -4662,11 +6405,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "fb211b978a9ea559fe29f037e83905548ca8cc887589c3fdfde23ce252bd472a",
       "triggers": [
         "website landing marketing responsive visual browser production launch accessibility performance seo qa"
@@ -4683,7 +6426,7 @@
         "project create clone locate move park delete archive storage disk pressure duplicate repo large assets local cloud"
       ],
       "category": "uncategorized",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4692,11 +6435,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "b2b658b50129821f884be057401c8fa1469dbd20fc8c095c0c83117c5f5c8a23",
       "triggers": [
         "project create clone locate move park delete archive storage disk pressure duplicate repo large assets local cloud"
@@ -4715,7 +6458,7 @@
         "git worktree isolated concurrent writer branch"
       ],
       "category": "engineering",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4731,7 +6474,7 @@
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "f6ea785d30d8b19be5be63db10fbda8eaa30afc4d78cf0e0d76427cd465f36bf",
       "triggers": [
         "git worktree isolated concurrent writer branch"
@@ -4748,7 +6491,7 @@
         "writing evaluate thesis specificity evidence reasoning genre source fidelity"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4757,11 +6500,11 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "25b6a8fd8675a7a41121ab5bfa6a42d7ecdcd95ae17cd9b96641801125ea0323",
       "triggers": [
         "writing evaluate thesis specificity evidence reasoning genre source fidelity"
@@ -4820,7 +6563,7 @@
       },
       "dependencies": [],
       "sourceKind": "VENDOR_LIVE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "metadataSha256": "5849b0c4a6fe74fc697c81d848e0c877572386cde3de084cbbbbbb834ca0692a",
       "triggers": [
         "current Vercel writing copy content clarity voice structure guidance"
@@ -4839,7 +6582,7 @@
         "write rewrite draft prepare report essay homepage proposal sop email message copy"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4848,14 +6591,14 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [
         "natural-writing-qa",
         "prose-craft"
       ],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "7ec549d682740156380247eba7a414815040437860740e00fd434838462a9aea",
       "triggers": [
         "write rewrite draft prepare report essay homepage proposal sop email message copy"
@@ -4872,7 +6615,7 @@
         "independent writing red team academic client public proposal sensitive"
       ],
       "category": "writing",
-      "version": "26",
+      "version": "27",
       "lifecycle": "active",
       "availability": "all-projects",
       "applicableProjects": [
@@ -4881,14 +6624,48 @@
       "source": "major-internal",
       "provenance": {
         "kind": "canonical-registry",
-        "registryVersion": 26
+        "registryVersion": 27
       },
       "dependencies": [],
       "sourceKind": "INTERNAL_DURABLE",
-      "registryVersion": 26,
+      "registryVersion": 27,
       "contentSha256": "5f2d0c5d07d4b54d3c53db7f9332a672f81be30118aa4777ced432430e9e4f2a",
       "triggers": [
         "independent writing red team academic client public proposal sensitive"
+      ]
+    },
+    {
+      "id": "xlsx-author",
+      "name": "xlsx-author",
+      "title": "Xlsx Author",
+      "description": "headless xlsx excel file artifact no office app managed agent",
+      "shortDescription": "headless xlsx excel file artifact no office app managed agent",
+      "aliases": [],
+      "triggerConditions": [
+        "headless xlsx excel file artifact no office app managed agent"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "financial-analysis",
+        "contentSha256": "98b55e4a1b56dde97c99b1a3fa90b53bf51c4dc091efedd0f8289f73e66571b3",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "headless xlsx excel file artifact no office app managed agent"
       ]
     }
   ]

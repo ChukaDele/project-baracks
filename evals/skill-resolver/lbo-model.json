@@ -1,0 +1,5 @@
+{
+  "skill": "lbo-model",
+  "should_trigger": ["Complete this LBO model template in Excel for the sponsor case."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

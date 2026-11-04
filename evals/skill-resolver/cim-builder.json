@@ -1,0 +1,5 @@
+{
+  "skill": "cim-builder",
+  "should_trigger": ["Draft a confidential information memorandum for this sale."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

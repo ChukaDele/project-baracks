@@ -1,0 +1,5 @@
+{
+  "skill": "kyc-rules",
+  "should_trigger": ["Apply the KYC rules grid and assign a risk rating."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

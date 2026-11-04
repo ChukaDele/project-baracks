@@ -1,0 +1,5 @@
+{
+  "skill": "roll-forward",
+  "should_trigger": ["Build a roll-forward schedule for this balance sheet account."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

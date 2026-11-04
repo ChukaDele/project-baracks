@@ -1,0 +1,5 @@
+{
+  "skill": "xlsx-author",
+  "should_trigger": ["Produce the workbook headless as an xlsx file artifact."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

@@ -1,0 +1,5 @@
+{
+  "skill": "gl-recon",
+  "should_trigger": ["Reconcile the general ledger to the subledger for this period."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

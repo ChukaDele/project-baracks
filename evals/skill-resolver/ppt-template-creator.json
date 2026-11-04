@@ -1,0 +1,5 @@
+{
+  "skill": "ppt-template-creator",
+  "should_trigger": ["Turn this PowerPoint template into a reusable skill."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

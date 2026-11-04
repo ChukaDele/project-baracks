@@ -1,0 +1,5 @@
+{
+  "skill": "variance-commentary",
+  "should_trigger": ["Write variance commentary for every P&L line over threshold."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

@@ -1,0 +1,5 @@
+{
+  "skill": "competitive-analysis",
+  "should_trigger": ["Build a competitive landscape deck for this sector."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

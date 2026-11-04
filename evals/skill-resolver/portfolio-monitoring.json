@@ -1,0 +1,5 @@
+{
+  "skill": "portfolio-monitoring",
+  "should_trigger": ["Run portfolio monitoring on this quarter's numbers."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

@@ -1,0 +1,7 @@
+{
+  "skill": "dcf-model",
+  "should_trigger": [
+    "Build a DCF model for this company with WACC and terminal value sensitivity."
+  ],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

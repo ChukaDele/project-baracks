@@ -1,0 +1,5 @@
+{
+  "skill": "returns-analysis",
+  "should_trigger": ["Build an IRR and MOIC sensitivity table across entry multiples."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

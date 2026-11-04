@@ -1,0 +1,5 @@
+{
+  "skill": "unit-economics",
+  "should_trigger": ["Analyze the unit economics and LTV/CAC of this target."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

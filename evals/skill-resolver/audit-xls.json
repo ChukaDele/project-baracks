@@ -1,0 +1,5 @@
+{
+  "skill": "audit-xls",
+  "should_trigger": ["Audit this financial model workbook for formula errors."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

@@ -1,0 +1,5 @@
+{
+  "skill": "comps-analysis",
+  "should_trigger": ["Build a comparable company analysis with peer multiples."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

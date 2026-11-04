@@ -1,0 +1,5 @@
+{
+  "skill": "finance-skills-routing",
+  "should_trigger": ["Use the finance-skills-routing skill."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

@@ -1,0 +1,5 @@
+{
+  "skill": "teaser",
+  "should_trigger": ["Draft an anonymous company teaser for this process."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

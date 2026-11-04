@@ -1,0 +1,5 @@
+{
+  "skill": "initiating-coverage",
+  "should_trigger": ["Write an initiating coverage report on this stock."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

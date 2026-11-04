@@ -2,7 +2,11 @@ export interface CanonicalSkillRoute {
   routeIds: string[];
   skills: string[];
   reasons: Record<string, string>;
+  /** Only additive routes matched: other skills keep their normal selection. */
+  additive: boolean;
 }
+
+const FINANCE_ROUTE_ID = 'anthropic-finance';
 
 interface RouteFragment {
   id: string;
@@ -367,6 +371,81 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
   if (legacyCleanup) add('legacy-cleanup', ['legacy-cleanup']);
   if (workspaceCleanup) add('workspace-cleanup', ['workspace-lifecycle-management']);
 
+  // Anthropic financial-services specialists (pinned, ~/.agents/skills). Their terms are also
+  // ordinary engineering words, so software work vetoes them, and the route only ever adds skills.
+  const financeText = text.replace(/\s+/gu, ' ');
+  const financeSpecialists: Array<[RegExp, string]> = [
+    [/\bclient (?:performance|portfolio|quarterly|investment) reports?\b/u, 'client-report'],
+    [/\bclient review (?:meeting|prep|pack)\b/u, 'client-review'],
+    [/\binvestment proposals?\b/u, 'investment-proposal'],
+    [/\b(?:dcf|discounted cash flows?)\b/u, 'dcf-model'],
+    [/\b(?:lbo|leveraged buyouts?)\b/u, 'lbo-model'],
+    [/\b(?:3|three)[- ]statements? (?:financial )?models?\b/u, '3-statement-model'],
+    [/\b(?:comparable compan(?:y|ies)|comparables|trading comps|comps (?:table|analysis|on|for)|run comps|peer multiples)\b/u, 'comps-analysis'],
+    [/\b(?:merger (?:model|analysis)|accretion|accretive|dilution analysis|pro forma eps)\b/u, 'merger-model'],
+    [/\b(?:irr|moic)\b/u, 'returns-analysis'],
+    [/\b(?:audit|check)\b.{0,60}\b(?:spreadsheet|workbook|excel model|financial model)\b|\bcheck my formulas\b|\bmodel (?:won.t|doesn.t|does not) balance\b/u, 'audit-xls'],
+    [/\b(?:clean|tidy)\b.{0,50}\b(?:spreadsheet|excel|workbook|xlsx)\b/u, 'clean-data-xls'],
+    [/\bcompetitive landscape (?:deck|slides?|analysis)\b/u, 'competitive-analysis'],
+    [/\b(?:refresh|update|roll)\b.{0,50}\b(?:deck|presentation(?! layer))\b.{0,50}\b(?:numbers|quarter\w*|earnings|comps)\b/u, 'deck-refresh'],
+    [/\b(?:qc|check|review)\b.{0,50}\b(?:investment banking|banker|client-ready)\b.{0,20}\b(?:deck|presentation)\b/u, 'ib-check-deck'],
+    [/\b(?:investment banking|banker|sell-side|m&a)\b.{0,40}\bpitch (?:deck|book)\b|\bpitch ?books?\b/u, 'pitch-deck'],
+    [/\b(?:ppt|pptx|powerpoint)\b.{0,30}\btemplate\b.{0,30}\bskill\b/u, 'ppt-template-creator'],
+    [/\bheadless\b.{0,40}\b(?:xlsx|excel)\b/u, 'xlsx-author'],
+    [/\bheadless\b.{0,40}\b(?:pptx|powerpoint)\b/u, 'pptx-author'],
+    [/\bearnings (?:update|analysis|report|note|review|call)\b|\bq[1-4] earnings\b/u, 'earnings-analysis'],
+    [/\b(?:pre-earnings|earnings preview)\b/u, 'earnings-preview'],
+    [/\b(?:initiat(?:e|ing|ion)(?: of)? coverage|initiation report)\b/u, 'initiating-coverage'],
+    [/\bmorning (?:meeting )?note\b/u, 'morning-note'],
+    [/\b(?:investment thesis|thesis tracker)\b/u, 'thesis-tracker'],
+    [/\bcatalyst calendar\b/u, 'catalyst-calendar'],
+    [/\b(?:stock (?:screen|idea)s?|investment ideas?)\b/u, 'idea-generation'],
+    [/\b(?:sector|industry) (?:overview|primer|landscape report)\b/u, 'sector-overview'],
+    [/\b(?:update|roll)\b.{0,40}\bmodel\b.{0,40}\b(?:earnings|estimates|new guidance)\b/u, 'model-update'],
+    [/\b(?:draft|build|write|prepare|structure)\b.{0,40}\b(?:cim|confidential information memorandum|offering memorandum)\b/u, 'cim-builder'],
+    [/\b(?:anonymous|sell-side|m&a|deal) (?:company )?teaser\b/u, 'teaser'],
+    [/\bbuyer (?:list|universe)\b|\b(?:potential|strategic) acquirers\b/u, 'buyer-list'],
+    [/\bprocess letter\b|\bbid instructions\b/u, 'process-letter'],
+    [/\bdata ?pack\b/u, 'datapack-builder'],
+    [/\bstrip profiles? (?:of|for)\b|\bcreate (?:a )?strip profiles?\b/u, 'strip-profile'],
+    [/\bdeal tracker\b|\blive deals\b/u, 'deal-tracker'],
+    [/\bscreen(?:ing)? (?:this |the |these |our |new |inbound )*(?:deals?|deal flow|cim|teaser)\b|\b(?:review|triage) (?:this |the )?cim\b|\b(?:review|triage) (?:this |the )?(?:deal|sell-side|m&a) teaser\b/u, 'deal-screening'],
+    [/\bdeal sourcing\b|\bsource (?:deals|targets)\b/u, 'deal-sourcing'],
+    [/\b(?:due diligence|diligence|dd) (?:checklist|tracker|request list)\b/u, 'dd-checklist'],
+    [/\bdd (?:meeting|call|prep)\b|\b(?:due diligence|diligence|management presentation|expert network)\b.{0,40}\b(?:meeting|call|prep)\b/u, 'dd-meeting-prep'],
+    [/\b(?:ic memo|investment committee|investment memo)\b/u, 'ic-memo'],
+    [/\bportfolio monitoring\b|\bportcos?\b.{0,60}\b(?:kpis?|covenants?|against plan)\b|\bportfolio compan(?:y|ies)\b.{0,60}\b(?:kpis?|covenants?|against plan)\b|\bkpis?\b.{0,30}\bportcos?\b/u, 'portfolio-monitoring'],
+    [/\bunit economics\b|\bltv\s*[/]?\s*cac\b|\b(?:analy[sz]e|calculate|compute)\b.{0,30}\bnet retention\b/u, 'unit-economics'],
+    [/\bvalue creation plan\b|\b100[- ]day plan\b.{0,40}\b(?:acquisition|post-close|portfolio|portco|deal)\b/u, 'value-creation-plan'],
+    [/\bportfolio\b.{0,40}\bai (?:readiness|opportunit\w+)\b|\bai readiness\b.{0,40}\bportfolio\b/u, 'ai-readiness'],
+    [/\b(?:gl|general ledger)\b.{0,40}\b(?:reconcil\w*|recon|subledger)\b|\breconcil\w+\b.{0,40}\b(?:gl|general ledger)\b/u, 'gl-recon'],
+    [/\b(?:recon|reconciliation) breaks?\b|\bbreak[- ]trac\w+\b/u, 'break-trace'],
+    [/\baccruals? (?:schedule|entries)\b/u, 'accrual-schedule'],
+    [/\bnav (?:pack|tie[- ]?out)\b|\btie[- ]?out\b.{0,40}\bnav\b|\blp statements?\b/u, 'nav-tieout'],
+    [/\broll[- ]?forward\b.{0,40}\b(?:schedule|account|balance)\b/u, 'roll-forward'],
+    [/\b(?:variance|flux) (?:commentary|explanations?)\b|\b(?:variance|flux) analysis\b.{0,30}\b(?:p&l|budget|actuals?|forecast|close|month|quarter|january|february|march|april|may|june|july|august|september|october|november|december)\b/u, 'variance-commentary'],
+    [/\bkyc\b.{0,50}\b(?:parse|extract|packet|documents?)\b|\bparse\b.{0,50}\bkyc\b/u, 'kyc-doc-parse'],
+    [/\bkyc\b.{0,50}\b(?:rules?|risk rating)\b|\baml rules?\b/u, 'kyc-rules'],
+  ];
+  const softwareWork = /\b(?:apis?|sdk|react|components?|endpoints?|migrations?|css|frontend|backend|websocket|postgres|sql|landing page|ui|module|checkout|repo|repository|pull request|scheduler|loading state|schema|auth|signup|sign-up|upload|security (?:issues?|audit)|report screen)\b/u;
+  const softwareWord = /\b(?:apps?|code|deploy\w*|bugs?|database|dashboard|security|feature|inventory)\b|(?<!-)\bpages?\b/u;
+  // These terms stay financial even beside a word like "app" or "page".
+  const unambiguousFinance = new Set(["dcf-model", "lbo-model", "3-statement-model", "audit-xls", "ic-memo", "unit-economics", "gl-recon", "accrual-schedule", "nav-tieout", "variance-commentary", "roll-forward", "portfolio-monitoring", "dd-checklist", "kyc-doc-parse", "kyc-rules", "comps-analysis", "cim-builder", "initiating-coverage", "merger-model", "returns-analysis", "thesis-tracker", "sector-overview", "earnings-analysis", "morning-note", "strip-profile", "investment-proposal"]);
+  const pickedFinance = matches(financeText, softwareWork)
+    ? []
+    : financeSpecialists
+        .filter(([pattern, id]) => matches(financeText, pattern) && (unambiguousFinance.has(id) || !matches(financeText, softwareWord)))
+        .map(([, id]) => id);
+  if (pickedFinance.length > 0) {
+    // Accounting work keeps Major's own control skill.
+    const accounting = ['gl-recon', 'break-trace', 'accrual-schedule', 'nav-tieout', 'roll-forward', 'variance-commentary'];
+    add(FINANCE_ROUTE_ID, [
+      'finance-skills-routing',
+      ...pickedFinance,
+      ...(pickedFinance.some((id) => accounting.includes(id)) ? ['reconciliation-close-statements'] : []),
+    ]);
+  }
+
   // Emil Kowalski (AIforUI) craft specialists. They sit beneath
   // design-direction-and-taste, which stays the single taste authority, so they
   // are appended after every other route and only on narrow craft triggers.
@@ -412,5 +491,5 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
     }
   }
 
-  return { routeIds, skills, reasons };
+  return { routeIds, skills, reasons, additive: routeIds.every((id) => id === FINANCE_ROUTE_ID) };
 }

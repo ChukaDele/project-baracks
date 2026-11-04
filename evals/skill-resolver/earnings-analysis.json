@@ -1,0 +1,5 @@
+{
+  "skill": "earnings-analysis",
+  "should_trigger": ["Write an earnings update report on this quarter's results."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}
