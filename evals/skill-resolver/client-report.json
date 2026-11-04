@@ -1,0 +1,5 @@
+{
+  "skill": "client-report",
+  "should_trigger": ["Prepare the client performance report for this quarter."],
+  "should_not_trigger": ["Rotate the API keys.", "Fix the sticky header on the marketing website."]
+}

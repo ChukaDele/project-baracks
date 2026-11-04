@@ -738,6 +738,74 @@
       ]
     },
     {
+      "id": "client-report",
+      "name": "client-report",
+      "title": "Client Report",
+      "description": "client performance portfolio report quarterly investment",
+      "shortDescription": "client performance portfolio report quarterly investment",
+      "aliases": [],
+      "triggerConditions": [
+        "client performance portfolio report quarterly investment"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "db7dbd21ca615db6e2f0a0c93eaef17554392aa4cea153f690962edb590945ba",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "client performance portfolio report quarterly investment"
+      ]
+    },
+    {
+      "id": "client-review",
+      "name": "client-review",
+      "title": "Client Review",
+      "description": "client review meeting prep allocation talking points",
+      "shortDescription": "client review meeting prep allocation talking points",
+      "aliases": [],
+      "triggerConditions": [
+        "client review meeting prep allocation talking points"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "ec37f6171c2bc1706cf31fb91f3e7c8da90a67576b6a15d87a4d411f7c7611a2",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "client review meeting prep allocation talking points"
+      ]
+    },
+    {
       "id": "codebase-design",
       "name": "codebase-design",
       "title": "Codebase Design",
@@ -3334,6 +3402,40 @@
       "contentSha256": "86aa985f78d21750193e89aa6f8b9b52567a20761f616587d5ce737a1c373f89",
       "triggers": [
         "third party integration adapter connector"
+      ]
+    },
+    {
+      "id": "investment-proposal",
+      "name": "investment-proposal",
+      "title": "Investment Proposal",
+      "description": "investment proposal client allocation recommendation",
+      "shortDescription": "investment proposal client allocation recommendation",
+      "aliases": [],
+      "triggerConditions": [
+        "investment proposal client allocation recommendation"
+      ],
+      "category": "finance-accounting",
+      "version": "27",
+      "lifecycle": "active",
+      "availability": "all-projects",
+      "applicableProjects": [
+        "all-projects"
+      ],
+      "source": "shared-agents",
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "ad15b23307708f1510585e258eacc760d4e2a1c2da43098a5a7e35140eda3b4c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      },
+      "dependencies": [],
+      "sourceKind": "DORMANT_REFERENCE",
+      "registryVersion": 27,
+      "triggers": [
+        "investment proposal client allocation recommendation"
       ]
     },
     {

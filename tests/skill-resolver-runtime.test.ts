@@ -84,7 +84,8 @@ describe('runtime skill resolver', () => {
         ).not.toContain(fixture.skill);
       }
     }
-  }, 15_000);
+    // Runtime grows with the eval count; CI runners are several times slower than local.
+  }, 60_000);
 
   it('resolves a canonical skill by a retained non-ID alias', () => {
     expect(

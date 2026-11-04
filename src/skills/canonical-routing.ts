@@ -375,6 +375,9 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
   // ordinary engineering words, so software work vetoes them, and the route only ever adds skills.
   const financeText = text.replace(/\s+/gu, ' ');
   const financeSpecialists: Array<[RegExp, string]> = [
+    [/\bclient (?:performance|portfolio|quarterly|investment) reports?\b/u, 'client-report'],
+    [/\bclient review (?:meeting|prep|pack)\b/u, 'client-review'],
+    [/\binvestment proposals?\b/u, 'investment-proposal'],
     [/\b(?:dcf|discounted cash flows?)\b/u, 'dcf-model'],
     [/\b(?:lbo|leveraged buyouts?)\b/u, 'lbo-model'],
     [/\b(?:3|three)[- ]statements? (?:financial )?models?\b/u, '3-statement-model'],
@@ -427,7 +430,7 @@ export function resolveCanonicalSkillRoute(task: string): CanonicalSkillRoute | 
   const softwareWork = /\b(?:apis?|sdk|react|components?|endpoints?|migrations?|css|frontend|backend|websocket|postgres|sql|landing page|ui|module|checkout|repo|repository|pull request|scheduler|loading state|schema|auth|signup|sign-up|upload|security (?:issues?|audit)|report screen)\b/u;
   const softwareWord = /\b(?:apps?|code|deploy\w*|bugs?|database|dashboard|security|feature|inventory)\b|(?<!-)\bpages?\b/u;
   // These terms stay financial even beside a word like "app" or "page".
-  const unambiguousFinance = new Set(["dcf-model", "lbo-model", "3-statement-model", "audit-xls", "ic-memo", "unit-economics", "gl-recon", "accrual-schedule", "nav-tieout", "variance-commentary", "roll-forward", "portfolio-monitoring", "dd-checklist", "kyc-doc-parse", "kyc-rules"]);
+  const unambiguousFinance = new Set(["dcf-model", "lbo-model", "3-statement-model", "audit-xls", "ic-memo", "unit-economics", "gl-recon", "accrual-schedule", "nav-tieout", "variance-commentary", "roll-forward", "portfolio-monitoring", "dd-checklist", "kyc-doc-parse", "kyc-rules", "comps-analysis", "cim-builder", "initiating-coverage", "merger-model", "returns-analysis", "thesis-tracker", "sector-overview", "earnings-analysis", "morning-note", "strip-profile", "investment-proposal"]);
   const pickedFinance = matches(financeText, softwareWork)
     ? []
     : financeSpecialists

@@ -92,7 +92,7 @@ A MERGE moves the unique content of the losing copy into the keeper. Nothing is 
 ```bash
 bash scripts/canonicalize-host-skills.sh           # dry run: prints every move
 bash scripts/canonicalize-host-skills.sh --apply
-python3 scripts/check-skill-drift.py               # must print "passed"
+python3 scripts/check-skill-drift.py               # must print "passed"; gstack's generated Claude and Codex variants are exempt
 ```
 
 The links for Major-owned skills point at the main checkout (`~/Projects/project-baracks/skills/internal/<id>`). The merged content of `website-design-qa` and `responsive-motion-systems` reaches the hosts only after this PR merges and the main checkout pulls. Until then the hosts read the older repo version. The `~/.agents` copy that is replaced is kept in the archive.
@@ -405,10 +405,11 @@ Cause: **a** needed but never fired · **b** duplicate or overlap · **c** not n
 
 ## Addendum: Anthropic finance specialists (registry v27)
 
-- 48 skills from the six vertical plugins of `anthropics/financial-services` at `60565064557ca77b12f62aa7877f365d111c129d` are registered as `shared-agents` entries (canonical home `~/.agents/skills`, hosts symlink). No skill content is copied into this repo; `~/.agents/finance-skills.lock.json` holds the per-skill hashes.
-- Not taken: `skill-creator` (id collision), partner LSEG and S&P skills (paid data), agent plugins (copies of the same skills plus wrappers), plugin slash commands and paid MCP connectors.
+- 51 skills from the six vertical plugins and `meeting-prep-agent` of `anthropics/financial-services` at `60565064557ca77b12f62aa7877f365d111c129d` are registered as `shared-agents` entries (canonical home `~/.agents/skills`, hosts symlink). No skill content is copied into this repo; `~/.agents/finance-skills.lock.json` holds the per-skill hashes.
+- Not taken: `skill-creator` (id collision), partner LSEG and S&P skills (paid data), plugin slash commands and paid MCP connectors.
 - Finance vocabulary is common English ("plan", "model", "update"), so these entries set `routeOnly`. Keyword routing fired them on 65 of 545 existing eval prompts; route-only selection leaves one, a genuine general-ledger reconciliation.
 - `src/skills/canonical-routing.ts` adds an additive `anthropic-finance` route: clear software-work terms veto it, ambiguous words such as "app" or "page" block only the less distinctive specialists, it never excludes other skills, and it adds the `finance-skills-routing` guide. Accounting routes keep `reconciliation-close-statements`.
 - Naming a `routeOnly` id in prose needs the word "skill" ("use the deal-tracker skill"), because these ids are ordinary phrases. `--skill <id>` is unchanged.
-- Known gap, shared with the `emil-*` entries: `scripts/materialize-project-skill-registry.mjs` does not emit `shared-agents` entries, so a validated project registry does not select them. The host skills and the prompt hook still work there.
+- Known limit, shared with the `emil-*` entries: a validated project registry is a closed, receipt-bound set, so it does not select `shared-agents` entries. Host skills, the prompt hook and the workflows still work there.
+- Agent definitions are ported outside this repo by `~/.agents/finance-agents-gen.py`; see the `finance-skills-routing` guide. Managed Agent cookbooks are not deployed. Workflows are Claude Code subagents because only those enforce tool limits; a live test showed description matching did not start them, so the prompt hook requires them and a `SubagentStop` gate records skipped workers. Prove them with `~/.agents/verify-finance-workflows.py --live`.
 - Evidence: `tests/anthropic-finance-skill-routing.test.ts` and `evals/skill-resolver/`.

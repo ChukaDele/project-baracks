@@ -2928,6 +2928,75 @@
       "aliases": [],
       "category": "finance-accounting",
       "routeOnly": true
+    },
+    {
+      "id": "client-report",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "client performance portfolio report quarterly investment",
+      "aliases": [],
+      "category": "finance-accounting",
+      "routeOnly": true,
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "db7dbd21ca615db6e2f0a0c93eaef17554392aa4cea153f690962edb590945ba",
+        "lock": "~/.agents/finance-skills.lock.json"
+      }
+    },
+    {
+      "id": "client-review",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "client review meeting prep allocation talking points",
+      "aliases": [],
+      "category": "finance-accounting",
+      "routeOnly": true,
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "ec37f6171c2bc1706cf31fb91f3e7c8da90a67576b6a15d87a4d411f7c7611a2",
+        "lock": "~/.agents/finance-skills.lock.json"
+      }
+    },
+    {
+      "id": "investment-proposal",
+      "source": "shared-agents",
+      "availability": "all-projects",
+      "load": "investment proposal client allocation recommendation",
+      "aliases": [],
+      "category": "finance-accounting",
+      "routeOnly": true,
+      "authority": {
+        "execution": "project-policy",
+        "mutation": "none",
+        "note": "Drafts analyst work product for qualified review. Not investment, legal, tax or accounting advice."
+      },
+      "provenance": {
+        "kind": "external-locked",
+        "repository": "https://github.com/anthropics/financial-services",
+        "commit": "60565064557ca77b12f62aa7877f365d111c129d",
+        "license": "Apache-2.0",
+        "plugin": "meeting-prep-agent",
+        "contentSha256": "ad15b23307708f1510585e258eacc760d4e2a1c2da43098a5a7e35140eda3b4c",
+        "lock": "~/.agents/finance-skills.lock.json"
+      }
     }
   ],
   "reconciliation": {

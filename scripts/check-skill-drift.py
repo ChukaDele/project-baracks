@@ -36,6 +36,15 @@ def major_roots(repo: Path, home: Path) -> set:
     return {(r / 'skills' / 'internal').resolve() for r in (repo, main)} | {(home / '.major' / 'skills' / 'internal').resolve()}
 
 
+def gstack_host_variants(name: str, reals: set, home: Path) -> bool:
+    """gstack setup generates a Claude copy and a Codex variant of each skill on purpose."""
+    base = (home / '.claude' / 'skills').resolve()
+    if name == 'gstack':
+        return reals <= {base / name, (home / '.codex' / 'skills' / name).resolve()}
+    allowed = {base / name, base / 'gstack' / '.agents' / 'skills' / name}
+    return name.startswith('gstack-') and reals <= allowed
+
+
 def check(home: Path, repo: Path) -> list[str]:
     major_owned = {p.name for p in (repo / 'skills' / 'internal').iterdir() if (p / 'SKILL.md').is_file()}
     by_name = defaultdict(list)
@@ -45,6 +54,8 @@ def check(home: Path, repo: Path) -> list[str]:
     errors = []
     for name, rows in sorted(by_name.items()):
         reals = {real for _, _, real in rows}
+        if gstack_host_variants(name, reals, home):
+            continue
         if len(reals) > 1:
             where = ', '.join(f"{rel}{' (symlink)' if e.is_symlink() else ' (copy)'} -> {real}" for rel, e, real in rows)
             errors.append(f'{name}: {len(reals)} different sources: {where}')
@@ -81,6 +92,14 @@ def self_test() -> None:
         assert any(e.startswith('shared: 2 different sources') for e in errors), errors
         assert not any(e.startswith('solo') for e in errors), errors
         assert any(e.startswith('owned2: Major-owned skill must symlink') for e in errors), errors
+        skill(home / '.claude/skills/gstack-x')
+        skill(home / '.claude/skills/gstack/.agents/skills/gstack-x', 'codex variant')
+        os.symlink(home / '.claude/skills/gstack/.agents/skills/gstack-x', home / '.codex/skills/gstack-x')
+        skill(home / '.claude/skills/gstack-y')
+        skill(home / '.codex/skills/gstack-y', 'hand-edited copy')
+        errors = check(home, repo)
+        assert not any(e.startswith('gstack-x') for e in errors), errors
+        assert any(e.startswith('gstack-y: 2 different sources') for e in errors), errors
     print('check-skill-drift self-test passed')
 
 

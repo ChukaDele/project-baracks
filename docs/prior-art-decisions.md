@@ -390,6 +390,8 @@ Detector outputs are diagnostic only; none of these components is used to concea
 
 | Upstream | Decision | License / pin | Major use |
 | --- | --- | --- | --- |
-| `anthropics/financial-services` vertical skills | ADOPT | Apache-2.0; `60565064557ca77b12f62aa7877f365d111c129d` | 48 skills installed unmodified as shared specialists, with a per-skill hash lock. |
+| `anthropics/financial-services` vertical skills | ADOPT | Apache-2.0; `60565064557ca77b12f62aa7877f365d111c129d` | 51 skills installed unmodified as shared specialists, with a per-skill hash lock. |
 | Claude Code plugin install of the same repo | REJECT for this use | same | Serves Claude only, not Codex or Major's resolver, and adds up to 11 unauthenticated paid MCP connectors to each session. |
+| `anthropics/financial-services` agent definitions and subagent manifests | WRAP | same pin | Ported to Claude Code subagents with the same tool limits. Data connectors are replaced by owner files. |
+| Managed Agent deploy and `orchestrate.py` | REJECT for this use | same | Needs hosted API spend and is labelled reference only; Claude Code subagents cover the role split. |
 | Major registry and canonical routing | ADOPT | repository canonical | Extended with one optional `routeOnly` field. No parallel registry or resolver. |

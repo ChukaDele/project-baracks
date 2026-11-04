@@ -30,6 +30,9 @@ afterAll(() => {
 const ids = (task: string) => resolveSkills({ task }).skills.map((skill) => skill.id);
 
 const finance = new Set([
+  'client-report',
+  'client-review',
+  'investment-proposal',
   'dcf-model',
   'lbo-model',
   '3-statement-model',
@@ -187,6 +190,8 @@ describe('Anthropic finance specialists at the default resolver limit', () => {
     'Summarize Q3 results of our marketing campaign',
     'Plan a Q4 results webinar',
     'Add KYC document upload to the signup form',
+    'Generate the customer report for this client',
+    'Review the client feedback from the meeting',
   ])('does not route unrelated work: %s', (task) => {
     expect(ids(task).filter((id) => finance.has(id))).toEqual([]);
   });
@@ -222,6 +227,14 @@ describe('Anthropic finance specialists at the default resolver limit', () => {
     ['Do the unit economics for this feature', 'unit-economics'],
     ['Check the workbook, the third tab has a bug in the WACC formula', 'audit-xls'],
     ['Run a KYC risk rating on this app user', 'kyc-rules'],
+    ['Prepare the client performance report for this quarter.', 'client-report'],
+    ['Prepare for the client review meeting next week.', 'client-review'],
+    ['Draft an investment proposal for this client.', 'investment-proposal'],
+    ['Draft a CIM for an app company', 'cim-builder'],
+    ['Build a comps table for cloud security companies', 'comps-analysis'],
+    ['Write an earnings update report on CrowdStrike security revenue', 'earnings-analysis'],
+    ['Sector overview of the fintech app market', 'sector-overview'],
+    ['Create a strip profile for this security company', 'strip-profile'],
   ])('routes ordinary finance phrasing: %s -> %s', (task, skill) => {
     expect(ids(task)).toContain(skill);
   });
