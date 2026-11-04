@@ -715,6 +715,9 @@ describe('installed host skill commands', () => {
     const managed = registry.entries.map((entry) => entry.id).sort();
     expect(catalog.entries.map((entry) => entry.id).sort()).toEqual(managed);
     expect(managed).toContain('animate');
+    // Route-only shared specialists stay, but other shared entries do not.
+    expect(managed).toContain('dcf-model');
+    expect(managed).not.toContain('emil-color');
     expect(managed).not.toContain('forged-project-member');
     expect(managed).not.toContain('project-owned');
     expect(readFileSync(join(target, 'MAJOR_SKILLS.lock'), 'utf8')).not.toContain(
@@ -746,6 +749,27 @@ describe('installed host skill commands', () => {
       expect(missingReceipt.stderr).toContain('project installed skill receipt is missing');
     }
     writeFileSync(receiptPath, validReceipt);
+
+    // A route-only shared entry is valid only as an exact canonical copy.
+    const projectRegistryPath = join(target, '.agents', 'skills.registry.json');
+    const validProjectRegistry = readFileSync(projectRegistryPath, 'utf8');
+    const tamperedRegistry = JSON.parse(validProjectRegistry) as {
+      entries: Array<{ id: string; load?: string }>;
+    };
+    tamperedRegistry.entries.find((entry) => entry.id === 'dcf-model')!.load = 'forged trigger';
+    writeFileSync(projectRegistryPath, JSON.stringify(tamperedRegistry));
+    const tamperedResolve = cli([
+      'skill',
+      'resolve',
+      '--task',
+      'Animate this interface',
+      '--skill',
+      'animate',
+      '--json',
+    ]);
+    expect(tamperedResolve.status).not.toBe(0);
+    expect(tamperedResolve.stderr).toContain('route-only shared set drifted');
+    writeFileSync(projectRegistryPath, validProjectRegistry);
 
     const forgedAuthority = join(home, 'forged-major-home');
     mkdirSync(join(forgedAuthority, 'project-skill-receipts'), { recursive: true });

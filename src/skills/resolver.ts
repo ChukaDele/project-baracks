@@ -329,7 +329,22 @@ function validatedProjectRegistryPath(cwd: string, hotRoot?: string): string | u
   const canonicalInternal = canonical.entries.filter((entry) => entry.source === 'major-internal').map((entry) => entry.id).sort();
   const projectedInternal = projected.entries.filter((entry) => entry.source === 'major-internal').map((entry) => entry.id).sort();
   if (JSON.stringify(canonicalInternal) !== JSON.stringify(projectedInternal)) throw new Error('project skill registry canonical entries drifted');
-  const projectedExternal = projected.entries.filter((entry) => entry.source !== 'major-internal');
+  // A route-only shared specialist carries no project content, so it is valid only as an exact canonical copy.
+  const canonicalById = new Map(canonical.entries.map((entry) => [entry.id, entry]));
+  const isCanonicalRouteOnly = (entry: SkillRegistryEntry) =>
+    entry.source === SHARED_AGENTS_SOURCE &&
+    entry.routeOnly === true &&
+    JSON.stringify(entry) === JSON.stringify(canonicalById.get(entry.id));
+  const projectedRouteOnly = projected.entries.filter(isCanonicalRouteOnly);
+  const canonicalRouteOnly = canonical.entries.filter(
+    (entry) => entry.source === SHARED_AGENTS_SOURCE && entry.routeOnly === true,
+  );
+  const routeOnlyIds = (entries: SkillRegistryEntry[]) => JSON.stringify(entries.map((entry) => entry.id).sort());
+  if (routeOnlyIds(projectedRouteOnly) !== routeOnlyIds(canonicalRouteOnly))
+    throw new Error('project skill registry route-only shared set drifted');
+  const projectedExternal = projected.entries.filter(
+    (entry) => entry.source !== 'major-internal' && !isCanonicalRouteOnly(entry),
+  );
   if (projectedExternal.length !== expectedExternal.size || projectedExternal.some((entry) => !expectedExternal.has(entry.id)))
     throw new Error('project skill registry contains unknown or unbound members');
   const catalogById = new Map(catalog.entries.map((entry) => [entry.id, entry]));
@@ -337,7 +352,7 @@ function validatedProjectRegistryPath(cwd: string, hotRoot?: string): string | u
     throw new Error('project skill registry/catalogue entries drifted');
   const canonicalCatalog = loadGeneratedSkillCatalog(join(dirname(canonicalPath), 'skills.catalog.json'));
   const canonicalCatalogById = new Map(canonicalCatalog.entries.map((entry) => [entry.id, entry]));
-  for (const id of canonicalInternal) {
+  for (const id of [...canonicalInternal, ...canonicalRouteOnly.map((entry) => entry.id)]) {
     if (JSON.stringify(catalogById.get(id)) !== JSON.stringify(canonicalCatalogById.get(id)))
       throw new Error(`project skill catalogue canonical entry drifted: ${id}`);
   }
