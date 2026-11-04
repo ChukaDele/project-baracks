@@ -119,6 +119,10 @@ if (command === 'receipt') {
   process.exit(0);
 }
 const internalEntries = registry.entries.filter((entry) => entry.source === 'major-internal');
+// Route-only shared specialists stay selectable because the canonical route still names them.
+const routeOnlySharedEntries = registry.entries.filter(
+  (entry) => entry.source === 'shared-agents' && entry.routeOnly === true,
+);
 const managedRoot = join(target, '.agents', 'skills');
 const managedSources = new Map(
   readFileSync(join(target, '.agents', 'managed-external.tsv'), 'utf8')
@@ -222,12 +226,15 @@ const projectRegistry = {
     canonicalRegistryVersion: registry.version,
     sources: [...locks.entries()].sort().map(([sourceKey, lock]) => ({ sourceKey, ...lock })),
   },
-  entries: [...internalEntries, ...externalEntries].sort((a, b) => a.id.localeCompare(b.id)),
+  entries: [...internalEntries, ...routeOnlySharedEntries, ...externalEntries].sort((a, b) =>
+    a.id.localeCompare(b.id),
+  ),
 };
 const canonicalById = new Map(canonicalCatalog.entries.map((entry) => [entry.id, entry]));
 const catalogEntries = projectRegistry.entries
   .map((entry) => {
-    if (entry.source === 'major-internal') return canonicalById.get(entry.id);
+    if (entry.source === 'major-internal' || entry.source === 'shared-agents')
+      return canonicalById.get(entry.id);
     const path = installed.get(entry.id);
     const description =
       readFileSync(join(path, 'SKILL.md'), 'utf8')

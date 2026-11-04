@@ -715,6 +715,9 @@ describe('installed host skill commands', () => {
     const managed = registry.entries.map((entry) => entry.id).sort();
     expect(catalog.entries.map((entry) => entry.id).sort()).toEqual(managed);
     expect(managed).toContain('animate');
+    // Route-only shared specialists stay, but other shared entries do not.
+    expect(managed).toContain('dcf-model');
+    expect(managed).not.toContain('emil-color');
     expect(managed).not.toContain('forged-project-member');
     expect(managed).not.toContain('project-owned');
     expect(readFileSync(join(target, 'MAJOR_SKILLS.lock'), 'utf8')).not.toContain(
