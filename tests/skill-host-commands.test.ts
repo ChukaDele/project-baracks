@@ -750,6 +750,27 @@ describe('installed host skill commands', () => {
     }
     writeFileSync(receiptPath, validReceipt);
 
+    // A route-only shared entry is valid only as an exact canonical copy.
+    const projectRegistryPath = join(target, '.agents', 'skills.registry.json');
+    const validProjectRegistry = readFileSync(projectRegistryPath, 'utf8');
+    const tamperedRegistry = JSON.parse(validProjectRegistry) as {
+      entries: Array<{ id: string; load?: string }>;
+    };
+    tamperedRegistry.entries.find((entry) => entry.id === 'dcf-model')!.load = 'forged trigger';
+    writeFileSync(projectRegistryPath, JSON.stringify(tamperedRegistry));
+    const tamperedResolve = cli([
+      'skill',
+      'resolve',
+      '--task',
+      'Animate this interface',
+      '--skill',
+      'animate',
+      '--json',
+    ]);
+    expect(tamperedResolve.status).not.toBe(0);
+    expect(tamperedResolve.stderr).toContain('route-only shared set drifted');
+    writeFileSync(projectRegistryPath, validProjectRegistry);
+
     const forgedAuthority = join(home, 'forged-major-home');
     mkdirSync(join(forgedAuthority, 'project-skill-receipts'), { recursive: true });
     writeFileSync(
